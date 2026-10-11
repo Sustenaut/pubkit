@@ -173,9 +173,11 @@ The make targets each kind of crate needs:
 
 - `cargo deny` and `cargo vet` pass in CI. Each `cargo vet` exemption
   records the evidence that does exist. [checked]
-- **`SUPPLY-CHAIN.md`** is generated per crate from that crate's own
-  dependency tree, not the workspace's. It ships in the package, renders as
-  `_documentation::supply_chain`, and marks build-time code. [checked:
+- **`SUPPLY-CHAIN.md`** is generated per crate by `pubkit supply-chain`
+  (`make supply-chain`, for the crates in `SUPPLY_CHAIN_CRATES`), from that
+  crate's own dependency tree for any target, not the workspace's. It ships
+  in the package, renders as `_documentation::supply_chain`, and marks
+  build-time code. [checked:
   committed copy current]
 - **`SECURITY.md`** says how to report a vulnerability (private reporting),
   what is checked and when, and what fuzzing has found. [judged]

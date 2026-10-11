@@ -3,6 +3,7 @@
     pubkit init --kind=rust|python [--bin=NAME]
     pubkit sync [--check]
     pubkit lock
+    pubkit supply-chain [--check] CRATE...
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -202,12 +203,19 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("sync", help="rewrite, or with --check verify, the managed files")
     p.add_argument("--check", action="store_true")
     commands.add_parser("lock", help="pin tests/requirements.txt with hashes")
+    p = commands.add_parser("supply-chain",
+                            help="write, or with --check verify, each crate's SUPPLY-CHAIN.md")
+    p.add_argument("--check", action="store_true")
+    p.add_argument("crates", nargs="+", metavar="CRATE")
     args = parser.parse_args(argv)
     root = Path.cwd()
     if args.command == "init":
         return init(root, args.kind, args.bin)
     if args.command == "sync":
         return sync(root, args.check)
+    if args.command == "supply-chain":
+        from .supply_chain import run
+        return run(root, args.crates, args.check)
     return lock(root)
 
 
