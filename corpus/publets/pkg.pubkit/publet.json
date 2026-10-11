@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.4.0 is released as v0.4.0 from commit 3dba53f0be11acbfce090277129769fbf903aa56.",
+      "content": "pubkit 0.5.0 is released as v0.5.0 from commit b16ef500418ec1bb00449e8e9a83092569ade08b.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.4.0",
+            "0.5.0",
             "pubkit --version",
-            "pubkit 0.4.0",
-            "v0.4.0",
-            "3dba53f0be11acbfce090277129769fbf903aa56"
+            "pubkit 0.5.0",
+            "v0.5.0",
+            "b16ef500418ec1bb00449e8e9a83092569ade08b"
           ]
         ]
       },
-      "scope": "the published release v0.4.0 of pubkit",
+      "scope": "the published release v0.5.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "3dba53f0be11acbfce090277129769fbf903aa56"
+          "revision": "b16ef500418ec1bb00449e8e9a83092569ade08b"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.4.0 was released on 2026-10-09 from commit 3dba53f0be11acbfce090277129769fbf903aa56 with these changes.",
+      "content": "pubkit 0.5.0 was released on 2026-10-11 from commit b16ef500418ec1bb00449e8e9a83092569ade08b with these changes.",
       "data": {
         "columns": [
           {
@@ -58,39 +58,27 @@
         "rows": [
           [
             "added",
-            "pubkit is a Claude Code plugin marketplace. Its rust-crate-quality plugin carries the Rust crate standard and an agent that audits a crate (library or command-line tool) against it, and writes or fixes the docs. Install it with `/plugin marketplace add schryer/pubkit`."
-          ],
-          [
-            "internal",
-            "CI checks the built wheel carries every template, built from a clean copy of the source."
+            "`pubkit supply-chain [--check] CRATE...` writes each crate's SUPPLY-CHAIN.md from its cargo vet files, and pubkit.mk runs it as `make supply-chain` and `make supply-chain-check` for the crates in SUPPLY_CHAIN_CRATES. It replaces the copies of the report script in publet and pubrel; it lists what is built for any target, and names the audit sources from the repository's own cargo vet config."
           ],
           [
             "changed",
-            "pubkit is licensed under Apache-2.0, as publet is, instead of MIT."
-          ],
-          [
-            "changed",
-            "The Rust crate standard asks that Cargo include patterns be anchored with /, since a bare name matches at any depth."
-          ],
-          [
-            "changed",
-            "The Rust crate standard asks that `make publish-check` verify the package in its own target directory: sharing target/ leaves cargo reporting the crate up to date after its source changes."
+            "pubkit requires Python 3.11 or later, for tomllib."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.4.0 of pubkit",
+      "scope": "the published release v0.5.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "3dba53f0be11acbfce090277129769fbf903aa56"
+          "revision": "b16ef500418ec1bb00449e8e9a83092569ade08b"
         }
       ]
     }
   },
-  "created": "2026-10-09T00:00:00Z",
+  "created": "2026-10-11T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
