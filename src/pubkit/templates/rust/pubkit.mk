@@ -8,8 +8,10 @@ export PATH := $(HOME)/.cargo/bin:$(CURDIR)/.venv/bin:$(PATH)
 CARGO ?= cargo
 CARGO_SCOPE ?= --workspace
 PYTEST_ARGS ?=
+# The crates whose SUPPLY-CHAIN.md is generated: those published.
+SUPPLY_CHAIN_CRATES ?=
 
-.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional
+.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional supply-chain supply-chain-check
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -45,3 +47,9 @@ build: ## Debug build
 
 functional: build ## The Gherkin suite against the built binaries
 	cd tests && pytest -q $(PYTEST_ARGS)
+
+supply-chain: ## Regenerate SUPPLY-CHAIN.md for each of SUPPLY_CHAIN_CRATES from supply-chain/
+	.venv/bin/pubkit supply-chain $(SUPPLY_CHAIN_CRATES)
+
+supply-chain-check: ## Fail if a committed SUPPLY-CHAIN.md is stale
+	.venv/bin/pubkit supply-chain --check $(SUPPLY_CHAIN_CRATES)

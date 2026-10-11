@@ -44,6 +44,17 @@ Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
 pubkit.
 
+## The supply-chain report
+
+`pubkit supply-chain CRATE...` writes each crate's `SUPPLY-CHAIN.md` beside
+its manifest, from the repository's `cargo vet` files (`supply-chain/`).
+The report lists every crate it builds, for any target, and marks build
+scripts and procedural macros. It says how each is vouched for: an imported
+audit, a trusted publisher, or an exemption with its evidence. `pubkit.mk`
+runs it as `make supply-chain`, and `make supply-chain-check` fails when a
+committed report is stale. Set `SUPPLY_CHAIN_CRATES` in the Makefile to the
+crates that are published.
+
 ## The Rust crate standard, and an agent that audits against it
 
 [**The Rust crate standard**](plugins/rust-crate-quality/rust-crate-standard.md)

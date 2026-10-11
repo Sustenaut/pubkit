@@ -45,6 +45,7 @@ def initialised(repo, run, kind):
 
 
 @given(parsers.parse('the file "{path}" reads "{text}"'))
+@when(parsers.parse('the file "{path}" reads "{text}"'))
 def file_reads(repo, path, text):
     target = repo / path
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -134,3 +135,28 @@ def wheel_holds_templates(wheel):
     missing = [p.relative_to(src).as_posix() for p in (src / "pubkit" / "templates").rglob("*")
                if p.is_file() and p.relative_to(src).as_posix() not in names]
     assert not missing, f"the wheel lacks {missing}"
+
+
+@given(parsers.parse('a crate "{name}" with no dependencies, vetted with audits imported from "{a}" and "{b}"'))
+def vetted_crate(repo, name, a, b):
+    """A crate with nothing to resolve, so cargo needs no network, and the
+    files `cargo vet init` would write, importing two audit sets."""
+    (repo / "Cargo.toml").write_text(
+        f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2021"\n')
+    (repo / "src").mkdir()
+    (repo / "src" / "lib.rs").write_text("")
+    (repo / "Cargo.lock").write_text(
+        f'version = 4\n\n[[package]]\nname = "{name}"\nversion = "0.1.0"\n')
+    chain = repo / "supply-chain"
+    chain.mkdir()
+    imports = "".join(f'\n[imports.{org}]\nurl = "https://example.org/{org}.toml"\n'
+                      for org in (a, b))
+    (chain / "config.toml").write_text('[cargo-vet]\nversion = "0.10"\n' + imports)
+    (chain / "audits.toml").write_text("[audits]\n")
+    (chain / "imports.lock").write_text("")
+
+
+@given(parsers.re(r'pubkit (?P<args>(?:"[^"]*" ?)+) has run'))
+def has_run(repo, run, args):
+    argv = args.strip().strip('"').split('" "')
+    assert run(pubkit(), *argv, cwd=repo).code == 0
