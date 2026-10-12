@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 
 import yaml
+
+from pubkit import standard
 from pytest_bdd import parsers, scenarios, then, when
 
 scenarios("workflows.feature")
@@ -51,3 +53,22 @@ def aggregate(workflow, name):
     job = jobs[name]
     assert job.get("if") == "always()", job.get("if")
     assert set(job["needs"]) == set(jobs) - {name}, job["needs"]
+
+
+@then("every job pubkit required plans for reads its targets from the plan job")
+def jobs_read_plan(workflow):
+    jobs = workflow["data"]["jobs"]
+    outputs = jobs["plan"]["outputs"]
+    for job in standard.JOBS:
+        assert job in outputs, f"plan does not output {job}"
+        assert f"needs.plan.outputs.{job}" in workflow["text"], f"no job reads {job}"
+        assert "plan" in jobs[job]["needs"], f"{job} does not need plan"
+
+
+@then("the gates and functional inputs only add targets")
+def inputs_only_add(workflow):
+    inputs = triggers(workflow)["workflow_call"]["inputs"]
+    for name in ("gates", "functional"):
+        assert inputs[name]["default"] == "", name
+        assert f"EXTRA: '${{{{ inputs.{name} }}}}'" in workflow["text"], name
+        assert f"REQUIRED: '${{{{ needs.plan.outputs.{name} }}}}'" in workflow["text"], name

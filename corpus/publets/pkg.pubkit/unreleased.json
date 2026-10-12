@@ -1,4 +1,25 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "changed",
+      "change": "rust-ci.yml runs every make target the Rust crate standard requires: a plan job asks `pubkit required` for each job's targets. The gates and functional inputs now only add targets, the msrv and fuzz inputs are ignored, cross runs on i686 and s390x by default, and a new audit job runs make deny and make vet"
+    },
+    {
+      "category": "added",
+      "change": "Stable rule IDs on every [checked] rule of the Rust crate standard, and standard.json generated from them and shipped in the package"
+    },
+    {
+      "category": "added",
+      "change": "`pubkit required` lists the make targets each rust-ci.yml job must run in a repository, from standard.json"
+    },
+    {
+      "category": "added",
+      "change": "`pubkit doc-coverage` writes and checks each published library's TESTING.md, moved here from publet's tools/doc-coverage.py"
+    },
+    {
+      "category": "added",
+      "change": "pubkit.mk provides every target the standard names: doc-coverage, doc-coverage-check, vectors, vectors-check, publish-check, msrv, fuzz-smoke, deny, vet and required, with PUBLISHED_CRATES, VECTORS_GENERATE, VECTORS_DIRS, FUZZ_TARGETS and MSRV"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

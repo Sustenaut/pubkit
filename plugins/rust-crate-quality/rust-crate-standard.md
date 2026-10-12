@@ -9,7 +9,9 @@ fuzzing, the supply-chain record, and version checks.
 Each rule is marked:
 
 - **[checked]** A tool enforces it in CI. An audit runs the tool and reports
-  what it says, and does not judge the rule again by hand.
+  what it says, and does not judge the rule again by hand. The tag names
+  the rule's stable ID and what checks it: `[checked: RS-DOC-04, make
+  doc-coverage-check, library]`.
 - **[judged]** Needs reading. An audit's real work is here.
 
 ## 1. Crate documentation, in `lib.rs`
@@ -42,18 +44,20 @@ items. It is never pasted from the README. In order:
 Longer documents live in a `_documentation` module of empty submodules, each
 `#[doc = include_str!("../X.md")]`, so they are versioned with the crate and
 render on docs.rs: `testing`, `supply_chain`, `security`, `changelog`.
-[checked: the build fails if a file is missing]
+[checked: RS-DOC-01, make doc, pubkit conform, library; the build fails if a file is missing]
 
 The README's examples are compiled as doctests through a `#[cfg(doctest)]`
-item that includes the README, so they cannot rot. [checked]
+item that includes the README, so they cannot rot. [checked: RS-DOC-02,
+rust-ci test, library]
 
 ## 2. Item documentation
 
 - **Every public item is documented.** `#![deny(missing_docs)]` and
-  `#![warn(missing_debug_implementations)]` are set. [checked]
+  `#![warn(missing_debug_implementations)]` are set. [checked: RS-DOC-03,
+  make lint, pubkit conform, library]
 - **Every public function has at least one example**, as a doctest. The
   repository's doc-coverage guard (`make doc-coverage-check`, where there is
-  one) enforces it. [checked]
+  one) enforces it. [checked: RS-DOC-04, make doc-coverage-check, library]
 - Examples use `?`, with the error plumbing hidden:
   `# Ok::<(), Box<dyn std::error::Error>>(())`. [judged]
 - Hidden setup lines (`# let ...`) are used sparingly. A reader must be able
@@ -77,20 +81,21 @@ item that includes the README, so they cannot rot. [checked]
 - **Test vectors from independent sources** live in `testdata/` as JSON:
   RFCs, other implementations, published test suites. Every case names its
   source. They are read by `tests/vectors.rs`, and regenerated and compared
-  in CI (`make vectors-check`). [checked where present; judged: are the
-  sources really independent?]
+  in CI (`make vectors-check`). [checked: RS-TEST-01, make vectors-check,
+  pubkit conform; judged: are the sources really independent?]
 - **Property tests** (proptest) cover invariants over many inputs:
   round-trips, and consistency at random sizes. [judged]
 - **Oracles:** where an established crate implements the same standard, its
   results are compared with ours in the tests. It is a dev-dependency only.
   [judged]
 - **Every test says what it covers** with a `// covers: module::item`
-  comment. A test claims only items in its own module's area. [checked: the
-  guard fails on a name that does not exist; judged: is the claim true?]
+  comment. A test claims only items in its own module's area. [checked:
+  RS-TEST-02, make doc-coverage-check, library; the guard fails on a name
+  that does not exist; judged: is the claim true?]
 - **`TESTING.md`** is generated from those comments and the examples. It
   lists every public item with its examples and covering tests, and renders
   as `_documentation::testing`. Item docs do not link to tests. [checked:
-  committed copy current]
+  RS-TEST-03, make doc-coverage-check, library; committed copy current]
 
 ## 4. Untrusted input
 
@@ -99,11 +104,13 @@ item that includes the README, so they cannot rot. [checked]
   is any entry point missing a target?]
 - Each input that ever found a bug is kept in `fuzz/regressions/<target>/`
   and replayed on every run. Each bug also gets a named regression test in
-  the crate's own tests. [checked: `make fuzz-smoke`]
+  the crate's own tests. [checked: RS-FUZZ-01, make fuzz-smoke, pubkit
+  conform]
 - Fuzzing runs on every change, briefly, and for longer on a schedule.
-  [checked: the `fuzz` input of pubkit's `rust-ci.yml`]
+  [checked: RS-FUZZ-02, rust-ci fuzz]
 - The crate forbids `unsafe` (`unsafe_code = "forbid"`) unless it needs it.
-  A crate that uses `unsafe` also runs miri. [checked]
+  A crate that uses `unsafe` also runs miri. [checked: RS-SAFE-01, pubkit
+  conform]
 
 ## 5. Packaging and metadata
 
@@ -128,8 +135,8 @@ item that includes the README, so they cannot rot. [checked]
   `src/` changes, so tests run a stale binary. [judged]
 - `license` names the licence, and the licence file is in the repository
   and ships in the package. Which licence is the project's choice; the
-  standard asks only that it be stated and shipped. [checked: `make
-  publish-check`]
+  standard asks only that it be stated and shipped. [checked: RS-PKG-01,
+  make publish-check]
 - **Docs build as docs.rs builds them.** That means from the packaged
   crate, on nightly, with `--cfg docsrs` and the metadata's flags, with no
   warnings. [judged: run it before each release]
@@ -157,38 +164,41 @@ The make targets each kind of crate needs:
 - Versions follow **Cargo's convention**. From 1.0: breaking is major, an
   addition is minor, a fix is a patch. Below 1.0 everything shifts one
   place: at `0.y.z`, breaking bumps `y` and anything compatible bumps `z`.
-  [checked: pubrel]
+  [checked: RS-VER-01, pubrel]
 - **The MSRV is tested.** CI builds the published crates on their
-  `rust-version` (the `msrv` input), and the scheduled run tests the latest
-  stable and beta. Raising the MSRV bumps the second number of the version,
-  `y` in `x.y.z` and in `0.y.z`. [checked]
+  `rust-version` (`make msrv`, in the `msrv` job), and the scheduled run
+  tests the latest stable and beta. Raising the MSRV bumps the second number of the version,
+  `y` in `x.y.z` and in `0.y.z`. [checked: RS-VER-02, make msrv]
 - **The public API is checked against the last release** by
   cargo-semver-checks, through pubrel (`"semver-checks": true` in
-  release.json). An unrecorded break fails, below 1.0 too. [checked]
+  release.json). An unrecorded break fails, below 1.0 too. [checked:
+  RS-VER-03, pubrel]
 - **Changes are recorded** with `pubrel add` as they land. The CHANGELOG is
   generated from the package publet and never edited. A release may open
-  with a summary (`pubrel summary`). [checked]
+  with a summary (`pubrel summary`). [checked: RS-VER-04, pubrel]
 
 ## 7. Supply chain and security
 
 - `cargo deny` and `cargo vet` pass in CI. Each `cargo vet` exemption
-  records the evidence that does exist. [checked]
+  records the evidence that does exist. [checked: RS-SUP-01, make deny,
+  make vet]
 - **`SUPPLY-CHAIN.md`** is generated per crate by `pubkit supply-chain`
   (`make supply-chain`, for the crates in `SUPPLY_CHAIN_CRATES`), from that
   crate's own dependency tree for any target, not the workspace's. It ships
   in the package, renders as `_documentation::supply_chain`, and marks
-  build-time code. [checked:
-  committed copy current]
+  build-time code. [checked: RS-SUP-02, make supply-chain-check; committed
+  copy current]
 - **`SECURITY.md`** says how to report a vulnerability (private reporting),
   what is checked and when, and what fuzzing has found. [judged]
 - Releases carry a **signed security record** of the checks run, through
-  pubrel's `security` section. [checked]
+  pubrel's `security` section. [checked: RS-SUP-03, pubrel]
 
 ## 8. Cross-platform CI
 
 Results that must be identical everywhere are tested on a 32-bit target and
-a big-endian one: the `cross-targets` input, i686 and s390x. That is in
-addition to Linux, macOS and Windows. [checked]
+a big-endian one: the `cross` job, i686 and s390x by default. That is in
+addition to Linux, macOS and Windows. [checked: RS-PLAT-01, rust-ci cross,
+rust-ci test]
 
 ## 9. Crates that are command-line tools
 
@@ -247,7 +257,7 @@ the rules above apply with these differences:
   a run. [judged]
 - **Every dependency comes from crates.io.** crates.io refuses a package
   with a git or path dependency. A tool built on a sibling crate is
-  published after that crate. [checked: `cargo publish --dry-run`]
+  published after that crate. [checked: RS-PKG-02, make publish-check]
 - Sections 4–8 apply unchanged:
   - untrusted input;
   - packaging;
@@ -263,6 +273,26 @@ the rules above apply with these differences:
   split it.
 - Name things exactly: the type, the function, the RFC section.
 - Never describe something that is planned as done.
+
+## 11. How the checked rules are enforced
+
+Each `[checked: ...]` tag gives a rule a stable ID, such as `RS-DOC-04`, and
+names what checks it:
+
+- `make TARGET`: a make target, which pubkit's `rust-ci.yml` runs on every
+  pull request. `pubkit.mk` provides each one.
+- `rust-ci JOB`: a job of `rust-ci.yml` that always runs, such as `test`
+  (Linux, macOS and Windows) or `cross` (i686 and s390x).
+- `pubkit conform`: a repository check that `pubkit sync --check` runs.
+- `pubrel`: pubrel's release workflow.
+- `library`, last: the rule applies only to a crate with a library target.
+
+`pubkit` generates `standard.json` from these tags and ships it. `pubkit
+required` reads it to list the targets each `rust-ci.yml` job must run for
+a repository. A repository can add targets of its own, through the
+workflow's `gates` and `functional` inputs, but cannot drop a required one.
+An ID is never reused for another rule. A rule removed from the standard
+leaves its ID unassigned.
 
 ## Deliberately not adopted
 

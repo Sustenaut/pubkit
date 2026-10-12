@@ -63,9 +63,9 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
-  Scenario: The built wheel carries every template
+  Scenario: The built wheel carries every template, and the standard's rules
     When pubkit's wheel is built
-    Then it holds every file under src/pubkit/templates
+    Then it holds every file under src/pubkit/templates, and standard.json
 
   Scenario: supply-chain writes each crate's report beside its manifest
     Given a crate "demo" with no dependencies, vetted with audits imported from "mozilla" and "zcash"

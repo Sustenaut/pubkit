@@ -55,6 +55,44 @@ runs it as `make supply-chain`, and `make supply-chain-check` fails when a
 committed report is stale. Set `SUPPLY_CHAIN_CRATES` in the Makefile to the
 crates that are published.
 
+## The checks the standard requires
+
+Every `[checked]` rule in the Rust crate standard has a stable ID and names
+what checks it: `[checked: RS-DOC-04, make doc-coverage-check, library]`.
+`make standard` generates `standard.json` from those tags, and it ships in
+pubkit. `pubkit required` reads it, and the repository's crates, and prints
+the make targets each `rust-ci.yml` job must run:
+
+```sh
+$ pubkit required
+gates=fmt-check lint doc doc-coverage-check publish-check
+functional=functional vectors-check supply-chain-check
+msrv=msrv
+fuzz=fuzz-smoke
+audit=deny vet
+cross_job=true
+...
+```
+
+A command-line tool, with no library target, is not held to the library
+rules (`doc-coverage-check`). `pubkit.mk` provides every target the
+standard names. A repository sets the variables they read in its Makefile:
+
+| Variable | Default | Read by |
+|---|---|---|
+| `PUBLISHED_CRATES` | `SUPPLY_CHAIN_CRATES` | `doc-coverage`, `publish-check`, `msrv` |
+| `VECTORS_GENERATE` | `./tools/vectors/generate.py` | `vectors`, `vectors-check` |
+| `VECTORS_DIRS` | `testdata` and `crates/*/testdata`, where present | `vectors-check` |
+| `FUZZ_TARGETS` | every `fuzz/fuzz_targets/*.rs` | `fuzz-smoke` |
+| `MSRV` | the first `rust-version` in `Cargo.toml` | `msrv` |
+
+`pubkit doc-coverage [--check] [CRATE...]` writes each published library's
+`TESTING.md`: every public item, the examples its docs run, and the tests
+whose `// covers:` comment names it. With `--check`, it fails on a public
+function with no example, a `// covers:` naming no public item, or a stale
+`TESTING.md`. It moved here from publet's `tools/`, so every repository runs
+the same version.
+
 ## The Rust crate standard, and an agent that audits against it
 
 [**The Rust crate standard**](plugins/rust-crate-quality/rust-crate-standard.md)
@@ -137,20 +175,24 @@ jobs:
     permissions: { contents: write }
 ```
 
-- **`rust-ci.yml`:** gates (`fmt-check lint doc` by default; `gates` names other make targets); `cargo test` on Linux, macOS and Windows (`test-args` adds arguments); then the hash-locked venv, `make sync-check`, and the `functional` targets (`functional` by default), optionally with extra apt packages and a released `pub`. Optional jobs, each off by default:
-  - `msrv: true` runs `make msrv MSRV=<the lowest rust-version stated>` on that toolchain;
-  - `fuzz: true` runs `make fuzz-smoke` on nightly (`fuzz-seconds`, and `fuzz-seconds-scheduled` on a schedule);
-  - `cross-targets` (a JSON list: i686, s390x or aarch64 `-unknown-linux-gnu`) runs `cargo test` under qemu, with `cross-test-args`;
+- **`rust-ci.yml`:** runs every check the standard requires. A `plan` job builds the hash-locked venv, runs `make sync-check`, and asks `pubkit required` which make targets each job runs. Then:
+  - `gates` runs the required gate targets, then any the `gates` input adds;
+  - `test` runs `cargo test` on Linux, macOS and Windows (`test-args` adds arguments);
+  - `functional` runs the required functional targets, then any the `functional` input adds, optionally with extra apt packages and a released `pub`;
+  - `msrv` runs `make msrv MSRV=<the lowest rust-version stated>` on that toolchain;
+  - `fuzz` runs `make fuzz-smoke` on nightly (`fuzz-seconds`, and `fuzz-seconds-scheduled` on a schedule);
+  - `cross` runs `cargo test` under qemu on `cross-targets`: i686 and s390x by default, or aarch64 `-unknown-linux-gnu`, with `cross-test-args`;
+  - `audit` runs `make deny` and `make vet`, with `cargo-deny-version` and `cargo-vet-version`;
   - when the caller also runs on a `schedule`, those runs test on the latest stable and beta Rust (`scheduled-toolchains`).
 
-  Every job reports through `passed`, the one check a ruleset needs.
+  The `gates` and `functional` inputs can only add targets. The `msrv` and `fuzz` inputs are ignored: those jobs run because the standard requires them. Every job reports through `passed`, the one check a ruleset needs.
 - **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium.
 
 ## Developing
 
 ```sh
 make venv     # hash-locked environment, this checkout installed editable
-make check    # the Gherkin suite
+make check    # standard.json current, then the Gherkin suite
 ```
 
 The suite drives the plugin through pytest's `pytester`. Each scenario

@@ -11,7 +11,7 @@ jobs:
   # from a released wheel, so there are no managed files to check.
   ci:
     uses: ./.github/workflows/python-ci.yml
-    with: { sync-check: false }
+    with: { sync-check: false, test: make check }
 
   release:
     needs: ci

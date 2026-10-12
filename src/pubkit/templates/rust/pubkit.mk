@@ -8,10 +8,23 @@ export PATH := $(HOME)/.cargo/bin:$(CURDIR)/.venv/bin:$(PATH)
 CARGO ?= cargo
 CARGO_SCOPE ?= --workspace
 PYTEST_ARGS ?=
-# The crates whose SUPPLY-CHAIN.md is generated: those published.
+# The crates published to crates.io. Each gets a SUPPLY-CHAIN.md, each
+# library among them a TESTING.md, and each is packaged by publish-check and
+# built by msrv.
 SUPPLY_CHAIN_CRATES ?=
+PUBLISHED_CRATES ?= $(SUPPLY_CHAIN_CRATES)
+# The generator of testdata/, and the directories it writes.
+VECTORS_GENERATE ?= ./tools/vectors/generate.py
+VECTORS_DIRS ?= $(wildcard testdata crates/*/testdata)
+# fuzz/fuzz_targets/*.rs, and how long each runs in fuzz-smoke.
+FUZZ_TARGETS ?= $(notdir $(basename $(wildcard fuzz/fuzz_targets/*.rs)))
+FUZZ_SECONDS ?= 60
+# The oldest Rust promised: CI passes the lowest rust-version any package
+# states.
+MSRV ?= $(shell sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 
-.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional supply-chain supply-chain-check
+.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional supply-chain supply-chain-check \
+        doc-coverage doc-coverage-check vectors vectors-check publish-check msrv fuzz-smoke deny vet required
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -53,3 +66,48 @@ supply-chain: ## Regenerate SUPPLY-CHAIN.md for each of SUPPLY_CHAIN_CRATES from
 
 supply-chain-check: ## Fail if a committed SUPPLY-CHAIN.md is stale
 	.venv/bin/pubkit supply-chain --check $(SUPPLY_CHAIN_CRATES)
+
+# The targets below enforce the Rust crate standard's checked rules; `pubkit
+# required` lists which each CI job runs here.
+
+doc-coverage: ## Regenerate each published library's TESTING.md
+	.venv/bin/pubkit doc-coverage $(PUBLISHED_CRATES)
+
+doc-coverage-check: ## Fail if a public function has no example, a test covers no real item, or TESTING.md is stale
+	.venv/bin/pubkit doc-coverage --check $(PUBLISHED_CRATES)
+
+vectors: ## Regenerate the test vectors from their independent sources
+	$(VECTORS_GENERATE)
+
+vectors-check: vectors ## Fail if the committed test vectors differ from what the sources give
+	@test -n "$(VECTORS_DIRS)" || { echo "no testdata/ here: the standard asks for test vectors (RS-TEST-01)"; exit 1; }
+	git diff --exit-code -- $(VECTORS_DIRS)
+
+# The verify build gets a target directory of its own. Sharing target/
+# leaves dep-info naming the packaged copy's sources, after which cargo
+# reports the crate Fresh however src/ changes, and tests run a stale binary.
+publish-check: ## Package each published crate and verify it builds as published
+	for crate in $(PUBLISHED_CRATES); do \
+	  CARGO_TARGET_DIR=$(CURDIR)/target/publish-check $(CARGO) publish --dry-run --locked -p $$crate; \
+	done
+
+msrv: ## Build the published crates on their minimum Rust version (rustup toolchain install $(MSRV))
+	$(CARGO) +$(MSRV) check --locked $(foreach crate,$(PUBLISHED_CRATES),-p $(crate))
+
+fuzz-smoke: ## Replay fuzz regressions, then fuzz each target briefly (needs nightly and cargo-fuzz)
+	@test -n "$(FUZZ_TARGETS)" || { echo "no fuzz/fuzz_targets/ here: the standard asks for fuzzing (RS-FUZZ-01)"; exit 1; }
+	cd fuzz && cargo +nightly fuzz build
+	cd fuzz && for target in $(FUZZ_TARGETS); do \
+	  mkdir -p corpus/$$target regressions/$$target; \
+	  cargo +nightly fuzz run $$target corpus/$$target regressions/$$target -- \
+	    -max_total_time=$(FUZZ_SECONDS) -timeout=10 || exit 1; \
+	done
+
+deny: ## Licence, advisory, ban and source audit
+	$(CARGO) deny --locked check
+
+vet: ## Every dependency is audited, trusted, or exempt with its evidence
+	cargo vet --locked
+
+required: ## The targets each CI job runs here, from the standard
+	.venv/bin/pubkit required

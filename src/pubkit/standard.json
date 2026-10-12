@@ -1,0 +1,273 @@
+{
+  "comment": "Generated from plugins/rust-crate-quality/rust-crate-standard.md by `make standard`. Do not edit.",
+  "source": "plugins/rust-crate-quality/rust-crate-standard.md",
+  "sha256": "20d840e1331c9f698d2c489d45ca064d0342af3b75341f6843fbced255bb1a14",
+  "baseline": [
+    {
+      "target": "fmt-check",
+      "job": "gates"
+    },
+    {
+      "target": "lint",
+      "job": "gates"
+    },
+    {
+      "target": "doc",
+      "job": "gates"
+    },
+    {
+      "target": "functional",
+      "job": "functional"
+    }
+  ],
+  "rules": [
+    {
+      "id": "RS-DOC-01",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "doc",
+          "job": "gates"
+        },
+        {
+          "kind": "conform"
+        }
+      ]
+    },
+    {
+      "id": "RS-DOC-02",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "job",
+          "job": "test"
+        }
+      ]
+    },
+    {
+      "id": "RS-DOC-03",
+      "section": "2. Item documentation",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "lint",
+          "job": "gates"
+        },
+        {
+          "kind": "conform"
+        }
+      ]
+    },
+    {
+      "id": "RS-DOC-04",
+      "section": "2. Item documentation",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "doc-coverage-check",
+          "job": "gates"
+        }
+      ]
+    },
+    {
+      "id": "RS-TEST-01",
+      "section": "3. Tests, and showing how each item is tested",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "vectors-check",
+          "job": "functional"
+        },
+        {
+          "kind": "conform"
+        }
+      ]
+    },
+    {
+      "id": "RS-TEST-02",
+      "section": "3. Tests, and showing how each item is tested",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "doc-coverage-check",
+          "job": "gates"
+        }
+      ]
+    },
+    {
+      "id": "RS-TEST-03",
+      "section": "3. Tests, and showing how each item is tested",
+      "applies": "library",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "doc-coverage-check",
+          "job": "gates"
+        }
+      ]
+    },
+    {
+      "id": "RS-FUZZ-01",
+      "section": "4. Untrusted input",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "fuzz-smoke",
+          "job": "fuzz"
+        },
+        {
+          "kind": "conform"
+        }
+      ]
+    },
+    {
+      "id": "RS-FUZZ-02",
+      "section": "4. Untrusted input",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "job",
+          "job": "fuzz"
+        }
+      ]
+    },
+    {
+      "id": "RS-SAFE-01",
+      "section": "4. Untrusted input",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "conform"
+        }
+      ]
+    },
+    {
+      "id": "RS-PKG-01",
+      "section": "5. Packaging and metadata",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "publish-check",
+          "job": "gates"
+        }
+      ]
+    },
+    {
+      "id": "RS-VER-01",
+      "section": "6. Versions, MSRV and the API",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "pubrel"
+        }
+      ]
+    },
+    {
+      "id": "RS-VER-02",
+      "section": "6. Versions, MSRV and the API",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "msrv",
+          "job": "msrv"
+        }
+      ]
+    },
+    {
+      "id": "RS-VER-03",
+      "section": "6. Versions, MSRV and the API",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "pubrel"
+        }
+      ]
+    },
+    {
+      "id": "RS-VER-04",
+      "section": "6. Versions, MSRV and the API",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "pubrel"
+        }
+      ]
+    },
+    {
+      "id": "RS-SUP-01",
+      "section": "7. Supply chain and security",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "deny",
+          "job": "audit"
+        },
+        {
+          "kind": "make",
+          "target": "vet",
+          "job": "audit"
+        }
+      ]
+    },
+    {
+      "id": "RS-SUP-02",
+      "section": "7. Supply chain and security",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "supply-chain-check",
+          "job": "functional"
+        }
+      ]
+    },
+    {
+      "id": "RS-SUP-03",
+      "section": "7. Supply chain and security",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "pubrel"
+        }
+      ]
+    },
+    {
+      "id": "RS-PLAT-01",
+      "section": "8. Cross-platform CI",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "job",
+          "job": "cross"
+        },
+        {
+          "kind": "job",
+          "job": "test"
+        }
+      ]
+    },
+    {
+      "id": "RS-PKG-02",
+      "section": "9. Crates that are command-line tools",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "make",
+          "target": "publish-check",
+          "job": "gates"
+        }
+      ]
+    }
+  ]
+}
