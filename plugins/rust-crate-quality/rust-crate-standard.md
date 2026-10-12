@@ -180,8 +180,10 @@ The make targets each kind of crate needs:
 ## 7. Supply chain and security
 
 - `cargo deny` and `cargo vet` pass in CI. Each `cargo vet` exemption
-  records the evidence that does exist. [checked: RS-SUP-01, make deny,
-  make vet]
+  records the evidence that does exist. `deny.toml` keeps the shared
+  baseline: every advisory fails, wildcards are banned, and only crates.io
+  is a source. `supply-chain/config.toml` imports the shared audit sets.
+  [checked: RS-SUP-01, make deny, make vet, pubkit conform]
 - **`SUPPLY-CHAIN.md`** is generated per crate by `pubkit supply-chain`
   (`make supply-chain`, for the crates in `SUPPLY_CHAIN_CRATES`), from that
   crate's own dependency tree for any target, not the workspace's. It ships
@@ -189,7 +191,8 @@ The make targets each kind of crate needs:
   build-time code. [checked: RS-SUP-02, make supply-chain-check; committed
   copy current]
 - **`SECURITY.md`** says how to report a vulnerability (private reporting),
-  what is checked and when, and what fuzzing has found. [judged]
+  what is checked and when, and what fuzzing has found. [judged] Every
+  repository has one. [checked: RS-SUP-04, pubkit conform]
 - Releases carry a **signed security record** of the checks run, through
   pubrel's `security` section. [checked: RS-SUP-03, pubrel]
 
@@ -283,7 +286,8 @@ names what checks it:
   pull request. `pubkit.mk` provides each one.
 - `rust-ci JOB`: a job of `rust-ci.yml` that always runs, such as `test`
   (Linux, macOS and Windows) or `cross` (i686 and s390x).
-- `pubkit conform`: a repository check that `pubkit sync --check` runs.
+- `pubkit conform`: a repository check that `pubkit sync --check` runs:
+  that a required file exists, or a setting such as `[lints]` holds.
 - `pubrel`: pubrel's release workflow.
 - `library`, last: the rule applies only to a crate with a library target.
 
@@ -293,6 +297,19 @@ a repository. A repository can add targets of its own, through the
 workflow's `gates` and `functional` inputs, but cannot drop a required one.
 An ID is never reused for another rule. A rule removed from the standard
 leaves its ID unassigned.
+
+A repository that cannot meet a rule yet declares an exception in
+`pubkit.json`, with the rule's ID, the reason, and the date by which it will
+be met or reviewed:
+
+```json
+{ "kind": "rust",
+  "exceptions": [
+    { "rule": "RS-TEST-01", "reason": "no independent source for pubrel's version arithmetic yet", "until": "2027-01-01" } ] }
+```
+
+An excepted rule's checks are skipped, and `pubkit conform` lists every open
+exception. An exception past its date, or naming no rule, fails the check.
 
 ## Deliberately not adopted
 

@@ -42,7 +42,7 @@ Files are **managed**, owned by pubkit and rewritten by `sync`, or
 
 Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
-pubkit.
+pubkit, and in a Rust repository it runs `pubkit conform` (below).
 
 ## The supply-chain report
 
@@ -92,6 +92,39 @@ whose `// covers:` comment names it. With `--check`, it fails on a public
 function with no example, a `// covers:` naming no public item, or a stale
 `TESTING.md`. It moved here from publet's `tools/`, so every repository runs
 the same version.
+
+## Conformance, and declared exceptions
+
+`pubkit conform` checks what no make target can, and `pubkit sync --check`
+runs it in every Rust repository:
+
+| Rule | Checked |
+|---|---|
+| RS-DOC-01 | each published library declares `pub mod _documentation` |
+| RS-DOC-03 | each published library sets `missing_docs` in its lints |
+| RS-SAFE-01 | each published crate sets `unsafe_code = "forbid"` |
+| RS-TEST-01 | `testdata/` (or `crates/*/testdata/`) exists |
+| RS-FUZZ-01 | `fuzz/fuzz_targets/*.rs` exists |
+| RS-SUP-01 | `deny.toml` keeps the shared baseline, and `supply-chain/config.toml` imports the shared audit sets |
+| RS-SUP-04 | `SECURITY.md` exists |
+
+It also checks that every workflow calling `rust-ci.yml` pins the pubkit
+version the lock pins, so a repository's CI cannot fall behind the standard
+its lock names. The published crates are those that do not set
+`publish = false`, or the list `"published"` in `pubkit.json` gives.
+
+A repository that cannot meet a rule yet declares an exception in
+`pubkit.json`:
+
+```json
+{ "kind": "rust",
+  "exceptions": [
+    { "rule": "RS-TEST-01", "reason": "no independent source for the version arithmetic yet", "until": "2027-01-01" } ] }
+```
+
+An excepted rule's conformance checks are skipped, its make targets leave
+`pubkit required`'s plan, and `pubkit conform` lists it as open. An
+exception past its `until` date, or naming no rule, fails.
 
 ## The Rust crate standard, and an agent that audits against it
 
