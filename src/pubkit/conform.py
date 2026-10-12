@@ -10,7 +10,10 @@ Each check belongs to a rule the standard tags `pubkit conform`:
 - RS-FUZZ-01: fuzz targets exist (`fuzz/fuzz_targets/*.rs`);
 - RS-SUP-01: `deny.toml` keeps the shared baseline, and
   `supply-chain/config.toml` imports the shared audit sets;
-- RS-SUP-04: `SECURITY.md` exists.
+- RS-SUP-04: `SECURITY.md` exists;
+- RS-SUP-05: the release key `release.json` names is labelled for what it
+  releases (the package's name and "release key"), not with a person's
+  name: its label is public in every release it signs.
 
 It also checks, without an exception possible, that every workflow calling
 pubkit's `rust-ci.yml` pins the pubkit this repository's lock pins, so the
@@ -147,6 +150,8 @@ def checks(root: Path, config: dict) -> dict[str, list[str]]:
         problem("RS-FUZZ-01", "no fuzz/fuzz_targets/*.rs: the standard asks for fuzzing")
     if not (root / "SECURITY.md").is_file():
         problem("RS-SUP-04", "no SECURITY.md")
+    for text in release_key_label(root):
+        problem("RS-SUP-05", text)
     deny = root / "deny.toml"
     if not deny.is_file():
         problem("RS-SUP-01", "no deny.toml")
@@ -164,6 +169,69 @@ def checks(root: Path, config: dict) -> dict[str, list[str]]:
             if imports.get(name, {}).get("url") != url:
                 problem("RS-SUP-01", f"supply-chain/config.toml: import {name} from {url}")
     return found
+
+
+def cbor(data: bytes, i: int = 0):
+    """Decode one CBOR item at `i`: (value, next index). Only what key
+    objects hold: integers, byte and text strings, arrays and maps."""
+    first = data[i]
+    major, info = first >> 5, first & 31
+    i += 1
+    if info < 24:
+        n = info
+    elif info in (24, 25, 26, 27):
+        size = 1 << (info - 24)
+        n = int.from_bytes(data[i:i + size], "big")
+        i += size
+    else:
+        raise ValueError("indefinite or reserved length")
+    if major == 0:
+        return n, i
+    if major == 1:
+        return -1 - n, i
+    if major in (2, 3):
+        raw = data[i:i + n]
+        return (raw if major == 2 else raw.decode()), i + n
+    if major == 4:
+        items = []
+        for _ in range(n):
+            item, i = cbor(data, i)
+            items.append(item)
+        return items, i
+    if major == 5:
+        out = {}
+        for _ in range(n):
+            key, i = cbor(data, i)
+            out[key], i = cbor(data, i)
+        return out, i
+    raise ValueError(f"CBOR major type {major}")
+
+
+def release_key_label(root: Path) -> list[str]:
+    """Problems with the label of the key release.json names (RS-SUP-05)."""
+    path = root / "release.json"
+    if not path.is_file():
+        return ["no release.json: the release key cannot be checked"]
+    release = json.loads(path.read_text(encoding="utf-8"))
+    key = release.get("key")
+    if not key:
+        return ["release.json names no key"]
+    names = [release.get("name")] + [p.get("name") for p in release.get("packages", [])]
+    names = [n for n in names if n]
+    # A workspace's crates share a family name: publet-core, publet-cli.
+    names += [n.split("-")[0] for n in names]
+    obj = root / release.get("corpus", "corpus") / "objects" / (key.replace(":", "_") + ".cbor")
+    if not obj.is_file():
+        return [f"the key object {key} is not in {obj.parent.relative_to(root)}/: export it"]
+    try:
+        label = cbor(obj.read_bytes())[0].get("body", {}).get("label", "")
+    except (ValueError, IndexError, UnicodeDecodeError, AttributeError):
+        return [f"{obj.relative_to(root)} is not a key object"]
+    if not label.endswith("release key") or not any(n in label for n in names):
+        want = f"{min(names, key=len)} release key" if names else "<package> release key"
+        return [f"the release key is labelled {label!r}: label it for what it releases, "
+                f"such as {want!r}, not with a person's name; rotate to a key labelled so"]
+    return []
 
 
 def workflow_pins(root: Path) -> list[str]:

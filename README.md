@@ -107,6 +107,7 @@ runs it in every Rust repository:
 | RS-FUZZ-01 | `fuzz/fuzz_targets/*.rs` exists |
 | RS-SUP-01 | `deny.toml` keeps the shared baseline, and `supply-chain/config.toml` imports the shared audit sets |
 | RS-SUP-04 | `SECURITY.md` exists |
+| RS-SUP-05 | the release key `release.json` names is labelled for what it releases ("pubunit release key"), not with a person's name: its label is public in every release it signs |
 
 It also checks that every workflow calling `rust-ci.yml` pins the pubkit
 version the lock pins, so a repository's CI cannot fall behind the standard
