@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
-.PHONY: help venv lock functional check wheel clean
+.PHONY: help venv lock standard standard-check functional check wheel clean
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -17,10 +17,16 @@ venv: ## Hash-locked environment, with this checkout installed editable
 lock: ## Pin tests/requirements.txt, with hashes
 	.venv/bin/pubkit lock
 
+standard: ## Regenerate src/pubkit/standard.json from the standard's [checked] tags
+	.venv/bin/python -m pubkit.standard
+
+standard-check: ## Fail if src/pubkit/standard.json differs from the standard's tags
+	.venv/bin/python -m pubkit.standard --check
+
 functional: ## The Gherkin suite
 	cd tests && pytest -q
 
-check: functional ## Everything CI runs
+check: standard-check functional ## Everything CI runs
 
 wheel: ## Build the wheel a release carries
 	.venv/bin/pip wheel --quiet --no-deps . -w dist

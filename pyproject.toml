@@ -27,6 +27,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 # Globs skip dot-directories, so each one templates use is named.
 pubkit = [
+    "standard.json",
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]

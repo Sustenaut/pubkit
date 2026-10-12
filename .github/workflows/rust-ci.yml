@@ -4,19 +4,23 @@
 #     uses: schryer/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
 #     with: { pub-version: v0.1.1 }
 #
-# The gates and the functional job run make targets -- pubkit.mk's by
-# default, and a repository adds its own (guards, conformance) by naming
-# them. The cross-platform job runs cargo directly: macOS ships make 3.81,
-# and Windows has no /bin/bash.
+# Every check the Rust crate standard tags `[checked: ..., make TARGET]` runs
+# here, for every repository: the plan job asks `pubkit required` (from the
+# pubkit the repository's lock pins) which targets each job must run, and
+# the jobs run them. The `gates` and `functional` inputs add a repository's
+# own targets (guards, conformance) after the required ones; they cannot
+# drop one. The cross-platform job runs cargo directly: macOS ships make
+# 3.81, and Windows has no /bin/bash.
 #
-# Optional jobs, each off until asked for:
+# Jobs the standard requires, beyond gates, test and functional:
 #
-# - msrv: true builds on the oldest Rust the packages promise, the lowest
+# - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.
-# - fuzz: true runs `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust:
-#   briefly on every change, longer on a schedule.
-# - cross-targets lists targets whose tests run under emulation: i686
-#   (32-bit) and s390x (big-endian) find word-size and byte-order bugs.
+# - fuzz runs `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust: briefly on
+#   every change, longer on a schedule.
+# - cross runs the tests under emulation on cross-targets: i686 (32-bit) and
+#   s390x (big-endian) by default, which find word-size and byte-order bugs.
+# - audit runs `make deny` and `make vet`.
 #
 # When the caller's workflow also runs on a `schedule`, those runs add the
 # toolchains job: the tests on the latest stable and beta Rust, which the
@@ -30,32 +34,58 @@ on:
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages for the functional job. }
       pub-version: { type: string, default: '', description: A publet tag whose pub the functional suite drives; empty installs none. }
       os-matrix: { type: string, default: '["ubuntu-latest", "macos-latest", "windows-latest"]' }
-      gates: { type: string, default: fmt-check lint doc, description: "Make targets the gates job runs, in order." }
+      gates: { type: string, default: '', description: "Extra make targets the gates job runs after the required ones." }
       test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
-      functional: { type: string, default: functional, description: "Make targets the functional job runs after sync-check, in order." }
-      msrv: { type: boolean, default: false, description: "Build on the lowest rust-version the manifests state, by make msrv MSRV=<version>." }
-      fuzz: { type: boolean, default: false, description: "Run make fuzz-smoke on nightly Rust." }
+      functional: { type: string, default: '', description: "Extra make targets the functional job runs after the required ones." }
+      msrv: { type: boolean, default: true, description: "Ignored: the msrv job runs whenever the standard requires it (RS-VER-02). Kept so callers that pass it keep working." }
+      fuzz: { type: boolean, default: true, description: "Ignored: the fuzz job runs whenever the standard requires it (RS-FUZZ-01, RS-FUZZ-02). Kept so callers that pass it keep working." }
       fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
       fuzz-seconds-scheduled: { type: number, default: 900, description: Seconds per fuzz target on a scheduled run. }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
-      cross-targets: { type: string, default: '[]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu." }
+      cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
+      cargo-deny-version: { type: string, default: 0.20.2 }
+      cargo-vet-version: { type: string, default: 0.10.2 }
       scheduled-toolchains: { type: string, default: '["stable", "beta"]', description: JSON list of toolchains a scheduled run tests on. }
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # What the standard requires here: the managed files in step, then the
+  # make targets each job must run, from `pubkit required`.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      gates: ${{ steps.required.outputs.gates }}
+      functional: ${{ steps.required.outputs.functional }}
+      msrv: ${{ steps.required.outputs.msrv }}
+      fuzz: ${{ steps.required.outputs.fuzz }}
+      audit: ${{ steps.required.outputs.audit }}
+      cross_job: ${{ steps.required.outputs.cross_job }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ inputs.python-version }}' }
+      - run: make venv
+      - run: make sync-check
+      - id: required
+        run: .venv/bin/pubkit required --github-output
+
   gates:
+    needs: plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ inputs.python-version }}' }
       - run: cargo --version && rustc --version
+      - run: make venv
       - run: |
-          for target in $GATES; do
+          for target in $(printf '%s\n' $REQUIRED $EXTRA | awk 'NF && !seen[$0]++'); do
             echo "::group::make $target"; make "$target"; echo "::endgroup::"
           done
-        env: { GATES: '${{ inputs.gates }}' }
+        env: { REQUIRED: '${{ needs.plan.outputs.gates }}', EXTRA: '${{ inputs.gates }}' }
 
   test:
     needs: gates
@@ -69,7 +99,7 @@ jobs:
       - run: cargo test ${{ inputs.test-args }}
 
   functional:
-    needs: gates
+    needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -89,16 +119,15 @@ jobs:
             || cargo install --locked --git https://github.com/schryer/publet --tag "$PUB" publet-cli
         env: { PUB: '${{ inputs.pub-version }}' }
       - run: make venv
-      - run: make sync-check
       - run: |
-          for target in $FUNCTIONAL; do
+          for target in $(printf '%s\n' $REQUIRED $EXTRA | awk 'NF && !seen[$0]++'); do
             echo "::group::make $target"; make "$target"; echo "::endgroup::"
           done
-        env: { FUNCTIONAL: '${{ inputs.functional }}' }
+        env: { REQUIRED: '${{ needs.plan.outputs.functional }}', EXTRA: '${{ inputs.functional }}' }
 
   msrv:
-    if: inputs.msrv
-    needs: gates
+    if: needs.plan.outputs.msrv != ''
+    needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -120,8 +149,8 @@ jobs:
         env: { MSRV: '${{ steps.msrv.outputs.version }}' }
 
   fuzz:
-    if: inputs.fuzz
-    needs: gates
+    if: needs.plan.outputs.fuzz != ''
+    needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -142,8 +171,8 @@ jobs:
   # are not cross-compiled on stable Rust, so these run the unit and
   # integration tests.
   cross:
-    if: inputs.cross-targets != '[]'
-    needs: gates
+    if: needs.plan.outputs.cross_job == 'true' && inputs.cross-targets != '[]'
+    needs: [plan, gates]
     strategy:
       fail-fast: false
       matrix:
@@ -172,6 +201,32 @@ jobs:
       - run: cargo test --target "$TARGET" $ARGS
         env: { TARGET: '${{ matrix.target }}', ARGS: '${{ inputs.cross-test-args }}' }
 
+  # Advisories, licences, bans and sources (cargo deny), and every
+  # dependency audited, trusted or exempt with its evidence (cargo vet).
+  audit:
+    if: needs.plan.outputs.audit != ''
+    needs: plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny
+            ~/.cargo/bin/cargo-vet
+          key: audit-tools-${{ inputs.cargo-deny-version }}-${{ inputs.cargo-vet-version }}-${{ runner.os }}
+      - run: |
+          command -v cargo-deny >/dev/null && cargo deny --version | grep -q " ${DENY}$" \
+            || cargo install --locked cargo-deny --version "$DENY"
+          command -v cargo-vet >/dev/null && cargo vet --version | grep -q " ${VET}$" \
+            || cargo install --locked cargo-vet --version "$VET"
+        env: { DENY: '${{ inputs.cargo-deny-version }}', VET: '${{ inputs.cargo-vet-version }}' }
+      - run: |
+          for target in $REQUIRED; do
+            echo "::group::make $target"; make "$target"; echo "::endgroup::"
+          done
+        env: { REQUIRED: '${{ needs.plan.outputs.audit }}' }
+
   # Scheduled runs only: the tests on Rust newer than the pinned toolchain,
   # so a release that breaks the build is seen the day it ships rather than
   # when the pin moves. Not run on pull requests, where a new Rust's
@@ -199,7 +254,7 @@ jobs:
   # failed fails here through gates itself.
   passed:
     if: always()
-    needs: [gates, test, functional, msrv, fuzz, cross, toolchains]
+    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, toolchains]
     runs-on: ubuntu-latest
     steps:
       - run: |

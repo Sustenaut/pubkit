@@ -4,6 +4,8 @@
     pubkit sync [--check]
     pubkit lock
     pubkit supply-chain [--check] CRATE...
+    pubkit doc-coverage [--check] [CRATE...]
+    pubkit required [--github-output]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -193,6 +195,26 @@ def lock(root: Path) -> int:
     return 0
 
 
+def required(root: Path, github_output: bool) -> int:
+    """The make targets each rust-ci.yml job must run here, from the standard."""
+    from . import standard
+    config = read_config(root)
+    if config["kind"] != "rust":
+        sys.exit("pubkit: required checks come from the Rust crate standard; this is not a Rust repository")
+    plan = standard.required(standard.load(), standard.has_library(root))
+    lines = [f"{job}={' '.join(targets)}" for job, targets in plan["targets"].items()]
+    lines += [f"{job}_job={'true' if job in plan['jobs'] else 'false'}"
+              for job in sorted(standard.WORKFLOW_JOBS)]
+    if github_output:
+        path = os.environ.get("GITHUB_OUTPUT")
+        if not path:
+            sys.exit("pubkit: --github-output needs GITHUB_OUTPUT set, as in a GitHub Actions step")
+        with open(path, "a", encoding="utf-8") as out:
+            out.write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
@@ -207,6 +229,15 @@ def main(argv: list[str] | None = None) -> int:
                             help="write, or with --check verify, each crate's SUPPLY-CHAIN.md")
     p.add_argument("--check", action="store_true")
     p.add_argument("crates", nargs="+", metavar="CRATE")
+    p = commands.add_parser("doc-coverage",
+                            help="write, or with --check verify, each library's TESTING.md")
+    p.add_argument("--check", action="store_true")
+    p.add_argument("crates", nargs="*", metavar="CRATE",
+                   help="the crates; by default every published library here")
+    p = commands.add_parser("required",
+                            help="the make targets each rust-ci.yml job must run, from the standard")
+    p.add_argument("--github-output", action="store_true",
+                   help="also append them to $GITHUB_OUTPUT")
     args = parser.parse_args(argv)
     root = Path.cwd()
     if args.command == "init":
@@ -216,6 +247,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "supply-chain":
         from .supply_chain import run
         return run(root, args.crates, args.check)
+    if args.command == "doc-coverage":
+        from .doc_coverage import run as coverage
+        return coverage(root, args.crates, args.check)
+    if args.command == "required":
+        return required(root, args.github_output)
     return lock(root)
 
 

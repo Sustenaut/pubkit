@@ -22,3 +22,8 @@ Feature: The reusable workflows parse as GitHub reads them
       | workflow      |
       | rust-ci.yml   |
       | python-ci.yml |
+
+  Scenario: rust-ci runs the targets pubkit required plans, in every job
+    When I parse the workflow "rust-ci.yml"
+    Then every job pubkit required plans for reads its targets from the plan job
+    And the gates and functional inputs only add targets

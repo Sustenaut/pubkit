@@ -20,43 +20,6 @@ SOURCE = Path(__file__).resolve().parents[2]
 scenarios("cli.feature")
 
 
-@pytest.fixture
-def repo(tmp_path):
-    root = tmp_path / "repo"
-    root.mkdir()
-    return root
-
-
-def pubkit():
-    """The `pubkit` installed beside the Python running this suite."""
-    found = shutil.which("pubkit", path=str(Path(sys.executable).parent))
-    assert found, "pubkit is not installed in this environment; run `make venv`"
-    return found
-
-
-@given("an empty repository")
-def empty(repo):
-    pass
-
-
-@given(parsers.parse('a repository initialised as "{kind}"'))
-def initialised(repo, run, kind):
-    assert run(pubkit(), "init", f"--kind={kind}", cwd=repo).code == 0
-
-
-@given(parsers.parse('the file "{path}" reads "{text}"'))
-@when(parsers.parse('the file "{path}" reads "{text}"'))
-def file_reads(repo, path, text):
-    target = repo / path
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text + "\n")
-
-
-@pytest.fixture
-def env():
-    return {}
-
-
 @given(parsers.parse('a package "{name}" {version} whose index lists files hashed "{a}" and "{b}"'))
 def indexed(tmp_path, env, name, version, a, b):
     """A local wheel pip resolves (no network), and an index JSON API, on
@@ -77,23 +40,6 @@ def indexed(tmp_path, env, name, version, a, b):
     env.update(PIP_NO_INDEX="1", PIP_FIND_LINKS=str(links),
                PUBKIT_INDEX_JSON=(tmp_path / "index").as_uri())
     env["resolved"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
-
-
-@when(parsers.re(r'I run pubkit (?P<args>(?:"[^"]*" ?)+)'), target_fixture="result")
-def run_pubkit(repo, run, env, args):
-    variables = {k: v for k, v in env.items() if k != "resolved"}
-    return run(pubkit(), *args.strip().strip('"').split('" "'), cwd=repo, env=variables)
-
-
-@then(parsers.parse("the repository has {paths}"))
-def has(repo, paths):
-    for path in paths.split(", "):
-        assert (repo / path.strip('"')).is_file(), path
-
-
-@then(parsers.parse('"{path}" contains "{text}"'))
-def contains(repo, path, text):
-    assert text in (repo / path).read_text()
 
 
 @then(parsers.parse('"{path}" pins this pubkit\'s wheel'))
@@ -128,12 +74,13 @@ def built_wheel(tmp_path):
     return next(tmp_path.glob("pubkit-*.whl"))
 
 
-@then("it holds every file under src/pubkit/templates")
+@then("it holds every file under src/pubkit/templates, and standard.json")
 def wheel_holds_templates(wheel):
     names = set(zipfile.ZipFile(wheel).namelist())
     src = SOURCE / "src"
     missing = [p.relative_to(src).as_posix() for p in (src / "pubkit" / "templates").rglob("*")
                if p.is_file() and p.relative_to(src).as_posix() not in names]
+    missing += [] if "pubkit/standard.json" in names else ["pubkit/standard.json"]
     assert not missing, f"the wheel lacks {missing}"
 
 
@@ -154,9 +101,3 @@ def vetted_crate(repo, name, a, b):
     (chain / "config.toml").write_text('[cargo-vet]\nversion = "0.10"\n' + imports)
     (chain / "audits.toml").write_text("[audits]\n")
     (chain / "imports.lock").write_text("")
-
-
-@given(parsers.re(r'pubkit (?P<args>(?:"[^"]*" ?)+) has run'))
-def has_run(repo, run, args):
-    argv = args.strip().strip('"').split('" "')
-    assert run(pubkit(), *argv, cwd=repo).code == 0
