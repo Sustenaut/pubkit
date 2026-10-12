@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.5.0 is released as v0.5.0 from commit b16ef500418ec1bb00449e8e9a83092569ade08b.",
+      "content": "pubkit 0.6.0 is released as v0.6.0 from commit 6cbd57f0e56c2adf829a74646f593e40f7e93a2c.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.5.0",
+            "0.6.0",
             "pubkit --version",
-            "pubkit 0.5.0",
-            "v0.5.0",
-            "b16ef500418ec1bb00449e8e9a83092569ade08b"
+            "pubkit 0.6.0",
+            "v0.6.0",
+            "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
           ]
         ]
       },
-      "scope": "the published release v0.5.0 of pubkit",
+      "scope": "the published release v0.6.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b16ef500418ec1bb00449e8e9a83092569ade08b"
+          "revision": "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.5.0 was released on 2026-10-11 from commit b16ef500418ec1bb00449e8e9a83092569ade08b with these changes.",
+      "content": "pubkit 0.6.0 was released on 2026-10-12 from commit 6cbd57f0e56c2adf829a74646f593e40f7e93a2c with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,52 @@
         ],
         "rows": [
           [
+            "changed",
+            "rust-ci.yml runs every make target the Rust crate standard requires: a plan job asks `pubkit required` for each job's targets. The gates and functional inputs now only add targets, the msrv and fuzz inputs are ignored, cross runs on i686 and s390x by default, and a new audit job runs make deny and make vet"
+          ],
+          [
             "added",
-            "`pubkit supply-chain [--check] CRATE...` writes each crate's SUPPLY-CHAIN.md from its cargo vet files, and pubkit.mk runs it as `make supply-chain` and `make supply-chain-check` for the crates in SUPPLY_CHAIN_CRATES. It replaces the copies of the report script in publet and pubrel; it lists what is built for any target, and names the audit sources from the repository's own cargo vet config."
+            "Stable rule IDs on every [checked] rule of the Rust crate standard, and standard.json generated from them and shipped in the package"
+          ],
+          [
+            "added",
+            "`pubkit required` lists the make targets each rust-ci.yml job must run in a repository, from standard.json"
+          ],
+          [
+            "added",
+            "`pubkit doc-coverage` writes and checks each published library's TESTING.md, moved here from publet's tools/doc-coverage.py"
+          ],
+          [
+            "added",
+            "pubkit.mk provides every target the standard names: doc-coverage, doc-coverage-check, vectors, vectors-check, publish-check, msrv, fuzz-smoke, deny, vet and required, with PUBLISHED_CRATES, VECTORS_GENERATE, VECTORS_DIRS, FUZZ_TARGETS and MSRV"
+          ],
+          [
+            "added",
+            "`pubkit conform` checks the standard's required files and settings (_documentation, lints, testdata/, fuzz/, deny.toml and supply-chain baselines, SECURITY.md) and that every workflow pins the pubkit the lock pins"
+          ],
+          [
+            "added",
+            "Dated exceptions in pubkit.json: an excepted rule's checks and make targets are skipped and listed as open, and an expired or unknown exception fails"
           ],
           [
             "changed",
-            "pubkit requires Python 3.11 or later, for tomllib."
+            "`pubkit sync --check` in a Rust repository now also runs `pubkit conform`, so it fails where the repository does not conform and declares no exception"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.5.0 of pubkit",
+      "scope": "the published release v0.6.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b16ef500418ec1bb00449e8e9a83092569ade08b"
+          "revision": "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
         }
       ]
     }
   },
-  "created": "2026-10-11T00:00:00Z",
+  "created": "2026-10-12T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
