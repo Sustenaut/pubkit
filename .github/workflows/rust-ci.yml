@@ -12,7 +12,8 @@
 # drop one. The cross-platform job runs cargo directly: macOS ships make
 # 3.81, and Windows has no /bin/bash.
 #
-# Jobs the standard requires, beyond gates, test and functional:
+# Jobs the standard requires, beyond gates, test and functional, each run
+# unless the repository declares an exception for its rule in pubkit.json:
 #
 # - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.

@@ -19,6 +19,18 @@
     {
       "category": "added",
       "change": "pubkit.mk provides every target the standard names: doc-coverage, doc-coverage-check, vectors, vectors-check, publish-check, msrv, fuzz-smoke, deny, vet and required, with PUBLISHED_CRATES, VECTORS_GENERATE, VECTORS_DIRS, FUZZ_TARGETS and MSRV"
+    },
+    {
+      "category": "added",
+      "change": "`pubkit conform` checks the standard's required files and settings (_documentation, lints, testdata/, fuzz/, deny.toml and supply-chain baselines, SECURITY.md) and that every workflow pins the pubkit the lock pins"
+    },
+    {
+      "category": "added",
+      "change": "Dated exceptions in pubkit.json: an excepted rule's checks and make targets are skipped and listed as open, and an expired or unknown exception fails"
+    },
+    {
+      "category": "changed",
+      "change": "`pubkit sync --check` in a Rust repository now also runs `pubkit conform`, so it fails where the repository does not conform and declares no exception"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

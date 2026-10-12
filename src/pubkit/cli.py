@@ -6,6 +6,7 @@
     pubkit supply-chain [--check] CRATE...
     pubkit doc-coverage [--check] [CRATE...]
     pubkit required [--github-output]
+    pubkit conform
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -129,6 +130,11 @@ def sync(root: Path, check: bool) -> int:
         if stale or lock_stale:
             return 1
         print(f"in step with pubkit {__version__}")
+        if kind == "rust":
+            if not (root / "Cargo.toml").exists():
+                print("no Cargo.toml yet: the standard's checks wait for a crate")
+                return 0
+            return conform(root)
         return 0
     if not stale:
         print(f"already in step with pubkit {__version__}")
@@ -195,13 +201,31 @@ def lock(root: Path) -> int:
     return 0
 
 
+def conform(root: Path) -> int:
+    """The standard's file and setting checks, and the declared exceptions."""
+    from . import conform as checks
+    config = read_config(root)
+    if config["kind"] != "rust":
+        sys.exit("pubkit: conform checks the Rust crate standard; this is not a Rust repository")
+    lines, problems = checks.run(root, config)
+    for problem in problems:
+        print(f"pubkit: {problem}", file=sys.stderr)
+    if problems:
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
 def required(root: Path, github_output: bool) -> int:
     """The make targets each rust-ci.yml job must run here, from the standard."""
+    from . import conform as checks
     from . import standard
     config = read_config(root)
     if config["kind"] != "rust":
         sys.exit("pubkit: required checks come from the Rust crate standard; this is not a Rust repository")
-    plan = standard.required(standard.load(), standard.has_library(root))
+    rules = standard.load()
+    waived, _, _ = checks.exceptions(config, {r["id"] for r in rules["rules"]})
+    plan = standard.required(rules, standard.has_library(root), frozenset(waived))
     lines = [f"{job}={' '.join(targets)}" for job, targets in plan["targets"].items()]
     lines += [f"{job}_job={'true' if job in plan['jobs'] else 'false'}"
               for job in sorted(standard.WORKFLOW_JOBS)]
@@ -234,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true")
     p.add_argument("crates", nargs="*", metavar="CRATE",
                    help="the crates; by default every published library here")
+    commands.add_parser("conform",
+                        help="check the standard's required files and settings, and the exceptions")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -252,6 +278,8 @@ def main(argv: list[str] | None = None) -> int:
         return coverage(root, args.crates, args.check)
     if args.command == "required":
         return required(root, args.github_output)
+    if args.command == "conform":
+        return conform(root)
     return lock(root)
 
 
