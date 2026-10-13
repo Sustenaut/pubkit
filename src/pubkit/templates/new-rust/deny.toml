@@ -1,0 +1,32 @@
+# cargo-deny: licences and advisories are a review decision, not a surprise.
+[advisories]
+# Every RustSec advisory for a crate in the tree fails the check: known
+# vulnerabilities always, and here also crates marked unmaintained or
+# unsound, and yanked releases. An advisory may be ignored only by naming
+# it below, with the reason beside it.
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = []
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.93
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+# Dependencies come from crates.io and nowhere else: no other registry, no
+# git repository.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

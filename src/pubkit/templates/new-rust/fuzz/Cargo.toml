@@ -1,0 +1,23 @@
+# Fuzz targets for what {name} reads from outside. A workspace of its own:
+# it needs a nightly compiler and libFuzzer.
+[package]
+name = "{name}-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+{name} = { path = ".." }
+
+[workspace]
+
+[[bin]]
+name = "greet"
+path = "fuzz_targets/greet.rs"
+test = false
+doc = false
+bench = false

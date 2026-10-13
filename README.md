@@ -223,6 +223,48 @@ or record the change. Commit its edits as usual, with `pubrel add internal
 
 `/plugin marketplace update pubkit` picks up a newer standard.
 
+## Starting a package
+
+    pubkit new --name=pubfoo --tag=PKG-PUBFOO-10-2026 [--description=TEXT]
+
+In an empty repository, writes a crate that passes every check from its
+first commit: the managed and seeded files, docs, test vectors, a fuzz
+target, Gherkin scenarios, `deny.toml`, `supply-chain/`, `SECURITY.md`,
+`release.json` with its security checks (the quality audit among them), and
+a release key labelled "pubfoo release key", its secret in the gitignored
+`corpus/.publet`. It refuses a `pubrel` older than 0.5.3 or a `pub` older
+than 0.2.1, and prints the two steps it does not take itself: the branch
+ruleset, and the line that adds the package to `governed.json`.
+
+## The nightly
+
+`.github/workflows/nightly.yml` runs every night over the repositories
+`governed.json` lists. It reports, in its summary, the pubkit each pins,
+whether it conforms to the latest standard, and its open exceptions
+(`pubkit freshness`). Then it keeps one pull request per repository, on its
+`pubkit-nightly` branch, with two commits (`pubkit nightly`):
+
+1. every outdated pub* pin (`pubkit pins`): the latest pubkit, pubrel's
+   release workflow and `pubrel-version`, `pub-version`, and the pub*
+   crates in `Cargo.lock`;
+2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
+   with an audit, adding no exemption, and that `cargo deny` passes. The
+   body lists each update skipped with what `cargo vet suggest` says it
+   needs.
+
+Each commit regenerates `SUPPLY-CHAIN.md` and records an `internal` pubrel
+row for each package it changes. An open pull request is updated, never a
+second one opened, and left alone when the night brings nothing new. When
+its CI fails, the pins are tested alone: if they pass, the crate commit is
+dropped. Nothing merges it: the Sustenaut bot sends a Slack DM when it is
+green or fails.
+
+It needs three secrets in schryer/pubkit: `PUBKIT_BUMP_TOKEN`, a token
+that may push branches and open pull requests in the governed repositories
+(without it the nightly only reports); `SUSTENAUT_SLACK_BOT_TOKEN`, the
+bot's token, with `chat:write`; and `SLACK_DM_USER_ID`, the Slack member
+whom it DMs.
+
 ## Locking
 
 `pubkit lock` resolves with pip's own resolver (`pip install --dry-run
