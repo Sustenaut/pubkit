@@ -28,21 +28,62 @@ A suite's own step with the same text wins over the plugin's.
 ## Keeping the files in step
 
 ```sh
-pubkit init --kind=rust --bin=pub   # or --kind=python
+pubkit init --kind=rust-package --bin=pub   # or --kind=python-utility, or --kind=service --project=NAME
 pubkit lock                         # pin tests/requirements.txt, with hashes
 pubkit sync --check                 # CI: fail if a managed file drifted
 pubkit sync                         # after bumping pubkit: rewrite them
 ```
 
+A repository is one of three kinds, named in `pubkit.json`:
+
+| Kind | What it is |
+|---|---|
+| `rust-package` | A released Rust package, held to the Rust crate standard (below) |
+| `python-utility` | A released Python tool |
+| `service` | A private repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
+
+pubkit 0.10.0 renamed the kinds `rust` and `python` to `rust-package` and
+`python-utility`; `sync` says so when `pubkit.json` still names an old one.
+
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
 
-- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel). For Rust, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below).
-- **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, and for Rust a `Makefile` that includes `pubkit.mk`.
+- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
+- **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, for a Rust package a `Makefile` that includes `pubkit.mk`, and for a service `with-secrets.json`.
 
 Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
 pubkit, and in a Rust repository it runs `pubkit conform` (below).
+
+## Services: `./with-secrets` and `service-ci.yml`
+
+A service runs every command that needs a secret through `./with-secrets`:
+
+```sh
+./with-secrets terraform plan
+./with-secrets scripts/setup-backup.sh
+```
+
+It reads a Bitwarden Secrets Manager project with the `bws` CLI, using a
+read-only machine account's token (`BWS_ACCESS_TOKEN`, or that line in the
+repository's git-ignored `.env`), and runs the command with the secrets in
+its environment only: the calling shell never holds them, and no master
+password is asked for. It stops, naming the projects the token can see, when
+it cannot see the one configured. `with-secrets.json` is the repository's:
+
+| Setting | Meaning |
+|---|---|
+| `project` | The project's name or id |
+| `terraform.dir` | Where the Terraform files are |
+| `terraform.secrets` | `declared`: a secret named like a declared variable in upper case (`HCLOUD_TOKEN` for `hcloud_token`) goes as `TF_VAR_hcloud_token` and under no other name. `map`: the names `terraform.names_from` lists go as `TF_VAR_secret_values` (declare it ephemeral) and `TF_VAR_secret_revisions` |
+
+Every other secret goes under its name in upper case, `-` as `_`.
+
+`service-ci.yml` is a service's CI: `pubkit sync --check` and shellcheck,
+`terraform fmt`, `init -backend=false` and `validate` when `terraform-dir`
+is given, and the repository's own tests when `test` is. No job has
+secrets. Its `passed` job is the one check a ruleset would require; private
+repositories on GitHub Free have no rulesets, so there it is a summary.
 
 ## The supply-chain report
 
@@ -119,7 +160,7 @@ A repository that cannot meet a rule yet declares an exception in
 `pubkit.json`:
 
 ```json
-{ "kind": "rust",
+{ "kind": "rust-package",
   "exceptions": [
     { "rule": "RS-TEST-01", "reason": "no independent source for the version arithmetic yet", "until": "2027-01-01" } ] }
 ```

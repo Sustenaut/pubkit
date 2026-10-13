@@ -4,7 +4,7 @@ Feature: Keeping a repository's shared files in step
 
   Scenario: init writes managed and seeded files for a Rust package
     Given an empty repository
-    When I run pubkit "init" "--kind=rust" "--bin=demo"
+    When I run pubkit "init" "--kind=rust-package" "--bin=demo"
     Then it succeeds
     And the repository has "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/ci.yml"
     And "Makefile" contains "DEMO_BIN_DIR"
@@ -13,19 +13,19 @@ Feature: Keeping a repository's shared files in step
   Scenario: init keeps the repository's own files
     Given an empty repository
     And the file "tests/pytest.ini" reads "[pytest]"
-    When I run pubkit "init" "--kind=python"
+    When I run pubkit "init" "--kind=python-utility"
     Then it succeeds
     And it prints "kept     tests/pytest.ini"
     And "tests/pytest.ini" contains "[pytest]"
 
   Scenario: A freshly initialised repository is in step
-    Given a repository initialised as "python"
+    Given a repository initialised as "python-utility"
     When I run pubkit "sync" "--check"
     Then it succeeds
     And it prints "in step with pubkit"
 
   Scenario: An edited managed file fails the check, and sync restores it
-    Given a repository initialised as "rust"
+    Given a repository initialised as "rust-package"
     And the file "pubkit.mk" reads "edited"
     When I run pubkit "sync" "--check"
     Then it fails
@@ -37,13 +37,13 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
 
   Scenario: Seeded files are the repository's to change
-    Given a repository initialised as "rust"
+    Given a repository initialised as "rust-package"
     And the file "Makefile" reads "include pubkit.mk"
     When I run pubkit "sync" "--check"
     Then it succeeds
 
   Scenario: A lock pinning another pubkit fails the check
-    Given a repository initialised as "python"
+    Given a repository initialised as "python-utility"
     And the file "tests/requirements.lock" reads "pubkit @ https://example.org/download/v0.0.0/pubkit-0.0.0-py3-none-any.whl"
     When I run pubkit "sync" "--check"
     Then it fails

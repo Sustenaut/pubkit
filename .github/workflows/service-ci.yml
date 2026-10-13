@@ -1,0 +1,87 @@
+# Reusable CI for a service: a private repository that deploys rather than
+# releases, and runs its secret-needing commands through ./with-secrets.
+#
+#   ci:
+#     uses: schryer/pubkit/.github/workflows/service-ci.yml@vX.Y.Z
+#     with: { setup: make venv, test: .venv/bin/python -m pytest -q }
+#
+# Every job runs without secrets: tests that need one are the repository's
+# to skip. Terraform is checked without a backend (fmt, init, validate), so
+# no state or credentials are touched.
+name: service-ci
+
+on:
+  workflow_call:
+    inputs:
+      python-version: { type: string, default: '3.14' }
+      setup: { type: string, default: '', description: 'Prepares the tests, for example make venv. Empty skips it.' }
+      test: { type: string, default: '', description: 'Runs the tests. Empty skips it.' }
+      terraform-dir: { type: string, default: '', description: 'Where the Terraform files are. Empty skips the Terraform checks.' }
+      shellcheck: { type: string, default: with-secrets, description: 'Shell scripts to check: space-separated globs.' }
+      sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ inputs.python-version }}' }
+      - if: inputs.sync-check
+        name: pubkit's managed files are in step
+        run: |
+          python3 -m venv .pubkit
+          .pubkit/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+          .pubkit/bin/pubkit sync --check
+      - name: shell scripts pass shellcheck
+        run: |
+          shopt -s globstar nullglob
+          files=($SCRIPTS)
+          if [ ${#files[@]} -gt 0 ]; then shellcheck --severity=warning "${files[@]}"; fi
+        env: { SCRIPTS: '${{ inputs.shellcheck }}' }
+
+  terraform:
+    if: inputs.terraform-dir != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_wrapper: false }
+      - run: terraform -chdir="$DIR" fmt -check -recursive
+        env: { DIR: '${{ inputs.terraform-dir }}' }
+      - run: terraform -chdir="$DIR" init -backend=false -input=false
+        env: { DIR: '${{ inputs.terraform-dir }}' }
+      - run: terraform -chdir="$DIR" validate
+        env: { DIR: '${{ inputs.terraform-dir }}' }
+
+  tests:
+    if: inputs.test != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ inputs.python-version }}' }
+      - if: inputs.setup != ''
+        run: ${{ inputs.setup }}
+      - run: ${{ inputs.test }}
+
+  # The one check a ruleset would require. Private repositories on GitHub
+  # Free have no rulesets, so there it is a summary to read, not a gate.
+  # A skipped job counts as passing; terraform and tests may be skipped only
+  # when not asked for.
+  passed:
+    if: always()
+    needs: [checks, terraform, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e --arg tf "$TF" --arg test "$TEST" '
+            all(to_entries[];
+                .value.result == "success"
+                or (.key == "terraform" and $tf == "" and .value.result == "skipped")
+                or (.key == "tests" and $test == "" and .value.result == "skipped"))' > /dev/null
+        env:
+          RESULTS: '${{ toJSON(needs) }}'
+          TF: '${{ inputs.terraform-dir }}'
+          TEST: '${{ inputs.test }}'
