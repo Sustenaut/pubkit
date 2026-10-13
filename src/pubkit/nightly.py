@@ -5,11 +5,12 @@ release: this pubkit (managed files, lock, `rust-ci.yml`), pubrel's release
 workflow and `pubrel-version`, the `pub-version` a workflow installs, and
 the pub* crates in `Cargo.lock`, within their requirements.
 
-`pubkit crates --report FILE` then updates the other crates in `Cargo.lock`
-within their requirements, and keeps an update only when `cargo vet`
-covers it with an audit, imported or by a trusted publisher, without adding
-an exemption, and `cargo deny` passes with it. Each update it drops is
-listed in the report with what `cargo vet suggest` says it needs.
+`pubkit crates --report FILE` then tries each upgrade `cargo update` would
+make to the other crates, one at a time on top of those it kept, and keeps
+one only when `cargo vet` covers it with an audit, imported or by a trusted
+publisher, without adding an exemption, and `cargo deny` passes with it.
+Each update it drops is listed in the report with the audits cargo vet
+recommends for it, as `cargo vet suggest` prints them.
 
 Each prints what it changed, one line per change, for the commit message
 and the pull request.
@@ -27,7 +28,6 @@ from . import __version__
 # The crates the pub* repositories publish, which `pins` moves rather than
 # `crates`.
 PUB_CRATES = ("publet-core", "publet-algorithms", "pubunit")
-MAX_ROUNDS = 20
 
 RELEASE_PIN = re.compile(r"(schryer/pubrel/\.github/workflows/release\.yml@v)([0-9][^\s'\"]*)")
 PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)([0-9][^\s,}'\"]*)")
@@ -115,22 +115,39 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
     return changes
 
 
-def suggestions(root: Path, crates: list[str]) -> dict[str, str]:
-    """What `cargo vet suggest` says each of `crates` needs: its lines."""
-    out = cargo(root, "vet", "suggest").stdout
-    found: dict[str, list[str]] = {}
-    for line in out.splitlines():
-        for crate in crates:
-            if re.search(rf"\b{re.escape(crate)}\b", line):
-                found.setdefault(crate, []).append(line.rstrip())
-    return {c: "\n".join(found.get(c, [])) or "(cargo vet suggest named nothing for it)"
-            for c in crates}
+UPDATE = re.compile(r"^\s*Updating (\S+) v(\S+) -> v(\S+)", re.M)
+
+
+def candidates(root: Path) -> list[tuple[str, str, str]]:
+    """(crate, from, to) for every upgrade `cargo update` would make, the
+    pub* crates aside. Downgrades (which the MSRV-aware resolver proposes
+    when a locked version needs a newer Rust) are not taken."""
+    return upgrades(cargo(root, "update", "--dry-run").stderr)
+
+
+def upgrades(dry_run: str) -> list[tuple[str, str, str]]:
+    """The upgrades in `cargo update --dry-run`'s output."""
+    return [(m.group(1), m.group(2), m.group(3)) for m in UPDATE.finditer(dry_run)
+            if m.group(1) not in PUB_CRATES]
+
+
+def recommended(vet_output: str) -> str:
+    """What cargo vet recommends auditing, from a failing run's output."""
+    lines = [line.rstrip() for line in vet_output.splitlines() if line.strip()]
+    at = next((i for i, line in enumerate(lines) if "recommended audits" in line), None)
+    return "\n".join(lines[at:] if at is not None else lines[-8:])
 
 
 def failing(vet_output: str) -> list[str]:
     """The crates `cargo vet` reports missing audits for."""
     return sorted({m.group(1) for m in re.finditer(r"^\s*([A-Za-z0-9_-]+):\S+ missing",
                                                      vet_output, re.M)})
+
+
+def has(root: Path, crate: str, version: str) -> bool:
+    lock = root / "Cargo.lock"
+    return lock.is_file() and f'name = "{crate}"\nversion = "{version}"' in lock.read_text(
+        encoding="utf-8")
 
 
 def snapshot(root: Path) -> dict[Path, bytes]:
@@ -169,60 +186,81 @@ def first_party_policy(root: Path, vet_output: str) -> list[str]:
     return own
 
 
+def tail(proc: subprocess.CompletedProcess, n: int = 8) -> str:
+    return "\n".join((proc.stdout + proc.stderr).strip().splitlines()[-n:])
+
+
 def crates(root: Path, report: Path | None) -> int:
+    """Try each upgrade on its own, on top of those already kept, and keep
+    it only when `cargo vet` passes without a new exemption and `cargo deny`
+    passes."""
     saved = snapshot(root)
-    old = locked(root)
-    cargo(root, "update", "--quiet")
-    new = locked(root)
-    changed = {c: (old[c], new[c]) for c in new
-               if c in old and new[c] != old[c] and c not in PUB_CRATES}
-    skipped: dict[str, str] = {}
     notes: list[str] = []
-    for _ in range(MAX_ROUNDS):
+    updated: list[tuple[str, str, str]] = []
+    skipped: list[dict] = []
+    todo = candidates(root)
+
+    vet = cargo(root, "vet")
+    own = first_party_policy(root, vet.stdout + vet.stderr) if vet.returncode else []
+    if own:
+        notes.append("supply-chain/config.toml: " + ", ".join(own) + " (this repository's own) "
+                     "not audited as crates.io crates, now that they are published there")
         vet = cargo(root, "vet")
-        if vet.returncode == 0:
-            break
-        own = first_party_policy(root, vet.stdout + vet.stderr)
-        if own:
-            notes.append("supply-chain/config.toml: " + ", ".join(own) + " (this repository's own) "
-                         "not audited as crates.io crates, now that they are published there")
-            continue
-        names = [c for c in failing(vet.stdout + vet.stderr) if c in changed and c not in skipped]
-        if not names:
-            # cargo vet failed for another reason: update nothing, and say why.
-            reason = "\n".join((vet.stdout + vet.stderr).strip().splitlines()[-8:])
-            restore(saved)
-            for name in changed:
-                skipped.setdefault(name, "cargo vet failed for a reason no update caused:\n"
-                                   + reason)
-            break
-        why = suggestions(root, names)
-        for name in names:
-            cargo(root, "update", "--quiet", "-p", f"{name}@{changed[name][1]}",
-                  "--precise", changed[name][0])
-            skipped[name] = "not covered by an audit:\n" + why[name]
-    else:
-        for name in changed:
-            skipped.setdefault(name, "cargo vet did not pass within the rounds allowed")
-    if cargo(root, "vet", "--locked").returncode != 0 or \
-            cargo(root, "deny", "--locked", "check").returncode != 0:
-        # Conservative: when the result does not pass both, update nothing.
+    deny = cargo(root, "deny", "--locked", "check", "--hide-inclusion-graph")
+    if vet.returncode or deny.returncode:
         restore(saved)
-        for name in changed:
-            skipped.setdefault(name, "the updates together did not pass cargo vet and cargo deny")
-    final = locked(root)
-    if final != old:
+        why = "main itself does not pass " + ("cargo vet" if vet.returncode else "cargo deny") + \
+              ":\n" + tail(vet if vet.returncode else deny)
+        skipped = [{"crate": c, "from": a, "to": b, "why": why} for c, a, b in todo]
+        todo, notes = [], []
+
+    for crate, old, new in todo:
+        if has(root, crate, new):
+            # Another kept update brought it along, and vet and deny passed.
+            updated.append((crate, old, new))
+            continue
+        if not has(root, crate, old):
+            continue
+        before = snapshot(root)
+        step = cargo(root, "update", "--quiet", "-p", f"{crate}@{old}", "--precise", new)
+        why = ""
+        if step.returncode:
+            why = "cargo updates it only together with other crates:\n" + tail(step)
+        else:
+            vet = cargo(root, "vet")
+            if vet.returncode:
+                why = "not covered by an audit; cargo vet recommends:\n" + recommended(
+                    vet.stdout + vet.stderr)
+            else:
+                # The advisory database was fetched above: --frozen is
+                # --locked, offline.
+                deny = cargo(root, "deny", "--frozen", "check", "--hide-inclusion-graph")
+                if deny.returncode:
+                    why = "cargo deny fails with it:\n" + tail(deny)
+        if why:
+            restore(before)
+            skipped.append({"crate": crate, "from": old, "to": new, "why": why})
+        else:
+            updated.append((crate, old, new))
+
+    if updated and (cargo(root, "vet", "--locked").returncode
+                    or cargo(root, "deny", "--locked", "check").returncode):
+        # Each passed on its own but not all together: take none.
+        restore(saved)
+        skipped += [{"crate": c, "from": a, "to": b,
+                     "why": "the updates together did not pass cargo vet and cargo deny"}
+                    for c, a, b in updated]
+        updated, notes = [], []
+    if not updated and not notes:
+        restore(saved)
+    if updated:
         refresh_reports(root)
-    updated = {c: v for c, v in changed.items() if final.get(c) == v[1]}
-    lines = notes + [f"{c} {a} -> {b}" for c, (a, b) in sorted(updated.items())]
+    lines = notes + [f"{c} {a} -> {b}" for c, a, b in updated]
     for line in lines:
         print(line)
     if report:
-        report.write_text(json.dumps({
-            "updated": lines,
-            "skipped": [{"crate": c, "from": changed[c][0], "to": changed[c][1], "why": w}
-                        for c, w in sorted(skipped.items())],
-        }, indent=2) + "\n", encoding="utf-8")
+        report.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
+                          encoding="utf-8")
     return 0
 
 
@@ -256,7 +294,7 @@ def body(pinned: list[str], updated: list[str], skipped: list[dict]) -> str:
     out += [f"- {line}" for line in updated] or ["None."]
     if skipped:
         out += ["", "### Skipped", "",
-                "Each needs an audit before the nightly takes it; `cargo vet suggest` says:", ""]
+                "Each needs an audit before the nightly takes it. cargo vet recommends, as `cargo vet suggest` would:", ""]
         for s in skipped:
             out += [f"<details><summary>{s['crate']} {s['from']} -> {s['to']}</summary>", "",
                     "```", s["why"], "```", "", "</details>", ""]

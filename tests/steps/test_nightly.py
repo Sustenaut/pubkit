@@ -35,6 +35,28 @@ def crates_skipped(skipped, names):
     assert skipped == names.split(", ")
 
 
+@when(parsers.parse('cargo update --dry-run says "{a}", "{b}" and "{c}"'),
+      target_fixture="tried")
+def dry_run(a, b, c):
+    return nightly.upgrades("\n".join(f"    {line}" for line in (a, b, c)))
+
+
+@then(parsers.parse('the upgrades tried are "{expected}"'))
+def upgrades_tried(tried, expected):
+    assert [f"{c} {a} -> {b}" for c, a, b in tried] == expected.split(", ")
+
+
+@when(parsers.parse('a failing cargo vet ends with "{header}" and "{line}"'),
+      target_fixture="reason")
+def vet_fails(header, line):
+    return nightly.recommended(f"Vetting Failed!\n  zeroize:1.9.1 missing\n{header}\n    {line}\n")
+
+
+@then(parsers.parse('the reason starts at "{start}" and names "{line}"'))
+def reason(reason, start, line):
+    assert reason.startswith(start) and line in reason and "Vetting Failed" not in reason
+
+
 @when(parsers.parse('the nightly writes a body with "{crate}" skipped because "{why}"'),
       target_fixture="body")
 def writes_body(crate, why):

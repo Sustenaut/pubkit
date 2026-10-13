@@ -25,6 +25,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When cargo vet reports "  zeroize:1.9.1 missing [\"safe-to-deploy\"]" and "  syn:3.0.9 missing [\"safe-to-run\"]"
     Then the crates skipped are "syn, zeroize"
 
+  Scenario: The upgrades tried are cargo's, without its downgrades or the pub* crates
+    When cargo update --dry-run says "Updating syn v3.0.5 -> v3.0.9", "Downgrading icu_provider v2.3.1 -> v2.1.1 (available: v2.3.1)" and "Updating publet-core v0.1.2 -> v0.1.3"
+    Then the upgrades tried are "syn 3.0.5 -> 3.0.9"
+
+  Scenario: A skipped crate's reason is the audits cargo vet recommends
+    When a failing cargo vet ends with "recommended audits for safe-to-deploy:" and "cargo vet diff zeroize 1.9.0 1.9.1"
+    Then the reason starts at "recommended audits" and names "cargo vet diff zeroize 1.9.0 1.9.1"
+
   Scenario: The body lists every skipped crate with what cargo vet suggest says
     When the nightly writes a body with "zeroize" skipped because "cargo vet diff zeroize 1.8.2 1.9.1"
     Then the body says nothing merges it
