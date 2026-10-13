@@ -1,6 +1,7 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
     pubkit init --kind=rust|python [--bin=NAME]
+    pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
     pubkit supply-chain [--check] CRATE...
@@ -8,6 +9,12 @@
     pubkit required [--github-output]
     pubkit conform
     pubkit audit --check [PACKAGE VERSION] | --standard
+    pubkit bump
+    pubkit pins --pubrel V --pub V [--no-lock]
+    pubkit crates [--report FILE]
+    pubkit record TEXT
+    pubkit nightly --pubrel V --pub V --body FILE
+    pubkit freshness [--json] DIR...
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -43,10 +50,10 @@ LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
 
 
-def templates(kind: str) -> dict[str, str]:
-    """Every template for `kind`, by repository path; the kind's own win."""
+def templates(kind: str, layers: tuple[str, ...] | None = None) -> dict[str, str]:
+    """Every template for `kind`, by repository path; later layers win."""
     out: dict[str, str] = {}
-    for layer in ("common", kind):
+    for layer in layers or ("common", kind):
         root = resources.files("pubkit") / "templates" / layer
         stack = [(root, "")]
         while stack:
@@ -81,23 +88,36 @@ def read_config(root: Path) -> dict[str, str]:
 
 
 def values(config: dict[str, str]) -> dict[str, str]:
-    return {"version": __version__, "bin_var": bin_var(config.get("bin", "app"))}
+    from .new import PUBREL_PIN
+    return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
+            "pubrel": PUBREL_PIN}
+
+
+def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,
+               extra: dict[str, str] | None = None, keep: set[str] | None = None) -> None:
+    """Write pubkit.json and the templates of `layers`: managed files always,
+    seeded ones unless already present."""
+    kind = config["kind"]
+    (root / CONFIG).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    owned = set(managed(kind))
+    fill = {**values(config), **(extra or {})}
+    for path, text in sorted(templates(kind, layers).items()):
+        target = root / path
+        if target.exists() and path not in owned:
+            print(f"kept     {path} (already present)")
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(render(text, fill), encoding="utf-8")
+        if path.endswith(".py") and text.startswith("#!"):
+            target.chmod(0o755)
+        print(f"{'managed' if path in owned else 'seeded '}  {path}")
 
 
 def init(root: Path, kind: str, binary: str | None) -> int:
     config = {"kind": kind}
     if binary:
         config["bin"] = binary
-    (root / CONFIG).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    owned = set(managed(kind))
-    for path, text in sorted(templates(kind).items()):
-        target = root / path
-        if target.exists() and path not in owned:
-            print(f"kept     {path} (already present)")
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(render(text, values(config)), encoding="utf-8")
-        print(f"{'managed' if path in owned else 'seeded '}  {path}")
+    init_files(root, config)
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
 
@@ -261,6 +281,14 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("init", help="write the shared files into this repository")
     p.add_argument("--kind", choices=KINDS, required=True)
     p.add_argument("--bin", help="the program under test, for <NAME>_BIN_DIR")
+    p = commands.add_parser("new", help="start a new Rust package that meets the standard")
+    p.add_argument("--name", required=True, help="the package's name, which is also its binary's")
+    p.add_argument("--tag", required=True, help="its Section 9.1 tag, PKG-XXXXXX-MM-YYYY")
+    p.add_argument("--description", default="", help="one sentence on what it is for")
+    p.add_argument("--no-key", action="store_true",
+                   help="do not create the corpus workspace and release key (for tests)")
+    p.add_argument("--no-lock", action="store_true",
+                   help="do not lock the test requirements, which needs the network")
     p = commands.add_parser("sync", help="rewrite, or with --check verify, the managed files")
     p.add_argument("--check", action="store_true")
     commands.add_parser("lock", help="pin tests/requirements.txt with hashes")
@@ -282,6 +310,27 @@ def main(argv: list[str] | None = None) -> int:
                             "($PUBREL_PACKAGE, $PUBREL_VERSION)"),
     group.add_argument("--standard", action="store_true",
                        help="print the sha256 of the standard this pubkit ships, for a report's header")
+    p = commands.add_parser("pins", help="move every outdated pub* pin to its latest release")
+    p.add_argument("--pubrel", default="", help="pubrel's latest release, for its workflow pins")
+    p.add_argument("--pub", default="", help="publet-cli's latest release, for pub-version")
+    p.add_argument("--no-lock", action="store_true", help="do not relock (it needs the network)")
+    p = commands.add_parser("crates",
+                            help="update other crates, keeping only what cargo vet audits and cargo deny passes")
+    p.add_argument("--report", type=Path, help="write what was updated and skipped, as JSON")
+    p = commands.add_parser("record",
+                            help="add an internal pubrel row for each package the last commit needs one for")
+    p.add_argument("text", help="what changed")
+    p = commands.add_parser("nightly",
+                            help="commit the pins, then the audited crate updates, and write the PR body")
+    p.add_argument("--pubrel", required=True)
+    p.add_argument("--pub", required=True)
+    p.add_argument("--body", required=True, type=Path)
+    commands.add_parser("bump",
+                        help="move this repository to this pubkit: managed files, lock, workflow pins")
+    p = commands.add_parser("freshness",
+                            help="report which pinned pubkit and standard each repository meets")
+    p.add_argument("--json", action="store_true", help="JSON rows instead of a Markdown table")
+    p.add_argument("dirs", nargs="+", metavar="DIR", type=Path)
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
     p = commands.add_parser("required",
@@ -298,6 +347,10 @@ def main(argv: list[str] | None = None) -> int:
     root = Path.cwd()
     if args.command == "init":
         return init(root, args.kind, args.bin)
+    if args.command == "new":
+        from .new import run as new
+        return new(root, args.name, args.tag, args.description, key=not args.no_key,
+                   lock=not args.no_lock)
     if args.command == "sync":
         return sync(root, args.check)
     if args.command == "supply-chain":
@@ -311,6 +364,28 @@ def main(argv: list[str] | None = None) -> int:
                         args.changed_files)
     if args.command == "conform":
         return conform(root)
+    if args.command == "pins":
+        from .nightly import pins
+        for line in pins(root, args.pubrel, args.pub, lock=not args.no_lock):
+            print(line)
+        return 0
+    if args.command == "crates":
+        from .nightly import crates
+        return crates(root, args.report)
+    if args.command == "record":
+        from .nightly import record
+        for package in record(root, args.text):
+            print(f"recorded for {package}")
+        return 0
+    if args.command == "nightly":
+        from .nightly import nightly
+        return nightly(root, args.pubrel, args.pub, args.body)
+    if args.command == "bump":
+        from .freshness import bump
+        return bump(root)
+    if args.command == "freshness":
+        from .freshness import freshness
+        return freshness(args.dirs, args.json)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)

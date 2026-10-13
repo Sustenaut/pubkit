@@ -1,0 +1,114 @@
+# Nightly: every repository governed.json lists.
+#
+# The report job checks each one out and runs `pubkit freshness`: the job
+# summary is one table of the pubkit each pins, whether it conforms to the
+# latest standard, and its open exceptions.
+#
+# The update job then keeps one pull request per repository, on its
+# pubkit-nightly branch, with two commits (.github/nightly/update.sh):
+#
+# 1. every outdated pub* pin: the latest pubkit, pubrel's release workflow
+#    and pubrel-version, pub-version, and the pub* crates in Cargo.lock;
+# 2. the other crates' updates that cargo vet covers with an audit (no new
+#    exemption) and cargo deny passes; the body lists each one skipped,
+#    with what `cargo vet suggest` says it needs.
+#
+# An open pull request is updated, never a second one opened. If its CI
+# fails with both commits, the first is tested alone, and the second
+# dropped when that passes. Nothing merges it: the Sustenaut bot DMs on
+# Slack when it is green or fails.
+#
+# Secrets: PUBKIT_BUMP_TOKEN, a token that may push branches and open pull
+# requests in the governed repositories (without it the job only reports);
+# SUSTENAUT_SLACK_BOT_TOKEN (chat:write) and SLACK_DM_USER_ID, whom it DMs.
+name: nightly
+
+on:
+  schedule: [{ cron: '41 1 * * *' }]
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.report.outputs.repos }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { path: pubkit }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14' }
+      # The latest release, from its wheel: what governed repositories move to.
+      - run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          python -m pip install --quiet \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
+        env: { GH_TOKEN: '${{ github.token }}' }
+      - id: report
+        run: |
+          mkdir repos
+          for repo in $(jq -r '.repositories[].repo' pubkit/governed.json); do
+            git clone --quiet --depth 1 "https://github.com/$repo" "repos/${repo#*/}"
+          done
+          pubkit freshness repos/*
+          echo "repos=$(jq -c '[.repositories[].repo]' pubkit/governed.json)" >> "$GITHUB_OUTPUT"
+
+  update:
+    needs: report
+    runs-on: ubuntu-latest
+    # Waits for the pull request's CI, fuzzing included.
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: ${{ fromJSON(needs.report.outputs.repos) }}
+    env:
+      GH_TOKEN: '${{ secrets.PUBKIT_BUMP_TOKEN }}'
+      REPO: '${{ matrix.repo }}'
+    steps:
+      - id: token
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No PUBKIT_BUMP_TOKEN: reporting only, no pull request for $REPO." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "present=$([ -n "$GH_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v5
+        with: { path: pubkit }
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.14' }
+      - if: steps.token.outputs.present == 'true'
+        id: latest
+        run: |
+          latest() { gh release view --repo "$1" --json tagName --jq .tagName; }
+          tag=$(latest "$GITHUB_REPOSITORY")
+          python -m pip install --quiet \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
+          pubrel=$(latest schryer/pubrel); pub=$(latest schryer/publet)
+          echo "pubrel=${pubrel#v}" >> "$GITHUB_OUTPUT"
+          echo "pub=${pub#v}" >> "$GITHUB_OUTPUT"
+        env: { GH_TOKEN: '${{ github.token }}' }
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny
+            ~/.cargo/bin/cargo-vet
+            ~/.cargo/bin/pubrel
+          key: nightly-tools-0.20.2-0.10.2-${{ steps.latest.outputs.pubrel }}-${{ runner.os }}
+      - if: steps.token.outputs.present == 'true'
+        run: |
+          command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
+          command -v cargo-vet >/dev/null || cargo install --locked cargo-vet --version 0.10.2
+          command -v pubrel >/dev/null || cargo install --locked pubrel --version "$PUBREL"
+        env: { PUBREL: '${{ steps.latest.outputs.pubrel }}' }
+      - if: steps.token.outputs.present == 'true'
+        run: |
+          git clone --quiet "https://x-access-token:$GH_TOKEN@github.com/$REPO" repo
+          cd repo
+          ../pubkit/.github/nightly/update.sh
+        env:
+          PUBREL: '${{ steps.latest.outputs.pubrel }}'
+          PUB: '${{ steps.latest.outputs.pub }}'
+          SLACK_TOKEN: '${{ secrets.SUSTENAUT_SLACK_BOT_TOKEN }}'
+          SLACK_USER: '${{ secrets.SLACK_DM_USER_ID }}'

@@ -3,14 +3,25 @@ name: ci
 on:
   push: { branches: [main] }
   pull_request:
+  # Nightly: the same checks, with longer fuzzing and the latest stable and
+  # beta Rust, so a new advisory or a new Rust that breaks the build shows up
+  # within a day.
+  schedule: [{ cron: '17 3 * * *' }]
+  workflow_dispatch:
 
 jobs:
+  # pubkit's shared Rust CI runs every check the Rust crate standard
+  # requires (`make required` lists them). Add your own targets with the
+  # `gates` and `functional` inputs.
   ci:
     uses: schryer/pubkit/.github/workflows/rust-ci.yml@v{version}
 
+  # The shared release workflow: on a pull request, a code change records
+  # what it changes and a release is the bump its changes require,
+  # published; on main, a published version is tagged and released.
   release:
     needs: ci
-    uses: schryer/pubrel/.github/workflows/release.yml@v0.1.0
-    with: { pub-version: v0.1.1, pubrel-version: v0.1.0 }
+    uses: schryer/pubrel/.github/workflows/release.yml@v{pubrel}
+    with: { pubrel-version: v{pubrel}, semver-checks-version: 0.51.0 }
     permissions:
       contents: write

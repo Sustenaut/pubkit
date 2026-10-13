@@ -1,0 +1,46 @@
+[package]
+name = "{name}"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+description = "{description}"
+repository = "https://github.com/schryer/{name}"
+documentation = "https://docs.rs/{name}"
+readme = "README.md"
+keywords = ["publet"]
+categories = []
+# Anchored with /: like gitignore patterns, a bare name matches at any depth.
+include = ["/src/**/*.rs", "/README.md", "/CHANGELOG.md", "/LICENSE", "/SECURITY.md", "/SUPPLY-CHAIN.md", "/TESTING.md"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--generate-link-to-definition"]
+
+[lib]
+name = "{crate}"
+path = "src/lib.rs"
+
+[[bin]]
+name = "{name}"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+overflow-checks = true
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
