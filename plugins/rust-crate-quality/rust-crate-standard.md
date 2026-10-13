@@ -195,6 +195,11 @@ The make targets each kind of crate needs:
   repository has one. [checked: RS-SUP-04, pubkit conform]
 - Releases carry a **signed security record** of the checks run, through
   pubrel's `security` section. [checked: RS-SUP-03, pubrel]
+- **The release key is labelled for what it releases, never with a
+  person's name.** A key's label is public, in its key object, and stays
+  in every release it signs. The key `release.json` names has a label that
+  names the package and ends with "release key", such as "pubunit release
+  key". [checked: RS-SUP-05, pubkit conform]
 
 ## 8. Cross-platform CI
 

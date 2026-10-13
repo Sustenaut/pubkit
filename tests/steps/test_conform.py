@@ -42,6 +42,18 @@ def vet_config(skip: str | None = None) -> str:
     return '[cargo-vet]\nversion = "0.10"\n' + imports
 
 
+KEY = "pub:sha2-256:demokey"
+
+
+def key_object(label: str) -> bytes:
+    """A key object holding `label`, as canonical CBOR."""
+    def text(t: str) -> bytes:
+        b = t.encode()
+        return bytes([0x60 | len(b)]) + b if len(b) < 24 else bytes([0x78, len(b)]) + b
+    body = b"\xa1" + text("label") + text(label)
+    return b"\xa2" + text("body") + body + text("type") + text("key")
+
+
 def workflow(version: str) -> str:
     return ("jobs:\n  ci:\n    uses: "
             f"schryer/pubkit/.github/workflows/rust-ci.yml@{version}\n")
@@ -59,10 +71,13 @@ def conforming(repo, env):
         "deny.toml": deny_toml(),
         "supply-chain/config.toml": vet_config(),
         ".github/workflows/ci.yml": workflow(f"v{__version__}"),
+        "release.json": json.dumps({"name": "demo", "corpus": "corpus", "key": KEY}),
     }
     for path, text in files.items():
         (repo / path).parent.mkdir(parents=True, exist_ok=True)
         (repo / path).write_text(text)
+    key_path(repo).parent.mkdir(parents=True)
+    key_path(repo).write_bytes(key_object("demo release key"))
     # The managed files, so `sync --check` gets as far as conform.
     from pubkit.cli import managed, render, templates, values
     every = templates("rust")
@@ -121,3 +136,17 @@ def exception(repo, rule, until, reason):
     config = json.loads(path.read_text())
     config.setdefault("exceptions", []).append({"rule": rule, "reason": reason, "until": until})
     path.write_text(json.dumps(config, indent=2) + "\n")
+
+
+def key_path(repo):
+    return repo / "corpus" / "objects" / (KEY.replace(":", "_") + ".cbor")
+
+
+@given(parsers.parse('the release key is labelled "{label}"'))
+def labelled(repo, label):
+    key_path(repo).write_bytes(key_object(label))
+
+
+@given("the release key's object is not in corpus/objects")
+def key_missing(repo):
+    key_path(repo).unlink()

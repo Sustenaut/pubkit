@@ -37,6 +37,21 @@ Feature: A Rust repository conforms to the standard, or says why not
       | deny.toml allows yanked crates                           | RS-SUP-01: deny.toml: set yanked = "deny"        |
       | the supply chain imports no audits from mozilla          | RS-SUP-01: supply-chain/config.toml: import mozilla |
 
+  Scenario: A release key labelled with a person's name fails
+    Given a Rust crate that meets the standard
+    And the release key is labelled "Jane Doe"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "RS-SUP-05: the release key is labelled 'Jane Doe'"
+    And stderr mentions "such as 'demo release key'"
+
+  Scenario: The release key's object must be exported to be checked
+    Given a Rust crate that meets the standard
+    And the release key's object is not in corpus/objects
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "RS-SUP-05: the key object pub:sha2-256:demokey is not in corpus/objects/"
+
   Scenario: A workflow pinning another pubkit fails
     Given a Rust crate that meets the standard
     And the workflow calls rust-ci.yml at "v0.0.1"

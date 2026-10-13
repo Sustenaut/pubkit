@@ -1,7 +1,7 @@
 {
   "comment": "Generated from plugins/rust-crate-quality/rust-crate-standard.md by `make standard`. Do not edit.",
   "source": "plugins/rust-crate-quality/rust-crate-standard.md",
-  "sha256": "2b0ef060c750940465ecf4f171c7be0bb8f325d72c49c4963baa2ded070b0cae",
+  "sha256": "b19d1bc875898780322fc98a69f32b20dbd63c8361c9e8ba04a287a64f1430f2",
   "baseline": [
     {
       "target": "fmt-check",
@@ -252,6 +252,16 @@
       "checks": [
         {
           "kind": "pubrel"
+        }
+      ]
+    },
+    {
+      "id": "RS-SUP-05",
+      "section": "7. Supply chain and security",
+      "applies": "every crate",
+      "checks": [
+        {
+          "kind": "conform"
         }
       ]
     },
