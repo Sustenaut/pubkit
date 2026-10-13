@@ -13,13 +13,13 @@ Feature: Keeping a repository's shared files in step
   Scenario: init keeps the repository's own files
     Given an empty repository
     And the file "tests/pytest.ini" reads "[pytest]"
-    When I run pubkit "init" "--kind=python-utility"
+    When I run pubkit "init" "--kind=utility"
     Then it succeeds
     And it prints "kept     tests/pytest.ini"
     And "tests/pytest.ini" contains "[pytest]"
 
   Scenario: A freshly initialised repository is in step
-    Given a repository initialised as "python-utility"
+    Given a repository initialised as "utility"
     When I run pubkit "sync" "--check"
     Then it succeeds
     And it prints "in step with pubkit"
@@ -43,7 +43,7 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
 
   Scenario: A lock pinning another pubkit fails the check
-    Given a repository initialised as "python-utility"
+    Given a repository initialised as "utility"
     And the file "tests/requirements.lock" reads "pubkit @ https://example.org/download/v0.0.0/pubkit-0.0.0-py3-none-any.whl"
     When I run pubkit "sync" "--check"
     Then it fails

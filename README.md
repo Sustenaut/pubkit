@@ -28,7 +28,7 @@ A suite's own step with the same text wins over the plugin's.
 ## Keeping the files in step
 
 ```sh
-pubkit init --kind=rust --bin=pub   # or --kind=python-utility, or --kind=service --project=NAME
+pubkit init --kind=rust --bin=pub   # or --kind=utility, or --kind=service --project=NAME
 pubkit lock                         # pin tests/requirements.txt, with hashes
 pubkit sync --check                 # CI: fail if a managed file drifted
 pubkit sync                         # after bumping pubkit: rewrite them
@@ -39,11 +39,12 @@ A repository is one of three kinds, named in `pubkit.json`:
 | Kind | What it is |
 |---|---|
 | `rust` | A released Rust package, held to the Rust crate standard (below) |
-| `python-utility` | A released Python tool |
+| `utility` | A released tool or library in any language, or several, without the Rust package's extra checks |
 | `service` | A private repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
 
-pubkit 0.10.0 renamed the kind `python` to `python-utility`; `sync` says so
-when `pubkit.json` still names the old one.
+The kind `python` (before 0.10.0) and `python-utility` (0.10.0) are now
+`utility`: a package's language doesn't decide its kind. `sync` says so
+when `pubkit.json` still names an old one.
 
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
