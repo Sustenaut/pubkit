@@ -1,13 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "changed",
-      "change": "RS-REL-01: a release cites a current quality audit. `pubkit audit --check [PACKAGE VERSION]` passes only on audit/<package>-<version>.md made against the standard pubkit ships with no blocking findings, and `pubkit conform` requires release.json to declare it as a security check"
-    },
-    {
-      "category": "added",
-      "change": "`pubkit audit --standard` prints the sha256 of the standard a report's header names; the rust-crate-quality agent writes a release's report to audit/ with that header"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
