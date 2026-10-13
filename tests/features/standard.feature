@@ -43,7 +43,7 @@ Feature: The required checks come from the standard
     And the GITHUB_OUTPUT file says "audit=deny vet"
 
   Scenario: A Python repository has no Rust standard to meet
-    Given a repository initialised as "python-utility"
+    Given a repository initialised as "utility"
     When I run pubkit "required"
     Then it fails
     And stderr mentions "not a Rust repository"

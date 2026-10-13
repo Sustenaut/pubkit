@@ -1,6 +1,6 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
-    pubkit init --kind=rust|python-utility|service [--bin=NAME]
+    pubkit init --kind=rust|utility|service [--bin=NAME]
     pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
@@ -39,14 +39,14 @@ from pathlib import Path
 from . import __version__
 from .plugin import bin_var
 
-KINDS = ("rust", "python-utility", "service")
-# The kinds before pubkit 0.10.0, and what each became. Not accepted: a
+KINDS = ("rust", "utility", "service")
+# Kinds pubkit no longer has, and what each became. Not accepted: a
 # repository says which it is in one way only.
-RENAMED_KINDS = {"python": "python-utility"}
+RENAMED_KINDS = {"python": "utility", "python-utility": "utility"}
 MANAGED = {
     "common": ["tests/requirements-pubkit.txt"],
     "rust": ["rust-toolchain.toml", "pubkit.mk"],
-    "python-utility": [],
+    "utility": [],
     # A private repository that deploys: the one secrets wrapper every
     # service runs its secret-needing commands through.
     "service": ["with-secrets"],
