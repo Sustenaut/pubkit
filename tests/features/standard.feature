@@ -47,3 +47,30 @@ Feature: The required checks come from the standard
     When I run pubkit "required"
     Then it fails
     And stderr mentions "not a Rust repository"
+
+  Scenario Outline: A pull request that touches no code skips fuzz and cross
+    Given a Rust repository whose crate "demo" has a library
+    And the pull request changes "<paths>"
+    When I run pubkit "required" "--event" "<event>" "--head-ref" "<branch>" "--changed-files" "changed"
+    Then it succeeds
+    And the plan line for "fuzz" is "<fuzz>"
+    And it prints "cross_job=<cross>"
+
+    Examples:
+      | event             | branch          | paths                          | fuzz       | cross |
+      | pull_request      | claude/docs     | README.md,.claude/notes.md     | (none)     | false |
+      | pull_request      | claude/docs     | README.md,src/lib.rs           | fuzz-smoke | true  |
+      | pull_request      | claude/deps     | Cargo.lock                     | fuzz-smoke | true  |
+      | pull_request      | claude/fuzz     | fuzz/regressions/parse/x       | fuzz-smoke | true  |
+      | pull_request      | claude/ci       | .github/workflows/ci.yml       | fuzz-smoke | true  |
+      | pull_request      | claude/tool     | rust-toolchain.toml            | fuzz-smoke | true  |
+      | pull_request      | release/v0.2.0  | CHANGELOG.md                   | fuzz-smoke | true  |
+      | push              |                 | README.md                      | fuzz-smoke | true  |
+      | schedule          |                 | README.md                      | fuzz-smoke | true  |
+
+  Scenario: Without the changed files, nothing is skipped
+    Given a Rust repository whose crate "demo" has a library
+    When I run pubkit "required" "--event" "pull_request" "--head-ref" "claude/docs"
+    Then it succeeds
+    And it prints "fuzz=fuzz-smoke"
+    And it prints "cross_job=true"

@@ -133,6 +133,41 @@ def required(standard: dict, library: bool, waived: frozenset[str] = frozenset()
     return {"targets": out, "jobs": sorted(jobs_on)}
 
 
+# What a change must touch for a pull request to run fuzzing and the
+# emulated cross-platform tests: Rust sources, Cargo's files and the pinned
+# toolchain, the fuzz targets, and the workflows.
+SLOW_JOBS = ("fuzz", "cross")
+
+
+def touches_code(path: str) -> bool:
+    """Whether a change to `path` can change what fuzzing or the cross tests
+    run: a Rust source, a Cargo manifest or lock, the toolchain pin, anything
+    under fuzz/, or a GitHub workflow."""
+    name = path.rsplit("/", 1)[-1]
+    return (
+        name.endswith(".rs")
+        or name in ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rust-toolchain")
+        or path.startswith("fuzz/")
+        or path.startswith(".github/workflows/")
+    )
+
+
+def skip_slow(event: str, head_ref: str, changed: list[str] | None) -> str | None:
+    """Why fuzz and cross can be skipped, or `None` when they must run.
+
+    Only on a pull request, only when the changed files are known, and only
+    when none of them touches code. A release pull request (its branch is
+    `release/...`), a push, and a scheduled or manual run always run
+    everything.
+    """
+    if event != "pull_request" or changed is None or head_ref.startswith("release/"):
+        return None
+    if any(touches_code(p) for p in changed):
+        return None
+    return ("this pull request touches no Rust code, Cargo files, fuzz/ or workflow "
+            "files, so fuzz and cross are skipped; releases and the nightly run them")
+
+
 def main(argv: list[str]) -> int:
     root = Path(__file__).resolve().parents[2]
     text = generate(root)

@@ -128,3 +128,15 @@ def makefile_has_targets(shipped):
     named = {b["target"] for b in shipped["baseline"]}
     named |= {c["target"] for r in shipped["rules"] for c in r["checks"] if c["kind"] == "make"}
     assert named <= defined, f"pubkit.mk lacks {sorted(named - defined)}"
+
+
+@given(parsers.parse('the pull request changes "{paths}"'))
+def changed(repo, paths):
+    (repo / "changed").write_text("\n".join(paths.split(",")) + "\n")
+
+
+@then(parsers.parse('the plan line for "{job}" is "{targets}"'))
+def plan_line(result, job, targets):
+    lines = result.stdout.decode().splitlines() if isinstance(result.stdout, bytes) else result.stdout.splitlines()
+    targets = "" if targets == "(none)" else targets
+    assert f"{job}={targets}" in lines, lines

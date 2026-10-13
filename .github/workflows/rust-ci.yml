@@ -13,7 +13,10 @@
 # 3.81, and Windows has no /bin/bash.
 #
 # Jobs the standard requires, beyond gates, test and functional, each run
-# unless the repository declares an exception for its rule in pubkit.json:
+# unless the repository declares an exception for its rule in pubkit.json.
+# fuzz and cross are also skipped on a pull request that touches no Rust
+# code, Cargo files, fuzz/ or workflow files; a release pull request, a push
+# and the nightly run them always:
 #
 # - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.
@@ -65,13 +68,24 @@ jobs:
       audit: ${{ steps.required.outputs.audit }}
       cross_job: ${{ steps.required.outputs.cross_job }}
     steps:
+      # Two commits, so a pull request's merge commit can be compared with
+      # its base: a pull request that touches no Rust code, Cargo files,
+      # fuzz/ or workflow files skips fuzz and cross. Release pull requests,
+      # pushes and scheduled runs run everything.
       - uses: actions/checkout@v5
+        with: { fetch-depth: 2 }
       - uses: actions/setup-python@v5
         with: { python-version: '${{ inputs.python-version }}' }
       - run: make venv
       - run: make sync-check
+      - if: github.event_name == 'pull_request'
+        run: git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
       - id: required
-        run: .venv/bin/pubkit required --github-output
+        run: |
+          changed=()
+          if [ -f "$RUNNER_TEMP/changed-files" ]; then changed=(--changed-files "$RUNNER_TEMP/changed-files"); fi
+          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" "${changed[@]}"
+        env: { EVENT: '${{ github.event_name }}', HEAD_REF: '${{ github.head_ref }}' }
 
   gates:
     needs: plan
