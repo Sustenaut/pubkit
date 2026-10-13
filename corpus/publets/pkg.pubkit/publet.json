@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.6.0 is released as v0.6.0 from commit 6cbd57f0e56c2adf829a74646f593e40f7e93a2c.",
+      "content": "pubkit 0.7.0 is released as v0.7.0 from commit 2f03b535a5f31948dc304d0b855e4625947d23de.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.6.0",
+            "0.7.0",
             "pubkit --version",
-            "pubkit 0.6.0",
-            "v0.6.0",
-            "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
+            "pubkit 0.7.0",
+            "v0.7.0",
+            "2f03b535a5f31948dc304d0b855e4625947d23de"
           ]
         ]
       },
-      "scope": "the published release v0.6.0 of pubkit",
+      "scope": "the published release v0.7.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
+          "revision": "2f03b535a5f31948dc304d0b855e4625947d23de"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.6.0 was released on 2026-10-12 from commit 6cbd57f0e56c2adf829a74646f593e40f7e93a2c with these changes.",
+      "content": "pubkit 0.7.0 was released on 2026-10-13 from commit 2f03b535a5f31948dc304d0b855e4625947d23de with these changes.",
       "data": {
         "columns": [
           {
@@ -58,51 +58,23 @@
         "rows": [
           [
             "changed",
-            "rust-ci.yml runs every make target the Rust crate standard requires: a plan job asks `pubkit required` for each job's targets. The gates and functional inputs now only add targets, the msrv and fuzz inputs are ignored, cross runs on i686 and s390x by default, and a new audit job runs make deny and make vet"
-          ],
-          [
-            "added",
-            "Stable rule IDs on every [checked] rule of the Rust crate standard, and standard.json generated from them and shipped in the package"
-          ],
-          [
-            "added",
-            "`pubkit required` lists the make targets each rust-ci.yml job must run in a repository, from standard.json"
-          ],
-          [
-            "added",
-            "`pubkit doc-coverage` writes and checks each published library's TESTING.md, moved here from publet's tools/doc-coverage.py"
-          ],
-          [
-            "added",
-            "pubkit.mk provides every target the standard names: doc-coverage, doc-coverage-check, vectors, vectors-check, publish-check, msrv, fuzz-smoke, deny, vet and required, with PUBLISHED_CRATES, VECTORS_GENERATE, VECTORS_DIRS, FUZZ_TARGETS and MSRV"
-          ],
-          [
-            "added",
-            "`pubkit conform` checks the standard's required files and settings (_documentation, lints, testdata/, fuzz/, deny.toml and supply-chain baselines, SECURITY.md) and that every workflow pins the pubkit the lock pins"
-          ],
-          [
-            "added",
-            "Dated exceptions in pubkit.json: an excepted rule's checks and make targets are skipped and listed as open, and an expired or unknown exception fails"
-          ],
-          [
-            "changed",
-            "`pubkit sync --check` in a Rust repository now also runs `pubkit conform`, so it fails where the repository does not conform and declares no exception"
+            "`pubkit conform` checks a new rule, RS-SUP-05: the release key release.json names is labelled for what it releases, such as \"pubunit release key\", not with a person's name, so `sync --check` fails for a repository whose release key is labelled with one"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.6.0 of pubkit",
+      "scope": "the published release v0.7.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6cbd57f0e56c2adf829a74646f593e40f7e93a2c"
+          "revision": "2f03b535a5f31948dc304d0b855e4625947d23de"
         }
       ]
     }
   },
-  "created": "2026-10-12T00:00:00Z",
+  "created": "2026-10-13T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
