@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.9.0 is released as v0.9.0 from commit 167ba4587a22a3510536301aa9b058fc8f3b57fd.",
+      "content": "pubkit 0.9.1 is released as v0.9.1 from commit 68034e601dde1054ee209b25226d382cbbaa45ca.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.9.0",
+            "0.9.1",
             "pubkit --version",
-            "pubkit 0.9.0",
-            "v0.9.0",
-            "167ba4587a22a3510536301aa9b058fc8f3b57fd"
+            "pubkit 0.9.1",
+            "v0.9.1",
+            "68034e601dde1054ee209b25226d382cbbaa45ca"
           ]
         ]
       },
-      "scope": "the published release v0.9.0 of pubkit",
+      "scope": "the published release v0.9.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "167ba4587a22a3510536301aa9b058fc8f3b57fd"
+          "revision": "68034e601dde1054ee209b25226d382cbbaa45ca"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.9.0 was released on 2026-10-13 from commit 167ba4587a22a3510536301aa9b058fc8f3b57fd with these changes.",
+      "content": "pubkit 0.9.1 was released on 2026-10-13 from commit 68034e601dde1054ee209b25226d382cbbaa45ca with these changes.",
       "data": {
         "columns": [
           {
@@ -57,31 +57,19 @@
         ],
         "rows": [
           [
-            "changed",
-            "RS-REL-01: a release cites a current quality audit. `pubkit audit --check [PACKAGE VERSION]` passes only on audit/<package>-<version>.md made against the standard pubkit ships with no blocking findings, and `pubkit conform` requires release.json to declare it as a security check"
-          ],
-          [
-            "added",
-            "`pubkit audit --standard` prints the sha256 of the standard a report's header names; the rust-crate-quality agent writes a release's report to audit/ with that header"
-          ],
-          [
-            "added",
-            "`pubkit new --name --tag` starts a Rust package that passes every check from its first commit, with a release key labelled \"<name> release key\""
-          ],
-          [
-            "added",
-            "The nightly workflow keeps one pull request per governed repository: the latest pub* pins, then the crate updates cargo vet audits and cargo deny passes (skipped ones listed with cargo vet suggest), dropping the crate commit when it alone fails CI; it never merges and DMs on Slack (`pubkit nightly`, `pins`, `crates`, `record`)"
+            "fixed",
+            "`pubkit crates` tries each upgrade on its own, on top of those already kept, so one unaudited crate no longer costs the audited ones; it takes no MSRV downgrades, handles crates locked at several versions, and gives each skipped crate its own reason (no audit, with what cargo vet recommends; cargo deny; or updatable only together with others)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.9.0 of pubkit",
+      "scope": "the published release v0.9.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "167ba4587a22a3510536301aa9b058fc8f3b57fd"
+          "revision": "68034e601dde1054ee209b25226d382cbbaa45ca"
         }
       ]
     }
