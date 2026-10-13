@@ -29,12 +29,12 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     Then it succeeds
     And "with-secrets" is executable
 
-  Scenario: The kinds before 0.10.0 are named as they are now
+  Scenario: The kind python is named python-utility since 0.10.0
     Given an empty repository
-    And the file "pubkit.json" reads "{"kind": "rust"}"
+    And the file "pubkit.json" reads "{"kind": "python"}"
     When I run pubkit "sync" "--check"
     Then it fails
-    And stderr mentions "the kind "rust" is now "rust-package""
+    And stderr mentions "the kind "python" is now "python-utility""
 
   Scenario: Secrets reach the command under their names, and Terraform's as TF_VAR_
     Given a service whose Terraform declares "hcloud_token"

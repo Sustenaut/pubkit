@@ -1,6 +1,6 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
-    pubkit init --kind=rust-package|python-utility|service [--bin=NAME]
+    pubkit init --kind=rust|python-utility|service [--bin=NAME]
     pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
@@ -39,13 +39,13 @@ from pathlib import Path
 from . import __version__
 from .plugin import bin_var
 
-KINDS = ("rust-package", "python-utility", "service")
+KINDS = ("rust", "python-utility", "service")
 # The kinds before pubkit 0.10.0, and what each became. Not accepted: a
 # repository says which it is in one way only.
-RENAMED_KINDS = {"rust": "rust-package", "python": "python-utility"}
+RENAMED_KINDS = {"python": "python-utility"}
 MANAGED = {
     "common": ["tests/requirements-pubkit.txt"],
-    "rust-package": ["rust-toolchain.toml", "pubkit.mk"],
+    "rust": ["rust-toolchain.toml", "pubkit.mk"],
     "python-utility": [],
     # A private repository that deploys: the one secrets wrapper every
     # service runs its secret-needing commands through.
@@ -166,7 +166,7 @@ def sync(root: Path, check: bool) -> int:
         if stale or lock_stale:
             return 1
         print(f"in step with pubkit {__version__}")
-        if kind == "rust-package":
+        if kind == "rust":
             if not (root / "Cargo.toml").exists():
                 print("no Cargo.toml yet: the standard's checks wait for a crate")
                 return 0
@@ -241,7 +241,7 @@ def conform(root: Path) -> int:
     """The standard's file and setting checks, and the declared exceptions."""
     from . import conform as checks
     config = read_config(root)
-    if config["kind"] != "rust-package":
+    if config["kind"] != "rust":
         sys.exit("pubkit: conform checks the Rust crate standard; this is not a Rust repository")
     lines, problems = checks.run(root, config)
     for problem in problems:
@@ -261,7 +261,7 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     from . import conform as checks
     from . import standard
     config = read_config(root)
-    if config["kind"] != "rust-package":
+    if config["kind"] != "rust":
         sys.exit("pubkit: required checks come from the Rust crate standard; this is not a Rust repository")
     rules = standard.load()
     waived, _, _ = checks.exceptions(config, {r["id"] for r in rules["rules"]})

@@ -28,7 +28,7 @@ A suite's own step with the same text wins over the plugin's.
 ## Keeping the files in step
 
 ```sh
-pubkit init --kind=rust-package --bin=pub   # or --kind=python-utility, or --kind=service --project=NAME
+pubkit init --kind=rust --bin=pub   # or --kind=python-utility, or --kind=service --project=NAME
 pubkit lock                         # pin tests/requirements.txt, with hashes
 pubkit sync --check                 # CI: fail if a managed file drifted
 pubkit sync                         # after bumping pubkit: rewrite them
@@ -38,12 +38,12 @@ A repository is one of three kinds, named in `pubkit.json`:
 
 | Kind | What it is |
 |---|---|
-| `rust-package` | A released Rust package, held to the Rust crate standard (below) |
+| `rust` | A released Rust package, held to the Rust crate standard (below) |
 | `python-utility` | A released Python tool |
 | `service` | A private repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
 
-pubkit 0.10.0 renamed the kinds `rust` and `python` to `rust-package` and
-`python-utility`; `sync` says so when `pubkit.json` still names an old one.
+pubkit 0.10.0 renamed the kind `python` to `python-utility`; `sync` says so
+when `pubkit.json` still names the old one.
 
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
@@ -160,7 +160,7 @@ A repository that cannot meet a rule yet declares an exception in
 `pubkit.json`:
 
 ```json
-{ "kind": "rust-package",
+{ "kind": "rust",
   "exceptions": [
     { "rule": "RS-TEST-01", "reason": "no independent source for the version arithmetic yet", "until": "2027-01-01" } ] }
 ```

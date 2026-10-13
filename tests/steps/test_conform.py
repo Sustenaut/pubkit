@@ -64,7 +64,7 @@ def workflow(version: str) -> str:
 @given("a Rust crate that meets the standard")
 def conforming(repo, env):
     files = {
-        "pubkit.json": '{"kind": "rust-package"}\n',
+        "pubkit.json": '{"kind": "rust"}\n',
         "Cargo.toml": MANIFEST,
         "src/lib.rs": LIB,
         "SECURITY.md": "# Security\n",
@@ -83,10 +83,10 @@ def conforming(repo, env):
     key_path(repo).write_bytes(key_object("demo release key"))
     # The managed files, so `sync --check` gets as far as conform.
     from pubkit.cli import managed, render, templates, values
-    every = templates("rust-package")
-    for path in managed("rust-package"):
+    every = templates("rust")
+    for path in managed("rust"):
         (repo / path).parent.mkdir(parents=True, exist_ok=True)
-        (repo / path).write_text(render(every[path], values({"kind": "rust-package"})))
+        (repo / path).write_text(render(every[path], values({"kind": "rust"})))
     env["PUBKIT_TODAY"] = "2026-10-12"
 
 

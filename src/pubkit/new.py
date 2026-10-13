@@ -173,10 +173,10 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
             print(f"pubkit: {p}", file=sys.stderr)
         return 1
 
-    config = {"kind": "rust-package", "bin": name}
+    config = {"kind": "rust", "bin": name}
     extra = {"name": name, "crate": name.replace("-", "_"), "tag": tag,
              "description": description or f"{name}: a pub* package."}
-    init_files(root, config, layers=("common", "rust-package", "new-rust"), extra=extra,
+    init_files(root, config, layers=("common", "rust", "new-rust"), extra=extra,
                keep=KEPT)
     for src, dst in RENAMED.items():
         if (root / src).exists():
