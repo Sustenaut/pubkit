@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.7.0 is released as v0.7.0 from commit 2f03b535a5f31948dc304d0b855e4625947d23de.",
+      "content": "pubkit 0.8.0 is released as v0.8.0 from commit 11e679e713ab855e08875acd7b8e6dc151061f9f.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.7.0",
+            "0.8.0",
             "pubkit --version",
-            "pubkit 0.7.0",
-            "v0.7.0",
-            "2f03b535a5f31948dc304d0b855e4625947d23de"
+            "pubkit 0.8.0",
+            "v0.8.0",
+            "11e679e713ab855e08875acd7b8e6dc151061f9f"
           ]
         ]
       },
-      "scope": "the published release v0.7.0 of pubkit",
+      "scope": "the published release v0.8.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "2f03b535a5f31948dc304d0b855e4625947d23de"
+          "revision": "11e679e713ab855e08875acd7b8e6dc151061f9f"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.7.0 was released on 2026-10-13 from commit 2f03b535a5f31948dc304d0b855e4625947d23de with these changes.",
+      "content": "pubkit 0.8.0 was released on 2026-10-13 from commit 11e679e713ab855e08875acd7b8e6dc151061f9f with these changes.",
       "data": {
         "columns": [
           {
@@ -58,18 +58,18 @@
         "rows": [
           [
             "changed",
-            "`pubkit conform` checks a new rule, RS-SUP-05: the release key release.json names is labelled for what it releases, such as \"pubunit release key\", not with a person's name, so `sync --check` fails for a repository whose release key is labelled with one"
+            "rust-ci.yml skips the fuzz and cross jobs on a pull request that touches no Rust code, Cargo files, fuzz/ or workflow files; release pull requests, pushes and the nightly run everything. `pubkit required` takes --event, --head-ref and --changed-files to decide"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.7.0 of pubkit",
+      "scope": "the published release v0.8.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "2f03b535a5f31948dc304d0b855e4625947d23de"
+          "revision": "11e679e713ab855e08875acd7b8e6dc151061f9f"
         }
       ]
     }

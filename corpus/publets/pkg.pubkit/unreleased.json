@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "changed",
-      "change": "rust-ci.yml skips the fuzz and cross jobs on a pull request that touches no Rust code, Cargo files, fuzz/ or workflow files; release pull requests, pushes and the nightly run everything. `pubkit required` takes --event, --head-ref and --changed-files to decide"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
