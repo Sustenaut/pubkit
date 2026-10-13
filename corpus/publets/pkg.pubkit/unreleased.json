@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "fixed",
-      "change": "`pubkit crates` tries each upgrade on its own, on top of those already kept, so one unaudited crate no longer costs the audited ones; it takes no MSRV downgrades, handles crates locked at several versions, and gives each skipped crate its own reason (no audit, with what cargo vet recommends; cargo deny; or updatable only together with others)"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
