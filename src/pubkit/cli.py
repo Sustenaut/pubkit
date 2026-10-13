@@ -1,6 +1,6 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
-    pubkit init --kind=rust|python [--bin=NAME]
+    pubkit init --kind=rust-package|python-utility|service [--bin=NAME]
     pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
@@ -39,12 +39,20 @@ from pathlib import Path
 from . import __version__
 from .plugin import bin_var
 
-KINDS = ("rust", "python")
+KINDS = ("rust-package", "python-utility", "service")
+# The kinds before pubkit 0.10.0, and what each became. Not accepted: a
+# repository says which it is in one way only.
+RENAMED_KINDS = {"rust": "rust-package", "python": "python-utility"}
 MANAGED = {
     "common": ["tests/requirements-pubkit.txt"],
-    "rust": ["rust-toolchain.toml", "pubkit.mk"],
-    "python": [],
+    "rust-package": ["rust-toolchain.toml", "pubkit.mk"],
+    "python-utility": [],
+    # A private repository that deploys: the one secrets wrapper every
+    # service runs its secret-needing commands through.
+    "service": ["with-secrets"],
 }
+# Managed files that are programs, written executable.
+EXECUTABLE = {"with-secrets"}
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
@@ -80,8 +88,11 @@ def managed(kind: str) -> list[str]:
 def read_config(root: Path) -> dict[str, str]:
     path = root / CONFIG
     if not path.exists():
-        sys.exit(f"pubkit: no {CONFIG} here; run `pubkit init --kind=rust|python` first")
+        sys.exit(f"pubkit: no {CONFIG} here; run `pubkit init --kind={'|'.join(KINDS)}` first")
     config = json.loads(path.read_text(encoding="utf-8"))
+    if config.get("kind") in RENAMED_KINDS:
+        sys.exit(f"pubkit: the kind \"{config['kind']}\" is now \"{RENAMED_KINDS[config['kind']]}\" "
+                 f"(pubkit 0.10.0); change it in {CONFIG}")
     if config.get("kind") not in KINDS:
         sys.exit(f"pubkit: {CONFIG} must give a kind: one of {', '.join(KINDS)}")
     return config
@@ -108,16 +119,18 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(render(text, fill), encoding="utf-8")
-        if path.endswith(".py") and text.startswith("#!"):
+        if (path.endswith(".py") and text.startswith("#!")) or path in EXECUTABLE:
             target.chmod(0o755)
         print(f"{'managed' if path in owned else 'seeded '}  {path}")
 
 
-def init(root: Path, kind: str, binary: str | None) -> int:
+def init(root: Path, kind: str, binary: str | None, project: str | None = None) -> int:
     config = {"kind": kind}
     if binary:
         config["bin"] = binary
-    init_files(root, config)
+    if kind == "service" and not project:
+        sys.exit("pubkit: a service names the Bitwarden Secrets Manager project its secrets are in: --project=NAME")
+    init_files(root, config, extra={"project": project or ""})
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
 
@@ -137,6 +150,8 @@ def sync(root: Path, check: bool) -> int:
         if not check:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(want, encoding="utf-8")
+            if path in EXECUTABLE:
+                target.chmod(0o755)
             print(f"updated  {path}")
     lock = root / LOCK
     wheel = f"/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl"
@@ -151,7 +166,7 @@ def sync(root: Path, check: bool) -> int:
         if stale or lock_stale:
             return 1
         print(f"in step with pubkit {__version__}")
-        if kind == "rust":
+        if kind == "rust-package":
             if not (root / "Cargo.toml").exists():
                 print("no Cargo.toml yet: the standard's checks wait for a crate")
                 return 0
@@ -226,7 +241,7 @@ def conform(root: Path) -> int:
     """The standard's file and setting checks, and the declared exceptions."""
     from . import conform as checks
     config = read_config(root)
-    if config["kind"] != "rust":
+    if config["kind"] != "rust-package":
         sys.exit("pubkit: conform checks the Rust crate standard; this is not a Rust repository")
     lines, problems = checks.run(root, config)
     for problem in problems:
@@ -246,7 +261,7 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     from . import conform as checks
     from . import standard
     config = read_config(root)
-    if config["kind"] != "rust":
+    if config["kind"] != "rust-package":
         sys.exit("pubkit: required checks come from the Rust crate standard; this is not a Rust repository")
     rules = standard.load()
     waived, _, _ = checks.exceptions(config, {r["id"] for r in rules["rules"]})
@@ -281,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("init", help="write the shared files into this repository")
     p.add_argument("--kind", choices=KINDS, required=True)
     p.add_argument("--bin", help="the program under test, for <NAME>_BIN_DIR")
+    p.add_argument("--project", help="service: the Bitwarden Secrets Manager project (name or id) with-secrets reads")
     p = commands.add_parser("new", help="start a new Rust package that meets the standard")
     p.add_argument("--name", required=True, help="the package's name, which is also its binary's")
     p.add_argument("--tag", required=True, help="its Section 9.1 tag, PKG-XXXXXX-MM-YYYY")
@@ -346,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     root = Path.cwd()
     if args.command == "init":
-        return init(root, args.kind, args.bin)
+        return init(root, args.kind, args.bin, args.project)
     if args.command == "new":
         from .new import run as new
         return new(root, args.name, args.tag, args.description, key=not args.no_key,

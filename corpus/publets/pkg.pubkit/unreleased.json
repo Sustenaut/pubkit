@@ -1,4 +1,13 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "changed",
+      "change": "The kinds rust and python are renamed rust-package and python-utility; sync fails, saying which name to use, on a pubkit.json naming an old one"
+    },
+    {
+      "category": "added",
+      "change": "The kind service, for a private repository that deploys: a managed ./with-secrets runs one command with the secrets of a Bitwarden Secrets Manager project in its environment (read with bws and a read-only machine account's token; Terraform variables as TF_VAR_ or as a secret_values map, set in the seeded with-secrets.json), and the reusable workflow service-ci.yml checks sync, shellcheck, Terraform (fmt, validate) and the repository's tests"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

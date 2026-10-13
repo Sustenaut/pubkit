@@ -13,6 +13,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | workflow      |
       | rust-ci.yml   |
       | python-ci.yml |
+      | service-ci.yml |
 
   Scenario Outline: A reusable workflow ends in the one check a ruleset requires
     When I parse the workflow "<workflow>"
@@ -22,6 +23,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | workflow      |
       | rust-ci.yml   |
       | python-ci.yml |
+      | service-ci.yml |
 
   Scenario: rust-ci runs the targets pubkit required plans, in every job
     When I parse the workflow "rust-ci.yml"

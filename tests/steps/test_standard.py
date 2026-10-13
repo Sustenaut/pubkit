@@ -30,7 +30,7 @@ def crate(repo: Path, name: str, lib: str | None, main: bool = False, tests: str
     if tests:
         (repo / "tests").mkdir()
         (repo / "tests" / "it.rs").write_text(tests)
-    (repo / "pubkit.json").write_text('{"kind": "rust"}\n')
+    (repo / "pubkit.json").write_text('{"kind": "rust-package"}\n')
 
 
 TWICE = '''//! A crate.
@@ -123,7 +123,7 @@ def shipped():
 
 @then("the rust pubkit.mk defines every target it names")
 def makefile_has_targets(shipped):
-    mk = (SOURCE / "src" / "pubkit" / "templates" / "rust" / "pubkit.mk").read_text()
+    mk = (SOURCE / "src" / "pubkit" / "templates" / "rust-package" / "pubkit.mk").read_text()
     defined = set(re.findall(r"^([a-z-]+):", mk, re.M))
     named = {b["target"] for b in shipped["baseline"]}
     named |= {c["target"] for r in shipped["rules"] for c in r["checks"] if c["kind"] == "make"}
