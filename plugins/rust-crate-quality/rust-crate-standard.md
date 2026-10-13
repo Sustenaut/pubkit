@@ -204,6 +204,15 @@ The make targets each kind of crate needs:
   names the package and ends with "release key", such as "pubunit release
   key". [checked: RS-SUP-05, pubkit conform]
 
+- **Each release cites a current quality audit.** The rust-crate-quality
+  agent writes its report for the version being released to
+  `audit/<package>-<version>.md`. The report's header names the standard it
+  audited against and how many of its findings block a release. A release
+  needs a report made against the standard as it is now, with none that
+  block. `release.json` declares `pubkit audit --check` as a security check,
+  so `pubrel prepare` cuts no release without one, and the signed security
+  record cites it. [checked: RS-REL-01, pubrel, pubkit conform]
+
 ## 8. Cross-platform CI
 
 Results that must be identical everywhere are tested on a 32-bit target and

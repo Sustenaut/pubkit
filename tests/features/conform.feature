@@ -52,6 +52,13 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "RS-SUP-05: the key object pub:sha2-256:demokey is not in corpus/objects/"
 
+  Scenario: A release must be gated on a current quality audit
+    Given a Rust crate that meets the standard
+    And release.json declares no audit check
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "RS-REL-01: release.json declares no `pubkit audit --check` security check"
+
   Scenario: A workflow pinning another pubkit fails
     Given a Rust crate that meets the standard
     And the workflow calls rust-ci.yml at "v0.0.1"

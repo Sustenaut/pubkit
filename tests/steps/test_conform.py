@@ -43,6 +43,8 @@ def vet_config(skip: str | None = None) -> str:
 
 
 KEY = "pub:sha2-256:demokey"
+AUDIT_CHECK = {"name": "quality audit current", "run": ".venv/bin/pubkit audit --check",
+               "version": ".venv/bin/pubkit --version"}
 
 
 def key_object(label: str) -> bytes:
@@ -71,7 +73,8 @@ def conforming(repo, env):
         "deny.toml": deny_toml(),
         "supply-chain/config.toml": vet_config(),
         ".github/workflows/ci.yml": workflow(f"v{__version__}"),
-        "release.json": json.dumps({"name": "demo", "corpus": "corpus", "key": KEY}),
+        "release.json": json.dumps({"name": "demo", "corpus": "corpus", "key": KEY,
+                                    "security": {"checks": [AUDIT_CHECK]}}),
     }
     for path, text in files.items():
         (repo / path).parent.mkdir(parents=True, exist_ok=True)
@@ -150,3 +153,11 @@ def labelled(repo, label):
 @given("the release key's object is not in corpus/objects")
 def key_missing(repo):
     key_path(repo).unlink()
+
+
+@given("release.json declares no audit check")
+def no_audit_check(repo):
+    path = repo / "release.json"
+    config = json.loads(path.read_text())
+    config["security"]["checks"] = []
+    path.write_text(json.dumps(config))

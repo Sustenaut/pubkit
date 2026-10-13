@@ -7,6 +7,7 @@
     pubkit doc-coverage [--check] [CRATE...]
     pubkit required [--github-output]
     pubkit conform
+    pubkit audit --check [PACKAGE VERSION] | --standard
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -272,6 +273,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true")
     p.add_argument("crates", nargs="*", metavar="CRATE",
                    help="the crates; by default every published library here")
+    p = commands.add_parser("audit",
+                            help="check a release's quality audit is current (RS-REL-01)")
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument("--check", nargs="*", metavar="PACKAGE VERSION",
+                       help="pass only if audit/PACKAGE-VERSION.md is current and blocks nothing; "
+                            "without them, the release pubrel prepare is cutting "
+                            "($PUBREL_PACKAGE, $PUBREL_VERSION)"),
+    group.add_argument("--standard", action="store_true",
+                       help="print the sha256 of the standard this pubkit ships, for a report's header")
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
     p = commands.add_parser("required",
@@ -301,6 +311,9 @@ def main(argv: list[str] | None = None) -> int:
                         args.changed_files)
     if args.command == "conform":
         return conform(root)
+    if args.command == "audit":
+        from .audit import run as audit
+        return audit(root, args.check if args.check is not None else [], args.standard)
     return lock(root)
 
 

@@ -11,6 +11,8 @@ Each check belongs to a rule the standard tags `pubkit conform`:
 - RS-SUP-01: `deny.toml` keeps the shared baseline, and
   `supply-chain/config.toml` imports the shared audit sets;
 - RS-SUP-04: `SECURITY.md` exists;
+- RS-REL-01: `release.json` declares `pubkit audit --check` as a security
+  check, so no release is cut without a current quality audit;
 - RS-SUP-05: the release key `release.json` names is labelled for what it
   releases (the package's name and "release key"), not with a person's
   name: its label is public in every release it signs.
@@ -152,6 +154,8 @@ def checks(root: Path, config: dict) -> dict[str, list[str]]:
         problem("RS-SUP-04", "no SECURITY.md")
     for text in release_key_label(root):
         problem("RS-SUP-05", text)
+    for text in audit_declared(root):
+        problem("RS-REL-01", text)
     deny = root / "deny.toml"
     if not deny.is_file():
         problem("RS-SUP-01", "no deny.toml")
@@ -232,6 +236,20 @@ def release_key_label(root: Path) -> list[str]:
         return [f"the release key is labelled {label!r}: label it for what it releases, "
                 f"such as {want!r}, not with a person's name; rotate to a key labelled so"]
     return []
+
+
+def audit_declared(root: Path) -> list[str]:
+    """Problems with release.json's declaration of the audit check (RS-REL-01)."""
+    path = root / "release.json"
+    if not path.is_file():
+        return []  # RS-SUP-05 already reports a missing release.json
+    release = json.loads(path.read_text(encoding="utf-8"))
+    checks = release.get("security", {}).get("checks", [])
+    if any("pubkit audit --check" in str(c.get("run", "")) for c in checks):
+        return []
+    return ["release.json declares no `pubkit audit --check` security check: add one "
+            "named \"quality audit current\", whose run is `.venv/bin/pubkit audit --check` "
+            "and whose version is `.venv/bin/pubkit --version`"]
 
 
 def workflow_pins(root: Path) -> list[str]:
