@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.9.1 is released as v0.9.1 from commit 68034e601dde1054ee209b25226d382cbbaa45ca.",
+      "content": "pubkit 0.10.0 is released as v0.10.0 from commit 829651a1dc232e29a971ace54275587ec5640c6f.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.9.1",
+            "0.10.0",
             "pubkit --version",
-            "pubkit 0.9.1",
-            "v0.9.1",
-            "68034e601dde1054ee209b25226d382cbbaa45ca"
+            "pubkit 0.10.0",
+            "v0.10.0",
+            "829651a1dc232e29a971ace54275587ec5640c6f"
           ]
         ]
       },
-      "scope": "the published release v0.9.1 of pubkit",
+      "scope": "the published release v0.10.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "68034e601dde1054ee209b25226d382cbbaa45ca"
+          "revision": "829651a1dc232e29a971ace54275587ec5640c6f"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.9.1 was released on 2026-10-13 from commit 68034e601dde1054ee209b25226d382cbbaa45ca with these changes.",
+      "content": "pubkit 0.10.0 was released on 2026-10-13 from commit 829651a1dc232e29a971ace54275587ec5640c6f with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,23 @@
         ],
         "rows": [
           [
-            "fixed",
-            "`pubkit crates` tries each upgrade on its own, on top of those already kept, so one unaudited crate no longer costs the audited ones; it takes no MSRV downgrades, handles crates locked at several versions, and gives each skipped crate its own reason (no audit, with what cargo vet recommends; cargo deny; or updatable only together with others)"
+            "changed",
+            "The kinds rust and python are renamed rust-package and python-utility; sync fails, saying which name to use, on a pubkit.json naming an old one"
+          ],
+          [
+            "added",
+            "The kind service, for a private repository that deploys: a managed ./with-secrets runs one command with the secrets of a Bitwarden Secrets Manager project in its environment (read with bws and a read-only machine account's token; Terraform variables as TF_VAR_ or as a secret_values map, set in the seeded with-secrets.json), and the reusable workflow service-ci.yml checks sync, shellcheck, Terraform (fmt, validate) and the repository's tests"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.9.1 of pubkit",
+      "scope": "the published release v0.10.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "68034e601dde1054ee209b25226d382cbbaa45ca"
+          "revision": "829651a1dc232e29a971ace54275587ec5640c6f"
         }
       ]
     }
