@@ -73,6 +73,30 @@ what the standard asks. Quote at most a line of the docs. End with the
 checks you ran and their results, and the ones you could not run and why.
 Do not pad the report: if a crate meets a section, say so in one line.
 
+### The report as a release's audit (RS-REL-01)
+
+When asked to audit a crate **for a release**, also write the report to
+`audit/<package>-<version>.md` in the repository, where `<version>` is the
+version being released (`pubrel next`, or `pubrel next --package NAME`).
+Start the file with this header, then the report:
+
+```
+---
+package: <package>
+version: <version>
+standard: <the output of `pubkit audit --standard`>
+blocking: <how many findings are under "Blocks a release">
+date: <today, YYYY-MM-DD>
+auditor: rust-crate-quality
+---
+```
+
+`pubkit audit --check` reads that header when the release is cut. It refuses
+a report on another version, against another version of the standard, or
+with `blocking` above 0. Count `blocking` honestly: it is what lets a
+release through. This file is the one thing you write outside the docs; say
+in your report that it should be committed with the release's changes.
+
 ## Writing
 
 When asked to write or fix:

@@ -108,6 +108,7 @@ runs it in every Rust repository:
 | RS-SUP-01 | `deny.toml` keeps the shared baseline, and `supply-chain/config.toml` imports the shared audit sets |
 | RS-SUP-04 | `SECURITY.md` exists |
 | RS-SUP-05 | the release key `release.json` names is labelled for what it releases ("pubunit release key"), not with a person's name: its label is public in every release it signs |
+| RS-REL-01 | `release.json` declares `pubkit audit --check` as a security check |
 
 It also checks that every workflow calling `rust-ci.yml` pins the pubkit
 version the lock pins, so a repository's CI cannot fall behind the standard
@@ -126,6 +127,40 @@ A repository that cannot meet a rule yet declares an exception in
 An excepted rule's conformance checks are skipped, its make targets leave
 `pubkit required`'s plan, and `pubkit conform` lists it as open. An
 exception past its `until` date, or naming no rule, fails.
+
+## A release cites a current audit
+
+The judged rules need a reader, so a release needs a report by the
+rust-crate-quality agent (RS-REL-01). For a release, the agent writes it to
+`audit/<package>-<version>.md`, with a header:
+
+```
+---
+package: pubunit
+version: 0.1.1
+standard: <pubkit audit --standard>
+blocking: 0
+date: 2026-10-13
+auditor: rust-crate-quality
+---
+```
+
+`pubkit audit --check [PACKAGE VERSION]` passes only on a report for that
+release, made against the standard this pubkit ships, with no finding that
+blocks a release. Without arguments it reads the release `pubrel prepare` is
+cutting from `PUBREL_PACKAGE` and `PUBREL_VERSION`. A repository declares it
+in `release.json`:
+
+```json
+{ "name": "quality audit current", "run": ".venv/bin/pubkit audit --check",
+  "version": ".venv/bin/pubkit --version" }
+```
+
+`pubrel prepare` runs every declared check before it changes anything, so it
+cuts no release without a current audit. It records each check's last line
+in the release's signed security record, so the release cites its report.
+Changing the standard makes earlier reports stale: a release after that
+needs a new audit.
 
 ## The Rust crate standard, and an agent that audits against it
 
