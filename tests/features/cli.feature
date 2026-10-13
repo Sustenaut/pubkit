@@ -4,7 +4,7 @@ Feature: Keeping a repository's shared files in step
 
   Scenario: init writes managed and seeded files for a Rust package
     Given an empty repository
-    When I run pubkit "init" "--kind=rust-package" "--bin=demo"
+    When I run pubkit "init" "--kind=rust" "--bin=demo"
     Then it succeeds
     And the repository has "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/ci.yml"
     And "Makefile" contains "DEMO_BIN_DIR"
@@ -25,7 +25,7 @@ Feature: Keeping a repository's shared files in step
     And it prints "in step with pubkit"
 
   Scenario: An edited managed file fails the check, and sync restores it
-    Given a repository initialised as "rust-package"
+    Given a repository initialised as "rust"
     And the file "pubkit.mk" reads "edited"
     When I run pubkit "sync" "--check"
     Then it fails
@@ -37,7 +37,7 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
 
   Scenario: Seeded files are the repository's to change
-    Given a repository initialised as "rust-package"
+    Given a repository initialised as "rust"
     And the file "Makefile" reads "include pubkit.mk"
     When I run pubkit "sync" "--check"
     Then it succeeds

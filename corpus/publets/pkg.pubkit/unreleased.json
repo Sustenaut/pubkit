@@ -2,7 +2,7 @@
   "changes": [
     {
       "category": "changed",
-      "change": "The kinds rust and python are renamed rust-package and python-utility; sync fails, saying which name to use, on a pubkit.json naming an old one"
+      "change": "The kind python is renamed python-utility; sync fails, saying which name to use, on a pubkit.json naming the old one. The kind rust keeps its name"
     },
     {
       "category": "added",

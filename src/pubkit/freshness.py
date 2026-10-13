@@ -43,7 +43,7 @@ def row(repo: Path) -> dict:
     if not config_path.is_file():
         return {**out, "conforms": "no pubkit.json", "exceptions": []}
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    if config.get("kind") != "rust-package":
+    if config.get("kind") != "rust":
         return {**out, "conforms": "not Rust", "exceptions": []}
     try:
         lines, problems = conform(repo, config)

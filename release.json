@@ -19,6 +19,6 @@
     "name": "pubkit",
     "check": "pubkit --version"
   },
-  "install": "pubkit init --kind=rust-package|python-utility|service, or pubkit sync, then pubkit lock: the lock pins the {tag} wheel by its sha256",
+  "install": "pubkit init --kind=rust|python-utility|service, or pubkit sync, then pubkit lock: the lock pins the {tag} wheel by its sha256",
   "key": "pub:sha2-256:ks7g2ycpdnhjdtsn3sfoiqoh2tazwtiwr2emxut3ugourttnnbka"
 }
