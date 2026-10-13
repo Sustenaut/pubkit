@@ -72,3 +72,17 @@ def inputs_only_add(workflow):
         assert inputs[name]["default"] == "", name
         assert f"EXTRA: '${{{{ inputs.{name} }}}}'" in workflow["text"], name
         assert f"REQUIRED: '${{{{ needs.plan.outputs.{name} }}}}'" in workflow["text"], name
+
+
+@then("the plan job compares a pull request with its base and passes it to pubkit required")
+def plan_passes_changes(workflow):
+    steps = workflow["data"]["jobs"]["plan"]["steps"]
+    checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout"))
+    assert checkout.get("with", {}).get("fetch-depth") == 2, checkout
+    diff = next(s for s in steps if "git diff --name-only HEAD^1 HEAD" in s.get("run", ""))
+    assert diff.get("if") == "github.event_name == 'pull_request'", diff
+    required = next(s for s in steps if s.get("id") == "required")
+    for flag in ("--event", "--head-ref", "--changed-files"):
+        assert flag in required["run"], flag
+    assert required["env"] == {"EVENT": "${{ github.event_name }}",
+                               "HEAD_REF": "${{ github.head_ref }}"}

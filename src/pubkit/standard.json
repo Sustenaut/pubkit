@@ -1,7 +1,7 @@
 {
   "comment": "Generated from plugins/rust-crate-quality/rust-crate-standard.md by `make standard`. Do not edit.",
   "source": "plugins/rust-crate-quality/rust-crate-standard.md",
-  "sha256": "b19d1bc875898780322fc98a69f32b20dbd63c8361c9e8ba04a287a64f1430f2",
+  "sha256": "67d22b69f7e755264bd103d6d0ae4fa8b2c83953cbb17480b9657d119271707e",
   "baseline": [
     {
       "target": "fmt-check",

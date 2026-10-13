@@ -27,3 +27,7 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "rust-ci.yml"
     Then every job pubkit required plans for reads its targets from the plan job
     And the gates and functional inputs only add targets
+
+  Scenario: rust-ci's plan hands the event, the branch and the changed files to pubkit
+    When I parse the workflow "rust-ci.yml"
+    Then the plan job compares a pull request with its base and passes it to pubkit required

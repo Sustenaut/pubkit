@@ -106,7 +106,10 @@ rust-ci test, library]
   and replayed on every run. Each bug also gets a named regression test in
   the crate's own tests. [checked: RS-FUZZ-01, make fuzz-smoke, pubkit
   conform]
-- Fuzzing runs on every change, briefly, and for longer on a schedule.
+- Fuzzing runs on every change that can change what it runs, briefly, and
+  for longer on a schedule. A pull request that touches no Rust code,
+  Cargo files, `fuzz/` or workflow files skips it. A release pull request
+  and the nightly always run it.
   [checked: RS-FUZZ-02, rust-ci fuzz]
 - The crate forbids `unsafe` (`unsafe_code = "forbid"`) unless it needs it.
   A crate that uses `unsafe` also runs miri. [checked: RS-SAFE-01, pubkit
@@ -205,7 +208,9 @@ The make targets each kind of crate needs:
 
 Results that must be identical everywhere are tested on a 32-bit target and
 a big-endian one: the `cross` job, i686 and s390x by default. That is in
-addition to Linux, macOS and Windows. [checked: RS-PLAT-01, rust-ci cross,
+addition to Linux, macOS and Windows. Like fuzzing, it is skipped on a pull
+request that touches no Rust code, Cargo files, `fuzz/` or workflow files,
+and runs on every release pull request and nightly. [checked: RS-PLAT-01, rust-ci cross,
 rust-ci test]
 
 ## 9. Crates that are command-line tools

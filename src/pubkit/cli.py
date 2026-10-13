@@ -216,8 +216,12 @@ def conform(root: Path) -> int:
     return 0
 
 
-def required(root: Path, github_output: bool) -> int:
-    """The make targets each rust-ci.yml job must run here, from the standard."""
+def required(root: Path, github_output: bool, event: str = "", head_ref: str = "",
+             changed_file: str | None = None) -> int:
+    """The make targets each rust-ci.yml job must run here, from the standard.
+
+    Given the event, the pull request's branch and the files it changes, a
+    pull request that touches no code skips fuzz and cross."""
     from . import conform as checks
     from . import standard
     config = read_config(root)
@@ -226,9 +230,19 @@ def required(root: Path, github_output: bool) -> int:
     rules = standard.load()
     waived, _, _ = checks.exceptions(config, {r["id"] for r in rules["rules"]})
     plan = standard.required(rules, standard.has_library(root), frozenset(waived))
+    changed = None
+    if changed_file is not None:
+        changed = [line.strip() for line in Path(changed_file).read_text(encoding="utf-8").splitlines()
+                   if line.strip()]
+    reason = standard.skip_slow(event, head_ref, changed)
+    if reason:
+        plan["targets"]["fuzz"] = []
+        plan["jobs"] = [j for j in plan["jobs"] if j not in standard.SLOW_JOBS]
     lines = [f"{job}={' '.join(targets)}" for job, targets in plan["targets"].items()]
     lines += [f"{job}_job={'true' if job in plan['jobs'] else 'false'}"
               for job in sorted(standard.WORKFLOW_JOBS)]
+    if reason:
+        print(f"pubkit: {reason}", file=sys.stderr)
     if github_output:
         path = os.environ.get("GITHUB_OUTPUT")
         if not path:
@@ -264,6 +278,12 @@ def main(argv: list[str] | None = None) -> int:
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
                    help="also append them to $GITHUB_OUTPUT")
+    p.add_argument("--event", default="",
+                   help="the GitHub event: on a pull_request, fuzz and cross may be skipped")
+    p.add_argument("--head-ref", default="",
+                   help="the pull request's branch; a release/ branch runs everything")
+    p.add_argument("--changed-files", metavar="FILE",
+                   help="a file listing the paths the pull request changes, one per line")
     args = parser.parse_args(argv)
     root = Path.cwd()
     if args.command == "init":
@@ -277,7 +297,8 @@ def main(argv: list[str] | None = None) -> int:
         from .doc_coverage import run as coverage
         return coverage(root, args.crates, args.check)
     if args.command == "required":
-        return required(root, args.github_output)
+        return required(root, args.github_output, args.event, args.head_ref,
+                        args.changed_files)
     if args.command == "conform":
         return conform(root)
     return lock(root)
