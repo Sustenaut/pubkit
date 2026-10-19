@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.11.0 is released as v0.11.0 from commit 80c9d568128a139b2ff0f25b15df431511c1d4d8.",
+      "content": "pubkit 0.11.1 is released as v0.11.1 from commit 07146fba199e13e9aac39c750ca0b5577a4a11c2.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.11.0",
+            "0.11.1",
             "pubkit --version",
-            "pubkit 0.11.0",
-            "v0.11.0",
-            "80c9d568128a139b2ff0f25b15df431511c1d4d8"
+            "pubkit 0.11.1",
+            "v0.11.1",
+            "07146fba199e13e9aac39c750ca0b5577a4a11c2"
           ]
         ]
       },
-      "scope": "the published release v0.11.0 of pubkit",
+      "scope": "the published release v0.11.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "80c9d568128a139b2ff0f25b15df431511c1d4d8"
+          "revision": "07146fba199e13e9aac39c750ca0b5577a4a11c2"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.11.0 was released on 2026-10-13 from commit 80c9d568128a139b2ff0f25b15df431511c1d4d8 with these changes.",
+      "content": "pubkit 0.11.1 was released on 2026-10-19 from commit 07146fba199e13e9aac39c750ca0b5577a4a11c2 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,24 @@
         ],
         "rows": [
           [
-            "changed",
-            "The kind python-utility (and python before it) is now utility: a released tool or library in any language, or several, without the Rust package's extra checks. sync fails on a pubkit.json naming an old kind, saying which to use"
+            "added",
+            "with-secrets.json can name aliases files ({\"aliases\": {\"NAME\": \"secret\"}}, kept next to the code that needs them) that also export a secret under the fixed name a tool reads, such as TAILSCALE_OAUTH_CLIENT_ID for the Tailscale Terraform provider; an alias of a missing secret is reported and skipped"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.11.0 of pubkit",
+      "scope": "the published release v0.11.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "80c9d568128a139b2ff0f25b15df431511c1d4d8"
+          "revision": "07146fba199e13e9aac39c750ca0b5577a4a11c2"
         }
       ]
     }
   },
-  "created": "2026-10-13T00:00:00Z",
+  "created": "2026-10-19T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
