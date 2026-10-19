@@ -73,6 +73,15 @@ def as_map(repo, run, name):
     (repo / "with-secrets.json").write_text(json.dumps(settings))
 
 
+@given(parsers.parse('the aliases file "{path}" maps "{alias}" to "{secret}"'))
+def aliases_file(repo, path, alias, secret):
+    (repo / path).parent.mkdir(parents=True, exist_ok=True)
+    (repo / path).write_text(json.dumps({"comment": "test", "aliases": {alias: secret}}))
+    settings = json.loads((repo / "with-secrets.json").read_text())
+    settings["aliases"] = [path]
+    (repo / "with-secrets.json").write_text(json.dumps(settings))
+
+
 @given(parsers.parse('Bitwarden holds "{k1}" as "{v1}" and "{k2}" as "{v2}" in the project "{project}"'))
 def holds(fake, k1, v1, k2, v2, project):
     (fake / "projects.json").write_text(json.dumps([{"id": f"id-{project}", "name": project}]))
