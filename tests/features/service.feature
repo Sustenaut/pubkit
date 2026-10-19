@@ -79,3 +79,31 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     And Bitwarden holds "HCLOUD_TOKEN" as "h1" and "restic-password" as "r1" in the project "infra"
     When I run "./with-secrets" with the token "tok" and a command that exits 7
     Then the exit code is 7
+
+  Scenario: An aliases file also exports a secret under the name a tool reads
+    Given a service whose Terraform declares "hcloud_token"
+    And the aliases file "infra/aliases.json" maps "TAILSCALE_OAUTH_CLIENT_ID" to "ts-tf-client-id"
+    And Bitwarden holds "ts-tf-client-id" as "c1" and "restic-password" as "r1" in the project "infra"
+    When I run "./with-secrets" with the token "tok"
+    Then it succeeds
+    And the command sees "TAILSCALE_OAUTH_CLIENT_ID" as "c1"
+    And the command sees "TS_TF_CLIENT_ID" as "c1"
+    And the command sees "RESTIC_PASSWORD" as "r1"
+
+  Scenario: An alias of a secret that is not in Bitwarden is reported and skipped
+    Given a service whose Terraform declares "hcloud_token"
+    And the aliases file "infra/aliases.json" maps "TAILSCALE_OAUTH_CLIENT_ID" to "missing"
+    And Bitwarden holds "HCLOUD_TOKEN" as "h1" and "restic-password" as "r1" in the project "infra"
+    When I run "./with-secrets" with the token "tok"
+    Then it succeeds
+    And stderr mentions "no secret 'missing' in Bitwarden"
+    And the command does not see "TAILSCALE_OAUTH_CLIENT_ID"
+
+  Scenario: An alias must be usable as an environment variable name
+    Given a service whose Terraform declares "hcloud_token"
+    And the aliases file "infra/aliases.json" maps "tailscale-id" to "ts-tf-client-id"
+    And Bitwarden holds "ts-tf-client-id" as "c1" and "restic-password" as "r1" in the project "infra"
+    When I run "./with-secrets" with the token "tok"
+    Then it fails
+    And stderr mentions "not usable as an environment variable name"
+    And the command did not run
