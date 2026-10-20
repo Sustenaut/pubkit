@@ -1,33 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "security",
-      "change": "pubkit refuses a --body, --report or --changed-files path outside the working directory and the temporary directories, a pubrel row's text that starts with '-', and a crate name that is not one, so no argument can reach another file or pass another program an option"
-    },
-    {
-      "category": "security",
-      "change": "Pins pytest 9.0.3, which fixes CVE-2025-71176, in the shared requirements"
-    },
-    {
-      "category": "fixed",
-      "change": "Rewrites four regular expressions that backtracked super-linearly on long input (the tool version, cargo vet's crate lines, impl lines and the standard's [checked] tags)"
-    },
-    {
-      "category": "internal",
-      "change": "The nightly script uses [[ ]] for its tests"
-    },
-    {
-      "category": "added",
-      "change": "python-ci's sonar job reads the coverage report the functional job's test command writes (coverage-report, by default coverage/coverage.xml), so SonarQube Cloud's quality gate can measure coverage on new code; pubkit's own suite now measures itself, the pubkit processes it starts included"
-    },
-    {
-      "category": "added",
-      "change": "rust-ci measures coverage when it has a SONAR_TOKEN: pubkit.mk's new coverage target runs the Rust tests and the Gherkin suite on a cargo-llvm-cov build, and the sonar job sends coverage/lcov.info to SonarQube Cloud. node-ci's sonar job likewise reads the LCOV report its test command writes (coverage-report)"
-    },
-    {
-      "category": "added",
-      "change": "pubkit protect puts one ruleset, ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; both files ship in the wheel, so an installed pubkit protects the repositories its release lists from any directory, and --config reads another list. --check reports how each differs and changes nothing; make protect runs it from a checkout. pubkit new prints the protected.json line instead of a gh api command"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
