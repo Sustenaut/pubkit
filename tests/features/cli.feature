@@ -18,6 +18,22 @@ Feature: Keeping a repository's shared files in step
     And it prints "kept     tests/pytest.ini"
     And "tests/pytest.ini" contains "[pytest]"
 
+  Scenario: init gives a Node package the Node CI
+    Given an empty repository
+    And the file "package.json" reads "{}"
+    When I run pubkit "init" "--kind=utility"
+    Then it succeeds
+    And ".github/workflows/ci.yml" contains "node-ci.yml"
+    And ".github/workflows/ci.yml" contains "secrets: inherit"
+
+  Scenario: init gives a package with a pyproject.toml the Python CI, even beside a package.json
+    Given an empty repository
+    And the file "package.json" reads "{}"
+    And the file "pyproject.toml" reads "[project]"
+    When I run pubkit "init" "--kind=utility"
+    Then it succeeds
+    And ".github/workflows/ci.yml" contains "python-ci.yml"
+
   Scenario: A freshly initialised repository is in step
     Given a repository initialised as "utility"
     When I run pubkit "sync" "--check"

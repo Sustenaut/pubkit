@@ -320,8 +320,9 @@ sha256: a release carries the wheel as an asset, and `pip install
 ```yaml
 jobs:
   ci:
-    uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.1.0      # or python-ci.yml
+    uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.1.0      # or python-ci.yml, node-ci.yml
     with: { pub-version: v0.1.1 }
+    secrets: inherit                                                # for SONAR_TOKEN
   release:
     needs: ci
     uses: schryer/pubrel/.github/workflows/release.yml@v0.1.0
@@ -343,6 +344,17 @@ jobs:
 
   The `gates` and `functional` inputs can only add targets. The `msrv` and `fuzz` inputs are ignored: those jobs run because the standard requires them. Every job reports through `passed`, the one check a ruleset needs.
 - **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium.
+- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubkit's managed files from `tests/requirements.lock`, and runs `npm test`. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). `pubkit init --kind=utility` seeds a `ci.yml` calling it in a repository with a `package.json` and no `pyproject.toml`.
+
+### SonarQube Cloud
+
+`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret (pass `secrets: inherit`), it sends the code to SonarQube Cloud as the project `OWNER_REPO` in the organization `OWNER`, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+
+1. In SonarQube Cloud, analyse the repository as a new project in the organization named like its GitHub owner, keeping the key `OWNER_REPO`.
+2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.
+3. Add the token as the repository's `SONAR_TOKEN` Actions secret.
+
+Every action these workflows use is pinned to a commit, with its version in a comment, and a test fails on one that is not.
 
 ## Developing
 

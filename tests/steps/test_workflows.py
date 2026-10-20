@@ -86,3 +86,57 @@ def plan_passes_changes(workflow):
         assert flag in required["run"], flag
     assert required["env"] == {"EVENT": "${{ github.event_name }}",
                                "HEAD_REF": "${{ github.head_ref }}"}
+
+
+@then("it takes an optional SONAR_TOKEN secret")
+def sonar_secret(workflow):
+    secrets = triggers(workflow)["workflow_call"]["secrets"]
+    assert secrets["SONAR_TOKEN"]["required"] is False
+
+
+@then(parsers.parse('its "{name}" job runs the pinned SonarQube scan only when the token is set'))
+def sonar_job(workflow, name):
+    job = workflow["data"]["jobs"][name]
+    assert job["env"] == {"SONAR_TOKEN": "${{ secrets.SONAR_TOKEN }}"}
+    steps = job["steps"]
+    scan = next(s for s in steps if s.get("uses", "").startswith("SonarSource/sonarqube-scan-action@"))
+    assert scan["if"] == "env.SONAR_TOKEN != ''"
+    checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout@"))
+    assert checkout["if"] == "env.SONAR_TOKEN != ''"
+    assert checkout["with"]["fetch-depth"] == 0
+    assert any(s.get("if") == "env.SONAR_TOKEN == ''" and "::notice::" in s["run"] for s in steps)
+
+
+@then("the scan names the project OWNER_REPO in the organization OWNER")
+def sonar_project(workflow):
+    steps = workflow["data"]["jobs"]["sonar"]["steps"]
+    args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"]
+    assert "-Dsonar.organization=${{ github.repository_owner }}" in args
+    assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
+
+
+@then("every action it uses is pinned to a full commit hash, with its version in a comment")
+def pinned(workflow):
+    for line in workflow["text"].splitlines():
+        match = re.match(r"\s*(?:- )?uses: (\S+)(.*)", line)
+        if not match or match.group(1).startswith("./") or line.lstrip().startswith("#"):
+            continue
+        action, rest = match.groups()
+        if action.startswith("schryer/"):
+            # Our own reusable workflows are pinned by release tag.
+            assert re.search(r"@v\d+\.\d+\.\d+$", action), line
+            continue
+        assert re.search(r"@[0-9a-f]{40}$", action), f"not pinned to a commit: {line.strip()}"
+        assert re.match(r"\s+# v\d+\.\d+\.\d+$", rest), f"no version comment: {line.strip()}"
+
+
+@then("its setup input runs npm ci with --ignore-scripts")
+def npm_ignore_scripts(workflow):
+    setup = triggers(workflow)["workflow_call"]["inputs"]["setup"]["default"]
+    assert setup.startswith("npm ci ") and "--ignore-scripts" in setup.split()
+
+
+@then("its browser-setup input runs npx with --no-install")
+def npx_no_install(workflow):
+    setup = triggers(workflow)["workflow_call"]["inputs"]["browser-setup"]["default"]
+    assert setup.startswith("npx --no-install ")

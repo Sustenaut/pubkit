@@ -1,4 +1,17 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "node-ci.yml, a reusable workflow for a Node package: npm ci without install scripts, npm test, optional browser tests (npx --no-install), pubkit sync --check, and the sonar and passed jobs; pubkit init --kind=utility seeds it where a package.json has no pyproject.toml beside it"
+    },
+    {
+      "category": "added",
+      "change": "rust-ci.yml, python-ci.yml and node-ci.yml run a sonar job: given a SONAR_TOKEN secret (secrets: inherit) it sends the code to SonarQube Cloud as the project OWNER_REPO in the organization OWNER, and without one it passes with a notice; the seeded ci.yml files pass secrets: inherit"
+    },
+    {
+      "category": "security",
+      "change": "Every action pubkit's workflows use is pinned to a full commit hash, with its version in a comment, so a moved tag cannot change what runs"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

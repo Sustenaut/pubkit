@@ -14,6 +14,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | rust-ci.yml   |
       | python-ci.yml |
       | service-ci.yml |
+      | node-ci.yml   |
 
   Scenario Outline: A reusable workflow ends in the one check a ruleset requires
     When I parse the workflow "<workflow>"
@@ -24,6 +25,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | rust-ci.yml   |
       | python-ci.yml |
       | service-ci.yml |
+      | node-ci.yml   |
 
   Scenario: rust-ci runs the targets pubkit required plans, in every job
     When I parse the workflow "rust-ci.yml"
@@ -33,3 +35,33 @@ Feature: The reusable workflows parse as GitHub reads them
   Scenario: rust-ci's plan hands the event, the branch and the changed files to pubkit
     When I parse the workflow "rust-ci.yml"
     Then the plan job compares a pull request with its base and passes it to pubkit required
+
+  Scenario Outline: A package's reusable workflow sends its code to SonarQube Cloud when given a token
+    When I parse the workflow "<workflow>"
+    Then it takes an optional SONAR_TOKEN secret
+    And its "sonar" job runs the pinned SonarQube scan only when the token is set
+    And the scan names the project OWNER_REPO in the organization OWNER
+
+    Examples:
+      | workflow      |
+      | rust-ci.yml   |
+      | python-ci.yml |
+      | node-ci.yml   |
+
+  Scenario Outline: Every action a workflow uses is pinned to a commit
+    When I parse the workflow "<workflow>"
+    Then every action it uses is pinned to a full commit hash, with its version in a comment
+
+    Examples:
+      | workflow       |
+      | ci.yml         |
+      | nightly.yml    |
+      | rust-ci.yml    |
+      | python-ci.yml  |
+      | service-ci.yml |
+      | node-ci.yml    |
+
+  Scenario: node-ci installs dependencies without running their scripts
+    When I parse the workflow "node-ci.yml"
+    Then its setup input runs npm ci with --ignore-scripts
+    And its browser-setup input runs npx with --no-install

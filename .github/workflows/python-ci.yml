@@ -3,6 +3,7 @@
 #   ci:
 #     uses: schryer/pubkit/.github/workflows/python-ci.yml@vX.Y.Z
 #     with: { browser-test: ./dev test --browser }
+#     secrets: inherit
 #
 # The commands are inputs, so a repository with its own entry point (a
 # ./dev script, tox) keeps it; the defaults are pubkit.mk's targets.
@@ -18,13 +19,16 @@ on:
       browser-test: { type: string, default: '', description: Runs the browser scenarios too; empty skips the browser job. }
       browser-setup: { type: string, default: .venv/bin/python -m playwright install --with-deps chromium }
       sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+      sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
+    secrets:
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
 jobs:
   functional:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
@@ -38,8 +42,8 @@ jobs:
     if: inputs.browser-test != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
@@ -48,13 +52,35 @@ jobs:
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
 
+  # SonarQube Cloud's analysis, into the project OWNER_REPO of the
+  # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
+  # in a private repository or a pull request from a fork, it says so and
+  # passes. The full history lets it tell new code from old.
+  sonar:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - if: env.SONAR_TOKEN == ''
+        run: echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 0 }
+      - if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        with:
+          args: >-
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            ${{ inputs.sonar-args }}
+
   # The one check a ruleset requires. A skipped job counts as passing a
   # required check, so this job always runs and passes only if every job it
   # needs succeeded -- the browser job may be skipped only when no
   # browser-test was asked for.
   passed:
     if: always()
-    needs: [functional, browser]
+    needs: [functional, browser, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |

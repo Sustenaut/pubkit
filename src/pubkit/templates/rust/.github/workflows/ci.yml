@@ -15,6 +15,7 @@ jobs:
   # `gates` and `functional` inputs.
   ci:
     uses: schryer/pubkit/.github/workflows/rust-ci.yml@v{version}
+    secrets: inherit
 
   # The shared release workflow: on a pull request, a code change records
   # what it changes and a release is the bump its changes require,
