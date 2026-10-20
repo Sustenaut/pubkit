@@ -24,7 +24,7 @@ Feature: A command-line argument cannot reach outside the repository
 
   Scenario: A crate name that cargo would take for an option is refused
     When the supply chain of the crate "--manifest-path=/elsewhere/Cargo.toml" is resolved
-    Then it stops with "is not a crate name"
+    Then it stops with "is not a crate in this workspace"
 
   Scenario: A file in the Actions runner's temporary directory is allowed
     Given RUNNER_TEMP names the directory "runner-temp"
