@@ -61,3 +61,9 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     When I run pubkit "protect"
     Then it fails
     And it prints "needs a repository admin"
+
+  Scenario: protect refuses an entry that is not a repository
+    Given protected.json lists "schryer/foo/../bar" requiring "ci / passed"
+    When I run pubkit "protect" "--check"
+    Then it fails
+    And stderr mentions "needs a repo, OWNER/NAME"

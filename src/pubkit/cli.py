@@ -421,8 +421,9 @@ def main(argv: list[str] | None = None) -> int:
         from .freshness import freshness
         return freshness(args.dirs, args.json)
     if args.command == "protect":
+        from .paths import confined
         from .protect import run as protect
-        return protect(root / args.config, args.repos, args.check)
+        return protect(confined(args.config, "the --config file"), args.repos, args.check)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)

@@ -18,6 +18,7 @@ differs, and fails when one does.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -30,6 +31,8 @@ GITHUB_ACTIONS = 15368
 APPS = {"SonarCloud Code Analysis": 12526}
 
 Api = Callable[[str, str, Any], Any]
+
+REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 def base() -> dict:
@@ -144,7 +147,12 @@ def load(config: Path) -> list[dict]:
     if not config.is_file():
         sys.exit(f"pubkit protect: no {config.name} here; run it in a checkout of "
                  f"schryer/pubkit, or pass --config")
-    return json.loads(config.read_text(encoding="utf-8"))["repositories"]
+    entries = json.loads(config.read_text(encoding="utf-8"))["repositories"]
+    for e in entries:
+        if not REPO.fullmatch(e.get("repo", "")) or not e.get("checks"):
+            sys.exit(f"pubkit protect: {config.name}: {json.dumps(e)} needs a repo, "
+                     f"OWNER/NAME, and the checks it requires")
+    return entries
 
 
 def run(config: Path, repos: list[str], check: bool, api: Api = gh) -> int:
