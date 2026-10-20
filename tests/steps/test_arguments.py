@@ -57,3 +57,33 @@ def read_version(tool):
 @then("it is three numbers")
 def three_numbers(version):
     assert version is not None and len(version) == 3, version
+
+
+@then("it has no version")
+def no_version(version):
+    assert version is None, version
+
+
+@given(parsers.parse('a pubrel that asks for a row for the package "{package}"'))
+def fake_pubrel(repo, monkeypatch, package):
+    bin_dir = repo / "bin"
+    bin_dir.mkdir()
+    script = bin_dir / "pubrel"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'if [ "$1" = check ]; then echo "run \\`pubrel add --package {package} CATEGORY"; exit 1; fi\n'
+        f'echo "$@" >> "{repo}/pubrel-calls"\n')
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+@when(parsers.parse('pubkit records "{text}" as a row in the category "{category}" with it'),
+      target_fixture="recorded")
+def record_with_pubrel(repo, text, category):
+    return nightly.record(repo, text, category)
+
+
+@then(parsers.parse('pubrel add was run with "{args}"'))
+def pubrel_add_ran(repo, recorded, args):
+    assert recorded == [args.split()[1]], recorded
+    assert (repo / "pubrel-calls").read_text().splitlines() == [f"add {args}"]

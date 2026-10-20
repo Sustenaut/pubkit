@@ -38,3 +38,12 @@ Feature: A command-line argument cannot reach outside the repository
   Scenario: A tool's version is the first x.y.z it prints
     When pubkit reads the version of "python3"
     Then it is three numbers
+
+  Scenario: A tool that prints no version has none
+    When pubkit reads the version of "true"
+    Then it has no version
+
+  Scenario: A row's text goes to pubrel add as it was given
+    Given a pubrel that asks for a row for the package "demo"
+    When pubkit records "Tidied the nightly" as a row in the category "internal" with it
+    Then pubrel add was run with "--package demo internal Tidied the nightly"
