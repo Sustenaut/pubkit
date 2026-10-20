@@ -15,11 +15,15 @@ CI if the committed copy is stale. It goes beside each crate's manifest.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import textwrap
 import tomllib
 from pathlib import Path
+
+# What cargo accepts as a package name: never an option.
+CRATE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_-]*")
 
 # The organisations whose audit sets cargo vet imports, by import name.
 ORGANISATIONS = {
@@ -53,8 +57,10 @@ def dependencies(root, meta, crate):
     only on some platforms is listed; one that is locked but never built,
     such as an optional dependency nothing enables, is not.
     """
+    if not CRATE_NAME.fullmatch(crate):
+        sys.exit(f"pubkit: {crate!r} is not a crate name")
     out = subprocess.run(
-        ["cargo", "tree", "--locked", "-q", "-p", crate, "-e", "normal,build", "--target", "all",
+        ["cargo", "tree", "--locked", "-q", f"--package={crate}", "-e", "normal,build", "--target", "all",
          "--prefix", "none", "--format", "{p}"],
         capture_output=True, text=True, check=True, cwd=root).stdout
     wanted = set()

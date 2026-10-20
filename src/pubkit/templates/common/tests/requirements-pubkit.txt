@@ -2,7 +2,7 @@
 # `pubkit sync --check` fails when it differs. Add your own requirements to
 # requirements.txt, which includes this one; `pubkit lock` then pins the lot
 # with hashes in requirements.lock.
-pytest==9.0.2
+pytest==9.0.3
 pytest-bdd==8.1.0
 pytest-xdist==3.8.0
 pubkit @ https://github.com/schryer/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl

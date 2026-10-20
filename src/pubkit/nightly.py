@@ -21,13 +21,18 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from . import __version__
+from .paths import confined
 
 # The crates the pub* repositories publish, which `pins` moves rather than
 # `crates`.
 PUB_CRATES = ("publet-core", "publet-algorithms", "pubunit")
+
+# The categories `pubrel add` takes.
+CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 
 RELEASE_PIN = re.compile(r"(schryer/pubrel/\.github/workflows/release\.yml@v)([0-9][^\s'\"]*)")
 PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)([0-9][^\s,}'\"]*)")
@@ -66,9 +71,15 @@ def refresh_reports(root: Path) -> None:
 def record(root: Path, text: str, category: str = "internal") -> list[str]:
     """Record `text` for every package `pubrel check` says needs a row for the
     committed change, and return the packages."""
+    if category not in CATEGORIES:
+        sys.exit(f"pubkit: pubrel has no category {category!r}; use one of "
+                 f"{', '.join(CATEGORIES)}")
+    if text.startswith("-"):
+        sys.exit(f"pubkit: the row's text {text!r} starts with '-', which pubrel would take "
+                 "for an option")
     out = subprocess.run(["pubrel", "check", "origin/main"], cwd=root, capture_output=True,
                          text=True, check=False)
-    hints = re.findall(r"run `pubrel add( --package ([A-Za-z0-9_-]+))? CATEGORY",
+    hints = re.findall(r"run `pubrel add( --package ([A-Za-z0-9_][A-Za-z0-9_-]*))? CATEGORY",
                        out.stdout + out.stderr)
     added = []
     for flag, package in hints:
@@ -173,7 +184,7 @@ def first_party_policy(root: Path, vet_output: str) -> list[str]:
     crates: `[policy.NAME] audit-as-crates-io = false`. Returns the names."""
     if "audit-as-crates-io" not in vet_output:
         return []
-    named = set(re.findall(r"^\s*│?\s*([A-Za-z0-9_-]+):\S+\s*$", vet_output, re.M))
+    named = set(re.findall(r"^[ \t]*(?:│[ \t]*)?([A-Za-z0-9_-]+):\S+[ \t]*$", vet_output, re.M))
     own = sorted(named & own_packages(root))
     config = root / "supply-chain" / "config.toml"
     if not own or not config.is_file():
@@ -194,6 +205,8 @@ def crates(root: Path, report: Path | None) -> int:
     """Try each upgrade on its own, on top of those already kept, and keep
     it only when `cargo vet` passes without a new exemption and `cargo deny`
     passes."""
+    if report:
+        report = confined(report, "the --report file")
     saved = snapshot(root)
     notes: list[str] = []
     updated: list[tuple[str, str, str]] = []
@@ -306,14 +319,16 @@ def nightly(root: Path, pubrel: str, pub: str, body_path: Path) -> int:
     Prints the commits it made: `pins`, `crates`, both, or nothing."""
     import contextlib  # noqa: PLC0415
     import io  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
 
+    body_path = confined(body_path, "the --body file")
     pinned = pins(root, pubrel, pub)
     made = ["pins"] if commit(root, "Move to the latest pub* releases", pinned) else []
-    report = root.parent / f"{root.name}-crates.json"
-    with contextlib.redirect_stdout(io.StringIO()):
-        crates(root, report)
-    result = json.loads(report.read_text(encoding="utf-8"))
-    report.unlink()
+    with tempfile.TemporaryDirectory() as tmp:
+        report = Path(tmp) / "crates.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            crates(root, report)
+        result = json.loads(report.read_text(encoding="utf-8"))
     if commit(root, "Update other crates the supply-chain audits cover", result["updated"]):
         made.append("crates")
     body_path.write_text(body(pinned, result["updated"], result["skipped"]), encoding="utf-8")

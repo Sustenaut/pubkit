@@ -37,7 +37,7 @@ JOBS = {
 BASELINE = {"fmt-check": "gates", "lint": "gates", "doc": "gates", "functional": "functional"}
 WORKFLOW_JOBS = {"test", "cross", "fuzz"}
 
-TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),\s*(.*?)\]", re.S)
+TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),\s*([^\]]*)\]")
 HEADING = re.compile(r"^## (\d+)\. (.+)$", re.M)
 
 

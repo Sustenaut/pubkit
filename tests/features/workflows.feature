@@ -48,6 +48,10 @@ Feature: The reusable workflows parse as GitHub reads them
       | python-ci.yml |
       | node-ci.yml   |
 
+  Scenario: python-ci gives SonarQube Cloud the suite's coverage
+    When I parse the workflow "python-ci.yml"
+    Then the functional job hands its coverage report to the sonar scan
+
   Scenario Outline: Every action a workflow uses is pinned to a commit
     When I parse the workflow "<workflow>"
     Then every action it uses is pinned to a full commit hash, with its version in a comment

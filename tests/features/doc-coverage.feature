@@ -44,3 +44,16 @@ Feature: Every public function has an example, and tests say what they cover
     When I run pubkit "doc-coverage" "other"
     Then it fails
     And stderr mentions "no crate here named other"
+
+  Scenario Outline: A method is listed under the type its impl block is for
+    Given a library "demo" whose method "read" is in the block "<impl>"
+    When I run pubkit "doc-coverage" "demo"
+    Then it succeeds
+    And "TESTING.md" contains "| `Meter::read` |"
+
+    Examples:
+      | impl                                 |
+      | impl Meter                           |
+      | impl<T: Copy> Meter                  |
+      | impl std::fmt::Display for Meter     |
+      | impl<T> From<Vec<T>, u8> for Meter   |

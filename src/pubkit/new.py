@@ -83,7 +83,7 @@ def version_of(tool: str) -> tuple[int, ...] | None:
     if shutil.which(tool) is None:
         return None
     out = subprocess.run([tool, "--version"], capture_output=True, text=True, check=False).stdout
-    m = re.search(r"(\d+)\.(\d+)\.(\d+)", out.splitlines()[0] if out else "")
+    m = re.search(r"(?<!\d)(\d+)\.(\d+)\.(\d+)", out.splitlines()[0] if out else "")
     return tuple(int(x) for x in m.groups()) if m else None
 
 

@@ -1,7 +1,8 @@
 # pubkit's own suite: the same pins it manages for everyone else (plus
 # PyYAML, to parse the workflows it ships), without
 # itself -- `make venv` installs this checkout, editable, on top.
-pytest==9.0.2
+pytest==9.0.3
 pytest-bdd==8.1.0
 pytest-xdist==3.8.0
 PyYAML==6.0.3
+coverage==7.16.2

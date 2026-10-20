@@ -68,6 +68,12 @@ Feature: The required checks come from the standard
       | push              |                 | README.md                      | fuzz-smoke | true  |
       | schedule          |                 | README.md                      | fuzz-smoke | true  |
 
+  Scenario: The changed files are read only from the repository or a temporary directory
+    Given a Rust repository whose crate "demo" has a library
+    When I run pubkit "required" "--event" "pull_request" "--head-ref" "claude/docs" "--changed-files" "/etc/pubkit-changed"
+    Then it fails
+    And stderr mentions "must be in the working directory or a temporary directory"
+
   Scenario: Without the changed files, nothing is skipped
     Given a Rust repository whose crate "demo" has a library
     When I run pubkit "required" "--event" "pull_request" "--head-ref" "claude/docs"

@@ -275,7 +275,9 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     plan = standard.required(rules, standard.has_library(root), frozenset(waived))
     changed = None
     if changed_file is not None:
-        changed = [line.strip() for line in Path(changed_file).read_text(encoding="utf-8").splitlines()
+        from .paths import confined
+        listed = confined(changed_file, "the --changed-files file")
+        changed = [line.strip() for line in listed.read_text(encoding="utf-8").splitlines()
                    if line.strip()]
     reason = standard.skip_slow(event, head_ref, changed)
     if reason:
