@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.11.3 is released as v0.11.3 from commit b641583f31a805f1a5ec7fc2c3c38e799f8d08f6.",
+      "content": "pubkit 0.12.0 is released as v0.12.0 from commit 631de5fe0346e516cf467e22f8a7e241ae0a9ecf.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.11.3",
+            "0.12.0",
             "pubkit --version",
-            "pubkit 0.11.3",
-            "v0.11.3",
-            "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
+            "pubkit 0.12.0",
+            "v0.12.0",
+            "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
           ]
         ]
       },
-      "scope": "the published release v0.11.3 of pubkit",
+      "scope": "the published release v0.12.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
+          "revision": "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.11.3 was released on 2026-10-20 from commit b641583f31a805f1a5ec7fc2c3c38e799f8d08f6 with these changes.",
+      "content": "pubkit 0.12.0 was released on 2026-10-20 from commit 631de5fe0346e516cf467e22f8a7e241ae0a9ecf with these changes.",
       "data": {
         "columns": [
           {
@@ -57,43 +57,23 @@
         ],
         "rows": [
           [
-            "security",
-            "pubkit refuses a --body, --report or --changed-files path outside the working directory and the temporary directories, a pubrel row's text that starts with '-', and a crate name that is not one, so no argument can reach another file or pass another program an option"
-          ],
-          [
-            "security",
-            "Pins pytest 9.0.3, which fixes CVE-2025-71176, in the shared requirements"
-          ],
-          [
             "fixed",
-            "Rewrites four regular expressions that backtracked super-linearly on long input (the tool version, cargo vet's crate lines, impl lines and the standard's [checked] tags)"
+            "pubkit protect prints the reasons GitHub gives for rejecting a ruleset, such as a required check's app not being installed on the repository, and says a repository admin must run it only when GitHub refuses access (HTTP 403 or 404)"
           ],
           [
-            "internal",
-            "The nightly script uses [[ ]] for its tests"
-          ],
-          [
-            "added",
-            "python-ci's sonar job reads the coverage report the functional job's test command writes (coverage-report, by default coverage/coverage.xml), so SonarQube Cloud's quality gate can measure coverage on new code; pubkit's own suite now measures itself, the pubkit processes it starts included"
-          ],
-          [
-            "added",
-            "rust-ci measures coverage when it has a SONAR_TOKEN: pubkit.mk's new coverage target runs the Rust tests and the Gherkin suite on a cargo-llvm-cov build, and the sonar job sends coverage/lcov.info to SonarQube Cloud. node-ci's sonar job likewise reads the LCOV report its test command writes (coverage-report)"
-          ],
-          [
-            "added",
-            "pubkit protect puts one ruleset, ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; both files ship in the wheel, so an installed pubkit protects the repositories its release lists from any directory, and --config reads another list. --check reports how each differs and changes nothing; make protect runs it from a checkout. pubkit new prints the protected.json line instead of a gh api command"
+            "changed",
+            "pubkit protect no longer ships a list of repositories: it reads protected.json in the working directory, or --config FILE, or protects the repositories named with --require CHECK (repeated) and no list. pubkit's own list is protected.json at its root. pubkit new prints the pubkit protect --require line for the new package"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.11.3 of pubkit",
+      "scope": "the published release v0.12.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
+          "revision": "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
         }
       ]
     }
