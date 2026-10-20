@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.11.2 is released as v0.11.2 from commit 9c91f331d80bc17b68f40c856c22d83ddc2367ce.",
+      "content": "pubkit 0.11.3 is released as v0.11.3 from commit b641583f31a805f1a5ec7fc2c3c38e799f8d08f6.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.11.2",
+            "0.11.3",
             "pubkit --version",
-            "pubkit 0.11.2",
-            "v0.11.2",
-            "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
+            "pubkit 0.11.3",
+            "v0.11.3",
+            "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
           ]
         ]
       },
-      "scope": "the published release v0.11.2 of pubkit",
+      "scope": "the published release v0.11.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
+          "revision": "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.11.2 was released on 2026-10-20 from commit 9c91f331d80bc17b68f40c856c22d83ddc2367ce with these changes.",
+      "content": "pubkit 0.11.3 was released on 2026-10-20 from commit b641583f31a805f1a5ec7fc2c3c38e799f8d08f6 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,27 +57,43 @@
         ],
         "rows": [
           [
-            "added",
-            "node-ci.yml, a reusable workflow for a Node package: npm ci without install scripts, npm test, optional browser tests (npx --no-install), pubkit sync --check, and the sonar and passed jobs; pubkit init --kind=utility seeds it where a package.json has no pyproject.toml beside it"
-          ],
-          [
-            "added",
-            "rust-ci.yml, python-ci.yml and node-ci.yml run a sonar job: given a SONAR_TOKEN secret (secrets: inherit) it sends the code to SonarQube Cloud as the project OWNER_REPO in the organization OWNER, and without one it passes with a notice; the seeded ci.yml files pass secrets: inherit"
+            "security",
+            "pubkit refuses a --body, --report or --changed-files path outside the working directory and the temporary directories, a pubrel row's text that starts with '-', and a crate name that is not one, so no argument can reach another file or pass another program an option"
           ],
           [
             "security",
-            "Every action pubkit's workflows use is pinned to a full commit hash, with its version in a comment, so a moved tag cannot change what runs"
+            "Pins pytest 9.0.3, which fixes CVE-2025-71176, in the shared requirements"
+          ],
+          [
+            "fixed",
+            "Rewrites four regular expressions that backtracked super-linearly on long input (the tool version, cargo vet's crate lines, impl lines and the standard's [checked] tags)"
+          ],
+          [
+            "internal",
+            "The nightly script uses [[ ]] for its tests"
+          ],
+          [
+            "added",
+            "python-ci's sonar job reads the coverage report the functional job's test command writes (coverage-report, by default coverage/coverage.xml), so SonarQube Cloud's quality gate can measure coverage on new code; pubkit's own suite now measures itself, the pubkit processes it starts included"
+          ],
+          [
+            "added",
+            "rust-ci measures coverage when it has a SONAR_TOKEN: pubkit.mk's new coverage target runs the Rust tests and the Gherkin suite on a cargo-llvm-cov build, and the sonar job sends coverage/lcov.info to SonarQube Cloud. node-ci's sonar job likewise reads the LCOV report its test command writes (coverage-report)"
+          ],
+          [
+            "added",
+            "pubkit protect puts one ruleset, ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; both files ship in the wheel, so an installed pubkit protects the repositories its release lists from any directory, and --config reads another list. --check reports how each differs and changes nothing; make protect runs it from a checkout. pubkit new prints the protected.json line instead of a gh api command"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.11.2 of pubkit",
+      "scope": "the published release v0.11.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
+          "revision": "b641583f31a805f1a5ec7fc2c3c38e799f8d08f6"
         }
       ]
     }
