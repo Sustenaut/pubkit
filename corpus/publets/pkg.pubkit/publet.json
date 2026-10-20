@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.11.1 is released as v0.11.1 from commit 07146fba199e13e9aac39c750ca0b5577a4a11c2.",
+      "content": "pubkit 0.11.2 is released as v0.11.2 from commit 9c91f331d80bc17b68f40c856c22d83ddc2367ce.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.11.1",
+            "0.11.2",
             "pubkit --version",
-            "pubkit 0.11.1",
-            "v0.11.1",
-            "07146fba199e13e9aac39c750ca0b5577a4a11c2"
+            "pubkit 0.11.2",
+            "v0.11.2",
+            "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
           ]
         ]
       },
-      "scope": "the published release v0.11.1 of pubkit",
+      "scope": "the published release v0.11.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "07146fba199e13e9aac39c750ca0b5577a4a11c2"
+          "revision": "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.11.1 was released on 2026-10-19 from commit 07146fba199e13e9aac39c750ca0b5577a4a11c2 with these changes.",
+      "content": "pubkit 0.11.2 was released on 2026-10-20 from commit 9c91f331d80bc17b68f40c856c22d83ddc2367ce with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,31 @@
         "rows": [
           [
             "added",
-            "with-secrets.json can name aliases files ({\"aliases\": {\"NAME\": \"secret\"}}, kept next to the code that needs them) that also export a secret under the fixed name a tool reads, such as TAILSCALE_OAUTH_CLIENT_ID for the Tailscale Terraform provider; an alias of a missing secret is reported and skipped"
+            "node-ci.yml, a reusable workflow for a Node package: npm ci without install scripts, npm test, optional browser tests (npx --no-install), pubkit sync --check, and the sonar and passed jobs; pubkit init --kind=utility seeds it where a package.json has no pyproject.toml beside it"
+          ],
+          [
+            "added",
+            "rust-ci.yml, python-ci.yml and node-ci.yml run a sonar job: given a SONAR_TOKEN secret (secrets: inherit) it sends the code to SonarQube Cloud as the project OWNER_REPO in the organization OWNER, and without one it passes with a notice; the seeded ci.yml files pass secrets: inherit"
+          ],
+          [
+            "security",
+            "Every action pubkit's workflows use is pinned to a full commit hash, with its version in a comment, so a moved tag cannot change what runs"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.11.1 of pubkit",
+      "scope": "the published release v0.11.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "07146fba199e13e9aac39c750ca0b5577a4a11c2"
+          "revision": "9c91f331d80bc17b68f40c856c22d83ddc2367ce"
         }
       ]
     }
   },
-  "created": "2026-10-19T00:00:00Z",
+  "created": "2026-10-20T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
