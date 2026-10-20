@@ -19,6 +19,10 @@
     {
       "category": "added",
       "change": "python-ci's sonar job reads the coverage report the functional job's test command writes (coverage-report, by default coverage/coverage.xml), so SonarQube Cloud's quality gate can measure coverage on new code; pubkit's own suite now measures itself, the pubkit processes it starts included"
+    },
+    {
+      "category": "added",
+      "change": "rust-ci measures coverage when it has a SONAR_TOKEN: pubkit.mk's new coverage target runs the Rust tests and the Gherkin suite on a cargo-llvm-cov build, and the sonar job sends coverage/lcov.info to SonarQube Cloud. node-ci's sonar job likewise reads the LCOV report its test command writes (coverage-report)"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

@@ -23,6 +23,7 @@ on:
       browser-setup: { type: string, default: npx --no-install playwright install --with-deps chromium }
       sync-check: { type: boolean, default: true, description: "Fail if pubkit's managed files drifted, using the pubkit tests/requirements.lock pins." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
+      coverage-report: { type: string, default: coverage/lcov.info, description: "The LCOV report the test command writes, if any, which the sonar job reads: node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info writes one." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
@@ -49,6 +50,13 @@ jobs:
         env: { APT: '${{ inputs.apt-packages }}' }
       - run: ${{ inputs.setup }}
       - run: ${{ inputs.test }}
+      # The sonar job runs elsewhere, so the report goes to it as an artifact.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: ${{ inputs.coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1
 
   browser:
     if: inputs.browser-test != ''
@@ -67,8 +75,11 @@ jobs:
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
   # in a private repository or a pull request from a fork, it says so and
-  # passes. The full history lets it tell new code from old.
+  # passes. The full history lets it tell new code from old, and the test
+  # job's coverage report, when its test command wrote one, gives the
+  # coverage SonarQube Cloud's quality gate asks of new code.
   sonar:
+    needs: test
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -79,11 +90,22 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 0 }
       - if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          name: coverage
+          path: coverage-download
+      # The report keeps the file name the test command gave it.
+      - if: env.SONAR_TOKEN != ''
+        id: report
+        run: echo "paths=$(find coverage-download -type f 2>/dev/null | paste -sd, -)" >> "$GITHUB_OUTPUT"
+      - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
           args: >-
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.javascript.lcov.reportPaths=${{ steps.report.outputs.paths }}
             ${{ inputs.sonar-args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a
