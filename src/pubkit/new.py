@@ -20,7 +20,7 @@ Run in an empty repository (a README or LICENSE already there is kept). It:
 5. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
    the test requirements;
 6. prints the lines that, in schryer/pubkit, protect its main branch
-   (protected.json, then `pubkit protect`) and register it for pubkit's
+   (src/pubkit/protected.json, then `pubkit protect`) and register it for pubkit's
    nightly workflow (governed.json).
 """
 
@@ -207,7 +207,7 @@ requests only, after CI): add
 
   {entry}
 
-to protected.json and run `pubkit protect schryer/{name}`. And register it
+to src/pubkit/protected.json and run `make protect REPOS=schryer/{name}`. And register it
 for pubkit's nightly workflow: add {{"repo": "schryer/{name}"}} to
 governed.json.""")
     return 0

@@ -29,6 +29,7 @@ where = ["src"]
 pubkit = [
     "standard.json",
     "ruleset.json",
+    "protected.json",
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]

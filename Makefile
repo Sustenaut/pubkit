@@ -39,7 +39,7 @@ check: standard-check functional ## Everything CI runs
 wheel: ## Build the wheel a release carries
 	.venv/bin/pip wheel --quiet --no-deps . -w dist
 
-protect: .venv/bin/pubkit ## Put the ruleset on every repository in protected.json (or REPOS="o/r ..."), through gh as their admin
+protect: .venv/bin/pubkit ## Put the ruleset on every repository in src/pubkit/protected.json (or REPOS="o/r ..."), through gh as their admin
 	.venv/bin/pubkit protect $(REPOS)
 
 protect-check: .venv/bin/pubkit ## Show how each repository differs from the ruleset, changing nothing

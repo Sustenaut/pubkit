@@ -22,7 +22,7 @@
     },
     {
       "category": "added",
-      "change": "pubkit protect puts one ruleset, src/pubkit/ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; --check reports how each differs and changes nothing. pubkit new prints the protected.json line instead of a gh api command"
+      "change": "pubkit protect puts one ruleset, ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; both files ship in the wheel, so an installed pubkit protects the repositories its release lists from any directory, and --config reads another list. --check reports how each differs and changes nothing; make protect runs it from a checkout. pubkit new prints the protected.json line instead of a gh api command"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
