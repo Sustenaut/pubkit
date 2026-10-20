@@ -19,6 +19,10 @@
     {
       "category": "added",
       "change": "python-ci's sonar job reads the coverage report the functional job's test command writes (coverage-report, by default coverage/coverage.xml), so SonarQube Cloud's quality gate can measure coverage on new code; pubkit's own suite now measures itself, the pubkit processes it starts included"
+    },
+    {
+      "category": "added",
+      "change": "pubkit protect puts one ruleset, src/pubkit/ruleset.json, on the default branch of every repository protected.json lists (no deletion or force push, pull requests only, each repository's required checks, no bypass), creating or updating it through gh; --check reports how each differs and changes nothing. pubkit new prints the protected.json line instead of a gh api command"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

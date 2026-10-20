@@ -28,6 +28,7 @@ where = ["src"]
 # Globs skip dot-directories, so each one templates use is named.
 pubkit = [
     "standard.json",
+    "ruleset.json",
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]

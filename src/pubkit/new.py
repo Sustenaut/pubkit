@@ -19,9 +19,9 @@ Run in an empty repository (a README or LICENSE already there is kept). It:
    to `corpus/objects`, checked against its identifier;
 5. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
    the test requirements;
-6. prints the one GitHub step it does not take by itself, the branch
-   ruleset, and the line that registers the package for pubkit's nightly
-   workflow.
+6. prints the lines that, in schryer/pubkit, protect its main branch
+   (protected.json, then `pubkit protect`) and register it for pubkit's
+   nightly workflow (governed.json).
 """
 
 from __future__ import annotations
@@ -55,27 +55,8 @@ UNRELEASED_COMMENT = (
     "summary; `pubrel prepare` moves them into the package publet."
 )
 
-RULESET = {
-    "name": "main changes by pull request, after CI",
-    "target": "branch",
-    "enforcement": "active",
-    "conditions": {"ref_name": {"exclude": [], "include": ["~DEFAULT_BRANCH"]}},
-    "rules": [
-        {"type": "deletion"},
-        {"type": "non_fast_forward"},
-        {"type": "pull_request", "parameters": {
-            "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": False,
-            "required_reviewers": [], "require_code_owner_review": False,
-            "require_last_push_approval": False, "required_review_thread_resolution": False,
-            "allowed_merge_methods": ["merge", "squash", "rebase"]}},
-        {"type": "required_status_checks", "parameters": {
-            "strict_required_status_checks_policy": False, "do_not_enforce_on_create": False,
-            "required_status_checks": [
-                {"context": "ci / passed", "integration_id": 15368},
-                {"context": "release / release", "integration_id": 15368}]}},
-    ],
-    "bypass_actors": [],
-}
+# The checks a new package's ruleset requires: its CI and its release job.
+CHECKS = ["ci / passed", "release / release"]
 
 
 def version_of(tool: str) -> tuple[int, ...] | None:
@@ -212,7 +193,7 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
         from .cli import lock as lock_requirements  # noqa: PLC0415
         lock_requirements(root)
 
-    ruleset = json.dumps(RULESET)
+    entry = json.dumps({"repo": f"schryer/{name}", "checks": CHECKS})
     print(f"""
 {name} is ready: every file the standard asks for, a release key, and a
 crate that passes every check. Next:
@@ -221,13 +202,12 @@ crate that passes every check. Next:
   cargo vet                        # fetch the shared audits into supply-chain/
   git add -A && git commit -m "{name}: a new pub* package" && git push
 
-Then protect main, as every pub* repository is (pull requests only, after
-CI), with:
+Then, in schryer/pubkit, protect main as every pub* repository is (pull
+requests only, after CI): add
 
-  gh api -X POST repos/schryer/{name}/rulesets --input - <<'RULESET'
-{ruleset}
-RULESET
+  {entry}
 
-And register it for pubkit's nightly workflow: add
-{{"repo": "schryer/{name}"}} to governed.json in schryer/pubkit.""")
+to protected.json and run `pubkit protect schryer/{name}`. And register it
+for pubkit's nightly workflow: add {{"repo": "schryer/{name}"}} to
+governed.json.""")
     return 0

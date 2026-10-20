@@ -15,6 +15,7 @@
     pubkit record TEXT
     pubkit nightly --pubrel V --pub V --body FILE
     pubkit freshness [--json] DIR...
+    pubkit protect [--check] [--config FILE] [REPO...]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -358,6 +359,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("dirs", nargs="+", metavar="DIR", type=Path)
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
+    p = commands.add_parser("protect",
+                            help="put pubkit's ruleset on the default branch of each repository")
+    p.add_argument("--check", action="store_true",
+                   help="change nothing: print how each differs, and fail when one does")
+    p.add_argument("--config", type=Path, default=Path("protected.json"),
+                   help="the repositories and their checks (default: protected.json here)")
+    p.add_argument("repos", nargs="*", metavar="REPO",
+                   help="OWNER/NAME; by default every repository the config lists")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -411,6 +420,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "freshness":
         from .freshness import freshness
         return freshness(args.dirs, args.json)
+    if args.command == "protect":
+        from .protect import run as protect
+        return protect(root / args.config, args.repos, args.check)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)
