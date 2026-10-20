@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.0 is released as v0.12.0 from commit 631de5fe0346e516cf467e22f8a7e241ae0a9ecf.",
+      "content": "pubkit 0.12.1 is released as v0.12.1 from commit 6d8202e68797937c429e1028dd3e51c70240f562.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.0",
+            "0.12.1",
             "pubkit --version",
-            "pubkit 0.12.0",
-            "v0.12.0",
-            "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
+            "pubkit 0.12.1",
+            "v0.12.1",
+            "6d8202e68797937c429e1028dd3e51c70240f562"
           ]
         ]
       },
-      "scope": "the published release v0.12.0 of pubkit",
+      "scope": "the published release v0.12.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
+          "revision": "6d8202e68797937c429e1028dd3e51c70240f562"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.0 was released on 2026-10-20 from commit 631de5fe0346e516cf467e22f8a7e241ae0a9ecf with these changes.",
+      "content": "pubkit 0.12.1 was released on 2026-10-20 from commit 6d8202e68797937c429e1028dd3e51c70240f562 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,22 +58,22 @@
         "rows": [
           [
             "fixed",
-            "pubkit protect prints the reasons GitHub gives for rejecting a ruleset, such as a required check's app not being installed on the repository, and says a repository admin must run it only when GitHub refuses access (HTTP 403 or 404)"
+            "Rewrites the two regular expressions SonarQube Cloud still found backtracking (the tool version and the standard's [checked] tags), and passes cargo and pubrel only values pubkit has checked: the crate's name from cargo metadata, a row's text that cannot start with '-', and the --report path once confined"
           ],
           [
-            "changed",
-            "pubkit protect no longer ships a list of repositories: it reads protected.json in the working directory, or --config FILE, or protects the repositories named with --require CHECK (repeated) and no list. pubkit's own list is protected.json at its root. pubkit new prints the pubkit protect --require line for the new package"
+            "added",
+            "rust-ci's sonar job also reads Cobertura XML a functional target writes in coverage/ (coverage/*.xml) as sonar.python.coverage.reportPaths, so a Rust repository's Python scripts count toward coverage on new code"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.0 of pubkit",
+      "scope": "the published release v0.12.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "631de5fe0346e516cf467e22f8a7e241ae0a9ecf"
+          "revision": "6d8202e68797937c429e1028dd3e51c70240f562"
         }
       ]
     }
