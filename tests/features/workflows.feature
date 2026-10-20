@@ -48,9 +48,20 @@ Feature: The reusable workflows parse as GitHub reads them
       | python-ci.yml |
       | node-ci.yml   |
 
-  Scenario: python-ci gives SonarQube Cloud the suite's coverage
-    When I parse the workflow "python-ci.yml"
-    Then the functional job hands its coverage report to the sonar scan
+  Scenario Outline: A package's reusable workflow gives SonarQube Cloud the tests' coverage
+    When I parse the workflow "<workflow>"
+    Then the "<job>" job hands its coverage report to the sonar scan as "<property>"
+
+    Examples:
+      | workflow      | job        | property                          |
+      | python-ci.yml | functional | sonar.python.coverage.reportPaths |
+      | rust-ci.yml   | functional | sonar.rust.lcov.reportPaths       |
+      | node-ci.yml   | test       | sonar.javascript.lcov.reportPaths |
+
+  Scenario: rust-ci measures coverage with the functional targets only when there is a scan to send it to
+    When I parse the workflow "rust-ci.yml"
+    Then the functional job runs make coverage in place of make functional when given a SONAR_TOKEN
+    And the token itself never reaches the functional job
 
   Scenario Outline: Every action a workflow uses is pinned to a commit
     When I parse the workflow "<workflow>"

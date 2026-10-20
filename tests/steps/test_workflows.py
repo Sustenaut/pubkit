@@ -12,7 +12,8 @@ from pytest_bdd import parsers, scenarios, then, when
 
 scenarios("workflows.feature")
 
-WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+SOURCE = Path(__file__).resolve().parents[2]
+WORKFLOWS = SOURCE / ".github" / "workflows"
 
 
 @when(parsers.parse('I parse the workflow "{workflow}"'), target_fixture="workflow")
@@ -142,19 +143,37 @@ def npx_no_install(workflow):
     assert setup.startswith("npx --no-install ")
 
 
-@then("the functional job hands its coverage report to the sonar scan")
-def coverage_handed_over(workflow):
+@then(parsers.parse('the "{name}" job hands its coverage report to the sonar scan as "{prop}"'))
+def coverage_handed_over(workflow, name, prop):
     jobs = workflow["data"]["jobs"]
-    report = triggers(workflow)["workflow_call"]["inputs"]["coverage-report"]
-    upload = next(s for s in jobs["functional"]["steps"]
+    upload = next(s for s in jobs[name]["steps"]
                   if s.get("uses", "").startswith("actions/upload-artifact@"))
-    assert upload["with"]["path"] == "${{ inputs.coverage-report }}", upload
     assert upload["with"]["if-no-files-found"] == "ignore", upload
-    assert report["default"] == "coverage/coverage.xml", report
-    assert jobs["sonar"]["needs"] == "functional", jobs["sonar"]
+    inputs = triggers(workflow)["workflow_call"]["inputs"]
+    if "coverage-report" in inputs:
+        assert upload["with"]["path"] == "${{ inputs.coverage-report }}", upload
+    assert jobs["sonar"]["needs"] == name, jobs["sonar"]
     download = next(s for s in jobs["sonar"]["steps"]
                     if s.get("uses", "").startswith("actions/download-artifact@"))
     assert download["with"]["name"] == upload["with"]["name"], download
+    assert download.get("continue-on-error") is True, download
     scan = next(s for s in jobs["sonar"]["steps"] if "sonarqube-scan-action" in s.get("uses", ""))
-    args = scan["with"]["args"]
-    assert f"-Dsonar.python.coverage.reportPaths={download['with']['path']}/*.xml" in args, args
+    assert f"-D{prop}=" in scan["with"]["args"], scan["with"]["args"]
+
+
+@then("the functional job runs make coverage in place of make functional when given a SONAR_TOKEN")
+def coverage_in_place(workflow):
+    job = workflow["data"]["jobs"]["functional"]
+    assert job["env"]["COVERAGE"] == "${{ secrets.SONAR_TOKEN != '' }}", job["env"]
+    loop = next(s for s in job["steps"] if "for target in" in s.get("run", ""))
+    assert 'if [[ "$target" = functional && "$COVERAGE" = true ]]; then target=coverage; fi' in loop["run"]
+    shipped = (SOURCE / "src" / "pubkit" / "templates" / "rust" / "pubkit.mk").read_text()
+    assert re.search(r"^coverage: .*##", shipped, re.M), "pubkit.mk has no coverage target"
+    assert re.search(r"^\.PHONY: .*\bcoverage\b", shipped, re.M), "coverage is not phony"
+
+
+@then("the token itself never reaches the functional job")
+def token_kept_out(workflow):
+    job = workflow["data"]["jobs"]["functional"]
+    text = yaml.safe_dump(job)
+    assert "secrets.SONAR_TOKEN }}" not in text, "the functional job is given the token"

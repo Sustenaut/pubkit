@@ -23,7 +23,7 @@ FUZZ_SECONDS ?= 60
 # states.
 MSRV ?= $(shell sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -1)
 
-.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional supply-chain supply-chain-check \
+.PHONY: help venv lock sync-check fmt fmt-check lint test doc build functional coverage supply-chain supply-chain-check \
         doc-coverage doc-coverage-check vectors vectors-check publish-check msrv fuzz-smoke deny vet required
 
 help: ## Show available targets
@@ -60,6 +60,19 @@ build: ## Debug build
 
 functional: build ## The Gherkin suite against the built binaries
 	cd tests && pytest -q $(PYTEST_ARGS)
+
+# Everything `functional` runs, and the Rust tests, on a build instrumented
+# by cargo-llvm-cov, so the suite's runs of the binaries count too. Paths in
+# the report are relative to the repository, for SonarQube Cloud.
+coverage: ## The Rust tests and the Gherkin suite on an instrumented build; LCOV in coverage/lcov.info (needs cargo-llvm-cov)
+	rm -rf coverage && mkdir coverage
+	source <($(CARGO) llvm-cov show-env --sh) \
+	  && $(CARGO) llvm-cov clean --workspace \
+	  && $(CARGO) build $(CARGO_SCOPE) \
+	  && $(CARGO) test $(CARGO_SCOPE) \
+	  && (cd tests && pytest -q $(PYTEST_ARGS)) \
+	  && $(CARGO) llvm-cov report --lcov --output-path coverage/lcov.info
+	sed -i.bak 's|^SF:$(CURDIR)/|SF:|' coverage/lcov.info && rm coverage/lcov.info.bak
 
 supply-chain: ## Regenerate SUPPLY-CHAIN.md for each of SUPPLY_CHAIN_CRATES from supply-chain/
 	.venv/bin/pubkit supply-chain $(SUPPLY_CHAIN_CRATES)

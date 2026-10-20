@@ -387,6 +387,16 @@ jobs:
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.
 3. Add the token as the repository's `SONAR_TOKEN` Actions secret.
 
+The default quality gate asks for 80% coverage on new code, and a scan without a coverage report counts it as 0%, so each workflow hands the sonar job one:
+
+| Workflow | Report | Written by |
+|---|---|---|
+| `rust-ci.yml` | `coverage/lcov.info` | `make coverage`, which the functional job runs in place of `make functional` when there is a token: the Rust tests and the Gherkin suite on a build cargo-llvm-cov instruments (`cargo-llvm-cov-version`) |
+| `python-ci.yml` | `coverage-report`, by default `coverage/coverage.xml` (Cobertura) | the `test` command, such as coverage.py with `patch = ["subprocess"]`, which also measures the programs the suite starts (pubkit's own `make functional` does this) |
+| `node-ci.yml` | `coverage-report`, by default `coverage/lcov.info` | the `test` command, such as `node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info` |
+
+A test command that writes no report leaves the scan as it was.
+
 Every action these workflows use is pinned to a commit, with its version in a comment, and a test fails on one that is not.
 
 ## Developing
