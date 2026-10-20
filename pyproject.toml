@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pubkit"
-version = "0.11.3"
+version = "0.12.0"
 description = "The testing setup every package shares: a pytest-bdd plugin, managed files, and reusable CI."
 readme = "README.md"
 license = "Apache-2.0"
