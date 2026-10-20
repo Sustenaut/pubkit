@@ -14,13 +14,15 @@ jobs:
   # is tests/requirements.lock (pip, with hashes), a format it does not
   # read, and the crate templates under src/pubkit/templates get their
   # Cargo.lock from `cargo generate-lockfile` when `pubkit new` starts a
-  # crate, so neither rule applies to these files.
+  # crate, so neither rule applies to these files. The suite's own steps
+  # are not code it measures.
   ci:
     uses: ./.github/workflows/python-ci.yml
     with:
       sync-check: false
       test: make check
       sonar-args: >-
+        -Dsonar.coverage.exclusions=tests/**
         -Dsonar.issue.ignore.multicriteria=pylock,cargolock
         -Dsonar.issue.ignore.multicriteria.pylock.ruleKey=text:S8565
         -Dsonar.issue.ignore.multicriteria.pylock.resourceKey=pyproject.toml
