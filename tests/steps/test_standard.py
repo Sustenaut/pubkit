@@ -77,6 +77,12 @@ def library_bad_cover(repo, name, item):
     crate(repo, name, TWICE, tests=f"// covers: {item}\n#[test]\nfn t() {{}}\n")
 
 
+@given(parsers.parse('a library "{name}" whose method "{method}" is in the block "{impl}"'))
+def library_method(repo, name, method, impl):
+    crate(repo, name, f"//! A crate.\n\npub struct Meter;\n\n{impl} {{\n"
+                      f"    /// No example.\n    pub fn {method}() {{}}\n}}\n")
+
+
 @given("GITHUB_OUTPUT names a file")
 def github_output(repo, env):
     env["GITHUB_OUTPUT"] = str(repo / "github-output")

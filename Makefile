@@ -23,8 +23,12 @@ standard: ## Regenerate src/pubkit/standard.json from the standard's [checked] t
 standard-check: ## Fail if src/pubkit/standard.json differs from the standard's tags
 	.venv/bin/python -m pubkit.standard --check
 
-functional: ## The Gherkin suite
-	cd tests && pytest -q
+functional: ## The Gherkin suite, with its coverage in coverage/coverage.xml
+	rm -rf coverage && mkdir coverage
+	cd tests && COVERAGE_RCFILE=$(CURDIR)/pyproject.toml COVERAGE_FILE=$(CURDIR)/coverage/.coverage \
+	  coverage run -m pytest -q
+	COVERAGE_FILE=coverage/.coverage coverage combine -q
+	COVERAGE_FILE=coverage/.coverage coverage xml -q
 
 check: standard-check functional ## Everything CI runs
 
@@ -32,4 +36,4 @@ wheel: ## Build the wheel a release carries
 	.venv/bin/pip wheel --quiet --no-deps . -w dist
 
 clean: ## Remove build artifacts
-	rm -rf build dist src/*.egg-info .pytest_cache tests/.pytest_cache
+	rm -rf build dist coverage src/*.egg-info .pytest_cache tests/.pytest_cache

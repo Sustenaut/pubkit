@@ -140,3 +140,21 @@ def npm_ignore_scripts(workflow):
 def npx_no_install(workflow):
     setup = triggers(workflow)["workflow_call"]["inputs"]["browser-setup"]["default"]
     assert setup.startswith("npx --no-install ")
+
+
+@then("the functional job hands its coverage report to the sonar scan")
+def coverage_handed_over(workflow):
+    jobs = workflow["data"]["jobs"]
+    report = triggers(workflow)["workflow_call"]["inputs"]["coverage-report"]
+    upload = next(s for s in jobs["functional"]["steps"]
+                  if s.get("uses", "").startswith("actions/upload-artifact@"))
+    assert upload["with"]["path"] == "${{ inputs.coverage-report }}", upload
+    assert upload["with"]["if-no-files-found"] == "ignore", upload
+    assert report["default"] == "coverage/coverage.xml", report
+    assert jobs["sonar"]["needs"] == "functional", jobs["sonar"]
+    download = next(s for s in jobs["sonar"]["steps"]
+                    if s.get("uses", "").startswith("actions/download-artifact@"))
+    assert download["with"]["name"] == upload["with"]["name"], download
+    scan = next(s for s in jobs["sonar"]["steps"] if "sonarqube-scan-action" in s.get("uses", ""))
+    args = scan["with"]["args"]
+    assert f"-Dsonar.python.coverage.reportPaths={download['with']['path']}/*.xml" in args, args

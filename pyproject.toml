@@ -31,3 +31,13 @@ pubkit = [
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]
+
+# `make functional` measures the suite, the `pubkit` processes it starts
+# included, into coverage/coverage.xml for SonarQube Cloud.
+[tool.coverage.run]
+source = ["pubkit"]
+patch = ["subprocess"]
+parallel = true
+
+[tool.coverage.xml]
+output = "coverage/coverage.xml"
