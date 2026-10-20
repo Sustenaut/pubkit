@@ -81,3 +81,22 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     Then it fails
     And it prints "Validation Failed (HTTP 422); Invalid rule 'required_status_checks': integration 12526 is not installed"
     And it prints nothing about a repository admin
+
+  Scenario: Without --config, a protected.json in the working directory is the list
+    Given protected.json lists "schryer/foo" requiring "ci / passed"
+    And GitHub has no ruleset in "schryer/foo"
+    When I run pubkit "protect"
+    Then it succeeds
+    And it prints "schryer/foo: created"
+    And stderr mentions "using ./protected.json"
+
+  Scenario: --require protects one repository with the checks it names, without a list
+    Given GitHub has no ruleset in "schryer/baz"
+    When I run pubkit "protect" "--require" "ci / passed" "--require" "build" "schryer/baz"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/baz" requiring "ci / passed, build"
+
+  Scenario: --require needs the repositories it applies to
+    When I run pubkit "protect" "--require" "ci / passed"
+    Then it fails
+    And stderr mentions "name the repositories too"

@@ -291,7 +291,7 @@ between them: `ci / passed` from a pubkit workflow, `release / release`
 where pubrel releases it, and `SonarCloud Code Analysis` once SonarQube
 Cloud analyses its pull requests. Both ship in the wheel.
 
-    pubkit protect [--check] [--config FILE] [REPO...]
+    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository it names (by default every one
 listed), or updates the ruleset already on the default branch to match,
@@ -299,6 +299,11 @@ renaming it. It calls the GitHub API through `gh`, signed in as the
 repositories' owner, since only an admin may change a ruleset. `--check`
 changes nothing: it prints how each repository differs, a setting GitHub
 adds with its own default aside, and fails when one does.
+
+The list is `--config FILE`, else a `protected.json` in the working
+directory (the same shape), else the one the installed pubkit ships.
+`--require CHECK`, repeated, reads no list: the repositories named require
+those checks, as in `pubkit protect --require "ci / passed" schryer/newrepo`.
 
 Installed as a tool, it runs from any directory and protects the
 repositories its release lists:

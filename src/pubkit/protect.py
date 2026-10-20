@@ -34,6 +34,7 @@ APPS = {"SonarCloud Code Analysis": 12526}
 
 Api = Callable[[str, str, Any], Any]
 
+LOCAL = "protected.json"
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
@@ -156,7 +157,11 @@ def protect(api: Api, repo: str, checks: list[str], check: bool) -> tuple[list[s
 
 
 def load(config: Path | None) -> list[dict]:
-    """The repositories and their checks: `config`, or the list this pubkit ships."""
+    """The repositories and their checks: `config`, else a protected.json in
+    the working directory, else the list this pubkit ships."""
+    if config is None and Path(LOCAL).is_file():
+        config = Path(LOCAL)
+        print(f"pubkit protect: using ./{LOCAL}", file=sys.stderr)
     if config is None:
         text = resources.files("pubkit").joinpath("protected.json").read_text(encoding="utf-8")
     elif not config.is_file():
@@ -171,8 +176,19 @@ def load(config: Path | None) -> list[dict]:
     return entries
 
 
-def run(config: Path | None, repos: list[str], check: bool, api: Api = gh) -> int:
-    entries = load(config)
+def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
+        api: Api = gh) -> int:
+    """Protect `repos` (by default every one listed). Given `requires`, the
+    named repositories require those checks, and no list is read."""
+    if requires:
+        if not repos:
+            sys.exit("pubkit protect: --require names a check; name the repositories too")
+        bad = [r for r in repos if not REPO.fullmatch(r)]
+        if bad:
+            sys.exit(f"pubkit protect: {', '.join(bad)} is not OWNER/NAME")
+        entries = [{"repo": r, "checks": requires} for r in repos]
+    else:
+        entries = load(config)
     known = {e["repo"]: e for e in entries}
     unknown = [r for r in repos if r not in known]
     if unknown:
