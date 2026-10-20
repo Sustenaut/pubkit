@@ -15,7 +15,7 @@
     pubkit record TEXT
     pubkit nightly --pubrel V --pub V --body FILE
     pubkit freshness [--json] DIR...
-    pubkit protect [--check] [--config FILE] [REPO...]
+    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -364,7 +364,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true",
                    help="change nothing: print how each differs, and fail when one does")
     p.add_argument("--config", type=Path,
-                   help="the repositories and their checks (default: the protected.json this pubkit ships)")
+                   help="the repositories and their checks (default: ./protected.json)")
+    p.add_argument("--require", action="append", metavar="CHECK",
+                   help="a check the named repositories require, instead of any list; repeat it")
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME; by default every repository the config lists")
     p = commands.add_parser("required",
@@ -424,7 +426,7 @@ def main(argv: list[str] | None = None) -> int:
         from .paths import confined
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
-        return protect(config, args.repos, args.check)
+        return protect(config, args.repos, args.check, args.require)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)

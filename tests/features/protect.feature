@@ -1,6 +1,7 @@
 Feature: Every repository's main branch carries pubkit's one ruleset
-  src/pubkit/ruleset.json is the ruleset; src/pubkit/protected.json lists
-  the repositories and the checks each requires. Both ship in the wheel. `pubkit protect` creates or
+  src/pubkit/ruleset.json is the ruleset, shipped in the wheel. Which
+  repositories carry it, with the checks each requires, is local: a
+  protected.json (pubkit's own sits at its root), or --require. `pubkit protect` creates or
   updates the ruleset through the GitHub API, and `pubkit protect --check`
   reports how a repository differs, changing nothing.
 
@@ -68,8 +69,33 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     Then it fails
     And stderr mentions "needs a repo, OWNER/NAME"
 
-  Scenario: Without --config, protect reads the list this pubkit ships
-    Given GitHub has pubkit's ruleset in "schryer/pubkit" requiring "ci / passed, release / release, SonarCloud Code Analysis"
-    When I run pubkit "protect" "--check" "schryer/pubkit"
+  Scenario: Without a list or --require, protect says how to give one
+    When I run pubkit "protect"
+    Then it fails
+    And stderr mentions "pass --config FILE, or name the repositories with --require"
+
+  Scenario: protect shows why GitHub rejected a ruleset
+    Given protected.json lists "schryer/foo" requiring "ci / passed, SonarCloud Code Analysis"
+    And GitHub rejects the ruleset for "schryer/foo" because "Invalid rule 'required_status_checks': integration 12526 is not installed"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it fails
+    And it prints "Validation Failed (HTTP 422); Invalid rule 'required_status_checks': integration 12526 is not installed"
+    And it prints nothing about a repository admin
+
+  Scenario: Without --config, a protected.json in the working directory is the list
+    Given protected.json lists "schryer/foo" requiring "ci / passed"
+    And GitHub has no ruleset in "schryer/foo"
+    When I run pubkit "protect"
     Then it succeeds
-    And it prints "schryer/pubkit: up to date"
+    And it prints "schryer/foo: created"
+
+  Scenario: --require protects one repository with the checks it names, without a list
+    Given GitHub has no ruleset in "schryer/baz"
+    When I run pubkit "protect" "--require" "ci / passed" "--require" "build" "schryer/baz"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/baz" requiring "ci / passed, build"
+
+  Scenario: --require needs the repositories it applies to
+    When I run pubkit "protect" "--require" "ci / passed"
+    Then it fails
+    And stderr mentions "name the repositories too"

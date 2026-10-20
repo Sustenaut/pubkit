@@ -3,10 +3,11 @@
 `ruleset.json` is the ruleset every pub* repository's main carries: no
 deletion, no force push, changes only by pull request (no approval needed,
 since one person owns them), only after the required checks pass, and
-nobody may bypass it. `protected.json`, shipped beside it, lists the
-repositories and the checks each one requires, which is all that differs
-between them. Both come with the wheel, so an installed pubkit protects
-the repositories its release names, from any directory.
+nobody may bypass it, and it ships with the wheel. Which repositories carry
+it, and the checks each requires (all that differs between them), is local
+configuration: a `protected.json` in the working directory, or one named
+with `--config`, or the repositories and `--require CHECK` on the command
+line. pubkit's own list is the protected.json in its checkout.
 
 `pubkit protect [REPO...]` creates the ruleset in each repository, or
 updates the one already on its default branch, renaming it, so a
@@ -34,6 +35,7 @@ APPS = {"SonarCloud Code Analysis": 12526}
 
 Api = Callable[[str, str, Any], Any]
 
+LOCAL = "protected.json"
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
@@ -60,12 +62,22 @@ def gh(method: str, path: str, body: Any = None) -> Any:
     proc = subprocess.run(argv, input=None if body is None else json.dumps(body),
                           capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise ApiError(f"gh api -X {method} {path}: {(proc.stderr or proc.stdout).strip()}")
+        raise ApiError(f"gh api -X {method} {path}: {proc.stderr.strip()}", proc.stdout)
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
 
 class ApiError(Exception):
-    pass
+    """A refused call: gh's message, then the reasons GitHub's response gives."""
+
+    def __init__(self, message: str, response: str = ""):
+        m = re.search(r"\(HTTP (\d+)\)", message)
+        self.status = int(m.group(1)) if m else None
+        try:
+            errors = json.loads(response).get("errors") or []
+        except (ValueError, AttributeError):
+            errors = []
+        reasons = [e if isinstance(e, str) else e.get("message") or json.dumps(e) for e in errors]
+        super().__init__("; ".join([message, *reasons]))
 
 
 def on_default_branch(rs: dict) -> bool:
@@ -146,14 +158,16 @@ def protect(api: Api, repo: str, checks: list[str], check: bool) -> tuple[list[s
 
 
 def load(config: Path | None) -> list[dict]:
-    """The repositories and their checks: `config`, or the list this pubkit ships."""
+    """The repositories and their checks: `config`, else the protected.json
+    in the working directory."""
     if config is None:
-        text = resources.files("pubkit").joinpath("protected.json").read_text(encoding="utf-8")
+        if not Path(LOCAL).is_file():
+            sys.exit(f"pubkit protect: no ./{LOCAL}; pass --config FILE, or name the "
+                     f"repositories with --require CHECK for each check they require")
+        config = Path(LOCAL)
     elif not config.is_file():
         sys.exit(f"pubkit protect: no {config}")
-    else:
-        text = config.read_text(encoding="utf-8")
-    entries = json.loads(text)["repositories"]
+    entries = json.loads(config.read_text(encoding="utf-8"))["repositories"]
     for e in entries:
         if not REPO.fullmatch(e.get("repo", "")) or not e.get("checks"):
             sys.exit(f"pubkit protect: protected.json: {json.dumps(e)} needs a repo, "
@@ -161,8 +175,19 @@ def load(config: Path | None) -> list[dict]:
     return entries
 
 
-def run(config: Path | None, repos: list[str], check: bool, api: Api = gh) -> int:
-    entries = load(config)
+def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
+        api: Api = gh) -> int:
+    """Protect `repos` (by default every one listed). Given `requires`, the
+    named repositories require those checks, and no list is read."""
+    if requires:
+        if not repos:
+            sys.exit("pubkit protect: --require names a check; name the repositories too")
+        bad = [r for r in repos if not REPO.fullmatch(r)]
+        if bad:
+            sys.exit(f"pubkit protect: {', '.join(bad)} is not OWNER/NAME")
+        entries = [{"repo": r, "checks": requires} for r in repos]
+    else:
+        entries = load(config)
     known = {e["repo"]: e for e in entries}
     unknown = [r for r in repos if r not in known]
     if unknown:
@@ -174,7 +199,7 @@ def run(config: Path | None, repos: list[str], check: bool, api: Api = gh) -> in
             lines, bad = protect(api, entry["repo"], entry["checks"], check)
         except ApiError as e:
             lines, bad = [f"{entry['repo']}: {e}"], True
-            if not check:
+            if not check and e.status in (403, 404):
                 lines.append("  changing a ruleset needs a repository admin: "
                              "`gh auth login` as its owner, then run this again")
         print("\n".join(lines))

@@ -31,6 +31,10 @@ if method != "GET":
     if repo in state["refuse"]:
         sys.stderr.write("gh: Resource not accessible by integration (HTTP 403)\\n")
         sys.exit(1)
+    if repo in state["reject"]:
+        print(json.dumps({{"message": "Validation Failed", "errors": state["reject"][repo]}}))
+        sys.stderr.write("gh: Validation Failed (HTTP 422)\\n")
+        sys.exit(1)
     state["sent"].append({{"method": method, "url": url, "body": json.load(sys.stdin)}})
     json.dump(state, open(path, "w"))
     print("{{}}")
@@ -50,7 +54,7 @@ def github(tmp_path, env):
     gh.write_text(FAKE_GH)
     gh.chmod(0o755)
     state = tmp_path / "github.json"
-    state.write_text(json.dumps({"rulesets": {}, "refuse": [], "sent": []}))
+    state.write_text(json.dumps({"rulesets": {}, "refuse": [], "reject": {}, "sent": []}))
     env["FAKE_GH"] = str(state)
     env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
     return state
@@ -102,7 +106,7 @@ def requires(built, a, b):
 
 @when("I read pubkit's protected.json", target_fixture="entries")
 def read_protected():
-    return json.loads((ROOT / "src" / "pubkit" / "protected.json").read_text())["repositories"]
+    return json.loads((ROOT / "protected.json").read_text())["repositories"]
 
 
 @then("every repository in it requires at least one check, and is listed once")
@@ -146,6 +150,11 @@ def has_pubkit_ruleset(github, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs]))
 
 
+@given(parsers.parse('GitHub rejects the ruleset for "{slug}" because "{reason}"'))
+def rejects(github, slug, reason):
+    _edit(github, lambda s: s["reject"].__setitem__(slug, [reason]))
+
+
 @given(parsers.parse('GitHub refuses to change rulesets in "{slug}"'))
 def refuses(github, slug):
     _edit(github, lambda s: s["refuse"].append(slug))
@@ -170,3 +179,9 @@ def sent_ruleset(github, slug, checks, old):
 def sent_nothing(github):
     assert _sent(github) == []
 
+
+
+@then("it prints nothing about a repository admin")
+def no_admin_hint(result):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert "repository admin" not in out, out

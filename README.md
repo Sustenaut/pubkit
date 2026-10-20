@@ -277,40 +277,40 @@ target, Gherkin scenarios, `deny.toml`, `supply-chain/`, `SECURITY.md`,
 a release key labelled "pubfoo release key", its secret in the gitignored
 `corpus/.publet`. It refuses a `pubrel` older than 0.5.3 or a `pub` older
 than 0.2.1, and prints the two steps it does not take itself: the lines
-that add the package to `src/pubkit/protected.json` and `governed.json`.
+that protect its main branch and add it to `protected.json` and `governed.json`.
 
 ## Protecting main
 
 Every repository's default branch carries the same ruleset,
-[`src/pubkit/ruleset.json`](src/pubkit/ruleset.json): it cannot be deleted
-or force-pushed, it changes only by pull request (no approval needed), only
-after the required checks pass, and nobody may bypass it.
-[`src/pubkit/protected.json`](src/pubkit/protected.json) lists the
-repositories and the checks each requires, the one thing that differs
-between them: `ci / passed` from a pubkit workflow, `release / release`
-where pubrel releases it, and `SonarCloud Code Analysis` once SonarQube
-Cloud analyses its pull requests. Both ship in the wheel.
+[`src/pubkit/ruleset.json`](src/pubkit/ruleset.json), which ships in the
+wheel: it cannot be deleted or force-pushed, it changes only by pull
+request (no approval needed), only after the required checks pass, and
+nobody may bypass it. Which repositories carry it, and the checks each
+requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--config FILE] [REPO...]
+    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
 
-creates the ruleset in each repository it names (by default every one
-listed), or updates the ruleset already on the default branch to match,
-renaming it. It calls the GitHub API through `gh`, signed in as the
-repositories' owner, since only an admin may change a ruleset. `--check`
-changes nothing: it prints how each repository differs, a setting GitHub
-adds with its own default aside, and fails when one does.
+creates the ruleset in each repository, or updates the ruleset already on
+the default branch to match, renaming it. It calls the GitHub API through
+`gh`, signed in as the repositories' owner, since only an admin may change
+a ruleset. `--check` changes nothing: it prints how each repository
+differs, a setting GitHub adds with its own default aside, and fails when
+one does. When GitHub rejects a ruleset, it prints GitHub's reasons.
 
-Installed as a tool, it runs from any directory and protects the
-repositories its release lists:
+The repositories come from one of:
 
-    pipx install https://github.com/schryer/pubkit/releases/download/vX.Y.Z/pubkit-X.Y.Z-py3-none-any.whl
-    pubkit protect
+- a `protected.json` in the working directory, or the file `--config`
+  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`.
+  `REPO` arguments pick some of the repositories it lists;
+- `--require CHECK`, repeated, and the `REPO` arguments, with no file:
+  `pubkit protect --require "ci / passed" schryer/newrepo`.
 
-To change the protection, edit those two files and open a pull request. In
-this checkout, `make protect` (or `make protect-check`, or `make protect
-REPOS=schryer/recipes`) applies the edited files at once, making the venv
-first if there is none; an installed pubkit applies them from the release
-that carries them.
+pubkit's own list, the pub* repositories, is
+[`protected.json`](protected.json) at the root of this checkout: `ci /
+passed` from a pubkit workflow, `release / release` where pubrel releases,
+and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
+requests. Here, `make protect` (or `make protect-check`, or `make protect
+REPOS=schryer/recipes`) runs it, making the venv first if there is none.
 
 ## The nightly
 
