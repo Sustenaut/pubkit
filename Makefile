@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
-.PHONY: help venv lock standard standard-check functional check wheel clean
+.PHONY: help venv lock standard standard-check functional check wheel protect protect-check clean
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -13,6 +13,10 @@ venv: ## Hash-locked environment, with this checkout installed editable
 	python3 -m venv .venv
 	.venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock
 	.venv/bin/pip install --quiet --no-deps -e .
+
+# Made on first use, so `make protect` needs nothing run before it.
+.venv/bin/pubkit:
+	$(MAKE) venv
 
 lock: ## Pin tests/requirements.txt, with hashes
 	.venv/bin/pubkit lock
@@ -34,6 +38,12 @@ check: standard-check functional ## Everything CI runs
 
 wheel: ## Build the wheel a release carries
 	.venv/bin/pip wheel --quiet --no-deps . -w dist
+
+protect: .venv/bin/pubkit ## Put the ruleset on every repository in protected.json (or REPOS="o/r ..."), through gh as their admin
+	.venv/bin/pubkit protect $(REPOS)
+
+protect-check: .venv/bin/pubkit ## Show how each repository differs from the ruleset, changing nothing
+	.venv/bin/pubkit protect --check $(REPOS)
 
 clean: ## Remove build artifacts
 	rm -rf build dist coverage src/*.egg-info .pytest_cache tests/.pytest_cache

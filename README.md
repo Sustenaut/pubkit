@@ -290,9 +290,10 @@ each requires, the one thing that differs between them: `ci / passed` from
 a pubkit workflow, `release / release` where pubrel releases it, and
 `SonarCloud Code Analysis` once SonarQube Cloud analyses its pull requests.
 
-    pubkit protect [--check] [REPO...]
+    make protect          # or: make protect-check, make protect REPOS=schryer/recipes
 
-run in this checkout, creates the ruleset in each repository it names (by
+runs `pubkit protect [--check] [REPO...]` in this checkout, making the venv
+first if there is none. It creates the ruleset in each repository it names (by
 default every one listed), or updates the ruleset already on the default
 branch to match, renaming it. It calls the GitHub API through `gh`, signed
 in as the repositories' owner, since only an admin may change a ruleset.
