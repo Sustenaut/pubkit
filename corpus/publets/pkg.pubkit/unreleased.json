@@ -5,8 +5,8 @@
       "change": "pubkit protect prints the reasons GitHub gives for rejecting a ruleset, such as a required check's app not being installed on the repository, and says a repository admin must run it only when GitHub refuses access (HTTP 403 or 404)"
     },
     {
-      "category": "added",
-      "change": "pubkit protect reads a protected.json in the working directory before the list it ships, and --require CHECK (repeated) protects the repositories named with those checks, reading no list"
+      "category": "changed",
+      "change": "pubkit protect no longer ships a list of repositories: it reads protected.json in the working directory, or --config FILE, or protects the repositories named with --require CHECK (repeated) and no list. pubkit's own list is protected.json at its root. pubkit new prints the pubkit protect --require line for the new package"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

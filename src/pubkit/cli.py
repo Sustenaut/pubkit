@@ -364,8 +364,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true",
                    help="change nothing: print how each differs, and fail when one does")
     p.add_argument("--config", type=Path,
-                   help="the repositories and their checks (default: ./protected.json if there "
-                        "is one, else the list this pubkit ships)")
+                   help="the repositories and their checks (default: ./protected.json)")
     p.add_argument("--require", action="append", metavar="CHECK",
                    help="a check the named repositories require, instead of any list; repeat it")
     p.add_argument("repos", nargs="*", metavar="REPO",

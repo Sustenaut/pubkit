@@ -3,10 +3,11 @@
 `ruleset.json` is the ruleset every pub* repository's main carries: no
 deletion, no force push, changes only by pull request (no approval needed,
 since one person owns them), only after the required checks pass, and
-nobody may bypass it. `protected.json`, shipped beside it, lists the
-repositories and the checks each one requires, which is all that differs
-between them. Both come with the wheel, so an installed pubkit protects
-the repositories its release names, from any directory.
+nobody may bypass it, and it ships with the wheel. Which repositories carry
+it, and the checks each requires (all that differs between them), is local
+configuration: a `protected.json` in the working directory, or one named
+with `--config`, or the repositories and `--require CHECK` on the command
+line. pubkit's own list is the protected.json in its checkout.
 
 `pubkit protect [REPO...]` creates the ruleset in each repository, or
 updates the one already on its default branch, renaming it, so a
@@ -157,18 +158,16 @@ def protect(api: Api, repo: str, checks: list[str], check: bool) -> tuple[list[s
 
 
 def load(config: Path | None) -> list[dict]:
-    """The repositories and their checks: `config`, else a protected.json in
-    the working directory, else the list this pubkit ships."""
-    if config is None and Path(LOCAL).is_file():
-        config = Path(LOCAL)
-        print(f"pubkit protect: using ./{LOCAL}", file=sys.stderr)
+    """The repositories and their checks: `config`, else the protected.json
+    in the working directory."""
     if config is None:
-        text = resources.files("pubkit").joinpath("protected.json").read_text(encoding="utf-8")
+        if not Path(LOCAL).is_file():
+            sys.exit(f"pubkit protect: no ./{LOCAL}; pass --config FILE, or name the "
+                     f"repositories with --require CHECK for each check they require")
+        config = Path(LOCAL)
     elif not config.is_file():
         sys.exit(f"pubkit protect: no {config}")
-    else:
-        text = config.read_text(encoding="utf-8")
-    entries = json.loads(text)["repositories"]
+    entries = json.loads(config.read_text(encoding="utf-8"))["repositories"]
     for e in entries:
         if not REPO.fullmatch(e.get("repo", "")) or not e.get("checks"):
             sys.exit(f"pubkit protect: protected.json: {json.dumps(e)} needs a repo, "

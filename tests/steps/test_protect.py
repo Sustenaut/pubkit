@@ -106,7 +106,7 @@ def requires(built, a, b):
 
 @when("I read pubkit's protected.json", target_fixture="entries")
 def read_protected():
-    return json.loads((ROOT / "src" / "pubkit" / "protected.json").read_text())["repositories"]
+    return json.loads((ROOT / "protected.json").read_text())["repositories"]
 
 
 @then("every repository in it requires at least one check, and is listed once")

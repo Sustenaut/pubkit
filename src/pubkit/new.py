@@ -20,7 +20,7 @@ Run in an empty repository (a README or LICENSE already there is kept). It:
 5. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
    the test requirements;
 6. prints the lines that, in schryer/pubkit, protect its main branch
-   (src/pubkit/protected.json, then `pubkit protect`) and register it for pubkit's
+   (`pubkit protect --require ...`, and a line for protected.json) and register it for pubkit's
    nightly workflow (governed.json).
 """
 
@@ -194,6 +194,7 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
         lock_requirements(root)
 
     entry = json.dumps({"repo": f"schryer/{name}", "checks": CHECKS})
+    requires = " ".join(f'--require "{c}"' for c in CHECKS)
     print(f"""
 {name} is ready: every file the standard asks for, a release key, and a
 crate that passes every check. Next:
@@ -202,12 +203,16 @@ crate that passes every check. Next:
   cargo vet                        # fetch the shared audits into supply-chain/
   git add -A && git commit -m "{name}: a new pub* package" && git push
 
-Then, in schryer/pubkit, protect main as every pub* repository is (pull
-requests only, after CI): add
+Then protect main as every pub* repository is (pull requests only, after
+CI):
+
+  pubkit protect {requires} schryer/{name}
+
+and, in schryer/pubkit, add
 
   {entry}
 
-to src/pubkit/protected.json and run `make protect REPOS=schryer/{name}`. And register it
-for pubkit's nightly workflow: add {{"repo": "schryer/{name}"}} to
+to protected.json, so `pubkit protect --check` there covers it. And register
+it for pubkit's nightly workflow: add {{"repo": "schryer/{name}"}} to
 governed.json.""")
     return 0
