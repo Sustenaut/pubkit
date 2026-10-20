@@ -124,13 +124,20 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
         print(f"{'managed' if path in owned else 'seeded '}  {path}")
 
 
+def is_node(root: Path) -> bool:
+    """A Node package: a package.json, and no pyproject.toml beside it."""
+    return (root / "package.json").exists() and not (root / "pyproject.toml").exists()
+
+
 def init(root: Path, kind: str, binary: str | None, project: str | None = None) -> int:
     config = {"kind": kind}
     if binary:
         config["bin"] = binary
     if kind == "service" and not project:
         sys.exit("pubkit: a service names the Bitwarden Secrets Manager project its secrets are in: --project=NAME")
-    init_files(root, config, extra={"project": project or ""})
+    # A Node package's seeded CI is node-ci.yml rather than python-ci.yml.
+    layers = ("common", kind, "node") if kind == "utility" and is_node(root) else None
+    init_files(root, config, layers, extra={"project": project or ""})
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
 

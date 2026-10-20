@@ -12,6 +12,7 @@
     "pyproject.toml",
     ".github/workflows/python-ci.yml",
     ".github/workflows/rust-ci.yml",
+    ".github/workflows/node-ci.yml",
     "plugins/",
     ".claude-plugin/"
   ],

@@ -3,6 +3,7 @@
 #   ci:
 #     uses: schryer/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
 #     with: { pub-version: v0.1.1 }
+#     secrets: inherit
 #
 # Every check the Rust crate standard tags `[checked: ..., make TARGET]` runs
 # here, for every repository: the plan job asks `pubkit required` (from the
@@ -25,6 +26,9 @@
 # - cross runs the tests under emulation on cross-targets: i686 (32-bit) and
 #   s390x (big-endian) by default, which find word-size and byte-order bugs.
 # - audit runs `make deny` and `make vet`.
+#
+# The sonar job sends the code to SonarQube Cloud when the caller passes a
+# SONAR_TOKEN (`secrets: inherit`), and otherwise passes with a notice.
 #
 # When the caller's workflow also runs on a `schedule`, those runs add the
 # toolchains job: the tests on the latest stable and beta Rust, which the
@@ -51,6 +55,9 @@ on:
       cargo-deny-version: { type: string, default: 0.20.2 }
       cargo-vet-version: { type: string, default: 0.10.2 }
       scheduled-toolchains: { type: string, default: '["stable", "beta"]', description: JSON list of toolchains a scheduled run tests on. }
+      sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
+    secrets:
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
 env:
   CARGO_TERM_COLOR: always
@@ -72,9 +79,9 @@ jobs:
       # its base: a pull request that touches no Rust code, Cargo files,
       # fuzz/ or workflow files skips fuzz and cross. Release pull requests,
       # pushes and scheduled runs run everything.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 2 }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       - run: make venv
       - run: make sync-check
@@ -91,8 +98,8 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       - run: cargo --version && rustc --version
       - run: make venv
@@ -110,21 +117,21 @@ jobs:
         os: ${{ fromJSON(inputs.os-matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: cargo test ${{ inputs.test-args }}
 
   functional:
     needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - if: inputs.pub-version != ''
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/pub
           key: pub-${{ inputs.pub-version }}
@@ -145,7 +152,7 @@ jobs:
     needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       # The oldest rust-version any package states: the oldest Rust the
       # repository promises anything on. Its `make msrv` builds whichever
       # packages make that promise.
@@ -168,9 +175,9 @@ jobs:
     needs: [plan, gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: rustup toolchain install nightly --profile minimal
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-fuzz
           key: cargo-fuzz-${{ inputs.cargo-fuzz-version }}-${{ runner.os }}
@@ -194,7 +201,7 @@ jobs:
         target: ${{ fromJSON(inputs.cross-targets) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Install the target's linker and emulator
         run: |
           case "$TARGET" in
@@ -223,8 +230,8 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/cache@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/bin/cargo-deny
@@ -257,9 +264,31 @@ jobs:
     env:
       RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - run: cargo --version && cargo test ${{ inputs.test-args }}
+
+  # SonarQube Cloud's analysis, into the project OWNER_REPO of the
+  # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
+  # in a private repository or a pull request from a fork, it says so and
+  # passes. The full history lets it tell new code from old.
+  sonar:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - if: env.SONAR_TOKEN == ''
+        run: echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 0 }
+      - if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        with:
+          args: >-
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            ${{ inputs.sonar-args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a
   # required check, so requiring the jobs above directly would let a PR
@@ -269,7 +298,7 @@ jobs:
   # failed fails here through gates itself.
   passed:
     if: always()
-    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, toolchains]
+    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, toolchains, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |
