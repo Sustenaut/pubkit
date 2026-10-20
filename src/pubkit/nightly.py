@@ -31,6 +31,10 @@ from .paths import confined
 # `crates`.
 PUB_CRATES = ("publet-core", "publet-algorithms", "pubunit")
 
+# A row's text, which must not start with '-' (pubrel has no `--`, so it
+# would read that as an option) or a space.
+ROW = re.compile(r"[^-\s].*", re.S)
+
 # The categories `pubrel add` takes.
 CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 
@@ -74,9 +78,11 @@ def record(root: Path, text: str, category: str = "internal") -> list[str]:
     if category not in CATEGORIES:
         sys.exit(f"pubkit: pubrel has no category {category!r}; use one of "
                  f"{', '.join(CATEGORIES)}")
-    if text.startswith("-"):
-        sys.exit(f"pubkit: the row's text {text!r} starts with '-', which pubrel would take "
-                 "for an option")
+    row = ROW.fullmatch(text)
+    if not row:
+        sys.exit(f"pubkit: the row's text {text!r} is empty or starts with a space or "
+                 "'-', which pubrel would take for an option")
+    text = row.group(0)
     out = subprocess.run(["pubrel", "check", "origin/main"], cwd=root, capture_output=True,
                          text=True, check=False)
     hints = re.findall(r"run `pubrel add( --package ([A-Za-z0-9_][A-Za-z0-9_-]*))? CATEGORY",
@@ -205,8 +211,7 @@ def crates(root: Path, report: Path | None) -> int:
     """Try each upgrade on its own, on top of those already kept, and keep
     it only when `cargo vet` passes without a new exemption and `cargo deny`
     passes."""
-    if report:
-        report = confined(report, "the --report file")
+    target = confined(report, "the --report file") if report else None
     saved = snapshot(root)
     notes: list[str] = []
     updated: list[tuple[str, str, str]] = []
@@ -271,8 +276,8 @@ def crates(root: Path, report: Path | None) -> int:
     lines = notes + [f"{c} {a} -> {b}" for c, a, b in updated]
     for line in lines:
         print(line)
-    if report:
-        report.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
+    if target:
+        target.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
                           encoding="utf-8")
     return 0
 

@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "fixed",
+      "change": "Rewrites the two regular expressions SonarQube Cloud still found backtracking (the tool version and the standard's [checked] tags), and passes cargo and pubrel only values pubkit has checked: the crate's name from cargo metadata, a row's text that cannot start with '-', and the --report path once confined"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

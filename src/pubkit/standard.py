@@ -37,7 +37,9 @@ JOBS = {
 BASELINE = {"fmt-check": "gates", "lint": "gates", "doc": "gates", "functional": "functional"}
 WORKFLOW_JOBS = {"test", "cross", "fuzz"}
 
-TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),\s*([^\]]*)\]")
+# The fields after the rule ID keep their leading space: `\s*` before
+# `[^\]]*` could match the same spaces either way, which backtracks.
+TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),([^\]]*)\]")
 HEADING = re.compile(r"^## (\d+)\. (.+)$", re.M)
 
 
