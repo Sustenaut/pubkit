@@ -166,12 +166,16 @@ jobs:
             echo "::group::make $target"; make "$target"; echo "::endgroup::"
           done
         env: { REQUIRED: '${{ needs.plan.outputs.functional }}', EXTRA: '${{ inputs.functional }}' }
-      # The sonar job runs elsewhere, so the report goes to it as an artifact.
+      # The sonar job runs elsewhere, so the reports go to it as an artifact:
+      # the LCOV of `make coverage`, and any Cobertura XML a functional target
+      # wrote in coverage/, such as the coverage of a repository's Python.
       - if: env.COVERAGE == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage
-          path: coverage/lcov.info
+          path: |
+            coverage/lcov.info
+            coverage/*.xml
           if-no-files-found: ignore
           retention-days: 1
 
@@ -326,6 +330,7 @@ jobs:
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.rust.lcov.reportPaths=coverage-download/lcov.info
+            -Dsonar.python.coverage.reportPaths=coverage-download/*.xml
             ${{ inputs.sonar-args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a

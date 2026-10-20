@@ -56,6 +56,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | workflow      | job        | property                          |
       | python-ci.yml | functional | sonar.python.coverage.reportPaths |
       | rust-ci.yml   | functional | sonar.rust.lcov.reportPaths       |
+      | rust-ci.yml   | functional | sonar.python.coverage.reportPaths |
       | node-ci.yml   | test       | sonar.javascript.lcov.reportPaths |
 
   Scenario: rust-ci measures coverage with the functional targets only when there is a scan to send it to
