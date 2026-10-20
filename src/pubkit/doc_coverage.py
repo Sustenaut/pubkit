@@ -31,9 +31,25 @@ from pathlib import Path
 
 FN = re.compile(r"\s*pub (?:const )?fn (\w+)")
 TYPE = re.compile(r"\s*pub (?:struct|enum|trait|type) (\w+)")
-IMPL = re.compile(r"\s*impl(?:<[^>]*>)?\s+(?:[\w:<>, ]+\s+for\s+)?(\w+)")
+IMPL = re.compile(r"\s*impl(?:<[^>]*>)?\s+")
+TRAIT = re.compile(r"[\w:<>, ]+")
 TEST_FN = re.compile(r"\s*(?:pub )?fn (\w+)")
 COVERS = re.compile(r"//\s*covers:\s*(.+)")
+
+
+def impl_of(line: str) -> str | None:
+    """The type an `impl` line implements for: `Foo` in `impl Foo` and in
+    `impl<T> Trait<T> for Foo<T>`. Split on ` for ` rather than matched in
+    one pattern, which would backtrack."""
+    m = IMPL.match(line)
+    if not m:
+        return None
+    rest = line[m.end():]
+    trait, sep, target = rest.partition(" for ")
+    if sep and TRAIT.fullmatch(trait.rstrip()):
+        rest = target.lstrip()
+    name = re.match(r"\w+", rest)
+    return name.group(0) if name else None
 
 
 def strip(line: str) -> str:
@@ -109,7 +125,7 @@ def items(crate: Crate) -> list[tuple]:
                 in_test = depth
             code = strip(line)
             if in_test is None:
-                impl = IMPL.match(line) if line.strip().startswith("impl") else None
+                impl = impl_of(line) if line.strip().startswith("impl") else None
                 fn, ty = FN.match(line), TYPE.match(line)
                 if fn or ty:
                     j, doc = i - 1, []
@@ -125,7 +141,7 @@ def items(crate: Crate) -> list[tuple]:
                     else:
                         out.append((ty.group(1), "type", path, i + 1, examples))
                 if impl and "{" in code:
-                    impl_stack.append((depth, impl.group(1)))
+                    impl_stack.append((depth, impl))
             depth += code.count("{") - code.count("}")
             while impl_stack and depth <= impl_stack[-1][0]:
                 impl_stack.pop()

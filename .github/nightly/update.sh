@@ -12,7 +12,7 @@ body=$(mktemp)
 summary=${GITHUB_STEP_SUMMARY:-/dev/null}
 
 notify() {
-  if [ -z "${SLACK_TOKEN:-}" ] || [ -z "${SLACK_USER:-}" ]; then
+  if [[ -z "${SLACK_TOKEN:-}" ]] || [[ -z "${SLACK_USER:-}" ]]; then
     echo "No Slack secrets: not sending \"$1\""; return 0
   fi
   curl -sS -X POST https://slack.com/api/chat.postMessage \
@@ -29,10 +29,10 @@ wait_ci() {
   sleep 60
   for i in $(seq 330); do
     runs=$(gh run list --repo "$REPO" --commit "$1" --json status,conclusion,url)
-    if [ "$(jq length <<<"$runs")" -gt 0 ] \
-        && [ "$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")" = 0 ]; then
+    if [[ "$(jq length <<<"$runs")" -gt 0 ]] \
+        && [[ "$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")" = 0 ]]; then
       failed=$(jq -r '[.[] | select(.conclusion | IN("success", "skipped", "neutral") | not) | .url] | join(" ")' <<<"$runs")
-      [ -z "$failed" ]; return
+      [[ -z "$failed" ]]; return
     fi
     sleep 60
   done
@@ -44,9 +44,9 @@ git checkout -q -B "$branch" origin/main
 made=$(pubkit nightly --pubrel "$PUBREL" --pub "$PUB" --body "$body" | tail -n 1)
 pr=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
 
-if [ -z "$made" ]; then
+if [[ -z "$made" ]]; then
   echo "$REPO: nothing to update." >> "$summary"
-  if [ -n "$pr" ]; then
+  if [[ -n "$pr" ]]; then
     gh pr close "$pr" --repo "$REPO" --delete-branch \
       --comment "Closed by pubkit's nightly: main has everything this pull request carried."
   fi
@@ -57,14 +57,14 @@ fi
 # already sent alone.
 tree=$(git rev-parse 'HEAD^{tree}')
 printf '\n<!-- pubkit-nightly tree=%s -->\n' "$tree" >> "$body"
-if [ -n "$pr" ] && gh pr view "$pr" --repo "$REPO" --json body --jq .body | grep -q "tree=$tree"; then
+if [[ -n "$pr" ]] && gh pr view "$pr" --repo "$REPO" --json body --jq .body | grep -q "tree=$tree"; then
   echo "$REPO: #$pr already carries tonight's update." >> "$summary"
   exit 0
 fi
 
 head=$(git rev-parse HEAD)
 git push -q --force origin "$branch"
-if [ -n "$pr" ]; then
+if [[ -n "$pr" ]]; then
   gh pr edit "$pr" --repo "$REPO" --body-file "$body"
 else
   url=$(gh pr create --repo "$REPO" --head "$branch" --base main \
@@ -82,7 +82,7 @@ with_crates=$failed
 
 # Re-test the pins alone: if they pass, the crate updates caused the failure
 # and stay out.
-if [ "$made" = "pins crates" ]; then
+if [[ "$made" = "pins crates" ]]; then
   git push -q --force origin HEAD~1:"$branch"
   if wait_ci "$(git rev-parse HEAD~1)"; then
     { cat "$body"; printf '\n## Crate updates dropped\n\nWith them CI failed (%s); without them it passes, so this pull request carries the pins alone.\n' "$with_crates"; } > "$body.new"
