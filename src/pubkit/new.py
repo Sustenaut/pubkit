@@ -59,13 +59,21 @@ UNRELEASED_COMMENT = (
 CHECKS = ["ci / passed", "release / release"]
 
 
+VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
+
+
 def version_of(tool: str) -> tuple[int, ...] | None:
     """The version `tool --version` prints, or `None` when it is missing."""
     if shutil.which(tool) is None:
         return None
     out = subprocess.run([tool, "--version"], capture_output=True, text=True, check=False).stdout
-    m = re.search(r"(?<!\d)(\d+)\.(\d+)\.(\d+)", out.splitlines()[0] if out else "")
-    return tuple(int(x) for x in m.groups()) if m else None
+    # Word by word, each matched from its start: one unanchored search for
+    # digits backtracks quadratically on a long run of them.
+    for word in (out.splitlines()[0] if out else "").split():
+        m = VERSION.match(word)
+        if m:
+            return tuple(int(x) for x in m.groups())
+    return None
 
 
 def check_tools() -> list[str]:

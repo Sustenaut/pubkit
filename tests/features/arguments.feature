@@ -24,7 +24,7 @@ Feature: A command-line argument cannot reach outside the repository
 
   Scenario: A crate name that cargo would take for an option is refused
     When the supply chain of the crate "--manifest-path=/elsewhere/Cargo.toml" is resolved
-    Then it stops with "is not a crate name"
+    Then it stops with "is not a crate in this workspace"
 
   Scenario: A file in the Actions runner's temporary directory is allowed
     Given RUNNER_TEMP names the directory "runner-temp"
@@ -38,3 +38,12 @@ Feature: A command-line argument cannot reach outside the repository
   Scenario: A tool's version is the first x.y.z it prints
     When pubkit reads the version of "python3"
     Then it is three numbers
+
+  Scenario: A tool that prints no version has none
+    When pubkit reads the version of "true"
+    Then it has no version
+
+  Scenario: A row's text goes to pubrel add as it was given
+    Given a pubrel that asks for a row for the package "demo"
+    When pubkit records "Tidied the nightly" as a row in the category "internal" with it
+    Then pubrel add was run with "--package demo internal Tidied the nightly"
