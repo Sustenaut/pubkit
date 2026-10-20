@@ -73,3 +73,11 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     When I run pubkit "protect" "--check" "schryer/pubkit"
     Then it succeeds
     And it prints "schryer/pubkit: up to date"
+
+  Scenario: protect shows why GitHub rejected a ruleset
+    Given protected.json lists "schryer/foo" requiring "ci / passed, SonarCloud Code Analysis"
+    And GitHub rejects the ruleset for "schryer/foo" because "Invalid rule 'required_status_checks': integration 12526 is not installed"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it fails
+    And it prints "Validation Failed (HTTP 422); Invalid rule 'required_status_checks': integration 12526 is not installed"
+    And it prints nothing about a repository admin

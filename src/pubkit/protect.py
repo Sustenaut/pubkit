@@ -60,12 +60,22 @@ def gh(method: str, path: str, body: Any = None) -> Any:
     proc = subprocess.run(argv, input=None if body is None else json.dumps(body),
                           capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise ApiError(f"gh api -X {method} {path}: {(proc.stderr or proc.stdout).strip()}")
+        raise ApiError(f"gh api -X {method} {path}: {proc.stderr.strip()}", proc.stdout)
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
 
 class ApiError(Exception):
-    pass
+    """A refused call: gh's message, then the reasons GitHub's response gives."""
+
+    def __init__(self, message: str, response: str = ""):
+        m = re.search(r"\(HTTP (\d+)\)", message)
+        self.status = int(m.group(1)) if m else None
+        try:
+            errors = json.loads(response).get("errors") or []
+        except (ValueError, AttributeError):
+            errors = []
+        reasons = [e if isinstance(e, str) else e.get("message") or json.dumps(e) for e in errors]
+        super().__init__("; ".join([message, *reasons]))
 
 
 def on_default_branch(rs: dict) -> bool:
@@ -174,7 +184,7 @@ def run(config: Path | None, repos: list[str], check: bool, api: Api = gh) -> in
             lines, bad = protect(api, entry["repo"], entry["checks"], check)
         except ApiError as e:
             lines, bad = [f"{entry['repo']}: {e}"], True
-            if not check:
+            if not check and e.status in (403, 404):
                 lines.append("  changing a ruleset needs a repository admin: "
                              "`gh auth login` as its owner, then run this again")
         print("\n".join(lines))
