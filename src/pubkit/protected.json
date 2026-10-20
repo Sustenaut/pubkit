@@ -7,7 +7,7 @@
     { "repo": "schryer/pubunit", "checks": ["ci / passed", "release / release"] },
     { "repo": "schryer/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
     { "repo": "schryer/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/recipe-host", "checks": ["test", "SonarCloud Code Analysis"] },
+    { "repo": "schryer/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
     { "repo": "schryer/recipes", "checks": ["build"] }
   ]
 }
