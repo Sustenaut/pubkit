@@ -3,6 +3,7 @@ uses and what each of its zones has at them, which terraform/hosting reads.
 Everything provider-specific is here, in the repository, not in pubkit:
 
     "hosting": {
+      "ttl": {"email": 1800},
       "providers": {
         "hetzner": {"type": "hetzner",
                     "dns": {"external_nameservers": ["helium.ns.hetzner.de.", ...]}},
@@ -30,7 +31,9 @@ Everything provider-specific is here, in the repository, not in pubkit:
     }
 
 A provider is any name the repository chooses, with one of the types in
-TYPES. A type is what pubkit supports: its settings, whether it serves
+TYPES. `ttl`, in the hosting block, a zone or a site, sets TTLs over the
+defaults (TTL_KINDS: a day for the apex NS rrset, an hour for email, five
+minutes for sites); the nearest wins. A type is what pubkit supports: its settings, whether it serves
 DNS, mail, and which kind of site it hosts. A new type needs pubkit to
 learn it, here and in terraform/hosting; a new provider of a known type
 needs only pubkit.json.
@@ -52,6 +55,8 @@ POLICIES = ("none", "quarantine", "reject")
 SERVED_BY = ("pages", "server")
 MAX_PRIORITY = 65535
 ACCOUNT_ID_LENGTH = 32
+TTL_KINDS = ("nameservers", "email", "sites")
+TTL_RANGE = (60, 604800)
 
 
 def stop(message: str) -> NoReturn:
@@ -107,6 +112,19 @@ def require(given: dict[str, Any], where: str, setting: str, ok: Callable[[Any],
             what: str) -> None:
     if setting in given and not ok(given[setting]):
         stop(f"{where}.{setting} must be {what}")
+
+
+def is_ttl(value: Any) -> bool:
+    return (isinstance(value, int) and not isinstance(value, bool)
+            and TTL_RANGE[0] <= value <= TTL_RANGE[1])
+
+
+def check_ttl(given: Any, where: str) -> None:
+    """A TTL block: seconds for the apex NS rrset, the email records and the
+    sites' records, over the defaults (a day, an hour, five minutes)."""
+    for kind, value in known(given, where, TTL_KINDS).items():
+        if not is_ttl(value):
+            stop(f"{where}.{kind} must be a number of seconds from {TTL_RANGE[0]} to {TTL_RANGE[1]}")
 
 
 # --- Provider types ---
@@ -228,7 +246,8 @@ def check_site(name: str, site: Any, where: str, providers: dict[str, Any]) -> N
     if kind is None:
         stop(f"{where}.provider must name a provider in hosting.providers that hosts sites")
     settings_of, check = SITES[kind]
-    site = known(site, where, ("provider", "kind", *settings_of))
+    site = known(site, where, ("provider", "kind", *settings_of, "ttl"))
+    require(site, where, "ttl", is_ttl, f"a number of seconds from {TTL_RANGE[0]} to {TTL_RANGE[1]}")
     if site.get("kind") != kind:
         stop(f"{where}.kind must be {kind}, the kind of site a {provider['type']} provider hosts")
     if kind != "server" and name == "@":
@@ -240,7 +259,9 @@ def check_zone(name: str, zone: Any, providers: dict[str, Any], types: dict[str,
     where = f"zones.{name}"
     if not is_name(name) or "." not in name:
         stop(f"{where} must be named by the domain, in lowercase, such as example.eu")
-    zone = known(zone, where, ("dns", "email", "apex_txt", "sites"))
+    zone = known(zone, where, ("dns", "ttl", "email", "apex_txt", "sites"))
+    if "ttl" in zone:
+        check_ttl(zone["ttl"], f"{where}.ttl")
     dns = zone.get("dns")
     if (not isinstance(dns, list) or not dns
             or not all(TYPES.get(types.get(p, ""), {}).get("dns") for p in dns)
@@ -263,10 +284,12 @@ def settings(config: dict[str, Any]) -> dict[str, Any]:
     given = config.get("hosting", {})
     if not isinstance(given, dict):
         sys.exit("pubkit: pubkit.json's hosting must be an object of providers and zones")
-    unknown = sorted(set(given) - {"providers", "zones"})
+    unknown = sorted(set(given) - {"ttl", "providers", "zones"})
     if unknown:
         sys.exit(f"pubkit: pubkit.json's hosting has no setting {', '.join(unknown)}; "
-                 "it takes providers and zones")
+                 "it takes ttl, providers and zones")
+    if "ttl" in given:
+        check_ttl(given["ttl"], "ttl")
     providers = given.get("providers", {})
     zones = given.get("zones", {})
     if not isinstance(providers, dict) or not isinstance(zones, dict):

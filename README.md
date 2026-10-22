@@ -164,6 +164,26 @@ relative to the zone (`"@"` for the apex, which only a server site can
 have, since the others are CNAMEs), each with its `provider` and that
 provider's `kind`.
 
+**TTLs.** Records get a day for the apex NS rrset (written when two
+providers serve a zone), an hour for the email records and the apex TXT
+rrset, and five minutes for the sites, unless `ttl` says otherwise:
+`hosting.ttl` for every zone, a zone's `ttl` for its records, or a site's
+`ttl` (a number) for that site's; the nearest wins. Each is in seconds,
+from 60 to a week. Lower them a TTL or more ahead of a change, so
+resolvers pick it up sooner, and raise them again after.
+
+```json
+"hosting": {
+  "ttl": { "email": 1800 },
+  "zones": {
+    "example.eu": {
+      "ttl": { "sites": 60, "nameservers": 3600 },
+      "sites": { "www": { "provider": "hetzner", "kind": "server", "server": "web", "ttl": 120 } }
+    }
+  }
+}
+```
+
 A new provider of a known type is a new entry in `providers`; a repository
 on two Hetzner projects names both. A new type, such as another mail
 provider, needs pubkit to learn it once, in `src/pubkit/hosting.py` and

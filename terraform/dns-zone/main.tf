@@ -22,7 +22,7 @@ locals {
       nameservers = {
         name   = "@"
         type   = "NS"
-        ttl    = 86400
+        ttl    = var.nameservers_ttl
         values = local.zone_nameservers
       }
     } : {},

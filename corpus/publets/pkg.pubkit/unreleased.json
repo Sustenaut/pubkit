@@ -6,7 +6,7 @@
     },
     {
       "category": "added",
-      "change": "A hosting block in pubkit.json holds every provider-specific fact the hosting modules use: providers, each named by the repository with a type pubkit supports (hetzner, cloudflare, google-cloud, mailbox-org) and its own settings, and zones, each naming the providers of its DNS, email and sites. pubkit sync and sync --check stop on a setting the block's types do not know, since Terraform would ignore it"
+      "change": "A hosting block in pubkit.json holds every provider-specific fact the hosting modules use: providers, each named by the repository with a type pubkit supports (hetzner, cloudflare, google-cloud, mailbox-org) and its own settings, and zones, each naming the providers of its DNS, email and sites. pubkit sync and sync --check stop on a setting the block's types do not know, since Terraform would ignore it. TTLs default to a day for the apex NS rrset, an hour for email and five minutes for sites; ttl in the hosting block, a zone or a site overrides them, the nearest winning"
     },
     {
       "category": "added",

@@ -54,3 +54,9 @@ variable "cloudflare" {
     error_message = "Hetzner, Cloudflare or both must serve the zone."
   }
 }
+
+variable "nameservers_ttl" {
+  description = "The TTL of the apex NS rrset written when two providers serve the zone."
+  type        = number
+  default     = 86400
+}

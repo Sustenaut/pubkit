@@ -124,6 +124,33 @@ run "zones" {
   }
 }
 
+# testdata/pubkit.json sets the email TTL for every zone, the sites' TTL
+# for example.org, and docs.example.org's own; the rest are the defaults.
+run "ttls" {
+  command = plan
+
+  assert {
+    condition = (
+      output.records["example.eu"]["email_mx"].ttl == var.config.ttl.email &&
+      output.records["example.eu"]["apex_txt"].ttl == var.config.ttl.email &&
+      output.records["example.eu"]["apex_a"].ttl == 300 &&
+      output.records["example.org"]["auth_a"].ttl == var.config.zones["example.org"].ttl.sites &&
+      output.records["example.org"]["docs_a"].ttl == var.config.zones["example.org"].sites.docs.ttl
+    )
+    error_message = "A site's TTL wins over its zone's, a zone's over hosting.ttl, and hosting.ttl over the default."
+  }
+}
+
+run "ttl_in_range" {
+  command = plan
+
+  variables {
+    config = merge(jsondecode(file("../testdata/pubkit.json")).hosting, { ttl = { sites = 5 } })
+  }
+
+  expect_failures = [var.config]
+}
+
 run "extra_records" {
   command = plan
 

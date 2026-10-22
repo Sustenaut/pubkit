@@ -8,6 +8,13 @@ variable "config" {
     Terraform drops a setting it does not know without a word.
   EOT
   type = object({
+    # TTLs for every zone, over the module's defaults (local.default_ttl).
+    ttl = optional(object({
+      nameservers = optional(number)
+      email       = optional(number)
+      sites       = optional(number)
+    }), {})
+
     providers = map(object({
       type = string
 
@@ -34,6 +41,14 @@ variable "config" {
 
     zones = map(object({
       dns = list(string)
+
+      # The zone's TTLs, over hosting.ttl and the defaults.
+      ttl = optional(object({
+        nameservers = optional(number)
+        email       = optional(number)
+        sites       = optional(number)
+      }), {})
+
       email = optional(object({
         provider     = string
         verification = optional(map(string), {})
@@ -51,9 +66,19 @@ variable "config" {
         served_by = optional(string, "pages")
         standby   = optional(string)
         service   = optional(string)
+        ttl       = optional(number)
       })), {})
     }))
   })
+
+  validation {
+    condition = alltrue(flatten([
+      [for ttl in values(var.config.ttl) : ttl == null || try(ttl >= 60 && ttl <= 604800, false)],
+      [for zone in values(var.config.zones) : [for ttl in values(zone.ttl) : ttl == null || try(ttl >= 60 && ttl <= 604800, false)]],
+      [for zone in values(var.config.zones) : [for site in values(zone.sites) : site.ttl == null || try(site.ttl >= 60 && site.ttl <= 604800, false)]],
+    ]))
+    error_message = "A TTL is a number of seconds from 60 to 604800 (a week)."
+  }
 
   validation {
     condition = alltrue([

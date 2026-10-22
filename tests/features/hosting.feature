@@ -61,6 +61,8 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "served_by": "server"}}} | standby must name a server |
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "served_by": "cdn"}}} | served_by must be one of |
       | {"dns": ["hetzner"], "sites": {"WWW": {"provider": "hetzner", "kind": "server", "server": "web"}}} | must be named by the name relative     |
+      | {"dns": ["hetzner"], "ttl": {"email": "1h"}}                                            | ttl.email must be a number of seconds           |
+      | {"dns": ["hetzner"], "sites": {"www": {"provider": "hetzner", "kind": "server", "server": "web", "ttl": 1000000}}} | www.ttl must be a number of seconds |
 
   Scenario Outline: A hosting block of the wrong shape stops it with a message
     Given the hosting settings '<config>'
@@ -72,6 +74,8 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"hosting": {"cloudflare": {}}}                  | hosting has no setting cloudflare            |
       | {"hosting": {"providers": []}}                   | must be objects, by name                     |
       | {"hosting": {"zones": {"Example.eu": {}}}}       | must be named by the domain                  |
+      | {"hosting": {"ttl": {"sites": 30}}}              | ttl.sites must be a number of seconds        |
+      | {"hosting": {"ttl": {"mx": 300}}}                | hosting.ttl has no setting mx                |
 
   Scenario: pubkit sync --check stops on a hosting block it cannot use
     Given a repository initialised as "utility"

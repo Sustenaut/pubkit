@@ -133,6 +133,11 @@ run "multi_provider" {
   }
 
   assert {
+    condition     = hcloud_zone_rrset.records["nameservers"].ttl == 86400
+    error_message = "The apex NS rrset's TTL is a day unless nameservers_ttl says otherwise."
+  }
+
+  assert {
     condition     = output.cloudflare_zone_id == "0123456789abcdef0123456789abcdef"
     error_message = "The Cloudflare zone's id is an output."
   }
@@ -177,6 +182,21 @@ run "no_external_nameservers" {
       "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.", "ns1.cloudflare.example.", "ns2.cloudflare.example.",
     ])
     error_message = "The assigned nameservers and Cloudflare's."
+  }
+}
+
+run "nameservers_ttl" {
+  command = plan
+
+  variables {
+    hetzner         = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+    cloudflare      = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
+    nameservers_ttl = 3600
+  }
+
+  assert {
+    condition     = hcloud_zone_rrset.records["nameservers"].ttl == 3600
+    error_message = "nameservers_ttl sets the apex NS rrset's TTL."
   }
 }
 

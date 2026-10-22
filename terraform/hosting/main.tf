@@ -13,6 +13,21 @@
 locals {
   providers = var.config.providers
 
+  # The TTLs a zone's records get unless pubkit.json sets them: in
+  # hosting.ttl for every zone, in a zone's ttl for its records, or in a
+  # site's ttl for that site's. Lower them ahead of a change, so resolvers
+  # pick it up sooner, and raise them again after.
+  default_ttl = {
+    nameservers = 86400
+    email       = 3600
+    sites       = 300
+  }
+  ttl = {
+    for zone_name, zone in var.config.zones : zone_name => {
+      for kind, default in local.default_ttl : kind => coalesce(zone.ttl[kind], var.config.ttl[kind], default)
+    }
+  }
+
   # Each site, with the zone it is in and its provider, keyed by its full
   # name. Within a zone, a site's records are keyed by its name, "apex" for
   # "@" and dots as underscores.
@@ -22,6 +37,7 @@ locals {
         zone     = zone_name
         name     = name
         key      = name == "@" ? "apex" : replace(name, ".", "_")
+        ttl      = coalesce(site.ttl, local.ttl[zone_name].sites)
         settings = local.providers[site.provider]
       })
     }
@@ -38,14 +54,14 @@ locals {
           (site.key) = {
             name   = site.name
             type   = "CNAME"
-            ttl    = 300
+            ttl    = site.ttl
             values = [site.kind == "pages" ? "${cloudflare_pages_project.site[fqdn].subdomain}." : site.settings.cloud_run.domain_target]
           }
         }
         : merge(
-          { "${site.key}_a" = { name = site.name, type = "A", ttl = 300, values = [var.servers[coalesce(site.server, site.standby)].ipv4] } },
+          { "${site.key}_a" = { name = site.name, type = "A", ttl = site.ttl, values = [var.servers[coalesce(site.server, site.standby)].ipv4] } },
           var.servers[coalesce(site.server, site.standby)].ipv6 == null ? {} : {
-            "${site.key}_aaaa" = { name = site.name, type = "AAAA", ttl = 300, values = [var.servers[coalesce(site.server, site.standby)].ipv6] }
+            "${site.key}_aaaa" = { name = site.name, type = "AAAA", ttl = site.ttl, values = [var.servers[coalesce(site.server, site.standby)].ipv6] }
           },
         )
       ) if site.zone == zone_name
@@ -59,7 +75,7 @@ locals {
     for zone_name, zone in var.config.zones : zone_name => merge(
       zone.email == null ? {} : merge(
         length(local.providers[zone.email.provider].mx) == 0 ? {} : {
-          email_mx = { name = "@", type = "MX", ttl = 3600, values = local.providers[zone.email.provider].mx }
+          email_mx = { name = "@", type = "MX", ttl = local.ttl[zone_name].email, values = local.providers[zone.email.provider].mx }
         },
 
         # Start with p=none, as mail providers recommend, and tighten to
@@ -68,7 +84,7 @@ locals {
           email_dmarc = {
             name   = "_dmarc"
             type   = "TXT"
-            ttl    = 3600
+            ttl    = local.ttl[zone_name].email
             values = ["\"v=DMARC1; p=${zone.email.dmarc.policy}; rua=mailto:${zone.email.dmarc.rua}\""]
           }
         },
@@ -77,17 +93,17 @@ locals {
         # points at them.
         {
           for selector, target in local.providers[zone.email.provider].dkim :
-          "email_dkim_${selector}" => { name = "${selector}._domainkey", type = "CNAME", ttl = 3600, values = [target] }
+          "email_dkim_${selector}" => { name = "${selector}._domainkey", type = "CNAME", ttl = local.ttl[zone_name].email, values = [target] }
         },
 
         # Keys proving the domain is ours to the mail provider.
         {
           for name, value in zone.email.verification :
-          "email_verification_${name}" => { name = name, type = "TXT", ttl = 3600, values = ["\"${value}\""] }
+          "email_verification_${name}" => { name = name, type = "TXT", ttl = local.ttl[zone_name].email, values = ["\"${value}\""] }
         },
       ),
       length(local.apex_txt[zone_name]) == 0 ? {} : {
-        apex_txt = { name = "@", type = "TXT", ttl = 3600, values = [for value in local.apex_txt[zone_name] : "\"${value}\""] }
+        apex_txt = { name = "@", type = "TXT", ttl = local.ttl[zone_name].email, values = [for value in local.apex_txt[zone_name] : "\"${value}\""] }
       },
     )
   }
@@ -106,8 +122,9 @@ module "zone" {
   source   = "../dns-zone"
   for_each = var.config.zones
 
-  zone    = each.key
-  records = merge(local.email_records[each.key], local.site_records[each.key], lookup(var.records, each.key, {}))
+  zone            = each.key
+  nameservers_ttl = local.ttl[each.key].nameservers
+  records         = merge(local.email_records[each.key], local.site_records[each.key], lookup(var.records, each.key, {}))
 
   hetzner = one([
     for name in each.value.dns : { dns = local.providers[name].dns } if local.providers[name].type == "hetzner"
