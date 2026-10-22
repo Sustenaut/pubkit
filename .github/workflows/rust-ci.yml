@@ -22,7 +22,8 @@
 # - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.
 # - fuzz runs `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust: briefly on
-#   every change, longer on a schedule.
+#   every change, longer on a schedule unless pubkit.json sets
+#   `"security": { "fuzz": { "rust": false } }`.
 # - cross runs the tests under emulation on cross-targets: i686 (32-bit) and
 #   s390x (big-endian) by default, which find word-size and byte-order bugs.
 # - audit runs `make deny` and `make vet`.
@@ -51,7 +52,7 @@ on:
       msrv: { type: boolean, default: true, description: "Ignored: the msrv job runs whenever the standard requires it (RS-VER-02). Kept so callers that pass it keep working." }
       fuzz: { type: boolean, default: true, description: "Ignored: the fuzz job runs whenever the standard requires it (RS-FUZZ-01, RS-FUZZ-02). Kept so callers that pass it keep working." }
       fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
-      fuzz-seconds-scheduled: { type: number, default: 900, description: Seconds per fuzz target on a scheduled run. }
+      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
@@ -217,9 +218,19 @@ jobs:
           command -v cargo-fuzz >/dev/null && cargo-fuzz --version | grep -q " ${VERSION}$" \
             || cargo install --locked cargo-fuzz --version "$VERSION"
         env: { VERSION: '${{ inputs.cargo-fuzz-version }}' }
-      - run: make fuzz-smoke FUZZ_SECONDS="$SECONDS_PER_TARGET"
+      # A scheduled run fuzzes for longer, unless pubkit.json sets
+      # "security": { "fuzz": { "rust": false } }; then it fuzzes as briefly
+      # as any other.
+      - run: |
+          seconds=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            seconds=$LONG
+          fi
+          make fuzz-smoke FUZZ_SECONDS="$seconds"
         env:
-          SECONDS_PER_TARGET: ${{ github.event_name == 'schedule' && inputs.fuzz-seconds-scheduled || inputs.fuzz-seconds }}
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-seconds }}'
+          LONG: '${{ inputs.fuzz-seconds-scheduled }}'
 
   # Built for the target with its own gcc, run under qemu-user. Doctests
   # are not cross-compiled on stable Rust, so these run the unit and

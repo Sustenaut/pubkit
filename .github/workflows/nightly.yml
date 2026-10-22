@@ -5,16 +5,25 @@
 # latest standard, and its open exceptions.
 #
 # The update job then keeps one pull request per repository, on its
-# pubkit-nightly branch, with two commits (.github/nightly/update.sh):
+# pubkit-nightly branch, with up to four commits (.github/nightly/update.sh):
 #
-# 1. every outdated pub* pin: the latest pubkit, pubrel's release workflow
-#    and pubrel-version, pub-version, and the pub* crates in Cargo.lock;
+# 1. every outdated pub* pin: the latest pubkit (in any of its *-ci.yml
+#    workflows), pubrel's release workflow and pubrel-version, pub-version,
+#    and the pub* crates in Cargo.lock;
 # 2. the other crates' updates that cargo vet covers with an audit (no new
 #    exemption) and cargo deny passes; the body lists each one skipped,
-#    with what `cargo vet suggest` says it needs.
+#    with what `cargo vet suggest` says it needs;
+# 3. the npm packages, to the newest version each range in package.json
+#    allows, in package-lock.json only;
+# 4. tests/requirements.lock, re-resolved from requirements.txt.
+#
+# A repository's pubkit.json turns each language's updates off with, for
+# example, `"update": { "node": false }`, or all of them with `"update":
+# false`; the pins always come. Its CI checks advisories on every run
+# either way.
 #
 # An open pull request is updated, never a second one opened. If its CI
-# fails with both commits, the first is tested alone, and the second
+# fails with the updates, the pins are tested alone, and the updates
 # dropped when that passes. Nothing merges it: the Sustenaut bot DMs on
 # Slack when it is green or fails.
 #

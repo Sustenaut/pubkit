@@ -1,4 +1,17 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "Per-language update and security settings in pubkit.json: \"update\": {\"rust\", \"node\", \"python\"} turns each language's dependency updates in the nightly pull request on or off (\"update\": false turns them all off, leaving the pub* pins), and \"security\": {\"fuzz\": {\"rust\": false}} keeps a scheduled rust-ci run's fuzzing as brief as any other. With updates on, the nightly pull request also moves the npm packages within their package.json ranges and re-locks tests/requirements.lock. An unknown setting stops the nightly"
+    },
+    {
+      "category": "added",
+      "change": "node-ci and python-ci run an audit job on every run, part of passed: npm audit of package-lock.json, and pip-audit of the hash-locked requirements (audit-requirements, by default tests/requirements.lock). A known advisory fails CI; there is no switch"
+    },
+    {
+      "category": "fixed",
+      "change": "pubkit pins moves pubkit's pin in python-ci, node-ci and service-ci workflows too, not only rust-ci"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

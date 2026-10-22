@@ -318,28 +318,57 @@ REPOS=schryer/recipes`) runs it, making the venv first if there is none.
 `governed.json` lists. It reports, in its summary, the pubkit each pins,
 whether it conforms to the latest standard, and its open exceptions
 (`pubkit freshness`). Then it keeps one pull request per repository, on its
-`pubkit-nightly` branch, with two commits (`pubkit nightly`):
+`pubkit-nightly` branch, with up to four commits (`pubkit nightly`):
 
-1. every outdated pub* pin (`pubkit pins`): the latest pubkit, pubrel's
-   release workflow and `pubrel-version`, `pub-version`, and the pub*
-   crates in `Cargo.lock`;
+1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
+   `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
+   `pub-version`, and the pub* crates in `Cargo.lock`;
 2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
    with an audit, adding no exemption, and that `cargo deny` passes. The
    body lists each update skipped with what `cargo vet suggest` says it
-   needs.
+   needs;
+3. the npm packages, each to the newest version its range in
+   `package.json` allows (`npm update --package-lock-only
+   --ignore-scripts`);
+4. `tests/requirements.lock`, re-resolved from `requirements.txt` (`pubkit
+   lock`).
 
-Each commit regenerates `SUPPLY-CHAIN.md` and records an `internal` pubrel
-row for each package it changes. An open pull request is updated, never a
-second one opened, and left alone when the night brings nothing new. When
-its CI fails, the pins are tested alone: if they pass, the crate commit is
-dropped. Nothing merges it: the Sustenaut bot sends a Slack DM when it is
-green or fails.
+Each commit regenerates `SUPPLY-CHAIN.md` where there is one and records an
+`internal` pubrel row for each package it changes. An open pull request is
+updated, never a second one opened, and left alone when the night brings
+nothing new. When its CI fails, the pins are tested alone: if they pass,
+the dependency commits are dropped. Nothing merges it: the Sustenaut bot
+sends a Slack DM when it is green or fails.
 
-It needs three secrets in schryer/pubkit: `PUBKIT_BUMP_TOKEN`, a token
-that may push branches and open pull requests in the governed repositories
-(without it the nightly only reports); `SUSTENAUT_SLACK_BOT_TOKEN`, the
-bot's token, with `chat:write`; and `SLACK_DM_USER_ID`, the Slack member
-whom it DMs.
+### Update and security settings
+
+A repository chooses what its nightly does in `pubkit.json`, per language
+(`rust`, `node`, `python`; each applies where the repository has that
+ecosystem's lock):
+
+```json
+{
+  "kind": "utility",
+  "update": { "rust": true, "node": true, "python": false },
+  "security": { "fuzz": { "rust": true } }
+}
+```
+
+| Setting | Default | Off means |
+|---|---|---|
+| `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
+| `security.fuzz.<language>` | `true` for `rust`, `false` otherwise | a scheduled `rust-ci.yml` run fuzzes for `fuzz-seconds`, as briefly as any other run, instead of `fuzz-seconds-scheduled`. pubkit has a fuzz job for Rust only, so turning `node` or `python` on stops the nightly with a message |
+
+A setting pubkit does not know stops the nightly with a message, rather
+than being ignored.
+
+Advisory checks have no setting. Every run of `rust-ci.yml` (cargo deny),
+`node-ci.yml` (`npm audit` of `package-lock.json`) and `python-ci.yml`
+(pip-audit of the hash-locked requirements) checks the advisories, the
+nightly included, and fails on a finding. The pub* pins also always come,
+so a governed repository keeps up with the standard. A repository's own CI
+runs on a schedule when its `ci.yml` has a `schedule:` trigger; the
+settings say what that run does.
 
 ## Locking
 
@@ -368,7 +397,7 @@ jobs:
   - `test` runs `cargo test` on Linux, macOS and Windows (`test-args` adds arguments);
   - `functional` runs the required functional targets, then any the `functional` input adds, optionally with extra apt packages and a released `pub`;
   - `msrv` runs `make msrv MSRV=<the lowest rust-version stated>` on that toolchain;
-  - `fuzz` runs `make fuzz-smoke` on nightly (`fuzz-seconds`, and `fuzz-seconds-scheduled` on a schedule);
+  - `fuzz` runs `make fuzz-smoke` on nightly (`fuzz-seconds`, and `fuzz-seconds-scheduled` on a schedule unless `pubkit.json` sets `"security": { "fuzz": { "rust": false } }`);
   - `cross` runs `cargo test` under qemu on `cross-targets`: i686 and s390x by default, or aarch64 `-unknown-linux-gnu`, with `cross-test-args`;
   - `audit` runs `make deny` and `make vet`, with `cargo-deny-version` and `cargo-vet-version`;
   - when the caller also runs on a `schedule`, those runs test on the latest stable and beta Rust (`scheduled-toolchains`).
@@ -376,8 +405,8 @@ jobs:
   On a pull request that touches no Rust code (`*.rs`), Cargo files (`Cargo.toml`, `Cargo.lock`, the toolchain pin), `fuzz/` or workflow files (`.github/workflows/`), the plan skips `fuzz` and `cross`, the slow emulated jobs: a documentation or `pubkit.json` change does not wait for them. A release pull request (a `release/` branch), a push to main and the nightly run everything. `pubkit required --event E --head-ref B --changed-files F` decides, and says why on stderr.
 
   The `gates` and `functional` inputs can only add targets. The `msrv` and `fuzz` inputs are ignored: those jobs run because the standard requires them. Every job reports through `passed`, the one check a ruleset needs.
-- **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium.
-- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubkit's managed files from `tests/requirements.lock`, and runs `npm test`. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). `pubkit init --kind=utility` seeds a `ci.yml` calling it in a repository with a `package.json` and no `pyproject.toml`.
+- **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium. The `audit` job checks `audit-requirements` (by default `tests/requirements.lock`) with pip-audit on every run.
+- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubkit's managed files from `tests/requirements.lock`, and runs `npm test`. The `audit` job runs `npm audit --package-lock-only` on every run and fails on any advisory, development dependencies included. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). `pubkit init --kind=utility` seeds a `ci.yml` calling it in a repository with a `package.json` and no `pyproject.toml`.
 
 ### SonarQube Cloud
 

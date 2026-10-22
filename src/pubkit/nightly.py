@@ -12,12 +12,21 @@ publisher, without adding an exemption, and `cargo deny` passes with it.
 Each update it drops is listed in the report with the audits cargo vet
 recommends for it, as `cargo vet suggest` prints them.
 
+`pubkit nightly` then updates the npm packages within their ranges and
+re-locks the Python requirements, when the repository has them. A
+repository turns each language's updates off with `update`, and the long
+nightly fuzz run with `security.fuzz`, in its pubkit.json (see
+`settings`); the pub* pins always come, and the advisory checks every CI
+run makes have no switch.
+
 Each prints what it changed, one line per change, for the commit message
 and the pull request.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import re
 import subprocess
@@ -41,6 +50,62 @@ CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 RELEASE_PIN = re.compile(r"(schryer/pubrel/\.github/workflows/release\.yml@v)([0-9][^\s'\"]*)")
 PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)([0-9][^\s,}'\"]*)")
 PUB_VERSION = re.compile(r"(pub-version:\s*v)([0-9][^\s,}'\"]*)")
+# Every pubkit reusable workflow a repository can call, not only rust-ci.
+CI_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/(?:rust|python|node|service)-ci\.yml@v)"
+                    r"[0-9][^\s'\"]*")
+
+# The languages pubkit's settings name, each by the ecosystem pubkit works
+# with: crates, npm packages, and the hash-locked Python requirements.
+LANGUAGES = ("rust", "node", "python")
+
+# What `update` and `security.fuzz` default to for each language. Fuzzing
+# runs only where pubkit has a fuzz job: Rust's, for now.
+UPDATES = dict.fromkeys(LANGUAGES, True)
+FUZZ = {"rust": True, "node": False, "python": False}
+FUZZ_SUPPORTED = ("rust",)
+
+# The keys `security` takes. The advisory checks have none: they always run.
+SECURITY = ("fuzz",)
+
+
+def by_language(name: str, given: object, defaults: dict[str, bool]) -> dict[str, bool]:
+    """A per-language switch: an object naming some languages, or one
+    boolean for all of them, over the defaults."""
+    if isinstance(given, bool):
+        return dict.fromkeys(defaults, given)
+    if not isinstance(given, dict):
+        sys.exit(f"pubkit: pubkit.json's {name} must be an object, such as "
+                 '{"rust": true, "python": false}, or true or false for every language')
+    unknown = sorted(set(given) - set(defaults))
+    if unknown:
+        sys.exit(f"pubkit: pubkit.json's {name} has no language {', '.join(unknown)}; "
+                 f"it takes {', '.join(defaults)}")
+    for key, value in given.items():
+        if not isinstance(value, bool):
+            sys.exit(f"pubkit: pubkit.json's {name}.{key} must be true or false, not {value!r}")
+    return {**defaults, **given}
+
+
+def settings(root: Path) -> dict[str, dict[str, bool]]:
+    """The repository's `update` and `security.fuzz`, per language, from
+    pubkit.json over the defaults. Anything else stops the nightly."""
+    path = root / "pubkit.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    security = config.get("security", {})
+    if not isinstance(security, dict):
+        sys.exit("pubkit: pubkit.json's security must be an object, such as "
+                 '{"fuzz": {"rust": true}}')
+    unknown = sorted(set(security) - set(SECURITY))
+    if unknown:
+        sys.exit(f"pubkit: pubkit.json's security has no setting {', '.join(unknown)}; "
+                 f"it takes {', '.join(SECURITY)} (the advisory checks always run)")
+    fuzz = by_language("security.fuzz", security.get("fuzz", {}), FUZZ)
+    unsupported = [lang for lang, on in fuzz.items()
+                   if on and lang not in FUZZ_SUPPORTED and lang in security.get("fuzz", {})]
+    if unsupported:
+        sys.exit(f"pubkit: pubkit has no fuzz job for {', '.join(unsupported)} yet; "
+                 f"security.fuzz can turn on {', '.join(FUZZ_SUPPORTED)}")
+    return {"update": by_language("update", config.get("update", {}), UPDATES), "fuzz": fuzz}
 
 
 def locked(root: Path) -> dict[str, str]:
@@ -96,7 +161,7 @@ def record(root: Path, text: str, category: str = "internal") -> list[str]:
 
 
 def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
-    from .freshness import WORKFLOW_PIN, pinned  # noqa: PLC0415
+    from .freshness import pinned  # noqa: PLC0415
 
     changes = []
     before = pinned(root)
@@ -108,7 +173,7 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         changes.append(f"pubkit {before} -> {__version__}")
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
-        new = WORKFLOW_PIN.sub(rf"\g<1>{__version__}", text)
+        new = CI_PIN.sub(rf"\g<1>{__version__}", text)
         for pattern, version, what in ((RELEASE_PIN, pubrel, "pubrel release workflow"),
                                        (PUBREL_VERSION, pubrel, "pubrel-version"),
                                        (PUB_VERSION, pub, "pub-version")):
@@ -133,6 +198,59 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
 
 
 UPDATE = re.compile(r"^\s*Updating (\S+) v(\S+) -> v(\S+)", re.M)
+
+
+def npm_locked(root: Path) -> dict[str, str]:
+    """Direct dependency -> version, from package-lock.json."""
+    lock = root / "package-lock.json"
+    if not lock.is_file():
+        return {}
+    packages = json.loads(lock.read_text(encoding="utf-8")).get("packages", {})
+    top = packages.get("", {})
+    names = {**top.get("dependencies", {}), **top.get("devDependencies", {})}
+    return {n: packages[f"node_modules/{n}"]["version"] for n in sorted(names)
+            if "version" in packages.get(f"node_modules/{n}", {})}
+
+
+def changed(old: dict[str, str], new: dict[str, str]) -> list[str]:
+    """One line per package whose version moved, in name order."""
+    return [f"{n} {old[n]} -> {new[n]}" for n in sorted(old) if n in new and new[n] != old[n]]
+
+
+def npm(root: Path) -> list[str]:
+    """Every npm package updated to the newest version its range in
+    package.json allows, in package-lock.json only and without running an
+    install script. The direct dependencies that moved, one line each."""
+    if not (root / "package-lock.json").is_file():
+        return []
+    old = npm_locked(root)
+    subprocess.run(["npm", "update", "--package-lock-only", "--ignore-scripts",
+                    "--no-audit", "--no-fund"], cwd=root, check=True, capture_output=True)
+    return changed(old, npm_locked(root)) or (["indirect dependencies"]
+                                              if git(root, "status", "--porcelain") else [])
+
+
+def python_locked(root: Path) -> dict[str, str]:
+    """Package -> version, from tests/requirements.lock."""
+    from .cli import LOCK  # noqa: PLC0415
+
+    lock = root / LOCK
+    if not lock.is_file():
+        return {}
+    return dict(re.findall(r"^([A-Za-z0-9_.-]+)==(\S+)", lock.read_text(encoding="utf-8"), re.M))
+
+
+def python(root: Path) -> list[str]:
+    """tests/requirements.lock re-resolved, so each package moves to the
+    newest version requirements.txt allows. The packages that moved."""
+    from .cli import LOCK, REQUIREMENTS, lock  # noqa: PLC0415
+
+    if not (root / REQUIREMENTS).is_file() or not (root / LOCK).is_file():
+        return []
+    old = python_locked(root)
+    with contextlib.redirect_stdout(io.StringIO()):
+        lock(root)
+    return changed(old, python_locked(root))
 
 
 def candidates(root: Path) -> list[tuple[str, str, str]]:
@@ -212,6 +330,10 @@ def crates(root: Path, report: Path | None) -> int:
     it only when `cargo vet` passes without a new exemption and `cargo deny`
     passes."""
     target = confined(report, "the --report file") if report else None
+    if not (root / "Cargo.lock").is_file():
+        if target:
+            target.write_text(json.dumps({"updated": [], "skipped": []}) + "\n", encoding="utf-8")
+        return 0
     saved = snapshot(root)
     notes: list[str] = []
     updated: list[tuple[str, str, str]] = []
@@ -302,14 +424,29 @@ def commit(root: Path, title: str, lines: list[str]) -> bool:
     return True
 
 
-def body(pinned: list[str], updated: list[str], skipped: list[dict]) -> str:
+def body(pinned: list[str], updated: list[str], skipped: list[dict],
+         others: dict[str, list[str]] | None = None, update: bool = True) -> str:
+    """The pull request's body. `others` is each further section's lines,
+    by heading; with `update` off, the body says the repository takes no
+    third-party updates instead of listing them."""
     out = ["Opened by pubkit's nightly workflow, which updates this pull request each night "
            "rather than opening another. Nothing merges it: merge it when CI is green.", ""]
     out += ["## 1. pub* pins", ""] + ([f"- {line}" for line in pinned] or ["Nothing outdated."])
-    out += ["", "## 2. Other crates", "",
-            "Updates within their requirements that `cargo vet` covers with an audit "
-            "(no new exemption) and `cargo deny` passes.", ""]
-    out += [f"- {line}" for line in updated] or ["None."]
+    if not update:
+        out += ["", "## Other dependencies", "",
+                "None: this repository takes no third-party updates; its pubkit.json sets `\"update\": false`."]
+        return "\n".join(out) + "\n"
+    number = 2
+    if updated or skipped:
+        out += ["", f"## {number}. Other crates", "",
+                "Updates within their requirements that `cargo vet` covers with an audit "
+                "(no new exemption) and `cargo deny` passes.", ""]
+        out += [f"- {line}" for line in updated] or ["None."]
+        number += 1
+    for heading, lines in (others or {}).items():
+        if lines:
+            out += ["", f"## {number}. {heading}", ""] + [f"- {line}" for line in lines]
+            number += 1
     if skipped:
         out += ["", "### Skipped", "",
                 "Each needs an audit before the nightly takes it. cargo vet recommends, as `cargo vet suggest` would:", ""]
@@ -320,22 +457,36 @@ def body(pinned: list[str], updated: list[str], skipped: list[dict]) -> str:
 
 
 def nightly(root: Path, pubrel: str, pub: str, body_path: Path) -> int:
-    """Both commits on the current branch, and the pull request's body.
-    Prints the commits it made: `pins`, `crates`, both, or nothing."""
-    import contextlib  # noqa: PLC0415
-    import io  # noqa: PLC0415
+    """The nightly's commits on the current branch, and the pull request's
+    body. Prints the commits it made, in order: `pins` first when it made
+    that one, then any of `crates`, `npm` and `python`, or nothing."""
     import tempfile  # noqa: PLC0415
 
     body_path = confined(body_path, "the --body file")
+    update = settings(root)["update"]
     pinned = pins(root, pubrel, pub)
     made = ["pins"] if commit(root, "Move to the latest pub* releases", pinned) else []
-    with tempfile.TemporaryDirectory() as tmp:
-        report = Path(tmp) / "crates.json"
-        with contextlib.redirect_stdout(io.StringIO()):
-            crates(root, report)
-        result = json.loads(report.read_text(encoding="utf-8"))
-    if commit(root, "Update other crates the supply-chain audits cover", result["updated"]):
-        made.append("crates")
-    body_path.write_text(body(pinned, result["updated"], result["skipped"]), encoding="utf-8")
+    result: dict = {"updated": [], "skipped": []}
+    others: dict[str, list[str]] = {}
+    if update["rust"]:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "crates.json"
+            with contextlib.redirect_stdout(io.StringIO()):
+                crates(root, report)
+            result = json.loads(report.read_text(encoding="utf-8"))
+        if commit(root, "Update other crates the supply-chain audits cover", result["updated"]):
+            made.append("crates")
+    for language, heading, update_with, title, name in (
+            ("node", "npm packages, within their ranges in package.json", npm,
+             "Update npm packages within their ranges", "npm"),
+            ("python", "Python packages, re-locked from requirements.txt", python,
+             "Update the locked Python packages", "python")):
+        if update[language]:
+            others[heading] = update_with(root)
+            if commit(root, title, others[heading]):
+                made.append(name)
+    body_path.write_text(body(pinned, result["updated"], result["skipped"], others,
+                              any(update.values())),
+                         encoding="utf-8")
     print(" ".join(made))
     return 0

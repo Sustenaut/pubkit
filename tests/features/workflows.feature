@@ -81,3 +81,17 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "node-ci.yml"
     Then its setup input runs npm ci with --ignore-scripts
     And its browser-setup input runs npx with --no-install
+
+  Scenario Outline: A package's reusable workflow checks advisories on every run, with no switch
+    When I parse the workflow "<workflow>"
+    Then its "audit" job runs "<check>" on every event
+    And no input turns the audit job off
+
+    Examples:
+      | workflow      | check                                      |
+      | node-ci.yml   | npm audit --package-lock-only              |
+      | python-ci.yml | pypa/gh-action-pip-audit                   |
+
+  Scenario: rust-ci fuzzes long on a schedule unless pubkit.json turns the long run off
+    When I parse the workflow "rust-ci.yml"
+    Then its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run

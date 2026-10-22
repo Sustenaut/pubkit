@@ -177,3 +177,25 @@ def token_kept_out(workflow):
     job = workflow["data"]["jobs"]["functional"]
     text = yaml.safe_dump(job)
     assert "secrets.SONAR_TOKEN }}" not in text, "the functional job is given the token"
+
+
+@then(parsers.parse('its "{name}" job runs "{check}" on every event'))
+def audit_job(workflow, name, check):
+    job = workflow["data"]["jobs"][name]
+    assert "if" not in job
+    assert check in yaml.safe_dump(job["steps"])
+    assert name in workflow["data"]["jobs"]["passed"]["needs"]
+
+
+@then("no input turns the audit job off")
+def audit_unconditional(workflow):
+    steps = workflow["data"]["jobs"]["audit"]["steps"]
+    assert not any("if" in step for step in steps)
+
+
+@then("its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run")
+def fuzz_setting(workflow):
+    run = next(s["run"] for s in workflow["data"]["jobs"]["fuzz"]["steps"]
+               if "fuzz-smoke" in s.get("run", ""))
+    assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and ".rust" in run
+    assert "pubkit.json" in run and "$LONG" in run and "seconds=$SHORT" in run

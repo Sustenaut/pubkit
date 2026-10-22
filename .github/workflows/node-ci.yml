@@ -9,6 +9,10 @@
 # scripts, and npx runs only what that installed, so a compromised package
 # cannot run code just by being installed. The commands are inputs; the
 # defaults are npm's own.
+#
+# The audit job checks every locked package, development ones included,
+# against npm's advisories on every run, nightly included, and fails on any
+# finding. It has no switch.
 name: node-ci
 
 on:
@@ -72,6 +76,16 @@ jobs:
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
 
+  # Every package in package-lock.json against npm's advisory database,
+  # without installing anything.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: '${{ inputs.node-version }}' }
+      - run: npm audit --package-lock-only --audit-level=low
+
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
   # in a private repository or a pull request from a fork, it says so and
@@ -114,7 +128,7 @@ jobs:
   # browser-test was asked for.
   passed:
     if: always()
-    needs: [test, browser, sonar]
+    needs: [test, browser, audit, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |
