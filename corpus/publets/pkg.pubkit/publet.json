@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.3 is released as v0.12.3 from commit a88044594f5e85f891863170b933dbca30017305.",
+      "content": "pubkit 0.12.4 is released as v0.12.4 from commit 8fe3e29d63522c0f1f75d8e756deebde36d51b88.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.3",
+            "0.12.4",
             "pubkit --version",
-            "pubkit 0.12.3",
-            "v0.12.3",
-            "a88044594f5e85f891863170b933dbca30017305"
+            "pubkit 0.12.4",
+            "v0.12.4",
+            "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
           ]
         ]
       },
-      "scope": "the published release v0.12.3 of pubkit",
+      "scope": "the published release v0.12.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a88044594f5e85f891863170b933dbca30017305"
+          "revision": "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.3 was released on 2026-10-22 from commit a88044594f5e85f891863170b933dbca30017305 with these changes.",
+      "content": "pubkit 0.12.4 was released on 2026-10-22 from commit 8fe3e29d63522c0f1f75d8e756deebde36d51b88 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,30 +58,18 @@
         "rows": [
           [
             "added",
-            "Hosting modules, taken by tag as github.com/schryer/pubkit//terraform/<name>?ref=vX.Y.Z. terraform/hosting reads the hosting block of pubkit.json and writes every zone in it: its DNS at Hetzner, Cloudflare or both (multi-provider, with both providers' nameservers in the apex NS rrset, through terraform/dns-zone), its email records from its mail provider, and its sites: server addresses, Cloudflare Pages projects (served from Pages or a standby server) and Cloud Run sites' records, whose domain mappings terraform/cloud-run-sites makes, apart so a repository without Google Cloud needs no Google credentials"
-          ],
-          [
-            "added",
-            "A hosting block in pubkit.json holds every provider-specific fact the hosting modules use: providers, each named by the repository with a type pubkit supports (hetzner, cloudflare, google-cloud, mailbox-org) and its own settings, and zones, each naming the providers of its DNS, email and sites. pubkit sync and sync --check stop on a setting the block's types do not know, since Terraform would ignore it. TTLs default to a day for the apex NS rrset, an hour for email and five minutes for sites; ttl in the hosting block, a zone or a site overrides them, the nearest winning"
-          ],
-          [
-            "added",
-            "actions/deploy-static, a composite action that deploys a directory to a server over rsync (with a pinned host key, or one scanned each run) and to Cloudflare Pages through a pinned wrangler, or to both, and fails rather than deploy nowhere or to half a target"
-          ],
-          [
-            "internal",
-            "deploy-static's scripts use [[ ]] for their tests, as SonarQube Cloud asks (shelldre:S7688)"
+            "python-ci and node-ci send the browser job's coverage to SonarQube Cloud too: the browser job uploads what browser-test writes to browser-coverage-report (default coverage/) as the coverage-browser artifact, and the sonar job waits for it, reading every coverage* artifact. A repository can move its browser tests out of the test command into browser-test, where they run beside the unit tests, without losing their coverage. Later jobs in the run can download the same coverage* artifacts"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.3 of pubkit",
+      "scope": "the published release v0.12.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a88044594f5e85f891863170b933dbca30017305"
+          "revision": "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
         }
       ]
     }
