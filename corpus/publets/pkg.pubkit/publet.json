@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.1 is released as v0.12.1 from commit 6d8202e68797937c429e1028dd3e51c70240f562.",
+      "content": "pubkit 0.12.2 is released as v0.12.2 from commit 00b26ae71a45047103b00e6e994da27f52dcc93b.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.1",
+            "0.12.2",
             "pubkit --version",
-            "pubkit 0.12.1",
-            "v0.12.1",
-            "6d8202e68797937c429e1028dd3e51c70240f562"
+            "pubkit 0.12.2",
+            "v0.12.2",
+            "00b26ae71a45047103b00e6e994da27f52dcc93b"
           ]
         ]
       },
-      "scope": "the published release v0.12.1 of pubkit",
+      "scope": "the published release v0.12.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6d8202e68797937c429e1028dd3e51c70240f562"
+          "revision": "00b26ae71a45047103b00e6e994da27f52dcc93b"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.1 was released on 2026-10-20 from commit 6d8202e68797937c429e1028dd3e51c70240f562 with these changes.",
+      "content": "pubkit 0.12.2 was released on 2026-10-22 from commit 00b26ae71a45047103b00e6e994da27f52dcc93b with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,48 @@
         ],
         "rows": [
           [
-            "fixed",
-            "Rewrites the two regular expressions SonarQube Cloud still found backtracking (the tool version and the standard's [checked] tags), and passes cargo and pubrel only values pubkit has checked: the crate's name from cargo metadata, a row's text that cannot start with '-', and the --report path once confined"
+            "added",
+            "Per-language update and security settings in pubkit.json: \"update\": {\"rust\", \"node\", \"python\"} turns each language's dependency updates in the nightly pull request on or off (\"update\": false turns them all off, leaving the pub* pins), and \"security\": {\"fuzz\": {\"rust\": false}} keeps a scheduled rust-ci run's fuzzing as brief as any other. With updates on, the nightly pull request also moves the npm packages within their package.json ranges and re-locks tests/requirements.lock. An unknown setting stops the nightly"
           ],
           [
             "added",
-            "rust-ci's sonar job also reads Cobertura XML a functional target writes in coverage/ (coverage/*.xml) as sonar.python.coverage.reportPaths, so a Rust repository's Python scripts count toward coverage on new code"
+            "node-ci and python-ci run an audit job on every run, part of passed: npm audit of package-lock.json, and pip-audit of the hash-locked requirements (audit-requirements, by default tests/requirements.lock). A known advisory fails CI; there is no switch"
+          ],
+          [
+            "fixed",
+            "pubkit pins moves pubkit's pin in python-ci, node-ci and service-ci workflows too, not only rust-ci"
+          ],
+          [
+            "added",
+            "OSV-Scanner (every lockfile, on every run) and GitHub dependency review (public pull requests) in rust-ci, node-ci and python-ci, both part of passed, with no switch"
+          ],
+          [
+            "added",
+            "security.dependabot in pubkit.json: pubkit sync and init write .github/dependabot.yml from its schedule, ecosystems and options (default: weekly GitHub Actions updates; false leaves the file to the repository), and security.sonar.args adds SonarQube Cloud properties to every sonar job"
+          ],
+          [
+            "added",
+            "Property tests: tests/requirements-pubkit.txt pins Hypothesis for every package, and pubkit's pytest plugin gives each Hypothesis property PUBKIT_FUZZ_RUNS inputs, with no deadline. python-ci and node-ci set it: fuzz-runs (100) on every push and pull request, fuzz-runs-scheduled (10000) on a scheduled run. security.fuzz now defaults to on for python and node, as for rust, and false keeps a scheduled run as brief as any other. A Node package's fast-check reads it through fc.configureGlobal"
+          ],
+          [
+            "added",
+            "pubkit protect also puts a ruleset on each repository's release tags (src/pubkit/tag-ruleset.json): nobody may create, move or delete a v* tag, and only GitHub Actions, where pubrel tag runs after a release pull request merges, may bypass it. protect --check reports a repository without it"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.1 of pubkit",
+      "scope": "the published release v0.12.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6d8202e68797937c429e1028dd3e51c70240f562"
+          "revision": "00b26ae71a45047103b00e6e994da27f52dcc93b"
         }
       ]
     }
   },
-  "created": "2026-10-20T00:00:00Z",
+  "created": "2026-10-22T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
