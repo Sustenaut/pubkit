@@ -1,23 +1,21 @@
-# One DNS zone, written once and served by Hetzner, and by Cloudflare too
-# when var.cloudflare is set, with the same records at both, so the domain
-# keeps resolving while either one is down. The registrar lists nameservers
-# of both (output "nameservers"). Nothing else should add records to the
-# zone.
+# One DNS zone, its records written once and served by Hetzner, Cloudflare
+# or both. With both, the records are the same at each, so the domain keeps
+# resolving while either one is down, and the registrar lists nameservers of
+# both (output "nameservers"). Nothing else should add records to the zone.
 #
 # Each entry of var.records is one rrset in zone-file form. Hetzner takes it
 # as it is; Cloudflare takes one record per value, so the Cloudflare section
-# below splits them.
-
-data "hcloud_zone" "zone" {
-  name = var.zone
-}
+# below splits them. The hosting module calls this once per zone in
+# pubkit.json, with the zone's DNS providers.
 
 locals {
-  multi_provider = var.cloudflare != null
+  on_hetzner     = var.hetzner != null
+  on_cloudflare  = var.cloudflare != null
+  multi_provider = local.on_hetzner && local.on_cloudflare
 
   # With both providers, every nameserver of both, at both, so a resolver
-  # that asks either one learns of all of them. With Hetzner alone, the
-  # apex NS rrset Hetzner made with the zone is left as it is.
+  # that asks either one learns of all of them. With one, the apex NS rrset
+  # the provider made with the zone is left as it is.
   records = merge(
     var.records,
     local.multi_provider ? {
@@ -30,41 +28,48 @@ locals {
     } : {},
   )
 
-  # Hetzner's registrar (konsoleH) won't list the nameservers Hetzner
-  # assigns a zone next to another provider's, but Hetzner serves the same
-  # zone from a second set of names too, which it takes as external. The
-  # registrar lists those and Cloudflare's. The zone itself can only name
-  # the assigned ones (Hetzner refuses the others as "not assigned to this
-  # zone"), so the apex NS rrset lists those and Cloudflare's.
-  hetzner_registrar_nameservers = [
-    "helium.ns.hetzner.de.",
-    "hydrogen.ns.hetzner.com.",
-    "oxygen.ns.hetzner.com.",
-  ]
-  hetzner_nameservers = sort([
-    for ns in data.hcloud_zone.zone.authoritative_nameservers.assigned : "${trimsuffix(ns, ".")}."
-  ])
-  cloudflare_nameservers = local.multi_provider ? [
+  # A registrar may refuse the nameservers Hetzner assigns a zone next to
+  # another provider's: Hetzner's own (konsoleH) does. Hetzner serves the
+  # same zone from a second set of names too, which it takes as external,
+  # and such a registrar lists those (dns.external_nameservers of the
+  # hetzner provider in pubkit.json) and Cloudflare's. The zone itself can
+  # only name the assigned ones (Hetzner refuses the others as "not
+  # assigned to this zone"), so the apex NS rrset lists those and
+  # Cloudflare's.
+  hetzner_nameservers = local.on_hetzner ? sort([
+    for ns in data.hcloud_zone.zone[0].authoritative_nameservers.assigned : "${trimsuffix(ns, ".")}."
+  ]) : []
+  hetzner_external_nameservers = local.on_hetzner ? [
+    for ns in var.hetzner.dns.external_nameservers : "${trimsuffix(ns, ".")}."
+  ] : []
+  hetzner_registrar_nameservers = (
+    length(local.hetzner_external_nameservers) > 0 ? local.hetzner_external_nameservers : local.hetzner_nameservers
+  )
+  cloudflare_nameservers = local.on_cloudflare ? [
     for ns in cloudflare_zone.zone[0].name_servers : "${trimsuffix(ns, ".")}."
   ] : []
 
-  zone_nameservers = sort(distinct(concat(local.hetzner_nameservers, local.cloudflare_nameservers)))
-  registrar_nameservers = (
-    local.multi_provider
-    ? sort(concat(local.hetzner_registrar_nameservers, local.cloudflare_nameservers))
-    : local.hetzner_nameservers
-  )
+  zone_nameservers      = sort(distinct(concat(local.hetzner_nameservers, local.cloudflare_nameservers)))
+  registrar_nameservers = sort(concat(local.hetzner_registrar_nameservers, local.cloudflare_nameservers))
+}
+
+# --- Hetzner ---
+
+data "hcloud_zone" "zone" {
+  count = local.on_hetzner ? 1 : 0
+
+  name = var.zone
 }
 
 # Hetzner keeps one rrset per name and type, which is what each entry is.
 #
-# Hetzner made the apex NS rrset with the zone, so with Cloudflare on, a
-# zone already in use needs it taken over rather than created, by an import
-# block in the root module (README.md, "Hosting modules").
+# Hetzner made the apex NS rrset with the zone, so when a second provider
+# joins a zone already in use, it is taken over rather than created, by an
+# import block in the root module (README.md, "Hosting modules").
 resource "hcloud_zone_rrset" "records" {
-  for_each = local.records
+  for_each = local.on_hetzner ? local.records : {}
 
-  zone = data.hcloud_zone.zone.name
+  zone = data.hcloud_zone.zone[0].name
   name = each.value.name
   type = each.value.type
   ttl  = each.value.ttl
@@ -72,10 +77,10 @@ resource "hcloud_zone_rrset" "records" {
   records = [for value in each.value.values : { value = value }]
 }
 
-# --- Cloudflare: the second provider, when var.cloudflare is set ---
+# --- Cloudflare ---
 
 resource "cloudflare_zone" "zone" {
-  count = local.multi_provider ? 1 : 0
+  count = local.on_cloudflare ? 1 : 0
 
   account = { id = var.cloudflare.account_id }
   name    = var.zone
@@ -98,7 +103,7 @@ locals {
   # Pages subdomain, Cloudflare's nameservers) are known only after apply,
   # and for_each keys must be known at plan time. Cloudflare lists its own
   # nameservers itself, so its NS records are Hetzner's alone.
-  cloudflare_records = local.multi_provider ? merge([
+  cloudflare_records = local.on_cloudflare ? merge([
     for key, rrset in local.records : {
       for i, value in(key == "nameservers" ? local.hetzner_nameservers : rrset.values) : "${key} ${i}" => {
         name = rrset.name == "@" ? var.zone : "${rrset.name}.${var.zone}"

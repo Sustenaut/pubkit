@@ -89,59 +89,125 @@ repositories on GitHub Free have no rulesets, so there it is a summary.
 
 ## Hosting modules
 
-Terraform modules for a domain's DNS, its email and its static sites, and an
-action that deploys a static site, taken from this repository by tag. They
-are the setup `schryer-eu-infra` runs for schryer.eu, written once so every
-zone gets the same.
+Terraform modules for a repository's domains: their DNS, their email and
+their sites, each at the provider the repository chooses, and an action
+that deploys a static site. They are taken from this repository by tag, and
+they hold no provider's names, hosts or accounts: those are in the
+repository's own `pubkit.json`, under `hosting`, so each repository keeps
+its own setup.
 
-```hcl
-module "mail" {
-  source             = "github.com/schryer/pubkit//terraform/mailbox-org?ref=vX.Y.Z"
-  verification_value = "0123..."                # the key mailbox.org shows for the domain
-  dmarc_rua          = "alerts@example.eu"
-  extra_apex_txt     = ["google-site-verification=..."]
-}
+### The hosting block
 
-module "docs" {
-  source                = "github.com/schryer/pubkit//terraform/static-site?ref=vX.Y.Z"
-  name                  = "docs"
-  zone                  = "example.eu"
-  cloudflare_account_id = var.cloudflare_account_id
-  pages_project         = "example-docs"
-  served_by             = "pages"               # or "server" while Pages is out
-  standby_ipv4          = module.web.ipv4
-  standby_ipv6          = module.web.ipv6
-}
+`providers` are the providers the repository uses, each under a name it
+chooses, with a `type` and that provider's facts. `zones` are its domains,
+each naming the providers that serve its DNS, its email and its sites.
+This is [`terraform/testdata/pubkit.json`](terraform/testdata/pubkit.json),
+which the modules are tested with (secrets never go here; tokens stay with
+`./with-secrets`):
 
-module "dns" {
-  source     = "github.com/schryer/pubkit//terraform/dns-zone?ref=vX.Y.Z"
-  zone       = "example.eu"
-  cloudflare = { account_id = var.cloudflare_account_id }   # null: Hetzner alone
-  records = merge(module.mail.records, module.docs.records, {
-    web = { name = "@", type = "A", ttl = 300, values = [module.web.ipv4] }
-  })
+```json
+"hosting": {
+  "providers": {
+    "hetzner": {
+      "type": "hetzner",
+      "dns": { "external_nameservers": ["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."] }
+    },
+    "cloudflare": { "type": "cloudflare", "account_id": "fedcba9876543210fedcba9876543210" },
+    "gcp": {
+      "type": "google-cloud",
+      "project": "example-project",
+      "region": "europe-north1",
+      "cloud_run": { "domain_target": "ghs.googlehosted.com." }
+    },
+    "mailbox": {
+      "type": "mailbox-org",
+      "mx": ["10 mxext1.mailbox.org.", "10 mxext2.mailbox.org.", "10 mxext3.mailbox.org.", "10 mxext4.mailbox.org."],
+      "spf": "include:mailbox.org",
+      "dkim": { "mbo0001": "mbo0001._domainkey.mailbox.org.", "...": "..." }
+    }
+  },
+  "zones": {
+    "example.eu": {
+      "dns": ["hetzner", "cloudflare"],
+      "email": {
+        "provider": "mailbox",
+        "verification": { "f67e29eb00a65673481c0f9731bc90e0c6f94fd3": "<the key mailbox.org shows>" },
+        "dmarc": { "policy": "none", "rua": "alerts@example.eu" }
+      },
+      "apex_txt": ["google-site-verification=abc"],
+      "sites": {
+        "@": { "provider": "hetzner", "kind": "server", "server": "web" },
+        "recipes": { "provider": "cloudflare", "kind": "pages", "project": "example-recipes", "standby": "web" },
+        "pub": { "provider": "gcp", "kind": "cloud-run", "service": "pub-site" }
+      }
+    }
+  }
 }
 ```
 
-- **`terraform/dns-zone`:** every record of one zone, as rrsets in
-  zone-file form (`name` relative, `"@"` for the apex; trailing dots, MX
-  `"10 host."`, TXT quoted), written to the existing Hetzner zone. With
-  `cloudflare` set, Cloudflare serves the same zone too, in multi-provider
-  mode: the module creates the Cloudflare zone, writes one unproxied record
-  per value (MX split into priority and host), and puts both providers'
-  nameservers in the apex NS rrset at both. `nameservers` is the list for
-  the registrar; `hetzner_nameservers` and `cloudflare_zone_id` are outputs
-  too. Hetzner keeps one rrset per name and type, so the module refuses two
-  entries for the same pair, and the key `nameservers` is its own.
-- **`terraform/mailbox-org`:** no resources; its `records` output is
-  mailbox.org's MX, SPF, DKIM, DMARC and verification rrsets, to merge into
-  `dns-zone`'s. Other apex TXT values go in `extra_apex_txt`, since they
-  share SPF's rrset. `dmarc_policy` starts at `none`.
-- **`terraform/static-site`:** a Cloudflare Pages project (production
-  branch `main`, no Git connection) and its custom domain, and a `records`
-  output pointing the name at it, or, with `served_by = "server"`, at the
-  standby server's addresses. `project_name`, `subdomain` and `url` are
-  outputs.
+The provider types pubkit supports, and what each holds:
+
+| type | settings | serves DNS | sites |
+| --- | --- | --- | --- |
+| `hetzner` | `dns.external_nameservers`: the names Hetzner also serves a zone from, which a registrar such as Hetzner's own (konsoleH) lists next to another provider's; without them the registrar gets the assigned ones | yes; the zone must already exist at Hetzner | `server`: A (and AAAA) records to a server's addresses |
+| `cloudflare` | `account_id` | yes; with Hetzner too, in multi-provider mode | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
+| `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a domain mapping to the Cloud Run `service` |
+| `mailbox-org` | `mx` (`"priority host."`), `spf` (its mechanisms, such as `include:mailbox.org`), `dkim` (selector, in lowercase, to host) | no | no; a zone's `email.provider` |
+
+A zone's `dns` lists one or two providers that serve DNS, at most one of
+each type. Its `email` names a mail provider, with the domain's own
+`verification` TXT records and `dmarc` (`policy` none, quarantine or
+reject, and `rua`, where reports go). `apex_txt` holds other apex TXT
+values, such as a Google site verification; they share the SPF record's
+rrset, since Hetzner keeps one rrset per name and type. `sites` are by name
+relative to the zone (`"@"` for the apex, which only a server site can
+have, since the others are CNAMEs), each with its `provider` and that
+provider's `kind`.
+
+A new provider of a known type is a new entry in `providers`; a repository
+on two Hetzner projects names both. A new type, such as another mail
+provider, needs pubkit to learn it once, in `src/pubkit/hosting.py` and
+`terraform/hosting`. Terraform ignores a setting its types do not name,
+so `pubkit sync` (and `sync --check`, in CI) checks the block first and
+stops on anything it does not know.
+
+### Using it
+
+The root module reads the block, gives the servers' addresses (known only
+once the servers exist), and configures the Terraform providers, each with
+the one account it deploys to:
+
+```hcl
+module "hosting" {
+  source = "github.com/schryer/pubkit//terraform/hosting?ref=vX.Y.Z"
+  config = jsondecode(file("${path.root}/pubkit.json")).hosting
+
+  servers = {
+    web = { ipv4 = module.web.ipv4, ipv6 = module.web.ipv6 }
+  }
+}
+```
+
+Its outputs are `nameservers` (by zone, for the registrar),
+`cloudflare_zone_ids`, `records` (every rrset, by zone) and `sites` (by
+full name: provider, kind, address, and a Pages site's project and
+pages.dev name). `records` takes other rrsets, by zone, for anything the
+block does not describe. A Cloud Run site's service is the repository's
+own; the module maps the name to it, and the root module adds
+`depends_on` when the service is created in the same apply.
+
+The modules need Terraform 1.11 or newer, `hcloud` 1.69, `cloudflare` 5.28
+and `google` 7. A provider the block does not use needs no token or
+provider block.
+
+- **`terraform/hosting`:** the block above, zone by zone.
+- **`terraform/dns-zone`:** one zone's rrsets in zone-file form (`name`
+  relative, `"@"` for the apex; trailing dots, MX `"10 host."`, TXT
+  quoted), at Hetzner, Cloudflare or both. With both, Cloudflare runs in
+  multi-provider mode: one unproxied record per value (MX split into
+  priority and host), and both providers' nameservers in the apex NS rrset
+  at both. `terraform/hosting` calls it for each zone; it can be used on
+  its own with `hetzner` and `cloudflare` set as in the block.
 - **`actions/deploy-static`:** deploys a directory to a server over rsync
   (`deploy-key`, `deploy-target`, and `known-hosts`, the server's pinned
   host key; without it the key is scanned on every run), to Cloudflare
@@ -155,35 +221,30 @@ module "dns" {
       dir: site
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
       cloudflare-account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      cloudflare-project: example-docs
+      cloudflare-project: example-recipes
       deploy-key: ${{ secrets.DEPLOY_KEY }}
       deploy-target: deploy@example.eu:./
       known-hosts: example.eu ssh-ed25519 AAAA...
   ```
 
-The root module configures the `hcloud` and `cloudflare` providers; the
-modules need Terraform 1.11 or newer, `hcloud` 1.69 and `cloudflare` 5.28.
-With `cloudflare = null`, `dns-zone` creates nothing at Cloudflare and the
-root module needs no Cloudflare token or provider block (init still fetches
-the provider).
-
 **Moving a zone that is already in use.** Hetzner made the apex NS rrset
-with the zone, so the first apply with `cloudflare` set must take it over
-rather than create it, with an import block in the root module (this is
-what schryer-eu-infra needed):
+with the zone, so the first apply with Cloudflare joining it must take it
+over rather than create it, with an import block in the root module (this
+is what schryer-eu-infra needed):
 
 ```hcl
 import {
-  to = module.dns.hcloud_zone_rrset.records["nameservers"]
+  to = module.hosting.module.zone["example.eu"].hcloud_zone_rrset.records["nameservers"]
   id = "example.eu/@/NS"
 }
 ```
 
-Records a root module already manages move with `moved` blocks to
-`module.dns.hcloud_zone_rrset.records["<key>"]`, or with import blocks like
-the one above when they were written as separate resources. The keys
-`mailbox-org` and `static-site` use (`email_mx`, `recipes`, `recipes_a`,
-...) are the ones schryer-eu-infra's `local.records` uses.
+Records a root module already manages move with `moved` blocks, or with
+import blocks like the one above when they were separate resources. In a
+zone, the email records are `email_mx`, `email_dmarc`,
+`email_dkim_<selector>` and `email_verification_<name>`, the apex TXT
+rrset is `apex_txt`, and a site's are its name (`apex` for `"@"`, dots as
+underscores), with `_a` and `_aaaa` for a server's addresses.
 
 Each module's tests (`terraform test` in its directory) mock the providers
 and need no credentials; CI runs them on Terraform 1.11, with `fmt`,

@@ -2,7 +2,11 @@
   "changes": [
     {
       "category": "added",
-      "change": "Hosting modules, taken by tag as github.com/schryer/pubkit//terraform/<name>?ref=vX.Y.Z: dns-zone writes a zone's records (rrsets in zone-file form) to its Hetzner zone and, with cloudflare set, to a Cloudflare zone in multi-provider mode as well, with both providers' nameservers in the apex NS rrset; mailbox-org outputs mailbox.org's MX, SPF, DKIM, DMARC and verification records; static-site makes a Cloudflare Pages project and domain and points the name at it or, with served_by = \"server\", at a standby server"
+      "change": "Hosting modules, taken by tag as github.com/schryer/pubkit//terraform/<name>?ref=vX.Y.Z. terraform/hosting reads the hosting block of pubkit.json and writes every zone in it: its DNS at Hetzner, Cloudflare or both (multi-provider, with both providers' nameservers in the apex NS rrset, through terraform/dns-zone), its email records from its mail provider, and its sites: server addresses, Cloudflare Pages projects (served from Pages or a standby server) and Cloud Run domain mappings"
+    },
+    {
+      "category": "added",
+      "change": "A hosting block in pubkit.json holds every provider-specific fact the hosting modules use: providers, each named by the repository with a type pubkit supports (hetzner, cloudflare, google-cloud, mailbox-org) and its own settings, and zones, each naming the providers of its DNS, email and sites. pubkit sync and sync --check stop on a setting the block's types do not know, since Terraform would ignore it"
     },
     {
       "category": "added",
