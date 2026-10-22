@@ -9,13 +9,13 @@ fail() {
   exit 1
 }
 
-[ -d "$DIR" ] || fail "dir: $DIR is not a directory"
-if [ "$DEPLOY_KEY_SET" != true ] && [ "$CLOUDFLARE_SET" != true ]; then
+[[ -d "$DIR" ]] || fail "dir: $DIR is not a directory"
+if [[ "$DEPLOY_KEY_SET" != true ]] && [[ "$CLOUDFLARE_SET" != true ]]; then
   fail "nothing to deploy to: set deploy-key, cloudflare-api-token or both"
 fi
-if [ "$DEPLOY_KEY_SET" = true ] && [ -z "$TARGET" ]; then
+if [[ "$DEPLOY_KEY_SET" = true ]] && [[ -z "$TARGET" ]]; then
   fail "deploy-key needs deploy-target"
 fi
-if [ "$CLOUDFLARE_SET" = true ] && { [ -z "$ACCOUNT" ] || [ -z "$PROJECT" ]; }; then
+if [[ "$CLOUDFLARE_SET" = true ]] && { [[ -z "$ACCOUNT" ]] || [[ -z "$PROJECT" ]]; }; then
   fail "cloudflare-api-token needs cloudflare-account-id and cloudflare-project"
 fi
