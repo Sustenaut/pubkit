@@ -1,5 +1,7 @@
-# Runs without credentials: both providers are mocked, with the nameservers
-# each would report.
+# Runs without credentials: both providers are mocked, with made-up
+# nameservers in place of the ones each would report. The providers' own
+# facts come from testdata/pubkit.json, as a root module's come from its
+# pubkit.json; none are written here.
 
 mock_provider "hcloud" {
   mock_data "hcloud_zone" {
@@ -16,7 +18,7 @@ mock_provider "cloudflare" {
   mock_resource "cloudflare_zone" {
     defaults = {
       id           = "0123456789abcdef0123456789abcdef"
-      name_servers = ["ada.ns.cloudflare.com", "bob.ns.cloudflare.com"]
+      name_servers = ["ns1.cloudflare.example", "ns2.cloudflare.example"]
     }
   }
 }
@@ -70,8 +72,8 @@ run "multi_provider" {
   command = apply
 
   variables {
-    hetzner    = { dns = { external_nameservers = ["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com."] } }
-    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+    hetzner    = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
   }
 
   assert {
@@ -80,8 +82,8 @@ run "multi_provider" {
   }
 
   assert {
-    condition = tolist([for r in hcloud_zone_rrset.records["nameservers"].records : r.value]) == tolist([
-      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.",
+    condition = tolist([for r in hcloud_zone_rrset.records["nameservers"].records : r.value]) == sort([
+      "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.", "ns1.cloudflare.example.", "ns2.cloudflare.example.",
     ])
     error_message = "Hetzner's apex NS rrset lists its assigned nameservers and Cloudflare's."
   }
@@ -123,10 +125,11 @@ run "multi_provider" {
   }
 
   assert {
-    condition = output.nameservers == tolist([
-      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com.",
-    ])
-    error_message = "The registrar gets Hetzner's external nameservers and Cloudflare's."
+    condition = output.nameservers == sort(concat(
+      [for ns in var.hetzner.dns.external_nameservers : "${trimsuffix(ns, ".")}."],
+      ["ns1.cloudflare.example.", "ns2.cloudflare.example."],
+    ))
+    error_message = "The registrar gets Hetzner's external nameservers, as given, and Cloudflare's."
   }
 
   assert {
@@ -160,18 +163,18 @@ run "one_rrset_per_name_and_type" {
   expect_failures = [var.records]
 }
 
-# Without external nameservers in pubkit.json, the registrar gets the
-# zone's assigned ones, next to Cloudflare's.
+# Without external nameservers, the registrar gets the zone's assigned
+# ones, next to Cloudflare's.
 run "no_external_nameservers" {
   command = apply
 
   variables {
-    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
   }
 
   assert {
-    condition = output.nameservers == tolist([
-      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.",
+    condition = output.nameservers == sort([
+      "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.", "ns1.cloudflare.example.", "ns2.cloudflare.example.",
     ])
     error_message = "The assigned nameservers and Cloudflare's."
   }
@@ -182,7 +185,7 @@ run "cloudflare_alone" {
 
   variables {
     hetzner    = null
-    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
   }
 
   assert {
@@ -191,7 +194,7 @@ run "cloudflare_alone" {
   }
 
   assert {
-    condition     = output.nameservers == tolist(["ada.ns.cloudflare.com.", "bob.ns.cloudflare.com."])
+    condition     = output.nameservers == tolist(["ns1.cloudflare.example.", "ns2.cloudflare.example."])
     error_message = "The registrar gets Cloudflare's nameservers."
   }
 }

@@ -13,8 +13,8 @@ mock_provider "hcloud" {
 variables {
   config = {
     providers = {
-      hetzner = { type = "hetzner" }
-      mailbox = { type = "mailbox-org", mx = ["10 mxext1.mailbox.org."], spf = "include:mailbox.org" }
+      hetzner = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+      mailbox = jsondecode(file("../testdata/pubkit.json")).hosting.providers.mailbox
     }
     zones = {
       "example.eu" = {
@@ -31,12 +31,14 @@ run "no_cloudflare_configuration" {
   command = plan
 
   assert {
-    condition     = toset(keys(output.records["example.eu"])) == toset(["email_mx", "apex_txt", "auth_a"])
-    error_message = "MX, SPF and the server's address, and nothing at Cloudflare."
+    condition = toset(keys(output.records["example.eu"])) == toset(concat(
+      ["email_mx", "apex_txt", "auth_a"], [for selector in keys(var.config.providers.mailbox.dkim) : "email_dkim_${selector}"],
+    ))
+    error_message = "The mail provider's records and the server's address, and nothing at Cloudflare."
   }
 
   assert {
-    condition     = output.nameservers["example.eu"] == tolist(["ns1.assigned.example.com."])
-    error_message = "Without external nameservers the registrar gets the assigned ones."
+    condition     = output.nameservers["example.eu"] == sort(var.config.providers.hetzner.dns.external_nameservers)
+    error_message = "The registrar gets the external nameservers from pubkit.json."
   }
 }

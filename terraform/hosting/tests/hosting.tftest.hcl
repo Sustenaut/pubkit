@@ -1,8 +1,9 @@
 # Runs without credentials: every provider is mocked. testdata/pubkit.json
-# has two zones: example.eu on Hetzner and Cloudflare, with mailbox.org's
+# has two zones: example.eu on Hetzner and Cloudflare, with mailbox.org
 # email, a server at the apex, a Pages site and a Cloud Run site; and
 # example.org on Hetzner alone, with a server and a Pages site served from
-# its standby server.
+# its standby server. Assertions read the providers' facts from var.config,
+# the same file, so none are written here.
 
 mock_provider "hcloud" {
   mock_data "hcloud_zone" {
@@ -18,7 +19,7 @@ mock_provider "cloudflare" {
   mock_resource "cloudflare_zone" {
     defaults = {
       id           = "0123456789abcdef0123456789abcdef"
-      name_servers = ["ada.ns.cloudflare.com", "bob.ns.cloudflare.com"]
+      name_servers = ["ns1.cloudflare.example", "ns2.cloudflare.example"]
     }
   }
   mock_resource "cloudflare_pages_project" {
@@ -40,21 +41,32 @@ run "zones" {
   command = apply
 
   assert {
-    condition = toset(keys(output.records["example.eu"])) == toset([
-      "email_mx", "email_dmarc", "email_dkim_mbo0001", "email_dkim_mbo0002", "email_dkim_mbo0003", "email_dkim_mbo0004",
-      "email_verification_f67e29eb00a65673481c0f9731bc90e0c6f94fd3", "apex_txt",
-      "apex_a", "apex_aaaa", "recipes", "pub",
-    ])
-    error_message = "example.eu: mailbox.org's records, the apex TXT rrset and its three sites."
+    condition = toset(keys(output.records["example.eu"])) == toset(concat(
+      ["email_mx", "email_dmarc", "apex_txt", "apex_a", "apex_aaaa", "recipes", "pub"],
+      [for selector in keys(var.config.providers.mailbox.dkim) : "email_dkim_${selector}"],
+      [for name in keys(var.config.zones["example.eu"].email.verification) : "email_verification_${name}"],
+    ))
+    error_message = "example.eu: its mail provider's records, the apex TXT rrset and its three sites."
   }
 
   assert {
     condition = (
-      tolist(output.records["example.eu"]["email_mx"].values) == tolist(["10 mxext1.mailbox.org.", "10 mxext2.mailbox.org.", "10 mxext3.mailbox.org.", "10 mxext4.mailbox.org."]) &&
-      tolist(output.records["example.eu"]["apex_txt"].values) == tolist(["\"v=spf1 include:mailbox.org ~all\"", "\"google-site-verification=abc\""]) &&
-      tolist(output.records["example.eu"]["email_dmarc"].values) == tolist(["\"v=DMARC1; p=none; rua=mailto:alerts@example.eu\""]) &&
-      output.records["example.eu"]["email_dkim_mbo0002"].name == "mbo0002._domainkey" &&
-      tolist(output.records["example.eu"]["email_verification_f67e29eb00a65673481c0f9731bc90e0c6f94fd3"].values) == tolist(["\"0123456789abcdef0123456789abcdef01234567\""])
+      tolist(output.records["example.eu"]["email_mx"].values) == tolist(var.config.providers.mailbox.mx) &&
+      tolist(output.records["example.eu"]["apex_txt"].values) == tolist(concat(
+        ["\"v=spf1 ${var.config.providers.mailbox.spf} ~all\""],
+        [for value in var.config.zones["example.eu"].apex_txt : "\"${value}\""],
+      )) &&
+      tolist(output.records["example.eu"]["email_dmarc"].values) == tolist(["\"v=DMARC1; p=${var.config.zones["example.eu"].email.dmarc.policy}; rua=mailto:${var.config.zones["example.eu"].email.dmarc.rua}\""]) &&
+      alltrue([
+        for selector, target in var.config.providers.mailbox.dkim :
+        output.records["example.eu"]["email_dkim_${selector}"].name == "${selector}._domainkey" &&
+        tolist(output.records["example.eu"]["email_dkim_${selector}"].values) == tolist([target])
+      ]) &&
+      alltrue([
+        for name, value in var.config.zones["example.eu"].email.verification :
+        output.records["example.eu"]["email_verification_${name}"].name == name &&
+        tolist(output.records["example.eu"]["email_verification_${name}"].values) == tolist(["\"${value}\""])
+      ])
     )
     error_message = "The email records come from the mailbox-org provider and the zone's email block."
   }
@@ -65,7 +77,7 @@ run "zones" {
       tolist(output.records["example.eu"]["apex_aaaa"].values) == tolist(["2001:db8::1"]) &&
       output.records["example.eu"]["recipes"].type == "CNAME" &&
       tolist(output.records["example.eu"]["recipes"].values) == tolist(["example-recipes-2ab.pages.dev."]) &&
-      tolist(output.records["example.eu"]["pub"].values) == tolist(["ghs.googlehosted.com."])
+      tolist(output.records["example.eu"]["pub"].values) == tolist([var.config.providers.gcp.cloud_run.domain_target])
     )
     error_message = "A server site gets its addresses, a Pages site the subdomain Cloudflare reports, a Cloud Run site the provider's domain_target."
   }
@@ -82,8 +94,8 @@ run "zones" {
 
   assert {
     condition = (
-      output.nameservers["example.eu"] == tolist(["ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."]) &&
-      output.nameservers["example.org"] == tolist(["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."])
+      output.nameservers["example.eu"] == sort(concat(var.config.providers.hetzner.dns.external_nameservers, ["ns1.cloudflare.example.", "ns2.cloudflare.example."])) &&
+      output.nameservers["example.org"] == sort(var.config.providers.hetzner.dns.external_nameservers)
     )
     error_message = "The registrar gets the external nameservers from pubkit.json, and Cloudflare's where it serves the zone too."
   }
@@ -95,7 +107,7 @@ run "zones" {
 
   assert {
     condition = (
-      cloudflare_pages_project.site["recipes.example.eu"].account_id == "fedcba9876543210fedcba9876543210" &&
+      cloudflare_pages_project.site["recipes.example.eu"].account_id == var.config.providers.cloudflare.account_id &&
       cloudflare_pages_project.site["recipes.example.eu"].production_branch == "main" &&
       cloudflare_pages_domain.site["docs.example.org"].project_name == "example-docs"
     )
@@ -145,7 +157,7 @@ run "dns_provider_must_serve_dns" {
 
   variables {
     config = {
-      providers = { gcp = { type = "google-cloud", project = "p", region = "r" } }
+      providers = { gcp = jsondecode(file("../testdata/pubkit.json")).hosting.providers.gcp }
       zones     = { "example.eu" = { dns = ["gcp"] } }
     }
   }
@@ -158,10 +170,7 @@ run "site_kind_follows_its_provider" {
 
   variables {
     config = {
-      providers = {
-        hetzner    = { type = "hetzner" }
-        cloudflare = { type = "cloudflare", account_id = "fedcba9876543210fedcba9876543210" }
-      }
+      providers = jsondecode(file("../testdata/pubkit.json")).hosting.providers
       zones = {
         "example.eu" = {
           dns   = ["hetzner"]

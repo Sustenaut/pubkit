@@ -13,7 +13,7 @@ mock_provider "hcloud" {
 
 variables {
   zone    = "example.eu"
-  hetzner = { dns = { external_nameservers = ["helium.ns.hetzner.de."] } }
+  hetzner = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
   records = { web = { name = "@", type = "A", ttl = 300, values = ["192.0.2.1"] } }
 }
 
@@ -26,7 +26,7 @@ run "no_cloudflare_configuration" {
   }
 
   assert {
-    condition     = output.nameservers == tolist(["helium.ns.hetzner.de."])
+    condition     = output.nameservers == sort([for ns in var.hetzner.dns.external_nameservers : "${trimsuffix(ns, ".")}."])
     error_message = "The registrar gets the external nameservers given."
   }
 }

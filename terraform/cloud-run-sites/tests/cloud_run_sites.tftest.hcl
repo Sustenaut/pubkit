@@ -17,8 +17,8 @@ run "mappings" {
 
   assert {
     condition = (
-      google_cloud_run_domain_mapping.site["pub.example.eu"].location == "europe-north1" &&
-      google_cloud_run_domain_mapping.site["pub.example.eu"].metadata[0].namespace == "example-project" &&
+      google_cloud_run_domain_mapping.site["pub.example.eu"].location == var.config.providers.gcp.region &&
+      google_cloud_run_domain_mapping.site["pub.example.eu"].metadata[0].namespace == var.config.providers.gcp.project &&
       google_cloud_run_domain_mapping.site["pub.example.eu"].spec[0].route_name == "pub-site"
     )
     error_message = "A Cloud Run site maps its name to its service, in the provider's project and region."
