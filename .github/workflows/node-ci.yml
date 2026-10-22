@@ -31,6 +31,7 @@ on:
       test: { type: string, default: npm test, description: Runs the tests. }
       browser-test: { type: string, default: '', description: Runs the browser tests too; empty skips the browser job. }
       browser-setup: { type: string, default: npx --no-install playwright install --with-deps chromium }
+      browser-coverage-report: { type: string, default: coverage/, description: "The coverage the browser test command writes, if any, which the sonar job reads with the test job's report." }
       sync-check: { type: boolean, default: true, description: "Fail if pubkit's managed files drifted, using the pubkit tests/requirements.lock pins." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/lcov.info, description: "The LCOV report the test command writes, if any, which the sonar job reads: node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info writes one." }
@@ -96,6 +97,13 @@ jobs:
       - run: ${{ inputs.setup }}
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
+      # Its coverage joins the test job's, as an artifact of its own.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-browser
+          path: ${{ inputs.browser-coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1
 
   # Every package in package-lock.json against npm's advisory database,
   # without installing anything.
@@ -145,11 +153,15 @@ jobs:
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
   # in a private repository or a pull request from a fork, it says so and
-  # passes. The full history lets it tell new code from old, and the test
-  # job's coverage report, when its test command wrote one, gives the
-  # coverage SonarQube Cloud's quality gate asks of new code.
+  # passes. The full history lets it tell new code from old, and the
+  # coverage reports the test and browser jobs wrote, if any, give the
+  # coverage SonarQube Cloud's quality gate asks of new code. Each report
+  # arrives in coverage-download/<artifact>/.
   sonar:
-    needs: test
+    needs: [test, browser]
+    # It waits for the browser job too, so the browser tests' coverage
+    # counts; when no browser-test was asked for, that job is skipped.
+    if: always() && needs.test.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.browser.result)
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -163,9 +175,9 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         continue-on-error: true
         with:
-          name: coverage
+          pattern: coverage*
           path: coverage-download
-      # The report keeps the file name the test command gave it.
+      # The reports keep the file names the test commands gave them.
       - if: env.SONAR_TOKEN != ''
         id: report
         run: echo "paths=$(find coverage-download -type f 2>/dev/null | paste -sd, -)" >> "$GITHUB_OUTPUT"

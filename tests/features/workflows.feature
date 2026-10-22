@@ -58,6 +58,17 @@ Feature: The reusable workflows parse as GitHub reads them
       | rust-ci.yml   | functional | sonar.rust.lcov.reportPaths       |
       | rust-ci.yml   | functional | sonar.python.coverage.reportPaths |
       | node-ci.yml   | test       | sonar.javascript.lcov.reportPaths |
+      | python-ci.yml | browser    | sonar.python.coverage.reportPaths |
+      | node-ci.yml   | browser    | sonar.javascript.lcov.reportPaths |
+
+  Scenario Outline: A package's reusable workflow scans only once the browser tests' coverage is in
+    When I parse the workflow "<workflow>"
+    Then the sonar job waits for the browser job, and runs when it was skipped
+
+    Examples:
+      | workflow      |
+      | python-ci.yml |
+      | node-ci.yml   |
 
   Scenario: rust-ci measures coverage with the functional targets only when there is a scan to send it to
     When I parse the workflow "rust-ci.yml"

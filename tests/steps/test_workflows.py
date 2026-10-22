@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -150,15 +151,33 @@ def coverage_handed_over(workflow, name, prop):
                   if s.get("uses", "").startswith("actions/upload-artifact@"))
     assert upload["with"]["if-no-files-found"] == "ignore", upload
     inputs = triggers(workflow)["workflow_call"]["inputs"]
-    if "coverage-report" in inputs:
-        assert upload["with"]["path"] == "${{ inputs.coverage-report }}", upload
-    assert jobs["sonar"]["needs"] == name, jobs["sonar"]
+    report = "browser-coverage-report" if name == "browser" else "coverage-report"
+    if report in inputs:
+        assert upload["with"]["path"] == f"${{{{ inputs.{report} }}}}", upload
+    needs = jobs["sonar"]["needs"]
+    assert name in ([needs] if isinstance(needs, str) else needs), jobs["sonar"]
     download = next(s for s in jobs["sonar"]["steps"]
                     if s.get("uses", "").startswith("actions/download-artifact@"))
-    assert download["with"]["name"] == upload["with"]["name"], download
+    wanted = download["with"].get("name") or download["with"]["pattern"]
+    assert fnmatch.fnmatchcase(upload["with"]["name"], wanted), download
+    assert "merge-multiple" not in download["with"], "reports of the same name would overwrite each other"
     assert download.get("continue-on-error") is True, download
     scan = next(s for s in jobs["sonar"]["steps"] if "sonarqube-scan-action" in s.get("uses", ""))
     assert f"-D{prop}=" in scan["with"]["args"], scan["with"]["args"]
+
+
+@then("the sonar job waits for the browser job, and runs when it was skipped")
+def sonar_waits_for_browser(workflow):
+    jobs = workflow["data"]["jobs"]
+    sonar = jobs["sonar"]
+    assert "browser" in sonar["needs"], sonar["needs"]
+    tests = next(n for n in sonar["needs"] if n != "browser")
+    assert sonar["if"] == (
+        f"always() && needs.{tests}.result == 'success' && "
+        "contains(fromJSON('[\"success\", \"skipped\"]'), needs.browser.result)"), sonar["if"]
+    upload = next(s for s in jobs["browser"]["steps"]
+                  if s.get("uses", "").startswith("actions/upload-artifact@"))
+    assert upload["with"]["path"] == "${{ inputs.browser-coverage-report }}", upload
 
 
 @then("the functional job runs make coverage in place of make functional when given a SONAR_TOKEN")
