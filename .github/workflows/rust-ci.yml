@@ -311,18 +311,31 @@ jobs:
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - run: cargo --version && cargo test ${{ inputs.test-args }}
 
-  # Every lockfile in the repository (Cargo.lock, package-lock.json, the
-  # pip locks) against the OSV database, which gathers the RustSec, GitHub,
-  # PyPI and npm advisories, on every run. It has no switch.
+  # Every lockfile the repository commits (Cargo.lock, package-lock.json,
+  # the hash-locked pip requirements) against the OSV database, which
+  # gathers the RustSec, GitHub, PyPI and npm advisories, on every run. It
+  # has no switch. The lockfiles are named rather than found by a recursive
+  # scan, which would read a requirements.txt's lower bounds as pins.
   osv:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+      - id: locks
+        run: |
+          {
+            echo 'args<<EOF'
+            git ls-files '*Cargo.lock' '*package-lock.json' \
+              | sed 's/^/--lockfile=/'
+            git ls-files '*requirements.lock' | sed 's/^/--lockfile=requirements.txt:/'
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          git ls-files '*Cargo.lock' '*package-lock.json' '*requirements.lock' | grep -q . \
+            && echo "found=true" >> "$GITHUB_OUTPUT" \
+            || echo "::notice::No lockfile is committed, so OSV-Scanner has nothing to scan."
+      - if: steps.locks.outputs.found == 'true'
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
         with:
-          scan-args: |-
-            --recursive
-            ./
+          scan-args: ${{ steps.locks.outputs.args }}
 
   # A pull request that adds or moves a dependency to a version with a
   # known vulnerability fails here, before it merges. GitHub's dependency
