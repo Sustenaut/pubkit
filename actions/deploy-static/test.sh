@@ -40,7 +40,7 @@ DIR="$work/site/" DEPLOY_KEY=secret TARGET=deploy@example.eu:./ KNOWN_HOSTS="exa
 check "rsync copies the directory's contents" "rsync -rlvz --checksum --delete -e"
 check "rsync goes to the target" "$work/site/ deploy@example.eu:./"
 if grep -q ssh-keyscan "$work/calls"; then echo "FAIL: keyscan despite known-hosts"; failures=$((failures + 1)); fi
-if [ -e "$work/tmp/deploy-static-ssh" ]; then echo "FAIL: key left behind"; failures=$((failures + 1)); fi
+if [[ -e "$work/tmp/deploy-static-ssh" ]]; then echo "FAIL: key left behind"; failures=$((failures + 1)); fi
 
 # The server, without a host key: it is scanned from the target's host.
 : > "$work/calls"
@@ -66,4 +66,4 @@ else
   failures=$((failures + 1))
 fi
 
-[ "$failures" -eq 0 ]
+[[ "$failures" -eq 0 ]]

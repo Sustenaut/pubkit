@@ -10,7 +10,7 @@ trap 'rm -rf "$ssh_dir"' EXIT
 printf '%s\n' "$DEPLOY_KEY" > "$ssh_dir/key"
 chmod 600 "$ssh_dir/key"
 
-if [ -n "${KNOWN_HOSTS:-}" ]; then
+if [[ -n "${KNOWN_HOSTS:-}" ]]; then
   printf '%s\n' "$KNOWN_HOSTS" > "$ssh_dir/known_hosts"
 else
   host="${TARGET#*@}"
