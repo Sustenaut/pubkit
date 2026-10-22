@@ -151,6 +151,8 @@ def init(root: Path, kind: str, binary: str | None, project: str | None = None) 
 
 def sync(root: Path, check: bool) -> int:
     config = read_config(root)
+    from .hosting import settings  # noqa: PLC0415
+    settings(config)
     kind = config["kind"]
     every = templates(kind)
     stale = []

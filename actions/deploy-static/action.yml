@@ -1,0 +1,85 @@
+# Deploys a directory of static files to a web server, to Cloudflare Pages,
+# or to both, so either can serve the site (terraform/static-site chooses
+# which one its name points at). Build the files in an earlier step.
+#
+#   - uses: schryer/pubkit/actions/deploy-static@vX.Y.Z
+#     with:
+#       dir: site
+#       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+#       cloudflare-account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+#       cloudflare-project: example-site
+#       deploy-key: ${{ secrets.DEPLOY_KEY }}
+#       deploy-target: deploy@example.eu:./
+#       known-hosts: example.eu ssh-ed25519 AAAA...
+name: deploy-static
+description: Deploy a directory of static files to a web server over rsync, to Cloudflare Pages, or to both.
+
+inputs:
+  dir:
+    description: The directory to deploy, relative to the workspace. Its contents become the site's root.
+    required: true
+  deploy-key:
+    description: >
+      An SSH private key that may rsync into deploy-target, best one the
+      server restricts to that (a forced command). Leave empty when no
+      server has the site.
+    default: ''
+  deploy-target:
+    description: 'With deploy-key: the rsync destination, like deploy@example.eu:./'
+    default: ''
+  known-hosts:
+    description: >
+      With deploy-key: the server's host key, as a known_hosts line. Leave
+      empty to take whatever key the server offers (ssh-keyscan), which
+      trusts the network on every run.
+    default: ''
+  cloudflare-api-token:
+    description: >
+      A Cloudflare API token allowed to edit Cloudflare Pages. Leave empty
+      when the site is not on Cloudflare Pages.
+    default: ''
+  cloudflare-account-id:
+    description: 'With cloudflare-api-token: the Cloudflare account the Pages project is in.'
+    default: ''
+  cloudflare-project:
+    description: 'With cloudflare-api-token: the Pages project, which must already exist (terraform/static-site makes it).'
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Both steps refuse half their inputs, and the action refuses to deploy
+    # nowhere, so a missing secret fails the run instead of skipping a
+    # target without a word.
+    - name: Check the inputs
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        DEPLOY_KEY_SET: ${{ inputs.deploy-key != '' }}
+        TARGET: ${{ inputs.deploy-target }}
+        CLOUDFLARE_SET: ${{ inputs.cloudflare-api-token != '' }}
+        ACCOUNT: ${{ inputs.cloudflare-account-id }}
+        PROJECT: ${{ inputs.cloudflare-project }}
+      run: '"$GITHUB_ACTION_PATH/check-inputs.sh"'
+
+    - name: Deploy to the server
+      if: inputs.deploy-key != ''
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        DEPLOY_KEY: ${{ inputs.deploy-key }}
+        TARGET: ${{ inputs.deploy-target }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: '"$GITHUB_ACTION_PATH/deploy-server.sh"'
+
+    - name: Deploy to Cloudflare Pages
+      if: inputs.cloudflare-api-token != ''
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        # The names wrangler reads.
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        PROJECT: ${{ inputs.cloudflare-project }}
+        SOURCE: ${{ github.sha }}
+      run: '"$GITHUB_ACTION_PATH/deploy-pages.sh"'

@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.2 is released as v0.12.2 from commit 00b26ae71a45047103b00e6e994da27f52dcc93b.",
+      "content": "pubkit 0.12.3 is released as v0.12.3 from commit a88044594f5e85f891863170b933dbca30017305.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.2",
+            "0.12.3",
             "pubkit --version",
-            "pubkit 0.12.2",
-            "v0.12.2",
-            "00b26ae71a45047103b00e6e994da27f52dcc93b"
+            "pubkit 0.12.3",
+            "v0.12.3",
+            "a88044594f5e85f891863170b933dbca30017305"
           ]
         ]
       },
-      "scope": "the published release v0.12.2 of pubkit",
+      "scope": "the published release v0.12.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "00b26ae71a45047103b00e6e994da27f52dcc93b"
+          "revision": "a88044594f5e85f891863170b933dbca30017305"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.2 was released on 2026-10-22 from commit 00b26ae71a45047103b00e6e994da27f52dcc93b with these changes.",
+      "content": "pubkit 0.12.3 was released on 2026-10-22 from commit a88044594f5e85f891863170b933dbca30017305 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,42 +58,30 @@
         "rows": [
           [
             "added",
-            "Per-language update and security settings in pubkit.json: \"update\": {\"rust\", \"node\", \"python\"} turns each language's dependency updates in the nightly pull request on or off (\"update\": false turns them all off, leaving the pub* pins), and \"security\": {\"fuzz\": {\"rust\": false}} keeps a scheduled rust-ci run's fuzzing as brief as any other. With updates on, the nightly pull request also moves the npm packages within their package.json ranges and re-locks tests/requirements.lock. An unknown setting stops the nightly"
+            "Hosting modules, taken by tag as github.com/schryer/pubkit//terraform/<name>?ref=vX.Y.Z. terraform/hosting reads the hosting block of pubkit.json and writes every zone in it: its DNS at Hetzner, Cloudflare or both (multi-provider, with both providers' nameservers in the apex NS rrset, through terraform/dns-zone), its email records from its mail provider, and its sites: server addresses, Cloudflare Pages projects (served from Pages or a standby server) and Cloud Run sites' records, whose domain mappings terraform/cloud-run-sites makes, apart so a repository without Google Cloud needs no Google credentials"
           ],
           [
             "added",
-            "node-ci and python-ci run an audit job on every run, part of passed: npm audit of package-lock.json, and pip-audit of the hash-locked requirements (audit-requirements, by default tests/requirements.lock). A known advisory fails CI; there is no switch"
-          ],
-          [
-            "fixed",
-            "pubkit pins moves pubkit's pin in python-ci, node-ci and service-ci workflows too, not only rust-ci"
+            "A hosting block in pubkit.json holds every provider-specific fact the hosting modules use: providers, each named by the repository with a type pubkit supports (hetzner, cloudflare, google-cloud, mailbox-org) and its own settings, and zones, each naming the providers of its DNS, email and sites. pubkit sync and sync --check stop on a setting the block's types do not know, since Terraform would ignore it. TTLs default to a day for the apex NS rrset, an hour for email and five minutes for sites; ttl in the hosting block, a zone or a site overrides them, the nearest winning"
           ],
           [
             "added",
-            "OSV-Scanner (every lockfile, on every run) and GitHub dependency review (public pull requests) in rust-ci, node-ci and python-ci, both part of passed, with no switch"
+            "actions/deploy-static, a composite action that deploys a directory to a server over rsync (with a pinned host key, or one scanned each run) and to Cloudflare Pages through a pinned wrangler, or to both, and fails rather than deploy nowhere or to half a target"
           ],
           [
-            "added",
-            "security.dependabot in pubkit.json: pubkit sync and init write .github/dependabot.yml from its schedule, ecosystems and options (default: weekly GitHub Actions updates; false leaves the file to the repository), and security.sonar.args adds SonarQube Cloud properties to every sonar job"
-          ],
-          [
-            "added",
-            "Property tests: tests/requirements-pubkit.txt pins Hypothesis for every package, and pubkit's pytest plugin gives each Hypothesis property PUBKIT_FUZZ_RUNS inputs, with no deadline. python-ci and node-ci set it: fuzz-runs (100) on every push and pull request, fuzz-runs-scheduled (10000) on a scheduled run. security.fuzz now defaults to on for python and node, as for rust, and false keeps a scheduled run as brief as any other. A Node package's fast-check reads it through fc.configureGlobal"
-          ],
-          [
-            "added",
-            "pubkit protect also puts a ruleset on each repository's release tags (src/pubkit/tag-ruleset.json): nobody may create, move or delete a v* tag, and only GitHub Actions, where pubrel tag runs after a release pull request merges, may bypass it. protect --check reports a repository without it"
+            "internal",
+            "deploy-static's scripts use [[ ]] for their tests, as SonarQube Cloud asks (shelldre:S7688)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.2 of pubkit",
+      "scope": "the published release v0.12.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "00b26ae71a45047103b00e6e994da27f52dcc93b"
+          "revision": "a88044594f5e85f891863170b933dbca30017305"
         }
       ]
     }
