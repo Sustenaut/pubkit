@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "added",
-      "change": "python-ci and node-ci send the browser job's coverage to SonarQube Cloud too: the browser job uploads what browser-test writes to browser-coverage-report (default coverage/) as the coverage-browser artifact, and the sonar job waits for it, reading every coverage* artifact. A repository can move its browser tests out of the test command into browser-test, where they run beside the unit tests, without losing their coverage. Later jobs in the run can download the same coverage* artifacts"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
