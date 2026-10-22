@@ -4,8 +4,11 @@
 # with everything else, so this module holds no provider's names; Terraform
 # adds only what is known once things exist, a server's addresses.
 #
-# The root module configures the Terraform providers: hcloud, cloudflare
-# and google, each with the one account it deploys to.
+# The root module configures the Terraform providers, hcloud and
+# cloudflare, each with the one account it deploys to. A Cloud Run site's
+# record is here, but its domain mapping is in terraform/cloud-run-sites,
+# so a repository without Google Cloud needs no Google provider: unlike
+# the others, it will not start without credentials.
 
 locals {
   providers = var.config.providers
@@ -24,8 +27,7 @@ locals {
     }
   ]...)
 
-  pages_sites     = { for fqdn, site in local.sites : fqdn => site if site.kind == "pages" }
-  cloud_run_sites = { for fqdn, site in local.sites : fqdn => site if site.kind == "cloud-run" }
+  pages_sites = { for fqdn, site in local.sites : fqdn => site if site.kind == "pages" }
 
   # Where each site's name points: a CNAME, or a server's addresses.
   site_records = {
@@ -136,23 +138,4 @@ resource "cloudflare_pages_domain" "site" {
   account_id   = each.value.settings.account_id
   project_name = cloudflare_pages_project.site[each.key].name
   name         = each.key
-}
-
-# --- Cloud Run sites ---
-#
-# The service itself is the repository's own (its image, scaling and
-# access); this maps the site's name to it, and Google issues the
-# certificate once the CNAME points at the provider's domain_target.
-resource "google_cloud_run_domain_mapping" "site" {
-  for_each = local.cloud_run_sites
-
-  location = each.value.settings.region
-  name     = each.key
-
-  metadata {
-    namespace = each.value.settings.project
-  }
-  spec {
-    route_name = each.value.service
-  }
 }

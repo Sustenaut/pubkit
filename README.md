@@ -151,7 +151,7 @@ The provider types pubkit supports, and what each holds:
 | --- | --- | --- | --- |
 | `hetzner` | `dns.external_nameservers`: the names Hetzner also serves a zone from, which a registrar such as Hetzner's own (konsoleH) lists next to another provider's; without them the registrar gets the assigned ones | yes; the zone must already exist at Hetzner | `server`: A (and AAAA) records to a server's addresses |
 | `cloudflare` | `account_id` | yes; with Hetzner too, in multi-provider mode | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
-| `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a domain mapping to the Cloud Run `service` |
+| `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a CNAME to `domain_target`, and a domain mapping to the Cloud Run `service` (`terraform/cloud-run-sites`) |
 | `mailbox-org` | `mx` (`"priority host."`), `spf` (its mechanisms, such as `include:mailbox.org`), `dkim` (selector, in lowercase, to host) | no | no; a zone's `email.provider` |
 
 A zone's `dns` lists one or two providers that serve DNS, at most one of
@@ -167,7 +167,7 @@ provider's `kind`.
 A new provider of a known type is a new entry in `providers`; a repository
 on two Hetzner projects names both. A new type, such as another mail
 provider, needs pubkit to learn it once, in `src/pubkit/hosting.py` and
-`terraform/hosting`. Terraform ignores a setting its types do not name,
+`terraform/hosting` (or a module beside it). Terraform ignores a setting its types do not name,
 so `pubkit sync` (and `sync --check`, in CI) checks the block first and
 stops on anything it does not know.
 
@@ -175,7 +175,8 @@ stops on anything it does not know.
 
 The root module reads the block, gives the servers' addresses (known only
 once the servers exist), and configures the Terraform providers, each with
-the one account it deploys to:
+the one account it deploys to. A repository with Cloud Run sites adds
+`cloud-run-sites`:
 
 ```hcl
 module "hosting" {
@@ -186,21 +187,33 @@ module "hosting" {
     web = { ipv4 = module.web.ipv4, ipv6 = module.web.ipv6 }
   }
 }
+
+module "cloud_run_sites" {
+  source = "github.com/schryer/pubkit//terraform/cloud-run-sites?ref=vX.Y.Z"
+  config = jsondecode(file("${path.root}/pubkit.json")).hosting
+
+  # When the services are created in the same apply.
+  depends_on = [google_cloud_run_v2_service.pub_site]
+}
 ```
 
 Its outputs are `nameservers` (by zone, for the registrar),
 `cloudflare_zone_ids`, `records` (every rrset, by zone) and `sites` (by
 full name: provider, kind, address, and a Pages site's project and
 pages.dev name). `records` takes other rrsets, by zone, for anything the
-block does not describe. A Cloud Run site's service is the repository's
-own; the module maps the name to it, and the root module adds
-`depends_on` when the service is created in the same apply.
+block does not describe.
 
 The modules need Terraform 1.11 or newer, `hcloud` 1.69, `cloudflare` 5.28
-and `google` 7. A provider the block does not use needs no token or
-provider block.
+and `google` 7. `terraform/hosting` needs no Cloudflare token or provider
+block when no zone or site is at Cloudflare. The Google provider will not
+start without credentials, so the Cloud Run domain mappings are in their
+own module, which only a repository on Google Cloud takes.
 
-- **`terraform/hosting`:** the block above, zone by zone.
+- **`terraform/hosting`:** the block above, zone by zone: the records,
+  the Pages projects and their domains, and each zone's DNS.
+- **`terraform/cloud-run-sites`:** the Cloud Run sites' domain mappings,
+  each to its `service` in its provider's `project` and `region`; output
+  `domains`, with the records Google asks for.
 - **`terraform/dns-zone`:** one zone's rrsets in zone-file form (`name`
   relative, `"@"` for the apex; trailing dots, MX `"10 host."`, TXT
   quoted), at Hetzner, Cloudflare or both. With both, Cloudflare runs in

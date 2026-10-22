@@ -28,8 +28,6 @@ mock_provider "cloudflare" {
   }
 }
 
-mock_provider "google" {}
-
 variables {
   config = jsondecode(file("../testdata/pubkit.json")).hosting
   servers = {
@@ -102,15 +100,6 @@ run "zones" {
       cloudflare_pages_domain.site["docs.example.org"].project_name == "example-docs"
     )
     error_message = "Each Pages site has its project, in the provider's account, and its domain."
-  }
-
-  assert {
-    condition = (
-      google_cloud_run_domain_mapping.site["pub.example.eu"].location == "europe-north1" &&
-      google_cloud_run_domain_mapping.site["pub.example.eu"].metadata[0].namespace == "example-project" &&
-      google_cloud_run_domain_mapping.site["pub.example.eu"].spec[0].route_name == "pub-site"
-    )
-    error_message = "A Cloud Run site maps its name to its service, in the provider's project and region."
   }
 
   assert {
