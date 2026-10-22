@@ -19,6 +19,10 @@
     {
       "category": "added",
       "change": "security.dependabot in pubkit.json: pubkit sync and init write .github/dependabot.yml from its schedule, ecosystems and options (default: weekly GitHub Actions updates; false leaves the file to the repository), and security.sonar.args adds SonarQube Cloud properties to every sonar job"
+    },
+    {
+      "category": "added",
+      "change": "Property tests: tests/requirements-pubkit.txt pins Hypothesis for every package, and pubkit's pytest plugin gives each Hypothesis property PUBKIT_FUZZ_RUNS inputs, with no deadline. python-ci and node-ci set it: fuzz-runs (100) on every push and pull request, fuzz-runs-scheduled (10000) on a scheduled run. security.fuzz now defaults to on for python and node, as for rust, and false keeps a scheduled run as brief as any other. A Node package's fast-check reads it through fc.configureGlobal"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

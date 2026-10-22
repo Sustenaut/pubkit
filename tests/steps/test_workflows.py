@@ -201,6 +201,23 @@ def fuzz_setting(workflow):
     assert "pubkit.json" in run and "$LONG" in run and "seconds=$SHORT" in run
 
 
+@then(parsers.parse('its "{name}" job sets PUBKIT_FUZZ_RUNS before its tests, '
+                    'from security.fuzz.{language} on a scheduled run'))
+def property_runs(workflow, name, language):
+    data = workflow["data"]
+    steps = data["jobs"][name]["steps"]
+    at = next(i for i, s in enumerate(steps) if "PUBKIT_FUZZ_RUNS" in s.get("run", ""))
+    run = steps[at]["run"]
+    assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and f".{language}" in run
+    assert "runs=$SHORT" in run and "runs=$LONG" in run and '>> "$GITHUB_ENV"' in run
+    assert steps[at]["env"]["SHORT"] == "${{ inputs.fuzz-runs }}"
+    assert steps[at]["env"]["LONG"] == "${{ inputs.fuzz-runs-scheduled }}"
+    assert steps.index(next(s for s in steps if s.get("run") == "${{ inputs.test }}")) > at
+    inputs = data[True]["workflow_call"]["inputs"]
+    assert inputs["fuzz-runs"]["default"] == "100"
+    assert inputs["fuzz-runs-scheduled"]["default"] == "10000"
+
+
 @then(parsers.parse('its "{name}" job runs dependency review on public pull requests only'))
 def review_job(workflow, name):
     job = workflow["data"]["jobs"][name]

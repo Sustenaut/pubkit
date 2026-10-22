@@ -96,6 +96,15 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "rust-ci.yml"
     Then its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run
 
+  Scenario Outline: A package's reusable workflow tries more property-test inputs on a schedule unless pubkit.json says not to
+    When I parse the workflow "<workflow>"
+    Then its "<job>" job sets PUBKIT_FUZZ_RUNS before its tests, from security.fuzz.<language> on a scheduled run
+
+    Examples:
+      | workflow      | job        | language |
+      | python-ci.yml | functional | python   |
+      | node-ci.yml   | test       | node     |
+
   Scenario Outline: A package's reusable workflow scans every lockfile with OSV-Scanner and reviews new dependencies
     When I parse the workflow "<workflow>"
     Then its "osv" job runs "google/osv-scanner-action" on every event

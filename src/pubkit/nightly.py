@@ -58,11 +58,11 @@ CI_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/(?:rust|python|node|ser
 # with: crates, npm packages, and the hash-locked Python requirements.
 LANGUAGES = ("rust", "node", "python")
 
-# What `update` and `security.fuzz` default to for each language. Fuzzing
-# runs only where pubkit has a fuzz job: Rust's, for now.
+# What `update` and `security.fuzz` default to for each language: all on.
+# Fuzzing is cargo-fuzz for Rust, and the property tests (Hypothesis,
+# fast-check) for Python and Node; on, a scheduled run fuzzes for longer.
 UPDATES = dict.fromkeys(LANGUAGES, True)
-FUZZ = {"rust": True, "node": False, "python": False}
-FUZZ_SUPPORTED = ("rust",)
+FUZZ = dict.fromkeys(LANGUAGES, True)
 
 # The keys `security` takes (security.py reads dependabot and sonar). The
 # advisory checks have none: they always run.
@@ -101,11 +101,6 @@ def settings(root: Path) -> dict[str, dict[str, bool]]:
         sys.exit(f"pubkit: pubkit.json's security has no setting {', '.join(unknown)}; "
                  f"it takes {', '.join(SECURITY)} (the advisory checks always run)")
     fuzz = by_language("security.fuzz", security.get("fuzz", {}), FUZZ)
-    unsupported = [lang for lang, on in fuzz.items()
-                   if on and lang not in FUZZ_SUPPORTED and lang in security.get("fuzz", {})]
-    if unsupported:
-        sys.exit(f"pubkit: pubkit has no fuzz job for {', '.join(unsupported)} yet; "
-                 f"security.fuzz can turn on {', '.join(FUZZ_SUPPORTED)}")
     from .security import dependabot_settings, sonar_settings  # noqa: PLC0415
     dependabot_settings(config)
     sonar_settings(config)

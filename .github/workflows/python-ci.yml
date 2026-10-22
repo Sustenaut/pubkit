@@ -8,6 +8,10 @@
 # The commands are inputs, so a repository with its own entry point (a
 # ./dev script, tox) keeps it; the defaults are pubkit.mk's targets.
 #
+# Hypothesis property tests try PUBKIT_FUZZ_RUNS inputs each, which pubkit's
+# pytest plugin reads: fuzz-runs on every push and pull request,
+# fuzz-runs-scheduled on a schedule (security.fuzz.python in pubkit.json).
+#
 # The audit job checks the hash-locked requirements against the Python
 # advisories (pip-audit) on every run, nightly included, and fails on any
 # finding. It has no switch.
@@ -26,6 +30,8 @@ on:
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
       audit-requirements: { type: string, default: tests/requirements.lock, description: "The hash-locked requirements files the audit job checks, space-separated." }
+      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBKIT_FUZZ_RUNS)." }
+      fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
@@ -42,6 +48,19 @@ jobs:
       - run: ${{ inputs.setup }}
       - if: inputs.sync-check
         run: .venv/bin/pubkit sync --check
+      # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
+      # inputs. A scheduled run tries more, unless pubkit.json sets
+      # "security": { "fuzz": { "python": false } }.
+      - run: |
+          runs=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .python else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            runs=$LONG
+          fi
+          echo "PUBKIT_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
+        env:
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-runs }}'
+          LONG: '${{ inputs.fuzz-runs-scheduled }}'
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

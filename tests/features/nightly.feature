@@ -44,12 +44,12 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then the body says nothing merges it
     And the body shows "zeroize 1.9.0 -> 1.9.1" with "cargo vet diff zeroize 1.8.2 1.9.1"
 
-  Scenario: A repository takes every language's updates and fuzzes Rust unless it says otherwise
-    Then the settings are update "rust, node, python" and fuzz "rust"
+  Scenario: A repository takes every language's updates and fuzzing unless it says otherwise
+    Then the settings are update "rust, node, python" and fuzz "rust, node, python"
     When the repository's pubkit.json reads '{"kind": "utility", "update": {"node": false}, "security": {"fuzz": {"rust": false}}}'
-    Then the settings are update "rust, python" and fuzz "none"
-    When the repository's pubkit.json reads '{"update": false}'
-    Then the settings are update "none" and fuzz "rust"
+    Then the settings are update "rust, python" and fuzz "node, python"
+    When the repository's pubkit.json reads '{"update": false, "security": {"fuzz": false}}'
+    Then the settings are update "none" and fuzz "none"
 
   Scenario: A setting pubkit does not know stops the nightly
     When the repository's pubkit.json reads '{"update": {"go": true}}'
@@ -62,8 +62,8 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then reading the nightly settings stops with "the advisory checks always run"
     When the repository's pubkit.json reads '{"security": []}'
     Then reading the nightly settings stops with "security must be an object"
-    When the repository's pubkit.json reads '{"security": {"fuzz": {"python": true}}}'
-    Then reading the nightly settings stops with "no fuzz job for python yet"
+    When the repository's pubkit.json reads '{"security": {"fuzz": {"go": true}}}'
+    Then reading the nightly settings stops with "security.fuzz has no language go"
 
   Scenario: A repository with no npm or Python lock gets no npm or Python updates
     Then the npm and Python updates are empty

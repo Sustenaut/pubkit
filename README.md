@@ -361,8 +361,7 @@ ecosystem's lock):
 | Setting | Default | Off means |
 |---|---|---|
 | `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
-| `security.fuzz.<language>` | `true` for `rust`, `false` otherwise | a scheduled `rust-ci.yml` run fuzzes for `fuzz-seconds`, as briefly as any other run, instead of `fuzz-seconds-scheduled`. pubkit has a fuzz job for Rust only, so turning `node` or `python` on stops the nightly with a message |
-
+| `security.fuzz.<language>` | `true` | a scheduled run fuzzes as briefly as any other: `rust-ci.yml` runs cargo-fuzz for `fuzz-seconds` instead of `fuzz-seconds-scheduled`, and `python-ci.yml` and `node-ci.yml` give each property test `fuzz-runs` inputs instead of `fuzz-runs-scheduled` (see [Property tests](#property-tests)) |
 | `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out |
 | `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input |
 
@@ -380,6 +379,31 @@ in a vulnerable version. The pub* pins also always come,
 so a governed repository keeps up with the standard. A repository's own CI
 runs on a schedule when its `ci.yml` has a `schedule:` trigger; the
 settings say what that run does.
+
+### Property tests
+
+Python and Node fuzz with property tests: a test states what holds for
+every input, and the library generates inputs to break it, shrinking any
+failure to a small example. Python's is [Hypothesis](https://hypothesis.readthedocs.io),
+which `tests/requirements-pubkit.txt` pins for every package; Node's is
+[fast-check](https://fast-check.dev), which a package adds to its own
+`devDependencies`.
+
+Each property tries `PUBKIT_FUZZ_RUNS` inputs, which `python-ci.yml` and
+`node-ci.yml` set: `fuzz-runs` (100) on every push and pull request, and
+`fuzz-runs-scheduled` (10000) on a scheduled run unless
+`security.fuzz.<language>` is `false`. pubkit's pytest plugin reads it for
+Hypothesis, with no deadline. fast-check reads no variable of its own, so a
+setup file the test command loads (`node --test --import ./tests/setup.mjs`,
+or Vitest's `setupFiles`) does:
+
+```js
+import fc from "fast-check";
+fc.configureGlobal({ numRuns: Number(process.env.PUBKIT_FUZZ_RUNS) || 100 });
+```
+
+A failing property prints the input that broke it; Hypothesis also prints a
+`@reproduce_failure` blob that replays it exactly.
 
 ## Locking
 
