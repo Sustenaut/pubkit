@@ -311,6 +311,28 @@ jobs:
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - run: cargo --version && cargo test ${{ inputs.test-args }}
 
+  # Every lockfile in the repository (Cargo.lock, package-lock.json, the
+  # pip locks) against the OSV database, which gathers the RustSec, GitHub,
+  # PyPI and npm advisories, on every run. It has no switch.
+  osv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: |-
+            --recursive
+            ./
+
+  # A pull request that adds or moves a dependency to a version with a
+  # known vulnerability fails here, before it merges. GitHub's dependency
+  # graph serves it for public repositories only.
+  review:
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
   # in a private repository or a pull request from a fork, it says so and
@@ -334,6 +356,10 @@ jobs:
         with:
           name: coverage
           path: coverage-download
+      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      - if: env.SONAR_TOKEN != ''
+        id: settings
+        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
       - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
@@ -343,6 +369,7 @@ jobs:
             -Dsonar.rust.lcov.reportPaths=coverage-download/lcov.info
             -Dsonar.python.coverage.reportPaths=coverage-download/*.xml
             ${{ inputs.sonar-args }}
+            ${{ steps.settings.outputs.args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a
   # required check, so requiring the jobs above directly would let a PR
@@ -352,7 +379,7 @@ jobs:
   # failed fails here through gates itself.
   passed:
     if: always()
-    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, toolchains, sonar]
+    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, osv, review, toolchains, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |

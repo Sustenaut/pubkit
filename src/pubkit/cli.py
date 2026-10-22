@@ -123,6 +123,12 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
         if (path.endswith(".py") and text.startswith("#!")) or path in EXECUTABLE:
             target.chmod(0o755)
         print(f"{'managed' if path in owned else 'seeded '}  {path}")
+    from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
+    if (generated := dependabot(config)) is not None:
+        target = root / DEPENDABOT_PATH
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(generated, encoding="utf-8")
+        print(f"managed  {DEPENDABOT_PATH}")
 
 
 def is_node(root: Path) -> bool:
@@ -148,8 +154,11 @@ def sync(root: Path, check: bool) -> int:
     kind = config["kind"]
     every = templates(kind)
     stale = []
-    for path in managed(kind):
-        want = render(every[path], values(config))
+    from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
+    wanted = [(path, render(every[path], values(config))) for path in managed(kind)]
+    if (generated := dependabot(config)) is not None:
+        wanted.append((DEPENDABOT_PATH, generated))
+    for path, want in wanted:
         target = root / path
         have = target.read_text(encoding="utf-8") if target.exists() else None
         if have == want:

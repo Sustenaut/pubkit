@@ -95,3 +95,15 @@ Feature: The reusable workflows parse as GitHub reads them
   Scenario: rust-ci fuzzes long on a schedule unless pubkit.json turns the long run off
     When I parse the workflow "rust-ci.yml"
     Then its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run
+
+  Scenario Outline: A package's reusable workflow scans every lockfile with OSV-Scanner and reviews new dependencies
+    When I parse the workflow "<workflow>"
+    Then its "osv" job runs "google/osv-scanner-action" on every event
+    And its "review" job runs dependency review on public pull requests only
+    And its passed job lets the review job be skipped
+
+    Examples:
+      | workflow      |
+      | rust-ci.yml   |
+      | node-ci.yml   |
+      | python-ci.yml |

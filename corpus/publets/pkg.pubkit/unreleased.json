@@ -11,6 +11,14 @@
     {
       "category": "fixed",
       "change": "pubkit pins moves pubkit's pin in python-ci, node-ci and service-ci workflows too, not only rust-ci"
+    },
+    {
+      "category": "added",
+      "change": "OSV-Scanner (every lockfile, on every run) and GitHub dependency review (public pull requests) in rust-ci, node-ci and python-ci, both part of passed, with no switch"
+    },
+    {
+      "category": "added",
+      "change": "security.dependabot in pubkit.json: pubkit sync and init write .github/dependabot.yml from its schedule, ecosystems and options (default: weekly GitHub Actions updates; false leaves the file to the repository), and security.sonar.args adds SonarQube Cloud properties to every sonar job"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

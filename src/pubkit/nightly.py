@@ -64,8 +64,9 @@ UPDATES = dict.fromkeys(LANGUAGES, True)
 FUZZ = {"rust": True, "node": False, "python": False}
 FUZZ_SUPPORTED = ("rust",)
 
-# The keys `security` takes. The advisory checks have none: they always run.
-SECURITY = ("fuzz",)
+# The keys `security` takes (security.py reads dependabot and sonar). The
+# advisory checks have none: they always run.
+SECURITY = ("fuzz", "dependabot", "sonar")
 
 
 def by_language(name: str, given: object, defaults: dict[str, bool]) -> dict[str, bool]:
@@ -105,6 +106,9 @@ def settings(root: Path) -> dict[str, dict[str, bool]]:
     if unsupported:
         sys.exit(f"pubkit: pubkit has no fuzz job for {', '.join(unsupported)} yet; "
                  f"security.fuzz can turn on {', '.join(FUZZ_SUPPORTED)}")
+    from .security import dependabot_settings, sonar_settings  # noqa: PLC0415
+    dependabot_settings(config)
+    sonar_settings(config)
     return {"update": by_language("update", config.get("update", {}), UPDATES), "fuzz": fuzz}
 
 

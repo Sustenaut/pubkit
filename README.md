@@ -350,7 +350,11 @@ ecosystem's lock):
 {
   "kind": "utility",
   "update": { "rust": true, "node": true, "python": false },
-  "security": { "fuzz": { "rust": true } }
+  "security": {
+    "fuzz": { "rust": true },
+    "dependabot": { "schedule": "weekly", "ecosystems": ["github-actions"] },
+    "sonar": { "args": "-Dsonar.exclusions=vendor/**" }
+  }
 }
 ```
 
@@ -359,13 +363,20 @@ ecosystem's lock):
 | `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
 | `security.fuzz.<language>` | `true` for `rust`, `false` otherwise | a scheduled `rust-ci.yml` run fuzzes for `fuzz-seconds`, as briefly as any other run, instead of `fuzz-seconds-scheduled`. pubkit has a fuzz job for Rust only, so turning `node` or `python` on stops the nightly with a message |
 
+| `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out |
+| `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input |
+
 A setting pubkit does not know stops the nightly with a message, rather
 than being ignored.
 
-Advisory checks have no setting. Every run of `rust-ci.yml` (cargo deny),
-`node-ci.yml` (`npm audit` of `package-lock.json`) and `python-ci.yml`
-(pip-audit of the hash-locked requirements) checks the advisories, the
-nightly included, and fails on a finding. The pub* pins also always come,
+Advisory checks have no setting. Every run of `rust-ci.yml`, `node-ci.yml`
+and `python-ci.yml`, the nightly included, checks the advisories and fails
+on a finding: OSV-Scanner reads every lockfile in the repository against
+the OSV database (RustSec, GitHub, PyPI and npm advisories), and each
+language adds its own check: cargo deny, `npm audit` of `package-lock.json`,
+or pip-audit of the hash-locked requirements. On a public repository's
+pull request, GitHub's dependency review also fails a change that brings
+in a vulnerable version. The pub* pins also always come,
 so a governed repository keeps up with the standard. A repository's own CI
 runs on a schedule when its `ci.yml` has a `schedule:` trigger; the
 settings say what that run does.

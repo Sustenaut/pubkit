@@ -199,3 +199,17 @@ def fuzz_setting(workflow):
                if "fuzz-smoke" in s.get("run", ""))
     assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and ".rust" in run
     assert "pubkit.json" in run and "$LONG" in run and "seconds=$SHORT" in run
+
+
+@then(parsers.parse('its "{name}" job runs dependency review on public pull requests only'))
+def review_job(workflow, name):
+    job = workflow["data"]["jobs"][name]
+    assert job["if"] == "github.event_name == 'pull_request' && !github.event.repository.private"
+    assert job["steps"][0]["uses"].startswith("actions/dependency-review-action@")
+    assert name in workflow["data"]["jobs"]["passed"]["needs"]
+
+
+@then("its passed job lets the review job be skipped")
+def review_may_skip(workflow):
+    run = workflow["data"]["jobs"]["passed"]["steps"][0]["run"]
+    assert '.key == "review"' in run or '.result == "skipped"' in run
