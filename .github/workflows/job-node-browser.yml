@@ -1,0 +1,40 @@
+# Node: the browser tests, on Playwright's Chromium installed with npx
+# --no-install, which runs only what the lock installed. What they write to
+# browser-coverage-report goes to the sonar job as the `coverage-browser`
+# artifact.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-node-browser
+
+on:
+  workflow_call:
+    inputs:
+      node-version: { type: string, default: '22' }
+      apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
+      setup: { type: string, default: npm ci --ignore-scripts --no-audit --no-fund, description: Installs the locked dependencies. }
+      browser-setup: { type: string, default: npx --no-install playwright install --with-deps chromium }
+      browser-coverage-report: { type: string, default: coverage/, description: "The coverage the browser test command writes, if any, which the sonar job reads with the test job's report." }
+      browser-test: { type: string, required: true, description: Runs the browser tests. }
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: '${{ inputs.node-version }}' }
+      - if: inputs.apt-packages != ''
+        run: sudo apt-get update && sudo apt-get install -y $APT
+        env: { APT: '${{ inputs.apt-packages }}' }
+      - run: ${{ inputs.setup }}
+      - run: ${{ inputs.browser-setup }}
+      - run: ${{ inputs.browser-test }}
+      # Its coverage joins the test job's, as an artifact of its own.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-browser
+          path: ${{ inputs.browser-coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1

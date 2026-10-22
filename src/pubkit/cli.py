@@ -64,6 +64,8 @@ def templates(kind: str, layers: tuple[str, ...] | None = None) -> dict[str, str
     out: dict[str, str] = {}
     for layer in layers or ("common", kind):
         root = resources.files("pubkit") / "templates" / layer
+        if not root.is_dir():  # a kind with no templates of its own, such as utility
+            continue
         stack = [(root, "")]
         while stack:
             node, prefix = stack.pop()
@@ -124,27 +126,28 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
             target.chmod(0o755)
         print(f"{'managed' if path in owned else 'seeded '}  {path}")
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
+    from .ci import generated as workflows  # noqa: PLC0415
+    written = workflows(config, root)
     if (generated := dependabot(config)) is not None:
-        target = root / DEPENDABOT_PATH
+        written.append((DEPENDABOT_PATH, generated))
+    for path, text in written:
+        target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(generated, encoding="utf-8")
-        print(f"managed  {DEPENDABOT_PATH}")
-
-
-def is_node(root: Path) -> bool:
-    """A Node package: a package.json, and no pyproject.toml beside it."""
-    return (root / "package.json").exists() and not (root / "pyproject.toml").exists()
+        target.write_text(text, encoding="utf-8")
+        print(f"managed  {path}")
 
 
 def init(root: Path, kind: str, binary: str | None, project: str | None = None) -> int:
-    config = {"kind": kind}
+    config: dict = {"kind": kind}
     if binary:
         config["bin"] = binary
     if kind == "service" and not project:
         sys.exit("pubkit: a service names the Bitwarden Secrets Manager project its secrets are in: --project=NAME")
-    # A Node package's seeded CI is node-ci.yml rather than python-ci.yml.
-    layers = ("common", kind, "node") if kind == "utility" and is_node(root) else None
-    init_files(root, config, layers, extra={"project": project or ""})
+    # A utility's CI is generated from the ci block (ci.py): Node's for a
+    # package.json without a pyproject.toml, Python's otherwise.
+    if kind == "utility":
+        config["ci"] = {}
+    init_files(root, config, extra={"project": project or ""})
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
 
@@ -157,9 +160,12 @@ def sync(root: Path, check: bool) -> int:
     every = templates(kind)
     stale = []
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
+    from .ci import generated as workflows, leftovers  # noqa: PLC0415
     wanted = [(path, render(every[path], values(config))) for path in managed(kind)]
+    wanted += workflows(config, root)
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
+    replaced = leftovers(config, root)
     for path, want in wanted:
         target = root / path
         have = target.read_text(encoding="utf-8") if target.exists() else None
@@ -175,6 +181,9 @@ def sync(root: Path, check: bool) -> int:
     lock = root / LOCK
     wheel = f"/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl"
     lock_stale = lock.exists() and wheel not in lock.read_text(encoding="utf-8")
+    for path in replaced:
+        print(f"pubkit: delete {path}: pubkit.json's ci block writes the workflows now",
+              file=sys.stderr)
     if check:
         for path in stale:
             print(f"pubkit: {path} differs from pubkit {__version__}'s; run `pubkit sync`",
@@ -182,7 +191,7 @@ def sync(root: Path, check: bool) -> int:
         if lock_stale:
             print(f"pubkit: {LOCK} does not pin pubkit {__version__}; run `pubkit lock`",
                   file=sys.stderr)
-        if stale or lock_stale:
+        if stale or lock_stale or replaced:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":

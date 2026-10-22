@@ -159,6 +159,22 @@ def record(root: Path, text: str, category: str = "internal") -> list[str]:
     return added
 
 
+def released_by_config(root: Path, pubrel: str, changes: list[str]) -> bool:
+    """Move the pubrel that pubkit.json's ci.release names to `pubrel`; True
+    when it moved. One the ci block leaves to pubkit moves with pubkit."""
+    path = root / "pubkit.json"
+    if not path.exists():
+        return False
+    config = json.loads(path.read_text(encoding="utf-8"))
+    release = config.get("ci", {}).get("release") if isinstance(config.get("ci"), dict) else None
+    if not isinstance(release, dict) or release.get("pubrel") in (None, pubrel):
+        return False
+    changes.append(f"pubkit.json: ci.release.pubrel {release['pubrel']} -> {pubrel}")
+    release["pubrel"] = pubrel
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
 def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
@@ -170,8 +186,14 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         if lock:
             lock_requirements(root)
         changes.append(f"pubkit {before} -> {__version__}")
+    if pubrel and released_by_config(root, pubrel, changes):
+        from .cli import sync  # noqa: PLC0415
+        sync(root, check=False)
+    from .ci import is_generated  # noqa: PLC0415
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
+        if is_generated(text):  # pubkit sync writes these, from pubkit.json
+            continue
         new = CI_PIN.sub(rf"\g<1>{__version__}", text)
         for pattern, version, what in ((RELEASE_PIN, pubrel, "pubrel release workflow"),
                                        (PUBREL_VERSION, pubrel, "pubrel-version"),

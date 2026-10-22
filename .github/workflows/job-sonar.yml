@@ -1,0 +1,57 @@
+# SonarQube Cloud's analysis, into the project OWNER_REPO of the
+# organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
+# in a private repository or a pull request from a fork, it says so and
+# passes. The full history lets it tell new code from old, and every
+# coverage* artifact of the run, each in coverage-download/<artifact>/,
+# gives the coverage SonarQube Cloud's quality gate asks of new code: the
+# files matching report-pattern go to report-property. Properties
+# pubkit.json adds (security.sonar.args) come after sonar-args.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-sonar
+
+on:
+  workflow_call:
+    inputs:
+      sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
+      report-property: { type: string, required: true, description: "The property the coverage reports go to, such as sonar.javascript.lcov.reportPaths." }
+      report-pattern: { type: string, default: '*', description: "The file names, as a find -name pattern, of the coverage reports to send." }
+    secrets:
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - if: env.SONAR_TOKEN == ''
+        run: echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 0 }
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          pattern: coverage*
+          path: coverage-download
+      # The reports keep the file names the test commands gave them.
+      - if: env.SONAR_TOKEN != ''
+        id: report
+        run: echo "paths=$(find coverage-download -type f -name "$PATTERN" 2>/dev/null | paste -sd, -)" >> "$GITHUB_OUTPUT"
+        env: { PATTERN: '${{ inputs.report-pattern }}' }
+      - if: env.SONAR_TOKEN != ''
+        id: settings
+        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+      - if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        with:
+          args: >-
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -D${{ inputs.report-property }}=${{ steps.report.outputs.paths }}
+            ${{ inputs.sonar-args }}
+            ${{ steps.settings.outputs.args }}

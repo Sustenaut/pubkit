@@ -1,0 +1,56 @@
+# Python: the hash-locked environment, pubkit sync --check, and the
+# functional suite, whose coverage report goes to the sonar job as the
+# `coverage` artifact. Hypothesis property tests try PUBKIT_FUZZ_RUNS inputs
+# each: fuzz-runs, or fuzz-runs-scheduled on a schedule.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-python-functional
+
+on:
+  workflow_call:
+    inputs:
+      python-version: { type: string, default: '3.14' }
+      apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
+      setup: { type: string, default: make venv, description: Creates .venv from the hash-locked requirements. }
+      test: { type: string, default: make functional, description: Runs the default scenarios. }
+      sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+      coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
+      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBKIT_FUZZ_RUNS)." }
+      fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }
+
+jobs:
+  functional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: { python-version: '${{ inputs.python-version }}' }
+      - if: inputs.apt-packages != ''
+        run: sudo apt-get update && sudo apt-get install -y $APT
+        env: { APT: '${{ inputs.apt-packages }}' }
+      - run: ${{ inputs.setup }}
+      - if: inputs.sync-check
+        run: .venv/bin/pubkit sync --check
+      # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
+      # inputs. A scheduled run tries more, unless pubkit.json sets
+      # "security": { "fuzz": { "python": false } }.
+      - run: |
+          runs=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .python else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            runs=$LONG
+          fi
+          echo "PUBKIT_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
+        env:
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-runs }}'
+          LONG: '${{ inputs.fuzz-runs-scheduled }}'
+      - run: ${{ inputs.test }}
+      # The sonar job runs elsewhere, so the report goes to it as an artifact.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: ${{ inputs.coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1

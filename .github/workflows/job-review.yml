@@ -1,0 +1,20 @@
+# A pull request's dependency changes against GitHub's advisories. pubkit
+# puts it in the pull request workflow only, and only for a public
+# repository, where GitHub's dependency graph serves it.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-review
+
+on:
+  workflow_call:
+
+jobs:
+  # A pull request that adds or moves a dependency to a version with a
+  # known vulnerability fails here, before it merges. GitHub's dependency
+  # graph serves it for public repositories only.
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
