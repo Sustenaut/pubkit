@@ -1,0 +1,14 @@
+{
+  "name": "release tags only from CI",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "exclude": [], "include": ["refs/tags/v*"] } },
+  "rules": [
+    { "type": "creation" },
+    { "type": "update" },
+    { "type": "deletion" }
+  ],
+  "bypass_actors": [
+    { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+  ]
+}

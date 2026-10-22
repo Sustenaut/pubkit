@@ -1,8 +1,9 @@
-Feature: Every repository's main branch carries pubkit's one ruleset
-  src/pubkit/ruleset.json is the ruleset, shipped in the wheel. Which
+Feature: Every repository carries pubkit's rulesets, on main and on its release tags
+  src/pubkit/ruleset.json is main's ruleset, and tag-ruleset.json the
+  release tags', both shipped in the wheel. Which
   repositories carry it, with the checks each requires, is local: a
   protected.json (pubkit's own sits at its root), or --require. `pubkit protect` creates or
-  updates the ruleset through the GitHub API, and `pubkit protect --check`
+  updates the rulesets through the GitHub API, and `pubkit protect --check`
   reports how a repository differs, changing nothing.
 
   Scenario: The ruleset keeps main to pull requests that passed their checks
@@ -11,6 +12,12 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     And it blocks deleting and force-pushing the branch
     And it takes changes only by pull request, with no approval needed
     And it requires "ci / passed" from GitHub Actions and "SonarCloud Code Analysis" from SonarCloud
+
+  Scenario: The tag ruleset leaves release tags to CI alone
+    When I build the tag ruleset
+    Then it targets the tags "refs/tags/v*"
+    And it blocks creating, moving and deleting them
+    And only GitHub Actions may bypass it
 
   Scenario: protected.json covers every governed repository
     When I read pubkit's protected.json
@@ -22,8 +29,10 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     And GitHub has no ruleset in "schryer/foo"
     When I run pubkit "protect" "--config" "protected.json"
     Then it succeeds
-    And it prints "schryer/foo: created"
+    And it prints "schryer/foo: created "main changes by pull request, after CI""
+    And it prints "schryer/foo: created "release tags only from CI""
     And GitHub was sent the ruleset for "schryer/foo" requiring "ci / passed, release / release"
+    And GitHub was sent the tag ruleset for "schryer/foo"
 
   Scenario: protect --check reports a ruleset that differs, and changes nothing
     Given protected.json lists "schryer/foo" requiring "ci / passed"
@@ -42,13 +51,23 @@ Feature: Every repository's main branch carries pubkit's one ruleset
     Then it succeeds
     And it prints "schryer/foo: updated "main""
     And GitHub was sent the ruleset for "schryer/foo" requiring "ci / passed", replacing "main"
+    And it prints "schryer/foo: "release tags only from CI" up to date"
 
   Scenario: A ruleset that matches is up to date, whatever GitHub adds to it
     Given protected.json lists "schryer/foo" requiring "ci / passed"
     And GitHub has pubkit's ruleset in "schryer/foo" requiring "ci / passed"
     When I run pubkit "protect" "--config" "protected.json" "--check"
     Then it succeeds
-    And it prints "schryer/foo: up to date"
+    And it prints "schryer/foo: "main changes by pull request, after CI" up to date"
+    And it prints "schryer/foo: "release tags only from CI" up to date"
+
+  Scenario: protect --check reports release tags without pubkit's tag ruleset
+    Given protected.json lists "schryer/foo" requiring "ci / passed"
+    And GitHub has only main's ruleset in "schryer/foo" requiring "ci / passed"
+    When I run pubkit "protect" "--config" "protected.json" "--check"
+    Then it fails
+    And it prints "schryer/foo: no ruleset on its release tags"
+    And GitHub was sent nothing
 
   Scenario: protect names the line to add for a repository protected.json lacks
     Given protected.json lists "schryer/foo" requiring "ci / passed"
