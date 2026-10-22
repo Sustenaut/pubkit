@@ -69,6 +69,11 @@ def contains(repo, path, text):
     assert text in (repo / path).read_text()
 
 
+@then(parsers.parse('"{path}" does not contain "{text}"'))
+def lacks(repo, path, text):
+    assert text not in (repo / path).read_text()
+
+
 @given(parsers.re(r'pubkit (?P<args>(?:"[^"]*" ?)+) has run'))
 def has_run(repo, run, args):
     argv = args.strip().strip('"').split('" "')

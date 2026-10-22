@@ -7,6 +7,14 @@
 #
 # The commands are inputs, so a repository with its own entry point (a
 # ./dev script, tox) keeps it; the defaults are pubkit.mk's targets.
+#
+# Hypothesis property tests try PUBKIT_FUZZ_RUNS inputs each, which pubkit's
+# pytest plugin reads: fuzz-runs on every push and pull request,
+# fuzz-runs-scheduled on a schedule (security.fuzz.python in pubkit.json).
+#
+# The audit job checks the hash-locked requirements against the Python
+# advisories (pip-audit) on every run, nightly included, and fails on any
+# finding. It has no switch.
 name: python-ci
 
 on:
@@ -21,6 +29,9 @@ on:
       sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
+      audit-requirements: { type: string, default: tests/requirements.lock, description: "The hash-locked requirements files the audit job checks, space-separated." }
+      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBKIT_FUZZ_RUNS)." }
+      fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
@@ -37,6 +48,19 @@ jobs:
       - run: ${{ inputs.setup }}
       - if: inputs.sync-check
         run: .venv/bin/pubkit sync --check
+      # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
+      # inputs. A scheduled run tries more, unless pubkit.json sets
+      # "security": { "fuzz": { "python": false } }.
+      - run: |
+          runs=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .python else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            runs=$LONG
+          fi
+          echo "PUBKIT_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
+        env:
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-runs }}'
+          LONG: '${{ inputs.fuzz-runs-scheduled }}'
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -59,6 +83,54 @@ jobs:
       - run: ${{ inputs.setup }}
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
+
+  # Every locked requirement against the Python advisories, by pip-audit,
+  # which reads the files without installing them.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: { python-version: '${{ inputs.python-version }}' }
+      - uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: ${{ inputs.audit-requirements }}
+          require-hashes: true
+
+  # Every lockfile the repository commits (Cargo.lock, package-lock.json,
+  # the hash-locked pip requirements) against the OSV database, which
+  # gathers the RustSec, GitHub, PyPI and npm advisories, on every run. It
+  # has no switch. The lockfiles are named rather than found by a recursive
+  # scan, which would read a requirements.txt's lower bounds as pins.
+  osv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - id: locks
+        run: |
+          {
+            echo 'args<<EOF'
+            git ls-files '*Cargo.lock' '*package-lock.json' \
+              | sed 's/^/--lockfile=/'
+            git ls-files '*requirements.lock' | sed 's/^/--lockfile=requirements.txt:/'
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          git ls-files '*Cargo.lock' '*package-lock.json' '*requirements.lock' | grep -q . \
+            && echo "found=true" >> "$GITHUB_OUTPUT" \
+            || echo "::notice::No lockfile is committed, so OSV-Scanner has nothing to scan."
+      - if: steps.locks.outputs.found == 'true'
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: ${{ steps.locks.outputs.args }}
+
+  # A pull request that adds or moves a dependency to a version with a
+  # known vulnerability fails here, before it merges. GitHub's dependency
+  # graph serves it for public repositories only.
+  review:
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
@@ -83,6 +155,10 @@ jobs:
         with:
           name: coverage
           path: coverage-download
+      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      - if: env.SONAR_TOKEN != ''
+        id: settings
+        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
       - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
@@ -91,14 +167,16 @@ jobs:
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.python.coverage.reportPaths=coverage-download/*.xml
             ${{ inputs.sonar-args }}
+            ${{ steps.settings.outputs.args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a
   # required check, so this job always runs and passes only if every job it
   # needs succeeded -- the browser job may be skipped only when no
-  # browser-test was asked for.
+  # browser-test was asked for, and the review job off a public pull
+  # request.
   passed:
     if: always()
-    needs: [functional, browser, sonar]
+    needs: [functional, browser, audit, osv, review, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |
@@ -106,7 +184,8 @@ jobs:
           echo "$RESULTS" | jq -e --arg browser "$BROWSER" '
             all(to_entries[];
                 .value.result == "success"
-                or (.key == "browser" and $browser == "" and .value.result == "skipped"))' > /dev/null
+                or (.key == "browser" and $browser == "" and .value.result == "skipped")
+                or (.key == "review" and .value.result == "skipped"))' > /dev/null
         env:
           RESULTS: '${{ toJSON(needs) }}'
           BROWSER: '${{ inputs.browser-test }}'

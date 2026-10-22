@@ -8,7 +8,7 @@ import shutil
 
 from pytest_bdd import given, parsers, scenarios
 
-from pubkit import __version__
+from pubkit import __version__, security
 from pubkit.conform import DENY_BASELINE, SHARED_IMPORTS
 
 scenarios("conform.feature")
@@ -73,6 +73,7 @@ def conforming(repo, env):
         "deny.toml": deny_toml(),
         "supply-chain/config.toml": vet_config(),
         ".github/workflows/ci.yml": workflow(f"v{__version__}"),
+        ".github/dependabot.yml": security.dependabot({"kind": "rust"}),
         "release.json": json.dumps({"name": "demo", "corpus": "corpus", "key": KEY,
                                     "security": {"checks": [AUDIT_CHECK]}}),
     }

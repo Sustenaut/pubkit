@@ -22,7 +22,8 @@
 # - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.
 # - fuzz runs `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust: briefly on
-#   every change, longer on a schedule.
+#   every change, longer on a schedule unless pubkit.json sets
+#   `"security": { "fuzz": { "rust": false } }`.
 # - cross runs the tests under emulation on cross-targets: i686 (32-bit) and
 #   s390x (big-endian) by default, which find word-size and byte-order bugs.
 # - audit runs `make deny` and `make vet`.
@@ -51,7 +52,7 @@ on:
       msrv: { type: boolean, default: true, description: "Ignored: the msrv job runs whenever the standard requires it (RS-VER-02). Kept so callers that pass it keep working." }
       fuzz: { type: boolean, default: true, description: "Ignored: the fuzz job runs whenever the standard requires it (RS-FUZZ-01, RS-FUZZ-02). Kept so callers that pass it keep working." }
       fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
-      fuzz-seconds-scheduled: { type: number, default: 900, description: Seconds per fuzz target on a scheduled run. }
+      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
@@ -217,9 +218,19 @@ jobs:
           command -v cargo-fuzz >/dev/null && cargo-fuzz --version | grep -q " ${VERSION}$" \
             || cargo install --locked cargo-fuzz --version "$VERSION"
         env: { VERSION: '${{ inputs.cargo-fuzz-version }}' }
-      - run: make fuzz-smoke FUZZ_SECONDS="$SECONDS_PER_TARGET"
+      # A scheduled run fuzzes for longer, unless pubkit.json sets
+      # "security": { "fuzz": { "rust": false } }; then it fuzzes as briefly
+      # as any other.
+      - run: |
+          seconds=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            seconds=$LONG
+          fi
+          make fuzz-smoke FUZZ_SECONDS="$seconds"
         env:
-          SECONDS_PER_TARGET: ${{ github.event_name == 'schedule' && inputs.fuzz-seconds-scheduled || inputs.fuzz-seconds }}
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-seconds }}'
+          LONG: '${{ inputs.fuzz-seconds-scheduled }}'
 
   # Built for the target with its own gcc, run under qemu-user. Doctests
   # are not cross-compiled on stable Rust, so these run the unit and
@@ -300,6 +311,41 @@ jobs:
       - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - run: cargo --version && cargo test ${{ inputs.test-args }}
 
+  # Every lockfile the repository commits (Cargo.lock, package-lock.json,
+  # the hash-locked pip requirements) against the OSV database, which
+  # gathers the RustSec, GitHub, PyPI and npm advisories, on every run. It
+  # has no switch. The lockfiles are named rather than found by a recursive
+  # scan, which would read a requirements.txt's lower bounds as pins.
+  osv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - id: locks
+        run: |
+          {
+            echo 'args<<EOF'
+            git ls-files '*Cargo.lock' '*package-lock.json' \
+              | sed 's/^/--lockfile=/'
+            git ls-files '*requirements.lock' | sed 's/^/--lockfile=requirements.txt:/'
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+          git ls-files '*Cargo.lock' '*package-lock.json' '*requirements.lock' | grep -q . \
+            && echo "found=true" >> "$GITHUB_OUTPUT" \
+            || echo "::notice::No lockfile is committed, so OSV-Scanner has nothing to scan."
+      - if: steps.locks.outputs.found == 'true'
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: ${{ steps.locks.outputs.args }}
+
+  # A pull request that adds or moves a dependency to a version with a
+  # known vulnerability fails here, before it merges. GitHub's dependency
+  # graph serves it for public repositories only.
+  review:
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
   # in a private repository or a pull request from a fork, it says so and
@@ -323,6 +369,10 @@ jobs:
         with:
           name: coverage
           path: coverage-download
+      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      - if: env.SONAR_TOKEN != ''
+        id: settings
+        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
       - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
@@ -332,6 +382,7 @@ jobs:
             -Dsonar.rust.lcov.reportPaths=coverage-download/lcov.info
             -Dsonar.python.coverage.reportPaths=coverage-download/*.xml
             ${{ inputs.sonar-args }}
+            ${{ steps.settings.outputs.args }}
 
   # The one check a ruleset requires. A skipped job counts as passing a
   # required check, so requiring the jobs above directly would let a PR
@@ -341,7 +392,7 @@ jobs:
   # failed fails here through gates itself.
   passed:
     if: always()
-    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, toolchains, sonar]
+    needs: [plan, gates, test, functional, msrv, fuzz, cross, audit, osv, review, toolchains, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |

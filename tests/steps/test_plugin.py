@@ -39,6 +39,18 @@ def cleanups(ctx, a, b):
 @then("it fails anyway")
 def fails_anyway():
     raise AssertionError("on purpose")
+
+@then("a property holds for every integer")
+def every_integer():
+    from hypothesis import given, strategies as st
+    tried = []
+
+    @given(st.integers())
+    def check(n):
+        tried.append(n)
+
+    check()
+    Path(os.environ["CLEANUP_LOG"]).write_text(str(len(tried)))
 '''
 
 
@@ -76,6 +88,23 @@ def runs(outer):
 @when(parsers.parse('the suite runs with "{a}" "{b}"'), target_fixture="outcome")
 def runs_with(outer, a, b):
     return outer["pytester"].runpytest_subprocess(a, b)
+
+
+@when(parsers.parse('the suite runs with PUBKIT_FUZZ_RUNS "{runs}"'), target_fixture="outcome")
+def runs_fuzzing(outer, monkeypatch, runs):
+    monkeypatch.setenv("PUBKIT_FUZZ_RUNS", runs)
+    return outer["pytester"].runpytest_subprocess()
+
+
+@then(parsers.parse("the property tried {n:d} inputs"))
+def tried(outer, n):
+    assert outer["log"].read_text() == str(n)
+
+
+@then(parsers.parse('pytest stops with "{text}"'))
+def stops(outcome, text):
+    assert outcome.ret != 0
+    assert text in "\n".join(outcome.errlines), "\n".join(outcome.errlines)
 
 
 def count(outcome, key):

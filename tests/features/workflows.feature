@@ -81,3 +81,38 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "node-ci.yml"
     Then its setup input runs npm ci with --ignore-scripts
     And its browser-setup input runs npx with --no-install
+
+  Scenario Outline: A package's reusable workflow checks advisories on every run, with no switch
+    When I parse the workflow "<workflow>"
+    Then its "audit" job runs "<check>" on every event
+    And no input turns the audit job off
+
+    Examples:
+      | workflow      | check                                      |
+      | node-ci.yml   | npm audit --package-lock-only              |
+      | python-ci.yml | pypa/gh-action-pip-audit                   |
+
+  Scenario: rust-ci fuzzes long on a schedule unless pubkit.json turns the long run off
+    When I parse the workflow "rust-ci.yml"
+    Then its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run
+
+  Scenario Outline: A package's reusable workflow tries more property-test inputs on a schedule unless pubkit.json says not to
+    When I parse the workflow "<workflow>"
+    Then its "<job>" job sets PUBKIT_FUZZ_RUNS before its tests, from security.fuzz.<language> on a scheduled run
+
+    Examples:
+      | workflow      | job        | language |
+      | python-ci.yml | functional | python   |
+      | node-ci.yml   | test       | node     |
+
+  Scenario Outline: A package's reusable workflow scans every lockfile with OSV-Scanner and reviews new dependencies
+    When I parse the workflow "<workflow>"
+    Then its "osv" job runs "google/osv-scanner-action" on every event
+    And its "review" job runs dependency review on public pull requests only
+    And its passed job lets the review job be skipped
+
+    Examples:
+      | workflow      |
+      | rust-ci.yml   |
+      | node-ci.yml   |
+      | python-ci.yml |

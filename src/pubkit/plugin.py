@@ -13,7 +13,10 @@ It provides what each suite otherwise writes for itself:
   empty`), reading the `result` fixture a `when` step sets;
 - markers for every `@tag` the feature files carry, so `--strict-markers`
   catches a typo in a marker expression without each new tag being
-  registered by hand.
+  registered by hand;
+- Hypothesis's examples per property test from `PUBKIT_FUZZ_RUNS`, which
+  python-ci sets: a short run on every push and pull request, a long one on
+  the nightly schedule (`security.fuzz.python` in pubkit.json).
 
 A suite's own step with the same text takes precedence over these.
 """
@@ -164,7 +167,25 @@ def _features(config: pytest.Config) -> Path:
     return base / configured if configured else base
 
 
+def _hypothesis_runs() -> None:
+    """Load a Hypothesis profile running PUBKIT_FUZZ_RUNS examples per
+    property, with no deadline: on a shared CI runner timing is noise, and
+    the long run is the one that finds the slow inputs worth a look."""
+    raw = os.environ.get("PUBKIT_FUZZ_RUNS", "")
+    if not raw:
+        return
+    if not raw.isdigit() or int(raw) < 1:
+        raise pytest.UsageError(f"PUBKIT_FUZZ_RUNS must be a positive whole number, not {raw!r}")
+    try:
+        from hypothesis import settings  # noqa: PLC0415
+    except ImportError:
+        return
+    settings.register_profile("pubkit", max_examples=int(raw), deadline=None, print_blob=True)
+    settings.load_profile("pubkit")
+
+
 def pytest_configure(config: pytest.Config) -> None:
+    _hypothesis_runs()
     root = _features(config)
     tags: set[str] = set()
     if root.is_dir():

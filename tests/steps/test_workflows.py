@@ -177,3 +177,56 @@ def token_kept_out(workflow):
     job = workflow["data"]["jobs"]["functional"]
     text = yaml.safe_dump(job)
     assert "secrets.SONAR_TOKEN }}" not in text, "the functional job is given the token"
+
+
+@then(parsers.parse('its "{name}" job runs "{check}" on every event'))
+def audit_job(workflow, name, check):
+    job = workflow["data"]["jobs"][name]
+    assert "if" not in job
+    assert check in yaml.safe_dump(job["steps"])
+    assert name in workflow["data"]["jobs"]["passed"]["needs"]
+
+
+@then("no input turns the audit job off")
+def audit_unconditional(workflow):
+    steps = workflow["data"]["jobs"]["audit"]["steps"]
+    assert not any("if" in step for step in steps)
+
+
+@then("its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run")
+def fuzz_setting(workflow):
+    run = next(s["run"] for s in workflow["data"]["jobs"]["fuzz"]["steps"]
+               if "fuzz-smoke" in s.get("run", ""))
+    assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and ".rust" in run
+    assert "pubkit.json" in run and "$LONG" in run and "seconds=$SHORT" in run
+
+
+@then(parsers.parse('its "{name}" job sets PUBKIT_FUZZ_RUNS before its tests, '
+                    'from security.fuzz.{language} on a scheduled run'))
+def property_runs(workflow, name, language):
+    data = workflow["data"]
+    steps = data["jobs"][name]["steps"]
+    at = next(i for i, s in enumerate(steps) if "PUBKIT_FUZZ_RUNS" in s.get("run", ""))
+    run = steps[at]["run"]
+    assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and f".{language}" in run
+    assert "runs=$SHORT" in run and "runs=$LONG" in run and '>> "$GITHUB_ENV"' in run
+    assert steps[at]["env"]["SHORT"] == "${{ inputs.fuzz-runs }}"
+    assert steps[at]["env"]["LONG"] == "${{ inputs.fuzz-runs-scheduled }}"
+    assert steps.index(next(s for s in steps if s.get("run") == "${{ inputs.test }}")) > at
+    inputs = data[True]["workflow_call"]["inputs"]
+    assert inputs["fuzz-runs"]["default"] == "100"
+    assert inputs["fuzz-runs-scheduled"]["default"] == "10000"
+
+
+@then(parsers.parse('its "{name}" job runs dependency review on public pull requests only'))
+def review_job(workflow, name):
+    job = workflow["data"]["jobs"][name]
+    assert job["if"] == "github.event_name == 'pull_request' && !github.event.repository.private"
+    assert job["steps"][0]["uses"].startswith("actions/dependency-review-action@")
+    assert name in workflow["data"]["jobs"]["passed"]["needs"]
+
+
+@then("its passed job lets the review job be skipped")
+def review_may_skip(workflow):
+    run = workflow["data"]["jobs"]["passed"]["steps"][0]["run"]
+    assert '.key == "review"' in run or '.result == "skipped"' in run

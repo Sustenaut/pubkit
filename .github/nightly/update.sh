@@ -68,7 +68,7 @@ if [[ -n "$pr" ]]; then
   gh pr edit "$pr" --repo "$REPO" --body-file "$body"
 else
   url=$(gh pr create --repo "$REPO" --head "$branch" --base main \
-    --title "Nightly: latest pub* releases and audited crate updates" --body-file "$body")
+    --title "Nightly: latest pub* releases and dependency updates" --body-file "$body")
   pr=${url##*/}
 fi
 link="https://github.com/$REPO/pull/$pr"
@@ -78,21 +78,23 @@ if wait_ci "$head"; then
   notify "$REPO nightly <$link|#$pr> is green ($made). Merge it when you are ready."
   exit 0
 fi
-with_crates=$failed
+with_updates=$failed
 
-# Re-test the pins alone: if they pass, the crate updates caused the failure
-# and stay out.
-if [[ "$made" = "pins crates" ]]; then
-  git push -q --force origin HEAD~1:"$branch"
-  if wait_ci "$(git rev-parse HEAD~1)"; then
-    { cat "$body"; printf '\n## Crate updates dropped\n\nWith them CI failed (%s); without them it passes, so this pull request carries the pins alone.\n' "$with_crates"; } > "$body.new"
+# Re-test the pins alone: if they pass, the dependency updates caused the
+# failure and stay out.
+read -ra commits <<<"$made"
+if [[ "${commits[0]}" = pins ]] && [[ ${#commits[@]} -gt 1 ]]; then
+  pins=$(git rev-parse "HEAD~$(( ${#commits[@]} - 1 ))")
+  git push -q --force origin "$pins:$branch"
+  if wait_ci "$pins"; then
+    { cat "$body"; printf '\n## Dependency updates dropped\n\nWith them CI failed (%s); without them it passes, so this pull request carries the pins alone.\n' "$with_updates"; } > "$body.new"
     gh pr edit "$pr" --repo "$REPO" --body-file "$body.new"
-    notify "$REPO nightly <$link|#$pr> is green with the pub* pins alone: the crate updates failed CI ($with_crates) and were dropped. Merge it when you are ready."
+    notify "$REPO nightly <$link|#$pr> is green with the pub* pins alone: the dependency updates failed CI ($with_updates) and were dropped. Merge it when you are ready."
     exit 0
   fi
   git push -q --force origin "$head:$branch"
-  notify "$REPO nightly <$link|#$pr> fails, with the crate updates ($with_crates) and without them ($failed)."
+  notify "$REPO nightly <$link|#$pr> fails, with the dependency updates ($with_updates) and without them ($failed)."
   exit 1
 fi
-notify "$REPO nightly <$link|#$pr> fails: $with_crates"
+notify "$REPO nightly <$link|#$pr> fails: $with_updates"
 exit 1
