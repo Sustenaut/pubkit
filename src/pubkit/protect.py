@@ -1,4 +1,5 @@
-"""`pubkit protect`: one ruleset on the default branch of every repository.
+"""`pubkit protect`: pubkit's rulesets on every repository: one on the
+default branch, and one on the release tags.
 
 `ruleset.json` is the ruleset every pub* repository's main carries: no
 deletion, no force push, changes only by pull request (no approval needed,
@@ -9,9 +10,14 @@ configuration: a `protected.json` in the working directory, or one named
 with `--config`, or the repositories and `--require CHECK` on the command
 line. pubkit's own list is the protected.json in its checkout.
 
-`pubkit protect [REPO...]` creates the ruleset in each repository, or
-updates the one already on its default branch, renaming it, so a
-repository never carries two. It calls the GitHub API through `gh`, which
+`tag-ruleset.json`, also in the wheel, keeps the release tags (`v*`) to
+CI: nobody may create, move or delete one, and only GitHub Actions, where
+`pubrel tag` runs once a release pull request merges, may bypass it. A
+hand-pushed tag cannot release code that CI did not pass.
+
+`pubkit protect [REPO...]` creates each ruleset in each repository, or
+updates the one already on its default branch or its release tags,
+renaming it, so a repository never carries two. It calls the GitHub API through `gh`, which
 must be signed in as someone who administers the repositories.
 `pubkit protect --check` changes nothing: it prints how each repository
 differs, and fails when one does. `--config FILE` reads another list, such
@@ -39,9 +45,14 @@ LOCAL = "protected.json"
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
-def base() -> dict:
-    """pubkit's ruleset, without the checks."""
-    return json.loads(resources.files("pubkit").joinpath("ruleset.json").read_text(encoding="utf-8"))
+def base(name: str = "ruleset.json") -> dict:
+    """One of pubkit's rulesets; the default branch's is without its checks."""
+    return json.loads(resources.files("pubkit").joinpath(name).read_text(encoding="utf-8"))
+
+
+def tag_ruleset() -> dict:
+    """The ruleset every repository's release tags carry."""
+    return base("tag-ruleset.json")
 
 
 def ruleset(checks: list[str]) -> dict:
@@ -86,12 +97,18 @@ def on_default_branch(rs: dict) -> bool:
         {"~DEFAULT_BRANCH", "~ALL", "refs/heads/main"} & set(include))
 
 
-def current(api: Api, repo: str) -> list[dict]:
-    """The repository's own rulesets that govern its default branch."""
+def on_release_tags(rs: dict) -> bool:
+    include = rs.get("conditions", {}).get("ref_name", {}).get("include", [])
+    return rs.get("target") == "tag" and bool({"~ALL", "refs/tags/v*"} & set(include))
+
+
+def current(api: Api, repo: str, target: str = "branch") -> list[dict]:
+    """The repository's own rulesets that govern its default branch, or
+    with target "tag" its release tags."""
     listed = api("GET", f"repos/{repo}/rulesets?includes_parents=false", None) or []
     full = [api("GET", f"repos/{repo}/rulesets/{r['id']}", None)
-            for r in listed if r.get("target") == "branch"]
-    return [r for r in full if on_default_branch(r)]
+            for r in listed if r.get("target") == target]
+    return [r for r in full if (on_default_branch if target == "branch" else on_release_tags)(r)]
 
 
 def _rules(rs: dict) -> dict[str, dict]:
@@ -133,25 +150,33 @@ def differences(want: dict, have: dict) -> list[str]:
 
 
 def protect(api: Api, repo: str, checks: list[str], check: bool) -> tuple[list[str], bool]:
-    """Bring one repository to the ruleset; its report lines, and whether
+    """Bring one repository to both rulesets; its report lines, and whether
     it differed (with `check`) or could not be brought in line."""
-    want = ruleset(checks)
-    have = current(api, repo)
+    lines, bad = bring(api, repo, ruleset(checks), current(api, repo), "its default branch", check)
+    tag_lines, tag_bad = bring(api, repo, tag_ruleset(), current(api, repo, "tag"),
+                               "its release tags", check)
+    return lines + tag_lines, bad or tag_bad
+
+
+def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
+          check: bool) -> tuple[list[str], bool]:
+    """Bring the rulesets on `where` to `want`, as protect does."""
     if not have:
         if check:
-            return [f"{repo}: no ruleset on its default branch"], True
+            return [f"{repo}: no ruleset on {where}"], True
         api("POST", f"repos/{repo}/rulesets", want)
         return [f"{repo}: created \"{want['name']}\""], False
     named = [r for r in have if r.get("name") == want["name"]]
     target = (named or have)[0]
     others = [r for r in have if r is not target]
-    lines = [f"{repo}: also on its default branch, \"{r['name']}\" (id {r['id']}): "
+    lines = [f"{repo}: also on {where}, \"{r['name']}\" (id {r['id']}): "
              f"delete it in Settings, Rules, Rulesets" for r in others]
     diff = differences(want, target)
     if not diff:
-        return [f"{repo}: up to date", *lines], bool(others)
+        return [f"{repo}: \"{want['name']}\" up to date", *lines], bool(others)
     if check:
-        return [f"{repo}: differs from pubkit's ruleset", *(f"  {d}" for d in diff), *lines], True
+        return [f"{repo}: differs from pubkit's \"{want['name']}\"", *(f"  {d}" for d in diff),
+                *lines], True
     api("PUT", f"repos/{repo}/rulesets/{target['id']}", want)
     return [f"{repo}: updated \"{target['name']}\" (id {target['id']})",
             *(f"  was: {d}" for d in diff), *lines], bool(others)

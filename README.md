@@ -279,7 +279,7 @@ a release key labelled "pubfoo release key", its secret in the gitignored
 than 0.2.1, and prints the two steps it does not take itself: the lines
 that protect its main branch and add it to `protected.json` and `governed.json`.
 
-## Protecting main
+## Protecting main and the release tags
 
 Every repository's default branch carries the same ruleset,
 [`src/pubkit/ruleset.json`](src/pubkit/ruleset.json), which ships in the
@@ -291,7 +291,12 @@ requires, is local configuration, not part of pubkit:
     pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
-the default branch to match, renaming it. It calls the GitHub API through
+the default branch to match, renaming it. It does the same for the release
+tags' ruleset, [`src/pubkit/tag-ruleset.json`](src/pubkit/tag-ruleset.json):
+nobody may create, move or delete a `v*` tag, and only GitHub Actions may
+bypass it. So the one way to release is the signed one: `pubrel prepare`
+on your machine, then merging the release pull request, after which CI
+runs `pubrel tag` on main. A tag pushed by hand is refused. It calls the GitHub API through
 `gh`, signed in as the repositories' owner, since only an admin may change
 a ruleset. `--check` changes nothing: it prints how each repository
 differs, a setting GitHub adds with its own default aside, and fails when

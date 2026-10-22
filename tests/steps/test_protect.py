@@ -104,6 +104,28 @@ def requires(built, a, b):
                       {"context": b, "integration_id": 12526}]
 
 
+@when("I build the tag ruleset", target_fixture="built")
+def build_tags():
+    return protect.tag_ruleset()
+
+
+@then(parsers.parse('it targets the tags "{pattern}"'))
+def tags(built, pattern):
+    assert built["target"] == "tag" and built["enforcement"] == "active"
+    assert built["conditions"]["ref_name"]["include"] == [pattern]
+
+
+@then("it blocks creating, moving and deleting them")
+def blocks_tags(built):
+    assert {r["type"] for r in built["rules"]} == {"creation", "update", "deletion"}
+
+
+@then("only GitHub Actions may bypass it")
+def actions_bypass(built):
+    assert built["bypass_actors"] == [
+        {"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}]
+
+
 @when("I read pubkit's protected.json", target_fixture="entries")
 def read_protected():
     return json.loads((ROOT / "protected.json").read_text())["repositories"]
@@ -134,20 +156,35 @@ def no_ruleset(github, slug):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, []))
 
 
+def _tags():
+    rs = protect.tag_ruleset()
+    rs.update(id=8)
+    return rs
+
+
 @given(parsers.parse('GitHub has the ruleset "{name}" in "{slug}" requiring "{checks}"'))
 def has_ruleset(github, name, slug, checks):
     rs = protect.ruleset(_checks(checks))
     rs.update(id=7, name=name)
-    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs]))
+    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs, _tags()]))
 
 
-@given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}"'))
-def has_pubkit_ruleset(github, slug, checks):
+def _pubkit_ruleset(slug, checks):
     rs = protect.ruleset(_checks(checks))
     rs.update(id=7, source=slug, current_user_can_bypass="never")
     # Settings GitHub adds with its own default are no difference.
     _rule(rs, "pull_request")["parameters"]["require_extra_approval_for_unattributed_changes"] = True
-    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs]))
+    return rs
+
+
+@given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}"'))
+def has_pubkit_ruleset(github, slug, checks):
+    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubkit_ruleset(slug, checks), _tags()]))
+
+
+@given(parsers.parse('GitHub has only main\'s ruleset in "{slug}" requiring "{checks}"'))
+def has_main_only(github, slug, checks):
+    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubkit_ruleset(slug, checks)]))
 
 
 @given(parsers.parse('GitHub rejects the ruleset for "{slug}" because "{reason}"'))
@@ -167,12 +204,19 @@ def _sent(github):
 @then(parsers.re(r'GitHub was sent the ruleset for "(?P<slug>[^"]+)" requiring "(?P<checks>[^"]+)"'
                  r'(?:, replacing "(?P<old>[^"]+)")?$'))
 def sent_ruleset(github, slug, checks, old):
-    (call,) = _sent(github)
+    (call,) = [c for c in _sent(github) if c["body"]["target"] == "branch"]
     assert call["body"] == protect.ruleset(_checks(checks))
     if old:
         assert (call["method"], call["url"]) == ("PUT", f"repos/{slug}/rulesets/7")
     else:
         assert (call["method"], call["url"]) == ("POST", f"repos/{slug}/rulesets")
+
+
+@then(parsers.parse('GitHub was sent the tag ruleset for "{slug}"'))
+def sent_tags(github, slug):
+    (call,) = [c for c in _sent(github) if c["body"]["target"] == "tag"]
+    assert (call["method"], call["url"], call["body"]) == (
+        "POST", f"repos/{slug}/rulesets", protect.tag_ruleset())
 
 
 @then("GitHub was sent nothing")
