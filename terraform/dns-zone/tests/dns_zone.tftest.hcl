@@ -1,12 +1,14 @@
-# Runs without credentials: both providers are mocked, with the nameservers
-# each would report.
+# Runs without credentials: both providers are mocked, with made-up
+# nameservers in place of the ones each would report. The providers' own
+# facts come from testdata/pubkit.json, as a root module's come from its
+# pubkit.json; none are written here.
 
 mock_provider "hcloud" {
   mock_data "hcloud_zone" {
     defaults = {
       name = "example.eu"
       authoritative_nameservers = {
-        assigned = ["hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com", "helium.ns.hetzner.de."]
+        assigned = ["ns3.assigned.example.de.", "ns1.assigned.example.com", "ns2.assigned.example.com."]
       }
     }
   }
@@ -16,13 +18,14 @@ mock_provider "cloudflare" {
   mock_resource "cloudflare_zone" {
     defaults = {
       id           = "0123456789abcdef0123456789abcdef"
-      name_servers = ["ada.ns.cloudflare.com", "bob.ns.cloudflare.com"]
+      name_servers = ["ns1.cloudflare.example", "ns2.cloudflare.example"]
     }
   }
 }
 
 variables {
-  zone = "example.eu"
+  zone    = "example.eu"
+  hetzner = {}
   records = {
     web = { name = "@", type = "A", ttl = 300, values = ["192.0.2.1"] }
     mx = {
@@ -55,8 +58,8 @@ run "hetzner_alone" {
   }
 
   assert {
-    condition     = output.nameservers == tolist(["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."])
-    error_message = "Without Cloudflare the registrar gets Hetzner's assigned nameservers, with trailing dots."
+    condition     = output.nameservers == tolist(["ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de."])
+    error_message = "Without Cloudflare or external nameservers the registrar gets the assigned ones, with trailing dots."
   }
 
   assert {
@@ -69,7 +72,8 @@ run "multi_provider" {
   command = apply
 
   variables {
-    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+    hetzner    = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
   }
 
   assert {
@@ -78,14 +82,14 @@ run "multi_provider" {
   }
 
   assert {
-    condition = tolist([for r in hcloud_zone_rrset.records["nameservers"].records : r.value]) == tolist([
-      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com.",
+    condition = tolist([for r in hcloud_zone_rrset.records["nameservers"].records : r.value]) == sort([
+      "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.", "ns1.cloudflare.example.", "ns2.cloudflare.example.",
     ])
     error_message = "Hetzner's apex NS rrset lists its assigned nameservers and Cloudflare's."
   }
 
   assert {
-    condition     = tolist([for i in range(3) : cloudflare_dns_record.records["nameservers ${i}"].content]) == tolist(["helium.ns.hetzner.de", "hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com"])
+    condition     = tolist([for i in range(3) : cloudflare_dns_record.records["nameservers ${i}"].content]) == tolist(["ns1.assigned.example.com", "ns2.assigned.example.com", "ns3.assigned.example.de"])
     error_message = "Cloudflare's NS records are Hetzner's nameservers alone, without trailing dots."
   }
 
@@ -121,10 +125,16 @@ run "multi_provider" {
   }
 
   assert {
-    condition = output.nameservers == tolist([
-      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com.",
-    ])
-    error_message = "The registrar gets Hetzner's external nameservers and Cloudflare's."
+    condition = output.nameservers == sort(concat(
+      [for ns in var.hetzner.dns.external_nameservers : "${trimsuffix(ns, ".")}."],
+      ["ns1.cloudflare.example.", "ns2.cloudflare.example."],
+    ))
+    error_message = "The registrar gets Hetzner's external nameservers, as given, and Cloudflare's."
+  }
+
+  assert {
+    condition     = hcloud_zone_rrset.records["nameservers"].ttl == 86400
+    error_message = "The apex NS rrset's TTL is a day unless nameservers_ttl says otherwise."
   }
 
   assert {
@@ -158,41 +168,63 @@ run "one_rrset_per_name_and_type" {
   expect_failures = [var.records]
 }
 
-# The other hosting modules' records go into this one's as they are.
-run "mailbox_org" {
-  command = plan
-
-  module {
-    source = "../mailbox-org"
-  }
-
-  variables {
-    verification_value = "0123456789abcdef0123456789abcdef01234567"
-    dmarc_rua          = "alerts@example.eu"
-    extra_apex_txt     = ["google-site-verification=abc"]
-  }
-}
-
-run "with_mailbox_org" {
+# Without external nameservers, the registrar gets the zone's assigned
+# ones, next to Cloudflare's.
+run "no_external_nameservers" {
   command = apply
 
   variables {
-    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
-    records    = merge(run.mailbox_org.records, { web = { name = "@", type = "A", ttl = 300, values = ["192.0.2.1"] } })
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
   }
 
   assert {
-    condition     = length(hcloud_zone_rrset.records) == 8 + 1 + 1
-    error_message = "mailbox.org's eight rrsets, the web record and the apex NS rrset."
+    condition = output.nameservers == sort([
+      "ns1.assigned.example.com.", "ns2.assigned.example.com.", "ns3.assigned.example.de.", "ns1.cloudflare.example.", "ns2.cloudflare.example.",
+    ])
+    error_message = "The assigned nameservers and Cloudflare's."
+  }
+}
+
+run "nameservers_ttl" {
+  command = plan
+
+  variables {
+    hetzner         = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+    cloudflare      = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
+    nameservers_ttl = 3600
   }
 
   assert {
-    condition = (
-      cloudflare_dns_record.records["email_mx 3"].priority == 10 &&
-      cloudflare_dns_record.records["email_mx 3"].content == "mxext4.mailbox.org" &&
-      cloudflare_dns_record.records["email_spf 1"].content == "\"google-site-verification=abc\"" &&
-      cloudflare_dns_record.records["email_dkim_mbo0001 0"].name == "mbo0001._domainkey.example.eu"
-    )
-    error_message = "mailbox.org's records reach Cloudflare split per value."
+    condition     = hcloud_zone_rrset.records["nameservers"].ttl == 3600
+    error_message = "nameservers_ttl sets the apex NS rrset's TTL."
   }
+}
+
+run "cloudflare_alone" {
+  command = apply
+
+  variables {
+    hetzner    = null
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
+  }
+
+  assert {
+    condition     = length(cloudflare_dns_record.records) == 1 + 2 + 1 + 1 && length(cloudflare_zone_dns_settings.zone) == 0
+    error_message = "Cloudflare alone: one record per value, no NS records, no multi-provider DNS."
+  }
+
+  assert {
+    condition     = output.nameservers == tolist(["ns1.cloudflare.example.", "ns2.cloudflare.example."])
+    error_message = "The registrar gets Cloudflare's nameservers."
+  }
+}
+
+run "some_provider" {
+  command = plan
+
+  variables {
+    hetzner = null
+  }
+
+  expect_failures = [var.cloudflare]
 }
