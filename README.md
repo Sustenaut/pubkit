@@ -87,6 +87,108 @@ is given, and the repository's own tests when `test` is. No job has
 secrets. Its `passed` job is the one check a ruleset would require; private
 repositories on GitHub Free have no rulesets, so there it is a summary.
 
+## Hosting modules
+
+Terraform modules for a domain's DNS, its email and its static sites, and an
+action that deploys a static site, taken from this repository by tag. They
+are the setup `schryer-eu-infra` runs for schryer.eu, written once so every
+zone gets the same.
+
+```hcl
+module "mail" {
+  source             = "github.com/schryer/pubkit//terraform/mailbox-org?ref=vX.Y.Z"
+  verification_value = "0123..."                # the key mailbox.org shows for the domain
+  dmarc_rua          = "alerts@example.eu"
+  extra_apex_txt     = ["google-site-verification=..."]
+}
+
+module "docs" {
+  source                = "github.com/schryer/pubkit//terraform/static-site?ref=vX.Y.Z"
+  name                  = "docs"
+  zone                  = "example.eu"
+  cloudflare_account_id = var.cloudflare_account_id
+  pages_project         = "example-docs"
+  served_by             = "pages"               # or "server" while Pages is out
+  standby_ipv4          = module.web.ipv4
+  standby_ipv6          = module.web.ipv6
+}
+
+module "dns" {
+  source     = "github.com/schryer/pubkit//terraform/dns-zone?ref=vX.Y.Z"
+  zone       = "example.eu"
+  cloudflare = { account_id = var.cloudflare_account_id }   # null: Hetzner alone
+  records = merge(module.mail.records, module.docs.records, {
+    web = { name = "@", type = "A", ttl = 300, values = [module.web.ipv4] }
+  })
+}
+```
+
+- **`terraform/dns-zone`:** every record of one zone, as rrsets in
+  zone-file form (`name` relative, `"@"` for the apex; trailing dots, MX
+  `"10 host."`, TXT quoted), written to the existing Hetzner zone. With
+  `cloudflare` set, Cloudflare serves the same zone too, in multi-provider
+  mode: the module creates the Cloudflare zone, writes one unproxied record
+  per value (MX split into priority and host), and puts both providers'
+  nameservers in the apex NS rrset at both. `nameservers` is the list for
+  the registrar; `hetzner_nameservers` and `cloudflare_zone_id` are outputs
+  too. Hetzner keeps one rrset per name and type, so the module refuses two
+  entries for the same pair, and the key `nameservers` is its own.
+- **`terraform/mailbox-org`:** no resources; its `records` output is
+  mailbox.org's MX, SPF, DKIM, DMARC and verification rrsets, to merge into
+  `dns-zone`'s. Other apex TXT values go in `extra_apex_txt`, since they
+  share SPF's rrset. `dmarc_policy` starts at `none`.
+- **`terraform/static-site`:** a Cloudflare Pages project (production
+  branch `main`, no Git connection) and its custom domain, and a `records`
+  output pointing the name at it, or, with `served_by = "server"`, at the
+  standby server's addresses. `project_name`, `subdomain` and `url` are
+  outputs.
+- **`actions/deploy-static`:** deploys a directory to a server over rsync
+  (`deploy-key`, `deploy-target`, and `known-hosts`, the server's pinned
+  host key; without it the key is scanned on every run), to Cloudflare
+  Pages (`cloudflare-api-token`, `cloudflare-account-id`,
+  `cloudflare-project`, with wrangler pinned), or to both. It fails rather
+  than deploy nowhere or to half a target.
+
+  ```yaml
+  - uses: schryer/pubkit/actions/deploy-static@vX.Y.Z
+    with:
+      dir: site
+      cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+      cloudflare-account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      cloudflare-project: example-docs
+      deploy-key: ${{ secrets.DEPLOY_KEY }}
+      deploy-target: deploy@example.eu:./
+      known-hosts: example.eu ssh-ed25519 AAAA...
+  ```
+
+The root module configures the `hcloud` and `cloudflare` providers; the
+modules need Terraform 1.11 or newer, `hcloud` 1.69 and `cloudflare` 5.28.
+With `cloudflare = null`, `dns-zone` creates nothing at Cloudflare and the
+root module needs no Cloudflare token or provider block (init still fetches
+the provider).
+
+**Moving a zone that is already in use.** Hetzner made the apex NS rrset
+with the zone, so the first apply with `cloudflare` set must take it over
+rather than create it, with an import block in the root module (this is
+what schryer-eu-infra needed):
+
+```hcl
+import {
+  to = module.dns.hcloud_zone_rrset.records["nameservers"]
+  id = "example.eu/@/NS"
+}
+```
+
+Records a root module already manages move with `moved` blocks to
+`module.dns.hcloud_zone_rrset.records["<key>"]`, or with import blocks like
+the one above when they were written as separate resources. The keys
+`mailbox-org` and `static-site` use (`email_mx`, `recipes`, `recipes_a`,
+...) are the ones schryer-eu-infra's `local.records` uses.
+
+Each module's tests (`terraform test` in its directory) mock the providers
+and need no credentials; CI runs them on Terraform 1.11, with `fmt`,
+`validate`, and the action's scripts under shellcheck and stubs.
+
 ## The supply-chain report
 
 `pubkit supply-chain CRATE...` writes each crate's `SUPPLY-CHAIN.md` beside

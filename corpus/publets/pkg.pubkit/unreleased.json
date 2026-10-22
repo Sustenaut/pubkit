@@ -1,4 +1,13 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "Hosting modules, taken by tag as github.com/schryer/pubkit//terraform/<name>?ref=vX.Y.Z: dns-zone writes a zone's records (rrsets in zone-file form) to its Hetzner zone and, with cloudflare set, to a Cloudflare zone in multi-provider mode as well, with both providers' nameservers in the apex NS rrset; mailbox-org outputs mailbox.org's MX, SPF, DKIM, DMARC and verification records; static-site makes a Cloudflare Pages project and domain and points the name at it or, with served_by = \"server\", at a standby server"
+    },
+    {
+      "category": "added",
+      "change": "actions/deploy-static, a composite action that deploys a directory to a server over rsync (with a pinned host key, or one scanned each run) and to Cloudflare Pages through a pinned wrangler, or to both, and fails rather than deploy nowhere or to half a target"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

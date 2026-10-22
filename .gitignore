@@ -6,3 +6,7 @@ __pycache__/
 .pytest_cache/
 /corpus/.publet/
 coverage/
+
+# Terraform modules: providers fetched by init, and locks, which only a root module keeps.
+.terraform/
+.terraform.lock.hcl
