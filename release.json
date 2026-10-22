@@ -14,7 +14,9 @@
     ".github/workflows/rust-ci.yml",
     ".github/workflows/node-ci.yml",
     "plugins/",
-    ".claude-plugin/"
+    ".claude-plugin/",
+    "terraform/",
+    "actions/"
   ],
   "command": {
     "name": "pubkit",

@@ -1,0 +1,198 @@
+# Runs without credentials: both providers are mocked, with the nameservers
+# each would report.
+
+mock_provider "hcloud" {
+  mock_data "hcloud_zone" {
+    defaults = {
+      name = "example.eu"
+      authoritative_nameservers = {
+        assigned = ["hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com", "helium.ns.hetzner.de."]
+      }
+    }
+  }
+}
+
+mock_provider "cloudflare" {
+  mock_resource "cloudflare_zone" {
+    defaults = {
+      id           = "0123456789abcdef0123456789abcdef"
+      name_servers = ["ada.ns.cloudflare.com", "bob.ns.cloudflare.com"]
+    }
+  }
+}
+
+variables {
+  zone = "example.eu"
+  records = {
+    web = { name = "@", type = "A", ttl = 300, values = ["192.0.2.1"] }
+    mx = {
+      name   = "@"
+      type   = "MX"
+      ttl    = 3600
+      values = ["10 mxext1.example.org.", "20 mxext2.example.org."]
+    }
+    spf  = { name = "@", type = "TXT", ttl = 3600, values = ["\"v=spf1 -all\""] }
+    docs = { name = "docs", type = "CNAME", ttl = 300, values = ["docs.example.org."] }
+  }
+}
+
+run "hetzner_alone" {
+  command = plan
+
+  assert {
+    condition     = length(hcloud_zone_rrset.records) == 4
+    error_message = "Each record is one Hetzner rrset, and the apex NS rrset is left alone."
+  }
+
+  assert {
+    condition     = tolist([for r in hcloud_zone_rrset.records["mx"].records : r.value]) == tolist(["10 mxext1.example.org.", "20 mxext2.example.org."])
+    error_message = "Hetzner takes the values in zone-file form."
+  }
+
+  assert {
+    condition     = length(cloudflare_zone.zone) == 0 && length(cloudflare_dns_record.records) == 0
+    error_message = "No Cloudflare resources without var.cloudflare."
+  }
+
+  assert {
+    condition     = output.nameservers == tolist(["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."])
+    error_message = "Without Cloudflare the registrar gets Hetzner's assigned nameservers, with trailing dots."
+  }
+
+  assert {
+    condition     = output.cloudflare_zone_id == null
+    error_message = "No Cloudflare zone id without Cloudflare."
+  }
+}
+
+run "multi_provider" {
+  command = apply
+
+  variables {
+    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+  }
+
+  assert {
+    condition     = cloudflare_zone.zone[0].type == "full" && cloudflare_zone_dns_settings.zone[0].multi_provider
+    error_message = "Cloudflare serves the full zone, with multi-provider DNS on."
+  }
+
+  assert {
+    condition = tolist([for r in hcloud_zone_rrset.records["nameservers"].records : r.value]) == tolist([
+      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com.",
+    ])
+    error_message = "Hetzner's apex NS rrset lists its assigned nameservers and Cloudflare's."
+  }
+
+  assert {
+    condition     = tolist([for i in range(3) : cloudflare_dns_record.records["nameservers ${i}"].content]) == tolist(["helium.ns.hetzner.de", "hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com"])
+    error_message = "Cloudflare's NS records are Hetzner's nameservers alone, without trailing dots."
+  }
+
+  assert {
+    condition = (
+      cloudflare_dns_record.records["mx 0"].priority == 10 &&
+      cloudflare_dns_record.records["mx 0"].content == "mxext1.example.org" &&
+      cloudflare_dns_record.records["mx 1"].priority == 20 &&
+      cloudflare_dns_record.records["mx 1"].content == "mxext2.example.org" &&
+      cloudflare_dns_record.records["mx 1"].name == "example.eu"
+    )
+    error_message = "MX values are split into priority and host, at the apex's full name."
+  }
+
+  assert {
+    condition = (
+      cloudflare_dns_record.records["docs 0"].name == "docs.example.eu" &&
+      cloudflare_dns_record.records["docs 0"].content == "docs.example.org" &&
+      cloudflare_dns_record.records["docs 0"].priority == null &&
+      cloudflare_dns_record.records["spf 0"].content == "\"v=spf1 -all\""
+    )
+    error_message = "Other records keep their value, less a trailing dot, at the full name."
+  }
+
+  assert {
+    condition     = alltrue([for record in cloudflare_dns_record.records : !record.proxied])
+    error_message = "No record is proxied."
+  }
+
+  assert {
+    condition     = length(cloudflare_dns_record.records) == 1 + 2 + 1 + 1 + 3
+    error_message = "One Cloudflare record per value, and one NS record per Hetzner nameserver."
+  }
+
+  assert {
+    condition = output.nameservers == tolist([
+      "ada.ns.cloudflare.com.", "bob.ns.cloudflare.com.", "helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com.",
+    ])
+    error_message = "The registrar gets Hetzner's external nameservers and Cloudflare's."
+  }
+
+  assert {
+    condition     = output.cloudflare_zone_id == "0123456789abcdef0123456789abcdef"
+    error_message = "The Cloudflare zone's id is an output."
+  }
+}
+
+run "nameservers_key_is_reserved" {
+  command = plan
+
+  variables {
+    records = {
+      nameservers = { name = "@", type = "NS", ttl = 3600, values = ["ns1.example.org."] }
+    }
+  }
+
+  expect_failures = [var.records]
+}
+
+run "one_rrset_per_name_and_type" {
+  command = plan
+
+  variables {
+    records = {
+      spf    = { name = "@", type = "TXT", ttl = 3600, values = ["\"v=spf1 -all\""] }
+      google = { name = "@", type = "txt", ttl = 3600, values = ["\"google-site-verification=x\""] }
+    }
+  }
+
+  expect_failures = [var.records]
+}
+
+# The other hosting modules' records go into this one's as they are.
+run "mailbox_org" {
+  command = plan
+
+  module {
+    source = "../mailbox-org"
+  }
+
+  variables {
+    verification_value = "0123456789abcdef0123456789abcdef01234567"
+    dmarc_rua          = "alerts@example.eu"
+    extra_apex_txt     = ["google-site-verification=abc"]
+  }
+}
+
+run "with_mailbox_org" {
+  command = apply
+
+  variables {
+    cloudflare = { account_id = "fedcba9876543210fedcba9876543210" }
+    records    = merge(run.mailbox_org.records, { web = { name = "@", type = "A", ttl = 300, values = ["192.0.2.1"] } })
+  }
+
+  assert {
+    condition     = length(hcloud_zone_rrset.records) == 8 + 1 + 1
+    error_message = "mailbox.org's eight rrsets, the web record and the apex NS rrset."
+  }
+
+  assert {
+    condition = (
+      cloudflare_dns_record.records["email_mx 3"].priority == 10 &&
+      cloudflare_dns_record.records["email_mx 3"].content == "mxext4.mailbox.org" &&
+      cloudflare_dns_record.records["email_spf 1"].content == "\"google-site-verification=abc\"" &&
+      cloudflare_dns_record.records["email_dkim_mbo0001 0"].name == "mbo0001._domainkey.example.eu"
+    )
+    error_message = "mailbox.org's records reach Cloudflare split per value."
+  }
+}
