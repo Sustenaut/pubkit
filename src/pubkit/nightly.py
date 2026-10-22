@@ -332,12 +332,19 @@ def tail(proc: subprocess.CompletedProcess, n: int = 8) -> str:
 def crates(root: Path, report: Path | None) -> int:
     """Try each upgrade on its own, on top of those already kept, and keep
     it only when `cargo vet` passes without a new exemption and `cargo deny`
-    passes."""
+    passes. A repository with no Cargo.lock has no crates to update."""
     target = confined(report, "the --report file") if report else None
-    if not (root / "Cargo.lock").is_file():
-        if target:
-            target.write_text(json.dumps({"updated": [], "skipped": []}) + "\n", encoding="utf-8")
-        return 0
+    lines, skipped = upgrade(root) if (root / "Cargo.lock").is_file() else ([], [])
+    for line in lines:
+        print(line)
+    if target:
+        target.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
+                          encoding="utf-8")
+    return 0
+
+
+def upgrade(root: Path) -> tuple[list[str], list[dict]]:
+    """The crate updates `crates` keeps, and those it skips with why."""
     saved = snapshot(root)
     notes: list[str] = []
     updated: list[tuple[str, str, str]] = []
@@ -399,13 +406,7 @@ def crates(root: Path, report: Path | None) -> int:
         restore(saved)
     if updated:
         refresh_reports(root)
-    lines = notes + [f"{c} {a} -> {b}" for c, a, b in updated]
-    for line in lines:
-        print(line)
-    if target:
-        target.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
-                          encoding="utf-8")
-    return 0
+    return notes + [f"{c} {a} -> {b}" for c, a, b in updated], skipped
 
 
 def git(root: Path, *args: str) -> str:
