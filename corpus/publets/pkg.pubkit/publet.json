@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.4 is released as v0.12.4 from commit 8fe3e29d63522c0f1f75d8e756deebde36d51b88.",
+      "content": "pubkit 0.12.5 is released as v0.12.5 from commit a8c93a61d2c1e0911868376760f9b6ecdb3e2d25.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.4",
+            "0.12.5",
             "pubkit --version",
-            "pubkit 0.12.4",
-            "v0.12.4",
-            "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
+            "pubkit 0.12.5",
+            "v0.12.5",
+            "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
           ]
         ]
       },
-      "scope": "the published release v0.12.4 of pubkit",
+      "scope": "the published release v0.12.5 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
+          "revision": "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.4 was released on 2026-10-22 from commit 8fe3e29d63522c0f1f75d8e756deebde36d51b88 with these changes.",
+      "content": "pubkit 0.12.5 was released on 2026-10-23 from commit a8c93a61d2c1e0911868376760f9b6ecdb3e2d25 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,23 @@
         "rows": [
           [
             "added",
-            "python-ci and node-ci send the browser job's coverage to SonarQube Cloud too: the browser job uploads what browser-test writes to browser-coverage-report (default coverage/) as the coverage-browser artifact, and the sonar job waits for it, reading every coverage* artifact. A repository can move its browser tests out of the test command into browser-test, where they run beside the unit tests, without losing their coverage. Later jobs in the run can download the same coverage* artifacts"
+            "Generated CI for a utility: with a ci block in pubkit.json, pubkit sync writes pr.yml, main.yml and nightly.yml, each calling only the jobs that event runs, so no job shows as skipped. Each job is its own reusable workflow (job-node-test.yml, job-node-browser.yml, job-node-audit.yml, job-python-functional.yml, job-python-browser.yml, job-python-audit.yml, job-osv.yml, job-review.yml, job-sonar.yml). ci.events, ci.with, ci.jobs (narrow a job's events, or false), ci.language and ci.release configure it; checks keep their names (ci / passed, release / release). pubkit init --kind=utility writes \"ci\": {} in place of a seeded ci.yml, and the nightly moves ci.release.pubrel in pubkit.json"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.4 of pubkit",
+      "scope": "the published release v0.12.5 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "8fe3e29d63522c0f1f75d8e756deebde36d51b88"
+          "revision": "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
         }
       ]
     }
   },
-  "created": "2026-10-22T00:00:00Z",
+  "created": "2026-10-23T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
