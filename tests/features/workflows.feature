@@ -10,11 +10,18 @@ Feature: The reusable workflows parse as GitHub reads them
     And every job the workflow runs uses only its declared inputs
 
     Examples:
-      | workflow      |
-      | rust-ci.yml   |
-      | python-ci.yml |
-      | service-ci.yml |
-      | node-ci.yml   |
+      | workflow                  |
+      | rust-ci.yml               |
+      | python-ci.yml             |
+      | service-ci.yml            |
+      | node-ci.yml               |
+      | job-node-test.yml         |
+      | job-node-browser.yml      |
+      | job-node-audit.yml        |
+      | job-python-functional.yml |
+      | job-python-browser.yml    |
+      | job-python-audit.yml      |
+      | job-sonar.yml             |
 
   Scenario Outline: A reusable workflow ends in the one check a ruleset requires
     When I parse the workflow "<workflow>"
@@ -87,6 +94,15 @@ Feature: The reusable workflows parse as GitHub reads them
       | python-ci.yml  |
       | service-ci.yml |
       | node-ci.yml    |
+      | job-node-test.yml         |
+      | job-node-browser.yml      |
+      | job-node-audit.yml        |
+      | job-python-functional.yml |
+      | job-python-browser.yml    |
+      | job-python-audit.yml      |
+      | job-osv.yml               |
+      | job-review.yml            |
+      | job-sonar.yml             |
 
   Scenario: node-ci installs dependencies without running their scripts
     When I parse the workflow "node-ci.yml"

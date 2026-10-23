@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "Generated CI for a utility: with a ci block in pubkit.json, pubkit sync writes pr.yml, main.yml and nightly.yml, each calling only the jobs that event runs, so no job shows as skipped. Each job is its own reusable workflow (job-node-test.yml, job-node-browser.yml, job-node-audit.yml, job-python-functional.yml, job-python-browser.yml, job-python-audit.yml, job-osv.yml, job-review.yml, job-sonar.yml). ci.events, ci.with, ci.jobs (narrow a job's events, or false), ci.language and ci.release configure it; checks keep their names (ci / passed, release / release). pubkit init --kind=utility writes \"ci\": {} in place of a seeded ci.yml, and the nightly moves ci.release.pubrel in pubkit.json"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

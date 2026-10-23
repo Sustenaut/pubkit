@@ -1,0 +1,23 @@
+# Node: every package in package-lock.json, development ones included,
+# against npm's advisories, without installing anything. Any finding fails.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-node-audit
+
+on:
+  workflow_call:
+    inputs:
+      node-version: { type: string, default: '22' }
+
+jobs:
+  # Every package in package-lock.json against npm's advisory database,
+  # without installing anything.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: '${{ inputs.node-version }}' }
+      - run: npm audit --package-lock-only --audit-level=low

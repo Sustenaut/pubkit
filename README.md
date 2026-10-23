@@ -642,7 +642,30 @@ jobs:
 
   The `gates` and `functional` inputs can only add targets. The `msrv` and `fuzz` inputs are ignored: those jobs run because the standard requires them. Every job reports through `passed`, the one check a ruleset needs.
 - **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium. The coverage it writes to `browser-coverage-report` (by default `coverage/`) reaches SonarQube Cloud with the functional job's, and the sonar job waits for it. The `audit` job checks `audit-requirements` (by default `tests/requirements.lock`) with pip-audit on every run.
-- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubkit's managed files from `tests/requirements.lock`, and runs `npm test`. The `audit` job runs `npm audit --package-lock-only` on every run and fails on any advisory, development dependencies included. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The coverage it writes to `browser-coverage-report` (by default `coverage/`, LCOV) reaches SonarQube Cloud with the test job's, and the sonar job waits for it. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). `pubkit init --kind=utility` seeds a `ci.yml` calling it in a repository with a `package.json` and no `pyproject.toml`.
+- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubkit's managed files from `tests/requirements.lock`, and runs `npm test`. The `audit` job runs `npm audit --package-lock-only` on every run and fails on any advisory, development dependencies included. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The coverage it writes to `browser-coverage-report` (by default `coverage/`, LCOV) reaches SonarQube Cloud with the test job's, and the sonar job waits for it. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). A repository with a `ci` block in pubkit.json gets the same jobs generated instead (below).
+
+### Generated CI: only the jobs a repository runs
+
+A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A utility (Python or Node) avoids that with a `ci` block in `pubkit.json`. `pubkit sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-sonar.yml` and so on) at this pubkit's tag, so the Actions pins still live in pubkit. `pubkit init --kind=utility` writes `"ci": {}`.
+
+```json
+"ci": {
+  "events": ["pr", "main", "nightly"],
+  "cron": "17 3 * * *",
+  "with": {"browser-test": "npm run test:browser", "coverage-report": "coverage/",
+           "sonar-args": "-Dsonar.tests=test"},
+  "jobs": {"review": false, "sonar": {"events": ["pr", "main"]}},
+  "release": {"pubrel": "0.5.4"}
+}
+```
+
+- **`events`:** which workflows to write. `pr` writes `pr.yml` (pull requests), `main` writes `main.yml` (pushes to main), and `nightly` writes `nightly.yml` (`cron`, or by hand). The default is pr and main.
+- **`with`:** the jobs' inputs, the same ones `python-ci.yml` and `node-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
+- **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only. `browser` runs only when `with` gives a `browser-test`.
+- **`language`:** `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node.
+- **`release`:** adds pubrel's release workflow to `pr.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs. `false` leaves it out. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
+
+The checks keep the names a ruleset requires: each job is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on. Every workflow ends in `ci / passed`, which passes only when every job succeeded. The generated workflows are managed files, so `pubkit sync --check` fails when one is edited, and also while a hand-written `ci.yml` is still beside them. The Rust and service workflows aren't generated yet: those repositories keep their `ci.yml`.
 
 ### SonarQube Cloud
 
