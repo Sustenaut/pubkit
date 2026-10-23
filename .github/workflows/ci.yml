@@ -99,8 +99,12 @@ jobs:
       - run: shellcheck actions/deploy-static/*.sh
       - run: actions/deploy-static/test.sh
 
+  # A skipped job anywhere upstream (review, on a push) would skip a job
+  # that needs it unless its condition says otherwise, so release and wheel
+  # run unless something upstream failed.
   release:
     needs: [passed, terraform, deploy-static]
+    if: ${{ !failure() && !cancelled() }}
     uses: schryer/pubrel/.github/workflows/release.yml@v0.5.0
     with: { pubrel-version: v0.5.0 }
     permissions:
@@ -110,7 +114,7 @@ jobs:
   # Built once, when the release appears, and never replaced.
   wheel:
     needs: release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !failure() && !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
