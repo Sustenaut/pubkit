@@ -28,7 +28,7 @@ if "+short" in args:
     print("\\n".join(state["resolved"]))
     sys.exit(0)
 server = next(a[1:] for a in args if a.startswith("@"))
-name, rtype = args[-2], args[-1]
+name, rtype = args[args.index("-q") + 1], args[args.index("-t") + 1]
 at = state["servers"].get(server)
 if not at or not at["serves"]:
     print(";; ->>HEADER<<- opcode: QUERY, status: REFUSED, id: 1")
@@ -50,7 +50,7 @@ state = json.load(open(path))
 args = sys.argv[1:]
 anchors = open(args[args.index("-a") + 1]).read()
 server = next(a[1:] for a in args if a.startswith("@"))
-name, rtype = args[-2], args[-1]
+name, rtype = args[args.index("-q") + 1], args[args.index("-t") + 1]
 state["delv"].append({{"server": server, "name": name, "type": rtype,
                       "root": next(a for a in args if a.startswith("+root="))}})
 json.dump(state, open(path, "w"))
@@ -194,7 +194,7 @@ def asked_missing(dns, count, zone):
     asked = [q for q in _asked(dns) if q["name"].startswith("pubkit-check-")]
     assert len({q["server"] for q in asked}) == count == len(asked), asked
     assert len({q["name"] for q in asked}) == 1, asked
-    assert all(q["name"].endswith(f".{zone}.") and q["root"] == f"+root={zone}" for q in asked), asked
+    assert all(q["name"].endswith(f".{zone}.") and q["root"] == f"+root={zone}." for q in asked), asked
 
 
 @then(parsers.parse('the rrsets compared for "{zone}" are "{expected}"'))
@@ -202,3 +202,8 @@ def compared(zone, expected):
     hosting = _hosting()
     wanted = check.rrsets(hosting["zones"][zone], hosting["providers"], [])
     assert [f"{name} {rtype}" for name, rtype in wanted] == expected.split(", ")
+
+
+@then(parsers.parse('stderr does not mention "{text}"'))
+def stderr_lacks(result, text):
+    assert text not in result.stderr, result.stderr

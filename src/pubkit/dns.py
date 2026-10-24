@@ -23,6 +23,7 @@ anywhere: every query is a read.
 
 from __future__ import annotations
 
+import re
 import secrets
 import shutil
 import subprocess
@@ -39,6 +40,17 @@ RDATA = 4  # the fields of a record dig prints before its value: owner, TTL, cla
 KEY_FIELDS = 3  # a DNSKEY's flags, protocol and algorithm, before its key
 NAME_TYPES = {"NS", "CNAME", "MX"}
 VALIDATED = ("; fully validated", "; negative response, fully validated")
+
+# What may reach dig and delv: absolute names in lower case, whose labels
+# are letters, digits, hyphens and underscores and start with neither a
+# hyphen nor a plus, and types in capitals. Names and types also go after
+# -q and -t, so neither is ever read as an option, and nothing else (a
+# name from pubkit.json, from --record, or from a nameserver's answer) is
+# passed or written into delv's trust anchors.
+NAME = re.compile(r"(?:[a-z0-9_][a-z0-9_-]{0,62}\.)+")
+TYPE = re.compile(r"[A-Z][A-Z0-9]{0,9}")
+LONGEST = 254  # an absolute name's length, its final dot included
+KEY = re.compile(r"(256|257) 3 [0-9]{1,3} [A-Za-z0-9+/]+={0,2}")
 
 
 @dataclass
@@ -58,9 +70,22 @@ def tool(name: str) -> str:
     return found
 
 
+def checked(name: str) -> str:
+    """An absolute name, as NAME allows; anything else stops the check."""
+    if not NAME.fullmatch(name) or len(name) > LONGEST:
+        sys.exit(f"pubkit: {name!r} is not a DNS name pubkit dns check asks about")
+    return name
+
+
+def checked_type(rtype: str) -> str:
+    if not TYPE.fullmatch(rtype):
+        sys.exit(f"pubkit: {rtype!r} is not a DNS record type, such as A or MX")
+    return rtype
+
+
 def absolute(name: str, zone: str) -> str:
     """A name relative to the zone ("@" for the apex), made absolute."""
-    return f"{zone}." if name == "@" else f"{name}.{zone}."
+    return checked(f"{zone}." if name == "@" else f"{name}.{zone}.")
 
 
 def normalise(rtype: str, rdata: list[str]) -> str:
@@ -77,7 +102,7 @@ def dig(server: str, fqdn: str, rtype: str) -> Answer:
     """Ask one nameserver, without recursion, for one rrset."""
     out = subprocess.run(
         [tool("dig"), "+norec", "+time=3", "+tries=2", "+noall", "+comments", "+answer",
-         f"@{server}", fqdn, rtype],
+         f"@{checked(server)}", "-q", checked(fqdn), "-t", checked_type(rtype)],
         capture_output=True, text=True, timeout=TIMEOUT, check=False).stdout
     answer = Answer()
     values = set()
@@ -96,9 +121,9 @@ def dig(server: str, fqdn: str, rtype: str) -> Answer:
 
 def resolved_nameservers(zone: str) -> set[str]:
     """The zone's NS rrset as this machine's resolver finds it."""
-    out = subprocess.run([tool("dig"), "+short", f"{zone}.", "NS"], capture_output=True,
-                         text=True, timeout=TIMEOUT, check=False).stdout
-    return {line.strip().lower() for line in out.splitlines() if line.strip().endswith(".")}
+    out = subprocess.run([tool("dig"), "+short", "-q", checked(f"{zone}."), "-t", "NS"],
+                         capture_output=True, text=True, timeout=TIMEOUT, check=False).stdout
+    return {line.strip().lower() for line in out.splitlines() if NAME.fullmatch(line.strip().lower())}
 
 
 def configured_nameservers(zone: dict[str, Any], providers: dict[str, Any]) -> set[str]:
@@ -114,7 +139,7 @@ def nameservers(name: str, zone: dict[str, Any], providers: dict[str, Any]) -> l
     those any of them lists in its apex NS rrset."""
     found = configured_nameservers(zone, providers) | resolved_nameservers(name)
     for server in sorted(found):
-        found |= dig(server, f"{name}.", "NS").values
+        found |= {ns for ns in dig(server, f"{name}.", "NS").values if NAME.fullmatch(ns)}
     return sorted(found)
 
 
@@ -143,7 +168,7 @@ def rrsets(zone: dict[str, Any], providers: dict[str, Any], extra: list[str]) ->
         if not name or not rtype:
             sys.exit(f"pubkit: --record {record} must be NAME/TYPE, the name relative to the zone "
                      "(\"@\" for the apex), such as www/A")
-        wanted.append((name, rtype.upper()))
+        wanted.append((name, checked_type(rtype.upper())))
     return list(dict.fromkeys(wanted))
 
 
@@ -191,8 +216,9 @@ def anchors(zone: str, pinned: set[str]) -> str:
     lines = []
     for key in sorted(pinned):
         flags, protocol, algorithm, _ = dnskey(key)
-        if flags == SEP:
-            lines.append(f'  "{zone}." static-key {flags} {protocol} {algorithm} "{key.split(" ")[3]}";')
+        if flags == SEP and KEY.fullmatch(key):
+            lines.append(f'  "{checked(f"{zone}.")}" static-key {flags} {protocol} {algorithm} '
+                         f'"{key.split(" ")[3]}";')
     return "trust-anchors {\n" + "\n".join(lines) + "\n};\n"
 
 
@@ -208,7 +234,8 @@ def validate(zone: str, servers: list[str], wanted: list[tuple[str, str]], pinne
             for name, rtype in [*wanted, (missing, "A")]:
                 fqdn = absolute(name, zone)
                 result = subprocess.run(
-                    [tool("delv"), "-a", str(anchor_file), f"+root={zone}", f"@{server}", fqdn, rtype],
+                    [tool("delv"), "-a", str(anchor_file), f"+root={checked(f'{zone}.')}",
+                     f"@{checked(server)}", "-q", fqdn, "-t", checked_type(rtype)],
                     capture_output=True, text=True, timeout=TIMEOUT, check=False)
                 lines = (result.stdout + result.stderr).splitlines()
                 if not any(line.strip() in VALIDATED for line in lines):

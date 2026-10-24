@@ -44,6 +44,14 @@ Feature: pubkit dns check compares a zone's nameservers and validates each one a
     Then it fails
     And stderr mentions "ns3.desec.example. does not serve example.net"
 
+  Scenario: A name in a nameserver's answer that is not a host name is never asked
+    Given every nameserver of "example.net" serves it alike
+    And "ns1.desec.io." answers "example.net. NS" with "ns1.cloudflare.example., ns2.cloudflare.example., ns1.desec.io., ns2.desec.org., -fevil."
+    When I run pubkit "dns" "check" "example.net"
+    Then it fails
+    And stderr mentions "example.net. NS differs between nameservers"
+    And stderr does not mention "-fevil. does not serve"
+
   Scenario: A nameserver that does not serve the zone fails the check
     Given every nameserver of "example.net" serves it alike
     And "ns2.cloudflare.example." does not serve the zone
@@ -90,6 +98,8 @@ Feature: pubkit dns check compares a zone's nameservers and validates each one a
       | args                                         | message                                          |
       | "dns" "check" "example.com"                  | has no zone example.com; it has example.eu       |
       | "dns" "check" "example.org" "--record" "mx"  | --record mx must be NAME/TYPE                    |
+      | "dns" "check" "example.org" "--record=-f/etc/passwd/A"   | is not a DNS name pubkit dns check asks about |
+      | "dns" "check" "example.org" "--record" "www/A;id" | is not a DNS record type                    |
 
   Scenario: The check needs dig
     Given every nameserver of "example.org" serves it alike
