@@ -8,7 +8,9 @@
 # cloudflare, each with the one account it deploys to. A Cloud Run site's
 # record is here, but its domain mapping is in terraform/cloud-run-sites,
 # so a repository without Google Cloud needs no Google provider: unlike
-# the others, it will not start without credentials.
+# the others, it will not start without credentials. deSEC's provider will
+# not either, so a zone's records at deSEC are written by
+# terraform/desec-zones, from this module's records and apex_nameservers.
 
 locals {
   providers = var.config.providers
@@ -132,6 +134,15 @@ module "zone" {
   cloudflare = one([
     for name in each.value.dns : { account_id = local.providers[name].account_id } if local.providers[name].type == "cloudflare"
   ])
+  desec = one([
+    for name in each.value.dns : { dns = local.providers[name].dns } if local.providers[name].type == "desec"
+  ])
+
+  # pubkit.json names each provider's keys by the provider's name; the zone
+  # module, by its type, of which a zone has at most one.
+  dnssec = each.value.dnssec == null ? null : {
+    keys = { for name, keys in each.value.dnssec.keys : local.providers[name].type => keys }
+  }
 }
 
 # --- Cloudflare Pages sites ---

@@ -36,6 +36,9 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"type": "mailbox-org", "mx": ["10 mxext1.mailbox.org"]}          | mx must be a list of MX values                |
       | {"type": "mailbox-org", "spf": "v=spf1 include:mailbox.org ~all"} | spf must be the SPF mechanisms                |
       | {"type": "mailbox-org", "dkim": {"MBO0001": "mbo0001.mailbox.org."}} | dkim must be an object mapping each selector |
+      | {"type": "desec"}                                                 | external_nameservers must list the names deSEC |
+      | {"type": "desec", "dns": {"external_nameservers": []}}            | external_nameservers must list the names deSEC |
+      | {"type": "desec", "account_id": "x"}                              | providers.p has no setting account_id         |
 
   Scenario Outline: A zone pubkit cannot use stops it with a message
     Given the providers of the modules' test setup with the zone '<zone>'
@@ -63,6 +66,29 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"dns": ["hetzner"], "sites": {"WWW": {"provider": "hetzner", "kind": "server", "server": "web"}}} | must be named by the name relative     |
       | {"dns": ["hetzner"], "ttl": {"email": "1h"}}                                            | ttl.email must be a number of seconds           |
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "hetzner", "kind": "server", "server": "web", "ttl": 1000000}}} | www.ttl must be a number of seconds |
+
+  Scenario: A zone deSEC and Cloudflare serve can be signed by both
+    Given the providers of the modules' test setup with the zone '{"dns": ["desec", "cloudflare"], "dnssec": {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["257 3 13 BBBB", "256 3 13 CCCC"]}}}'
+    Then pubkit accepts its hosting block
+
+  Scenario Outline: A dnssec block pubkit cannot use stops it with a message
+    Given the providers of the modules' test setup with the zone '{"dns": <dns>, "dnssec": <dnssec>}'
+    Then reading them stops with "<message>"
+
+    Examples:
+      | dns                       | dnssec                                                                                  | message                                          |
+      | ["hetzner", "cloudflare"] | {"keys": {"hetzner": ["257 3 13 AAAA"], "cloudflare": ["257 3 13 AAAA"]}}              | cannot be set while hetzner serves the zone      |
+      | ["desec", "cloudflare"]   | {"keys": {"desec": ["257 3 13 AAAA"]}}                                                  | keys must map each provider in the zone's dns    |
+      | ["desec"]                 | {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["257 3 13 AAAA"]}}                | keys must map each provider in the zone's dns    |
+      | ["desec"]                 | {"keys": {"desec": ["257 13 AAAA"]}}                                                    | keys.desec must be a list of DNSKEY values       |
+      | ["desec"]                 | {"keys": {"desec": ["257 3 13 AA AA"]}}                                                 | keys.desec must be a list of DNSKEY values       |
+      | ["desec"]                 | {"keys": {"desec": ["257 3 13 AAA*"]}}                                                  | keys.desec must be a list of DNSKEY values       |
+      | ["desec"]                 | {"keys": {"desec": ["258 3 13 AAAA"]}}                                                  | keys.desec must be a list of DNSKEY values       |
+      | ["desec"]                 | {"keys": {"desec": []}}                                                                 | keys.desec must be a list of DNSKEY values       |
+      | ["desec"]                 | {"keys": {"desec": "257 3 13 AAAA"}}                                                    | keys.desec must be a list of DNSKEY values       |
+      | ["desec", "cloudflare"]   | {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["256 3 13 AAAA"]}}                | keys.cloudflare must have a key-signing key      |
+      | ["desec", "cloudflare"]   | {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["257 3 8 AAAA"]}}                 | keys must all use one algorithm                  |
+      | ["desec"]                 | {"keys": {"desec": ["257 3 13 AAAA"]}, "ds": []}                                        | dnssec has no setting ds                         |
 
   Scenario Outline: A hosting block of the wrong shape stops it with a message
     Given the hosting settings '<config>'

@@ -10,7 +10,7 @@ variable "records" {
     (trailing dots, MX "priority host.", TXT quoted). Hetzner keeps one rrset
     per name and type, so each name and type appears once. The key only
     names the entry in state; "nameservers" is taken by the apex NS rrset
-    this module writes when two providers serve the zone.
+    this module writes when two or more providers serve the zone.
   EOT
   type = map(object({
     name   = string
@@ -50,13 +50,65 @@ variable "cloudflare" {
   default = null
 
   validation {
-    condition     = var.cloudflare != null || var.hetzner != null
-    error_message = "Hetzner, Cloudflare or both must serve the zone."
+    condition     = var.cloudflare != null || var.hetzner != null || var.desec != null
+    error_message = "Hetzner, Cloudflare, deSEC or some of them must serve the zone."
+  }
+}
+
+variable "desec" {
+  description = "deSEC serves the zone too, its records written by terraform/desec-zones, as a desec provider of pubkit.json's hosting block: {dns = {external_nameservers}}, the names deSEC serves every zone from, which its API does not report. Null when deSEC does not serve it."
+  type = object({
+    dns = object({
+      external_nameservers = list(string)
+    })
+  })
+  default = null
+
+  validation {
+    condition     = var.desec == null || try(length(var.desec.dns.external_nameservers) > 0, false)
+    error_message = "deSEC's dns.external_nameservers lists the names it serves zones from, such as ns1.desec.io."
+  }
+}
+
+variable "dnssec" {
+  description = <<-EOT
+    The zone is signed, by every provider that serves it (multi-signer):
+    {keys = {cloudflare = [...], desec = [...]}}, each provider's public
+    keys as DNSKEY values, "flags 3 algorithm public-key", such as
+    "257 3 13 mdss...GQ==". Cloudflare signs, and publishes the others'
+    keys next to its own (deSEC does so in terraform/desec-zones). Null
+    leaves the zone unsigned at Cloudflare (deSEC signs every zone, but
+    without a DS record at the registrar nothing validates).
+  EOT
+  type = object({
+    keys = map(list(string))
+  })
+  default = null
+
+  validation {
+    condition     = var.dnssec == null || var.hetzner == null
+    error_message = "Hetzner cannot sign a zone, so it cannot serve one with dnssec: a resolver would reject its unsigned answers once the registrar has a DS record."
+  }
+
+  validation {
+    condition = var.dnssec == null || try(toset(keys(var.dnssec.keys)) == toset(compact([
+      var.cloudflare != null ? "cloudflare" : "", var.desec != null ? "desec" : "",
+    ])), false)
+    error_message = "dnssec.keys has the keys of each provider that serves the zone, cloudflare and desec, and no other."
+  }
+
+  validation {
+    condition = var.dnssec == null || try(alltrue(flatten([
+      for keys in values(var.dnssec.keys) : [
+        for key in keys : can(regex("^(256|257) 3 [0-9]+ [A-Za-z0-9+/]+={0,2}$", key))
+      ]
+    ])), false)
+    error_message = "Each key is a DNSKEY value, \"flags 3 algorithm public-key\": flags 256 or 257, the key in base64 without spaces."
   }
 }
 
 variable "nameservers_ttl" {
-  description = "The TTL of the apex NS rrset written when two providers serve the zone."
+  description = "The TTL of the apex NS rrset written when two or more providers serve the zone."
   type        = number
   default     = 86400
 }

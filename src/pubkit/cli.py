@@ -16,6 +16,7 @@
     pubkit nightly --pubrel V --pub V --body FILE
     pubkit freshness [--json] DIR...
     pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
+    pubkit dns check ZONE [--record NAME/TYPE...]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -389,6 +390,13 @@ def main(argv: list[str] | None = None) -> int:
                    help="a check the named repositories require, instead of any list; repeat it")
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME; by default every repository the config lists")
+    p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
+    dns = p.add_subparsers(dest="dns_command", required=True)
+    p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
+                                     "validates alone against the pinned keys")
+    p.add_argument("zone", help="a zone in pubkit.json's hosting block, such as example.eu")
+    p.add_argument("--record", action="append", default=[], metavar="NAME/TYPE",
+                   help="another rrset to compare, such as www/A; repeat it")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -447,6 +455,9 @@ def main(argv: list[str] | None = None) -> int:
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
         return protect(config, args.repos, args.check, args.require)
+    if args.command == "dns":
+        from .dns import check
+        return check(root, args.zone, args.record)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)

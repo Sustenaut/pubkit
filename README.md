@@ -113,6 +113,10 @@ which the modules are tested with (secrets never go here; tokens stay with
       "dns": { "external_nameservers": ["helium.ns.hetzner.de.", "hydrogen.ns.hetzner.com.", "oxygen.ns.hetzner.com."] }
     },
     "cloudflare": { "type": "cloudflare", "account_id": "fedcba9876543210fedcba9876543210" },
+    "desec": {
+      "type": "desec",
+      "dns": { "external_nameservers": ["ns1.desec.io.", "ns2.desec.org."] }
+    },
     "gcp": {
       "type": "google-cloud",
       "project": "example-project",
@@ -140,6 +144,16 @@ which the modules are tested with (secrets never go here; tokens stay with
         "recipes": { "provider": "cloudflare", "kind": "pages", "project": "example-recipes", "standby": "web" },
         "pub": { "provider": "gcp", "kind": "cloud-run", "service": "pub-site" }
       }
+    },
+    "example.net": {
+      "dns": ["desec", "cloudflare"],
+      "dnssec": {
+        "keys": {
+          "desec": ["257 3 13 Wegp...cvA=="],
+          "cloudflare": ["257 3 13 o+F6...vBA==", "256 3 13 vowd...MAiQ=="]
+        }
+      },
+      "sites": { "@": { "provider": "hetzner", "kind": "server", "server": "small" } }
     }
   }
 }
@@ -150,12 +164,14 @@ The provider types pubkit supports, and what each holds:
 | type | settings | serves DNS | sites |
 | --- | --- | --- | --- |
 | `hetzner` | `dns.external_nameservers`: the names Hetzner also serves a zone from, which a registrar such as Hetzner's own (konsoleH) lists next to another provider's; without them the registrar gets the assigned ones | yes; the zone must already exist at Hetzner | `server`: A (and AAAA) records to a server's addresses |
-| `cloudflare` | `account_id` | yes; with Hetzner too, in multi-provider mode | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
+| `cloudflare` | `account_id` | yes; with another provider too, in multi-provider mode; signs with `dnssec` | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
+| `desec` | `dns.external_nameservers`: the names deSEC serves every zone from (`ns1.desec.io.`, `ns2.desec.org.`), which its API does not report | yes, through `terraform/desec-zones`; the zone must already exist at deSEC; always signs | no |
 | `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a CNAME to `domain_target`, and a domain mapping to the Cloud Run `service` (`terraform/cloud-run-sites`) |
 | `mailbox-org` | `mx` (`"priority host."`), `spf` (its mechanisms, such as `include:mailbox.org`), `dkim` (selector, in lowercase, to host) | no | no; a zone's `email.provider` |
 
-A zone's `dns` lists one or two providers that serve DNS, at most one of
-each type. Its `email` names a mail provider, with the domain's own
+A zone's `dns` lists the providers that serve its DNS, at most one of
+each type; with more than one, every provider's nameservers are in the
+apex NS rrset at each. Its `email` names a mail provider, with the domain's own
 `verification` TXT records and `dmarc` (`policy` none, quarantine or
 reject, and `rua`, where reports go). `apex_txt` holds other apex TXT
 values, such as a Google site verification; they share the SPF record's
@@ -164,8 +180,23 @@ relative to the zone (`"@"` for the apex, which only a server site can
 have, since the others are CNAMEs), each with its `provider` and that
 provider's `kind`.
 
-**TTLs.** Records get a day for the apex NS rrset (written when two
-providers serve a zone), an hour for the email records and the apex TXT
+**DNSSEC.** A zone's `dnssec.keys` pins each of its DNS providers' public
+keys, as DNSKEY values (`"flags 3 algorithm key"`, the key in base64
+without spaces), by provider name. Every provider signs the zone with its
+own keys and publishes the others' next to them (RFC 8901's multi-signer
+model 2), so an answer from any of them validates against either DS
+record at the registrar. Cloudflare's signing is turned on, with
+multi-signer; deSEC signs every zone it serves. Each provider needs a
+key-signing key (flags 257), and all keys one algorithm. Hetzner cannot
+sign, so a zone it serves cannot have `dnssec`. The keys are pinned rather
+than read from the providers: neither rotates them on its own, so a key
+change is a reviewed change to `pubkit.json`. Cloudflare's are on its DNS
+settings page, or `GET /zones/<id>/dnssec` (the KSK) and its DNSKEY rrset;
+deSEC's are in `terraform/desec-zones`' output `keys`. Without `dnssec`,
+Cloudflare does not sign.
+
+**TTLs.** Records get a day for the apex NS rrset (written when two or
+more providers serve a zone), an hour for the email records and the apex TXT
 rrset, and five minutes for the sites, unless `ttl` says otherwise:
 `hosting.ttl` for every zone, a zone's `ttl` for its records, or a site's
 `ttl` (a number) for that site's; the nearest wins. Each is in seconds,
@@ -217,30 +248,67 @@ module "cloud_run_sites" {
 }
 ```
 
-Its outputs are `nameservers` (by zone, for the registrar),
-`cloudflare_zone_ids`, `records` (every rrset, by zone) and `sites` (by
-full name: provider, kind, address, and a Pages site's project and
-pages.dev name). `records` takes other rrsets, by zone, for anything the
-block does not describe.
+A repository with zones at deSEC adds `desec-zones`, which writes the
+same records there, and configures the deSEC provider with its token
+(with `./with-secrets` and `"terraform.secrets": "declared"`, a
+`DESEC_TOKEN` secret reaches it as `TF_VAR_desec_token`):
 
-The modules need Terraform 1.11 or newer, `hcloud` 1.69, `cloudflare` 5.28
-and `google` 7. `terraform/hosting` needs no Cloudflare token or provider
-block when no zone or site is at Cloudflare. The Google provider will not
-start without credentials, so the Cloud Run domain mappings are in their
-own module, which only a repository on Google Cloud takes.
+```hcl
+variable "desec_token" {
+  type      = string
+  sensitive = true
+}
+
+provider "desec" {
+  api_token = var.desec_token
+}
+
+module "desec_zones" {
+  source           = "github.com/schryer/pubkit//terraform/desec-zones?ref=vX.Y.Z"
+  config           = jsondecode(file("${path.root}/pubkit.json")).hosting
+  records          = module.hosting.records
+  apex_nameservers = module.hosting.apex_nameservers
+}
+```
+
+Its outputs are `nameservers` (by zone, for the registrar),
+`cloudflare_zone_ids`, `records` (every rrset, by zone),
+`apex_nameservers` (the apex NS rrset of each zone two or more providers
+serve), `cloudflare_ds` (a signed zone's DS record at Cloudflare, for the
+registrar) and `sites` (by full name: provider, kind, address, and a Pages
+site's project and pages.dev name). `records` takes other rrsets, by zone,
+for anything the block does not describe.
+
+The modules need Terraform 1.11 or newer, `hcloud` 1.69, `cloudflare` 5.28,
+`Valodim/desec` 0.6 and `google` 7. `terraform/hosting` needs no Cloudflare
+token or provider block when no zone or site is at Cloudflare. The Google
+and deSEC providers will not start without credentials, even with nothing
+to do, so the Cloud Run domain mappings and the deSEC zones are in their
+own modules, which only a repository on Google Cloud or deSEC takes.
 
 - **`terraform/hosting`:** the block above, zone by zone: the records,
   the Pages projects and their domains, and each zone's DNS.
 - **`terraform/cloud-run-sites`:** the Cloud Run sites' domain mappings,
   each to its `service` in its provider's `project` and `region`; output
   `domains`, with the records Google asks for.
+- **`terraform/desec-zones`:** each zone a `desec` provider serves: the
+  domain, every rrset `terraform/hosting` writes (a TTL below the
+  domain's `minimum_ttl` raised to it, as deSEC requires), the apex NS
+  rrset when other providers serve the zone too, and with `dnssec` the
+  other providers' keys; outputs `ds` (deSEC's DS records, by zone, for
+  the registrar) and `keys` (its DNSKEY values, for `dnssec.keys`).
 - **`terraform/dns-zone`:** one zone's rrsets in zone-file form (`name`
   relative, `"@"` for the apex; trailing dots, MX `"10 host."`, TXT
-  quoted), at Hetzner, Cloudflare or both. With both, Cloudflare runs in
+  quoted), at Hetzner, Cloudflare or both, with deSEC's nameservers when
+  it serves the zone too. With more than one provider, Cloudflare runs in
   multi-provider mode: one unproxied record per value (MX split into
-  priority and host), and both providers' nameservers in the apex NS rrset
-  at both. `terraform/hosting` calls it for each zone; it can be used on
-  its own with `hetzner` and `cloudflare` set as in the block.
+  priority and host), and every provider's nameservers in the apex NS
+  rrset at each. With `dnssec`, Cloudflare signs in multi-signer mode and
+  serves the other providers' keys as DNSKEY records; denial of existence
+  is left as Cloudflare's plan has it (NSEC on Free; RFC 8901 lets each
+  provider choose). `terraform/hosting` calls it for each zone; it can be
+  used on its own with `hetzner`, `cloudflare`, `desec` and `dnssec` set
+  as in the block (`dnssec.keys` by provider type).
 - **`actions/deploy-static`:** deploys a directory to a server over rsync
   (`deploy-key`, `deploy-target`, and `known-hosts`, the server's pinned
   host key; without it the key is scanned on every run), to Cloudflare
@@ -272,12 +340,41 @@ import {
 }
 ```
 
+deSEC makes the zone's apex NS rrset too, so a zone it serves beside
+another provider takes that over the same way, with the domain itself,
+which must already exist at deSEC (created on desec.io):
+
+```hcl
+import {
+  to = module.desec_zones.desec_domain.zone["example.eu"]
+  id = "example.eu"
+}
+
+import {
+  to = module.desec_zones.desec_rrset.records["example.eu nameservers"]
+  id = "example.eu/@/NS"
+}
+```
+
 Records a root module already manages move with `moved` blocks, or with
 import blocks like the one above when they were separate resources. In a
 zone, the email records are `email_mx`, `email_dmarc`,
 `email_dkim_<selector>` and `email_verification_<name>`, the apex TXT
 rrset is `apex_txt`, and a site's are its name (`apex` for `"@"`, dots as
 underscores), with `_a` and `_aaaa` for a server's addresses.
+
+**Checking a zone.** `pubkit dns check ZONE` asks every nameserver of a
+zone in the hosting block (its providers' from `pubkit.json`, the ones
+resolvers find, and the ones each lists in its apex NS rrset), without
+recursion, for every rrset the block describes (`--record NAME/TYPE` adds
+others, such as a root module's own) and fails when their answers differ,
+TTLs aside, or a nameserver does not serve the zone. With `dnssec`, each
+nameserver must also serve exactly the pinned keys, and validate alone:
+`delv` asks it for each rrset and for a name that does not exist, with
+the pinned key-signing keys as trust anchors, as a resolver will once the
+registrar has the DS records. Run it after each step of a move, and
+before any DS record goes to the registrar; it only reads, and needs
+`dig` and `delv` (BIND 9; Debian's `bind9-dnsutils`).
 
 Each module's tests (`terraform test` in its directory) mock the providers
 and need no credentials; CI runs them on Terraform 1.11, with `fmt`,

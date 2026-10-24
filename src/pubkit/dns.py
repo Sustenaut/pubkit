@@ -1,0 +1,248 @@
+"""`pubkit dns check ZONE`: does every nameserver of a zone in pubkit.json's
+hosting block give the same answers, and, for a signed zone, does each one
+validate on its own?
+
+The nameservers are the ones the zone's providers are given in pubkit.json
+(dns.external_nameservers), the zone's NS rrset as resolvers find it, and
+the apex NS rrset each of those serves, so a provider joining a zone is
+asked before the registrar lists it. Each is asked, without recursion, for
+every rrset the hosting block describes (the apex NS rrset, the mail
+provider's records, each site's) and any given with --record; their
+answers must be the same, TTLs aside (deSEC raises a TTL below its minimum).
+
+With the zone's dnssec block, each nameserver must also serve exactly the
+keys it pins, every provider's, and validate alone: delv asks it, and only
+it, for each rrset and for a name that does not exist, with the pinned
+key-signing keys as trust anchors, which is what a resolver does once the
+registrar has a DS record for each. A provider that cannot sign, or one
+that changed its keys, fails here before any DS record is at the registrar.
+
+dig and delv are BIND 9's (Debian's bind9-dnsutils). Nothing is changed
+anywhere: every query is a read.
+"""
+
+from __future__ import annotations
+
+import secrets
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from .hosting import SEP, dnskey, settings
+
+TIMEOUT = 30
+RDATA = 4  # the fields of a record dig prints before its value: owner, TTL, class, type
+KEY_FIELDS = 3  # a DNSKEY's flags, protocol and algorithm, before its key
+NAME_TYPES = {"NS", "CNAME", "MX"}
+VALIDATED = ("; fully validated", "; negative response, fully validated")
+
+
+@dataclass
+class Answer:
+    """One nameserver's answer: its status, whether it is authoritative, and
+    the rrset's values, normalised so two providers' compare."""
+
+    status: str = ""
+    authoritative: bool = False
+    values: frozenset[str] = field(default_factory=frozenset)
+
+
+def tool(name: str) -> str:
+    found = shutil.which(name)
+    if not found:
+        sys.exit(f"pubkit: dns check needs {name}, from BIND 9 (such as Debian's bind9-dnsutils)")
+    return found
+
+
+def absolute(name: str, zone: str) -> str:
+    """A name relative to the zone ("@" for the apex), made absolute."""
+    return f"{zone}." if name == "@" else f"{name}.{zone}."
+
+
+def normalise(rtype: str, rdata: list[str]) -> str:
+    """A record's value as dig prints it, in one form: host names in lower
+    case, and a DNSKEY's key in one piece (dig may split a long one)."""
+    if rtype in NAME_TYPES:
+        return " ".join(rdata).lower()
+    if rtype == "DNSKEY" and len(rdata) > KEY_FIELDS:
+        return " ".join([*rdata[:KEY_FIELDS], "".join(rdata[KEY_FIELDS:])])
+    return " ".join(rdata)
+
+
+def dig(server: str, fqdn: str, rtype: str) -> Answer:
+    """Ask one nameserver, without recursion, for one rrset."""
+    out = subprocess.run(
+        [tool("dig"), "+norec", "+time=3", "+tries=2", "+noall", "+comments", "+answer",
+         f"@{server}", fqdn, rtype],
+        capture_output=True, text=True, timeout=TIMEOUT, check=False).stdout
+    answer = Answer()
+    values = set()
+    for line in out.splitlines():
+        if "status:" in line:
+            answer.status = line.split("status:")[1].split(",")[0].strip()
+        elif line.startswith(";; flags:"):
+            answer.authoritative = "aa" in line.split(":")[1].split(";")[0].split()
+        elif line and not line.startswith(";"):
+            fields = line.split()
+            if len(fields) > RDATA and fields[0].lower() == fqdn.lower() and fields[RDATA - 1] == rtype:
+                values.add(normalise(rtype, fields[RDATA:]))
+    answer.values = frozenset(values)
+    return answer
+
+
+def resolved_nameservers(zone: str) -> set[str]:
+    """The zone's NS rrset as this machine's resolver finds it."""
+    out = subprocess.run([tool("dig"), "+short", f"{zone}.", "NS"], capture_output=True,
+                         text=True, timeout=TIMEOUT, check=False).stdout
+    return {line.strip().lower() for line in out.splitlines() if line.strip().endswith(".")}
+
+
+def configured_nameservers(zone: dict[str, Any], providers: dict[str, Any]) -> set[str]:
+    return {
+        f"{name.lower().rstrip('.')}."
+        for provider in zone["dns"]
+        for name in providers[provider].get("dns", {}).get("external_nameservers", [])
+    }
+
+
+def nameservers(name: str, zone: dict[str, Any], providers: dict[str, Any]) -> list[str]:
+    """Every nameserver of the zone: the configured and resolved ones, and
+    those any of them lists in its apex NS rrset."""
+    found = configured_nameservers(zone, providers) | resolved_nameservers(name)
+    for server in sorted(found):
+        found |= dig(server, f"{name}.", "NS").values
+    return sorted(found)
+
+
+def rrsets(zone: dict[str, Any], providers: dict[str, Any], extra: list[str]) -> list[tuple[str, str]]:
+    """The (name, type) of every rrset the hosting block describes for the
+    zone, and those --record adds."""
+    wanted = [("@", "NS")]
+    if "dnssec" in zone:
+        wanted.append(("@", "DNSKEY"))
+    email = zone.get("email")
+    mail = providers[email["provider"]] if email else {}
+    if mail.get("mx"):
+        wanted.append(("@", "MX"))
+    if mail.get("spf") or zone.get("apex_txt"):
+        wanted.append(("@", "TXT"))
+    if email and "dmarc" in email:
+        wanted.append(("_dmarc", "TXT"))
+    wanted += [(f"{selector}._domainkey", "CNAME") for selector in mail.get("dkim", {})]
+    wanted += [(name, "TXT") for name in (email or {}).get("verification", {})]
+    for name, site in zone.get("sites", {}).items():
+        cname = site["kind"] == "cloud-run" or (
+            site["kind"] == "pages" and site.get("served_by", "pages") == "pages")
+        wanted += [(name, "CNAME")] if cname else [(name, "A"), (name, "AAAA")]
+    for record in extra:
+        name, _, rtype = record.rpartition("/")
+        if not name or not rtype:
+            sys.exit(f"pubkit: --record {record} must be NAME/TYPE, the name relative to the zone "
+                     "(\"@\" for the apex), such as www/A")
+        wanted.append((name, rtype.upper()))
+    return list(dict.fromkeys(wanted))
+
+
+def compare(zone: str, servers: list[str], wanted: list[tuple[str, str]]) -> list[str]:
+    """Every rrset at every nameserver: each must answer for the zone, and
+    all with the same values."""
+    problems = []
+    refusing: set[str] = set()
+    for name, rtype in wanted:
+        fqdn = absolute(name, zone)
+        answers = {server: dig(server, fqdn, rtype) for server in servers}
+        for server, answer in answers.items():
+            serving = answer.authoritative and answer.status in ("NOERROR", "NXDOMAIN")
+            if server not in refusing and not serving:
+                refusing.add(server)
+                problems.append(f"{server} does not serve {zone} (status {answer.status or 'none'}, "
+                                f"{'authoritative' if answer.authoritative else 'not authoritative'})")
+        given = {server: answer.values for server, answer in answers.items() if server not in refusing}
+        if len(set(given.values())) > 1:
+            lines = [f"  {server}: {', '.join(sorted(values)) or '(nothing)'}"
+                     for server, values in sorted(given.items())]
+            problems.append(f"{fqdn} {rtype} differs between nameservers:\n" + "\n".join(lines))
+    return problems
+
+
+def pinned_keys(dnssec: dict[str, Any]) -> set[str]:
+    return {normalise("DNSKEY", key.split(" ")) for keys in dnssec["keys"].values() for key in keys}
+
+
+def check_keys(zone: str, servers: list[str], pinned: set[str]) -> list[str]:
+    """Each nameserver's DNSKEY rrset is the keys pubkit.json pins, all of them."""
+    problems = []
+    for server in servers:
+        served = dig(server, f"{zone}.", "DNSKEY").values
+        for key in sorted(served - pinned):
+            problems.append(f"{server} serves a key pubkit.json does not pin: {key}")
+        for key in sorted(pinned - served):
+            problems.append(f"{server} does not serve the pinned key {key}")
+    return problems
+
+
+def anchors(zone: str, pinned: set[str]) -> str:
+    """delv's trust anchors: the pinned key-signing keys, which the
+    registrar's DS records will name."""
+    lines = []
+    for key in sorted(pinned):
+        flags, protocol, algorithm, _ = dnskey(key)
+        if flags == SEP:
+            lines.append(f'  "{zone}." static-key {flags} {protocol} {algorithm} "{key.split(" ")[3]}";')
+    return "trust-anchors {\n" + "\n".join(lines) + "\n};\n"
+
+
+def validate(zone: str, servers: list[str], wanted: list[tuple[str, str]], pinned: set[str]) -> list[str]:
+    """delv at each nameserver alone, with the pinned keys as anchors: every
+    rrset, and a name that does not exist, must validate."""
+    problems = []
+    missing = f"pubkit-check-{secrets.token_hex(6)}"
+    with tempfile.TemporaryDirectory() as tmp:
+        anchor_file = Path(tmp) / "anchors.conf"
+        anchor_file.write_text(anchors(zone, pinned), encoding="utf-8")
+        for server in servers:
+            for name, rtype in [*wanted, (missing, "A")]:
+                fqdn = absolute(name, zone)
+                result = subprocess.run(
+                    [tool("delv"), "-a", str(anchor_file), f"+root={zone}", f"@{server}", fqdn, rtype],
+                    capture_output=True, text=True, timeout=TIMEOUT, check=False)
+                lines = (result.stdout + result.stderr).splitlines()
+                if not any(line.strip() in VALIDATED for line in lines):
+                    reason = next((line.lstrip("; ") for line in lines if line.startswith(";;")),
+                                  "no answer")
+                    what = "a name that does not exist" if name == missing else f"{fqdn} {rtype}"
+                    problems.append(f"{server}: {what} does not validate against the pinned keys "
+                                    f"({reason})")
+    return problems
+
+
+def check(root: Path, zone: str, extra: list[str]) -> int:
+    from .cli import read_config  # noqa: PLC0415
+    hosting = settings(read_config(root))
+    zones = hosting.get("zones", {})
+    if zone not in zones:
+        sys.exit(f"pubkit: pubkit.json's hosting block has no zone {zone}; it has "
+                 f"{', '.join(sorted(zones)) or 'none'}")
+    providers = hosting.get("providers", {})
+    config = zones[zone]
+    servers = nameservers(zone, config, providers)
+    wanted = rrsets(config, providers, extra)
+    # The DNSKEY rrset is checked against the pinned keys, which says more.
+    problems = compare(zone, servers, [rrset for rrset in wanted if rrset[1] != "DNSKEY"])
+    if "dnssec" in config:
+        pinned = pinned_keys(config["dnssec"])
+        problems += check_keys(zone, servers, pinned)
+        problems += validate(zone, servers, wanted, pinned)
+    for problem in problems:
+        print(f"pubkit: {problem}", file=sys.stderr)
+    if problems:
+        return 1
+    print(f"{zone}: {len(wanted)} rrsets agree at {len(servers)} nameservers: {', '.join(servers)}")
+    if "dnssec" in config:
+        print(f"{zone}: every nameserver serves the {len(pinned)} pinned keys and validates alone, "
+              "a name that does not exist included")
+    return 0
