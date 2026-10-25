@@ -63,9 +63,9 @@ run "signed_beside_desec" {
   }
 
   assert {
-    condition = toset([for i in range(2) : cloudflare_dns_record.records["nameservers ${i}"].content]) == toset([
+    condition = toset([for k, r in cloudflare_dns_record.records : r.content if r.type == "NS"]) == toset([
       "ns1.desec.io", "ns2.desec.org",
-    ])
+    ]) && cloudflare_dns_record.records["nameservers ns1.desec.io"].content == "ns1.desec.io"
     error_message = "Cloudflare's NS records are deSEC's nameservers."
   }
 
@@ -134,7 +134,7 @@ run "three_providers" {
   }
 
   assert {
-    condition = toset([for i in range(3) : cloudflare_dns_record.records["nameservers ${i}"].content]) == toset([
+    condition = toset([for k, r in cloudflare_dns_record.records : r.content if r.type == "NS"]) == toset([
       "ns1.assigned.example.com", "ns1.desec.io", "ns2.desec.org",
     ])
     error_message = "Cloudflare's NS records are Hetzner's and deSEC's."

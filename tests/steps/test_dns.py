@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from pytest_bdd import given, parsers, scenarios, then
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from pubkit import dns as check
 
@@ -207,3 +207,60 @@ def compared(zone, expected):
 @then(parsers.parse('stderr does not mention "{text}"'))
 def stderr_lacks(result, text):
     assert text not in result.stderr, result.stderr
+
+
+def _record(index, rtype, content, priority=None):
+    zone = 'module.hosting.module.zone["example.eu"]'
+    return {"address": f'{zone}.cloudflare_dns_record.records[{json.dumps(index)}]',
+            "mode": "managed", "type": "cloudflare_dns_record", "name": "records", "index": index,
+            "values": {"type": rtype, "content": content, "priority": priority}}
+
+
+def _state(records):
+    return json.dumps({"values": {"root_module": {"child_modules": [{
+        "address": "module.hosting", "child_modules": [{
+            "address": 'module.hosting.module.zone["example.eu"]', "resources": records}]}]}}})
+
+
+@given("a Terraform state with Cloudflare records of a zone under position keys", target_fixture="state")
+def position_keyed():
+    return _state([
+        _record("nameservers 1", "NS", "ns1.desec.io"),
+        _record("nameservers ns2.desec.org", "NS", "ns2.desec.org"),
+        _record("email_mx 0", "MX", "mxext1.mailbox.org", 10),
+        _record("apex_txt 0", "TXT", '"v=spf1 include:mailbox.org ~all"'),
+        _record("apex_a 0", "A", "192.0.2.1"),
+        _record("recipes 0", "CNAME", "example-recipes.pages.dev"),
+    ])
+
+
+@given("a Terraform state with no Cloudflare records under position keys", target_fixture="state")
+def value_keyed():
+    return _state([_record("apex_a 0", "A", "192.0.2.1")])
+
+
+@given("a Terraform state that is not JSON", target_fixture="state")
+def not_json():
+    return "Terraform has no state"
+
+
+@when("I run pubkit dns moves on it", target_fixture="result")
+def run_moves(repo, run, state):
+    from conftest import pubkit
+    return run(pubkit(), "dns", "moves", stdin=state, cwd=repo)
+
+
+@then("it moves 3 records, and none of the A, AAAA or CNAME records or those already keyed by value")
+def moved_three(result):
+    out = result.stdout
+    assert out.count("moved {") == 3, out
+    assert "apex_a" not in out and "recipes" not in out and "ns2.desec.org" not in out, out
+
+
+@then("it moves the NS, MX and apex TXT records to keys by their values, HCL-quoted")
+def moved_by_value(result):
+    zone = 'module.hosting.module.zone["example.eu"].cloudflare_dns_record.records'
+    for old, new in (("nameservers 1", "nameservers ns1.desec.io"),
+                     ("email_mx 0", "email_mx 10 mxext1.mailbox.org"),
+                     ("apex_txt 0", 'apex_txt \\"v=spf1 include:mailbox.org ~all\\"')):
+        assert f'  from = {zone}["{old}"]\n  to   = {zone}["{new}"]\n' in result.stdout, result.stdout

@@ -131,13 +131,20 @@ resource "cloudflare_zone_dns_settings" "zone" {
 
 locals {
   # One Cloudflare record per value of each rrset, keyed by the rrset and
-  # the value's position. The keys can't use the values themselves: some (a
-  # Pages subdomain, Cloudflare's nameservers) are known only after apply,
-  # and for_each keys must be known at plan time. Cloudflare lists its own
+  # the record itself: "nameservers ns1.desec.io", "email_mx 10
+  # mxext1.mailbox.org". A value that comes or goes then changes only its
+  # own record; keyed by position, the others would shift, and Cloudflare
+  # refuses a record created while another, being changed, still holds the
+  # same value ("an identical record already exists"). A, AAAA and CNAME
+  # records keep their position ("www 0"): their values (a server's address,
+  # a Pages subdomain) may be known only after apply, and for_each keys must
+  # be known at plan time. `pubkit dns moves` writes the moved blocks that
+  # take a zone from position keys to these. Cloudflare lists its own
   # nameservers itself, so its NS records are the other providers' alone.
   cloudflare_records = local.on_cloudflare ? merge([
     for key, rrset in local.records : {
-      for i, value in(key == "nameservers" ? sort(concat(local.hetzner_nameservers, local.desec_nameservers)) : rrset.values) : "${key} ${i}" => {
+      for i, value in(key == "nameservers" ? sort(concat(local.hetzner_nameservers, local.desec_nameservers)) : rrset.values) :
+      (contains(["A", "AAAA", "CNAME"], rrset.type) ? "${key} ${i}" : "${key} ${trimsuffix(value, ".")}") => {
         name = rrset.name == "@" ? var.zone : "${rrset.name}.${var.zone}"
         type = rrset.type
         ttl  = rrset.ttl

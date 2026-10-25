@@ -1,4 +1,6 @@
-"""`pubkit dns check ZONE`: does every nameserver of a zone in pubkit.json's
+"""`pubkit dns check ZONE` and `pubkit dns moves`.
+
+`pubkit dns check ZONE`: does every nameserver of a zone in pubkit.json's
 hosting block give the same answers, and, for a signed zone, does each one
 validate on its own?
 
@@ -19,10 +21,17 @@ that changed its keys, fails here before any DS record is at the registrar.
 
 dig and delv are BIND 9's (Debian's bind9-dnsutils). Nothing is changed
 anywhere: every query is a read.
+
+`pubkit dns moves` reads `terraform show -json` on stdin and writes the
+moved blocks that take terraform/dns-zone's Cloudflare records from the
+position keys of pubkit 0.12.6 and earlier ("email_mx 0") to the keys by
+value that replaced them ("email_mx 10 mxext1.mailbox.org"), so a root
+module moves to the new keys with no change to any record.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import secrets
 import shutil
@@ -272,4 +281,50 @@ def check(root: Path, zone: str, extra: list[str]) -> int:
     if "dnssec" in config:
         print(f"{zone}: every nameserver serves the {len(pinned)} pinned keys and validates alone, "
               "a name that does not exist included")
+    return 0
+
+
+POSITION_KEYED = {"A", "AAAA", "CNAME"}
+
+
+def hcl(text: str) -> str:
+    """A string as an HCL literal."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("${", "$${").replace("%{", "%%{") + '"'
+
+
+def resources(module: dict[str, Any]):
+    yield from module.get("resources", [])
+    for child in module.get("child_modules", []):
+        yield from resources(child)
+
+
+def moves(state: str) -> int:
+    """Moved blocks for every Cloudflare record of terraform/dns-zone still
+    under a position key whose type pubkit now keys by value."""
+    try:
+        root = json.loads(state).get("values", {}).get("root_module", {})
+    except (json.JSONDecodeError, AttributeError):
+        sys.exit("pubkit: dns moves reads `terraform show -json` on stdin")
+    blocks = []
+    for resource in resources(root):
+        index, address = resource.get("index"), resource.get("address", "")
+        marker = ".cloudflare_dns_record.records["
+        if (resource.get("type") != "cloudflare_dns_record" or resource.get("name") != "records"
+                or not isinstance(index, str) or not address.startswith("module.") or marker not in address):
+            continue
+        key, _, position = index.rpartition(" ")
+        record = resource.get("values", {})
+        if not key or not position.isdigit() or record.get("type") in POSITION_KEYED:
+            continue
+        priority = record.get("priority")
+        value = f"{priority} {record['content']}" if record.get("type") == "MX" else record["content"]
+        base = address[:address.index(marker) + len(marker) - 1]
+        blocks.append(f"moved {{\n  from = {base}[{hcl(index)}]\n  to   = {base}[{hcl(f'{key} {value}')}]\n}}\n")
+    if blocks:
+        print("# Cloudflare records keyed by value since pubkit 0.12.7 (terraform/dns-zone);\n"
+              "# written by `pubkit dns moves`. Once applied, this file can go.\n")
+        print("\n".join(blocks), end="")
+    else:
+        print("pubkit: no Cloudflare record of terraform/dns-zone is under a position key",
+              file=sys.stderr)
     return 0

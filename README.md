@@ -49,12 +49,19 @@ when `pubkit.json` still names an old one.
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
 
-- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
+- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel) and `pubkit` (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
 - **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, for a Rust package a `Makefile` that includes `pubkit.mk`, and for a service `with-secrets.json`.
 
 Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
 pubkit, and in a Rust repository it runs `pubkit conform` (below).
+
+**`./pubkit`** runs the pubkit this repository pins, whichever (if any) is
+installed: `./pubkit sync --check`, `./pubkit dns check example.eu`. It
+runs `uvx` on that release's wheel, which uv fetches once and caches, in
+the repository's root, from whichever directory it is called. Without uv
+it says how to install it. It is managed, so `pubkit sync` moves it with
+the rest when a repository moves to a new pubkit.
 
 ## Services: `./with-secrets` and `service-ci.yml`
 
@@ -261,6 +268,7 @@ variable "desec_token" {
 
 provider "desec" {
   api_token = var.desec_token
+  retry_max = 30
 }
 
 module "desec_zones" {
@@ -270,6 +278,12 @@ module "desec_zones" {
   apex_nameservers = module.hosting.apex_nameservers
 }
 ```
+
+deSEC allows 15 rrset writes a minute (and 100 an hour) per domain, and
+Terraform writes many at once, so a zone's first apply hits the limit. deSEC
+then says how long to wait, and the provider waits that long before trying
+again, up to `retry_max` times (5 by default, too few for a whole zone; 30
+covers one of up to about 100 rrsets).
 
 Its outputs are `nameservers` (by zone, for the registrar),
 `cloudflare_zone_ids`, `records` (every rrset, by zone),
@@ -303,7 +317,11 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   it serves the zone too. With more than one provider, Cloudflare runs in
   multi-provider mode: one unproxied record per value (MX split into
   priority and host), and every provider's nameservers in the apex NS
-  rrset at each. With `dnssec`, Cloudflare signs in multi-signer mode and
+  rrset at each. Each record is keyed by its rrset and its value
+  (`"nameservers ns1.desec.io"`, `"email_mx 10 mxext1.mailbox.org"`), so a
+  value that comes or goes changes only its own record; A, AAAA and CNAME
+  records, whose values may be known only after apply, keep their position
+  (`"www 0"`). With `dnssec`, Cloudflare signs in multi-signer mode and
   serves the other providers' keys as DNSKEY records; denial of existence
   is left as Cloudflare's plan has it (NSEC on Free; RFC 8901 lets each
   provider choose). `terraform/hosting` calls it for each zone; it can be
@@ -354,6 +372,17 @@ import {
   to = module.desec_zones.desec_rrset.records["example.eu nameservers"]
   id = "example.eu/@/NS"
 }
+```
+
+**From pubkit 0.12.6 or earlier**, a zone at Cloudflare has its NS, MX,
+TXT and other records under position keys (`"email_mx 0"`), which pubkit
+now keys by value. Position keys shifted when a provider joined, and
+Cloudflare refused a record created while another, being changed, still
+held its value. `pubkit dns moves` writes the moved blocks from the state,
+so the first plan on the new pubkit shows only moves:
+
+```sh
+./with-secrets terraform show -json | ./pubkit dns moves > moved-cloudflare-keys.tf
 ```
 
 Records a root module already manages move with `moved` blocks, or with
