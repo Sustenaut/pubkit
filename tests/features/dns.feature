@@ -107,3 +107,22 @@ Feature: pubkit dns check compares a zone's nameservers and validates each one a
     When I run pubkit "dns" "check" "example.org"
     Then it fails
     And stderr mentions "dns check needs dig, from BIND 9"
+
+  Scenario: pubkit dns moves takes Cloudflare records from position keys to keys by value
+    Given a Terraform state with Cloudflare records of a zone under position keys
+    When I run pubkit dns moves on it
+    Then it succeeds
+    And it moves the NS, MX and apex TXT records to keys by their values, HCL-quoted
+    And it moves 3 records, and none of the A, AAAA or CNAME records or those already keyed by value
+
+  Scenario: pubkit dns moves says when there is nothing to move
+    Given a Terraform state with no Cloudflare records under position keys
+    When I run pubkit dns moves on it
+    Then it succeeds
+    And stderr mentions "no Cloudflare record of terraform/dns-zone is under a position key"
+
+  Scenario: pubkit dns moves needs terraform show -json
+    Given a Terraform state that is not JSON
+    When I run pubkit dns moves on it
+    Then it fails
+    And stderr mentions "reads `terraform show -json` on stdin"

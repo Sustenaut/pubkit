@@ -89,19 +89,22 @@ run "multi_provider" {
   }
 
   assert {
-    condition     = tolist([for i in range(3) : cloudflare_dns_record.records["nameservers ${i}"].content]) == tolist(["ns1.assigned.example.com", "ns2.assigned.example.com", "ns3.assigned.example.de"])
-    error_message = "Cloudflare's NS records are Hetzner's nameservers alone, without trailing dots."
+    condition = alltrue([
+      for ns in ["ns1.assigned.example.com", "ns2.assigned.example.com", "ns3.assigned.example.de"] :
+      cloudflare_dns_record.records["nameservers ${ns}"].content == ns
+    ])
+    error_message = "Cloudflare's NS records are Hetzner's nameservers alone, without trailing dots, each keyed by its name."
   }
 
   assert {
     condition = (
-      cloudflare_dns_record.records["mx 0"].priority == 10 &&
-      cloudflare_dns_record.records["mx 0"].content == "mxext1.example.org" &&
-      cloudflare_dns_record.records["mx 1"].priority == 20 &&
-      cloudflare_dns_record.records["mx 1"].content == "mxext2.example.org" &&
-      cloudflare_dns_record.records["mx 1"].name == "example.eu"
+      cloudflare_dns_record.records["mx 10 mxext1.example.org"].priority == 10 &&
+      cloudflare_dns_record.records["mx 10 mxext1.example.org"].content == "mxext1.example.org" &&
+      cloudflare_dns_record.records["mx 20 mxext2.example.org"].priority == 20 &&
+      cloudflare_dns_record.records["mx 20 mxext2.example.org"].content == "mxext2.example.org" &&
+      cloudflare_dns_record.records["mx 20 mxext2.example.org"].name == "example.eu"
     )
-    error_message = "MX values are split into priority and host, at the apex's full name."
+    error_message = "MX values are split into priority and host, at the apex's full name, each keyed by both."
   }
 
   assert {
@@ -109,7 +112,7 @@ run "multi_provider" {
       cloudflare_dns_record.records["docs 0"].name == "docs.example.eu" &&
       cloudflare_dns_record.records["docs 0"].content == "docs.example.org" &&
       cloudflare_dns_record.records["docs 0"].priority == null &&
-      cloudflare_dns_record.records["spf 0"].content == "\"v=spf1 -all\""
+      cloudflare_dns_record.records["spf \"v=spf1 -all\""].content == "\"v=spf1 -all\""
     )
     error_message = "Other records keep their value, less a trailing dot, at the full name."
   }
@@ -227,4 +230,30 @@ run "some_provider" {
   }
 
   expect_failures = [var.cloudflare]
+}
+
+# A provider joining a zone adds NS records and changes none: each is keyed
+# by its name, so the others keep their keys (position keys would shift, and
+# Cloudflare refuses a record created while another still holds its value).
+run "keys_by_value" {
+  command = plan
+
+  variables {
+    hetzner    = jsondecode(file("../testdata/pubkit.json")).hosting.providers.hetzner
+    cloudflare = jsondecode(file("../testdata/pubkit.json")).hosting.providers.cloudflare
+    desec      = jsondecode(file("../testdata/pubkit.json")).hosting.providers.desec
+  }
+
+  assert {
+    condition = toset([for k, r in cloudflare_dns_record.records : k if r.type == "NS"]) == toset([
+      "nameservers ns1.assigned.example.com", "nameservers ns2.assigned.example.com", "nameservers ns3.assigned.example.de",
+      "nameservers ns1.desec.io", "nameservers ns2.desec.org",
+    ])
+    error_message = "NS records are keyed by name: deSEC's join Hetzner's, whose keys stay the same."
+  }
+
+  assert {
+    condition     = contains(keys(cloudflare_dns_record.records), "web 0") && contains(keys(cloudflare_dns_record.records), "docs 0")
+    error_message = "A, AAAA and CNAME records keep their position keys, since their values may be known only after apply."
+  }
 }

@@ -17,6 +17,7 @@
     pubkit freshness [--json] DIR...
     pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
     pubkit dns check ZONE [--record NAME/TYPE...]
+    pubkit dns moves < STATE.json
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -46,7 +47,8 @@ KINDS = ("rust", "utility", "service")
 # repository says which it is in one way only.
 RENAMED_KINDS = {"python": "utility", "python-utility": "utility"}
 MANAGED = {
-    "common": ["tests/requirements-pubkit.txt"],
+    # The pinned pubkit, and a way to run exactly it.
+    "common": ["tests/requirements-pubkit.txt", "pubkit"],
     "rust": ["rust-toolchain.toml", "pubkit.mk"],
     "utility": [],
     # A private repository that deploys: the one secrets wrapper every
@@ -54,7 +56,7 @@ MANAGED = {
     "service": ["with-secrets"],
 }
 # Managed files that are programs, written executable.
-EXECUTABLE = {"with-secrets"}
+EXECUTABLE = {"with-secrets", "pubkit"}
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
@@ -397,6 +399,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("zone", help="a zone in pubkit.json's hosting block, such as example.eu")
     p.add_argument("--record", action="append", default=[], metavar="NAME/TYPE",
                    help="another rrset to compare, such as www/A; repeat it")
+    dns.add_parser("moves", help="moved blocks taking Cloudflare records to keys by value, "
+                                 "from `terraform show -json` on stdin")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -455,6 +459,9 @@ def main(argv: list[str] | None = None) -> int:
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
         return protect(config, args.repos, args.check, args.require)
+    if args.command == "dns" and args.dns_command == "moves":
+        from .dns import moves
+        return moves(sys.stdin.read())
     if args.command == "dns":
         from .dns import check
         return check(root, args.zone, args.record)

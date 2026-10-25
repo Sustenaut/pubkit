@@ -12,6 +12,10 @@
 #     apex_nameservers = module.hosting.apex_nameservers
 #   }
 #
+# deSEC allows 15 rrset writes a minute per domain, and a zone's first apply
+# makes many: the root module's provider block sets retry_max (30), so the
+# provider waits as long as deSEC says and tries again (README.md).
+#
 # deSEC signs every zone it serves, with one key (a CSK) it manages itself.
 # With a zone's dnssec, it also serves the other providers' keys, so an
 # answer from any of them validates (RFC 8901's model 2, multi-signer).
