@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.5 is released as v0.12.5 from commit a8c93a61d2c1e0911868376760f9b6ecdb3e2d25.",
+      "content": "pubkit 0.12.6 is released as v0.12.6 from commit d16519adc5f5f4aec0d6594ecb26602401cc2002.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.5",
+            "0.12.6",
             "pubkit --version",
-            "pubkit 0.12.5",
-            "v0.12.5",
-            "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
+            "pubkit 0.12.6",
+            "v0.12.6",
+            "d16519adc5f5f4aec0d6594ecb26602401cc2002"
           ]
         ]
       },
-      "scope": "the published release v0.12.5 of pubkit",
+      "scope": "the published release v0.12.6 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
+          "revision": "d16519adc5f5f4aec0d6594ecb26602401cc2002"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.5 was released on 2026-10-23 from commit a8c93a61d2c1e0911868376760f9b6ecdb3e2d25 with these changes.",
+      "content": "pubkit 0.12.6 was released on 2026-10-25 from commit d16519adc5f5f4aec0d6594ecb26602401cc2002 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,31 @@
         "rows": [
           [
             "added",
-            "Generated CI for a utility: with a ci block in pubkit.json, pubkit sync writes pr.yml, main.yml and nightly.yml, each calling only the jobs that event runs, so no job shows as skipped. Each job is its own reusable workflow (job-node-test.yml, job-node-browser.yml, job-node-audit.yml, job-python-functional.yml, job-python-browser.yml, job-python-audit.yml, job-osv.yml, job-review.yml, job-sonar.yml). ci.events, ci.with, ci.jobs (narrow a job's events, or false), ci.language and ci.release configure it; checks keep their names (ci / passed, release / release). pubkit init --kind=utility writes \"ci\": {} in place of a seeded ci.yml, and the nightly moves ci.release.pubrel in pubkit.json"
+            "A desec provider type in pubkit.json's hosting block, and terraform/desec-zones, which writes every record terraform/hosting writes at the other providers to each zone a desec provider serves (the domain, its rrsets with TTLs raised to deSEC's minimum_ttl, and the apex NS rrset beside other providers), from terraform/hosting's new apex_nameservers and records outputs. It is apart because the deSEC provider will not start without a token. terraform/dns-zone lists deSEC's nameservers (dns.external_nameservers in pubkit.json) in the apex NS rrset and for the registrar, and multi-provider mode now means two or more providers"
+          ],
+          [
+            "added",
+            "A zone's dnssec block in pubkit.json pins each of its DNS providers' public keys (dnssec.keys, DNSKEY values by provider name) and signs the zone with every provider (RFC 8901 multi-signer): Cloudflare's DNSSEC is turned on with multi-signer and serves the other providers' keys as DNSKEY records, and deSEC serves Cloudflare's. Denial of existence is left to Cloudflare's plan (NSEC on Free). pubkit sync stops on a signed zone Hetzner serves, keys missing for a provider, a provider without a key-signing key, or mixed algorithms. Outputs cloudflare_ds (terraform/hosting) and ds and keys (terraform/desec-zones) give the DS records and keys"
+          ],
+          [
+            "added",
+            "pubkit dns check ZONE [--record NAME/TYPE]: asks every nameserver of a zone in the hosting block (configured, resolved, and listed in each one's apex NS rrset), without recursion, for every rrset the block describes and fails when they differ or one does not serve the zone; for a signed zone, each must serve exactly the pinned keys and validate alone under delv, with the pinned key-signing keys as trust anchors, for every rrset and a name that does not exist. It only reads, through dig and delv"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.5 of pubkit",
+      "scope": "the published release v0.12.6 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a8c93a61d2c1e0911868376760f9b6ecdb3e2d25"
+          "revision": "d16519adc5f5f4aec0d6594ecb26602401cc2002"
         }
       ]
     }
   },
-  "created": "2026-10-23T00:00:00Z",
+  "created": "2026-10-25T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
