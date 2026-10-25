@@ -1,17 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "added",
-      "change": "A desec provider type in pubkit.json's hosting block, and terraform/desec-zones, which writes every record terraform/hosting writes at the other providers to each zone a desec provider serves (the domain, its rrsets with TTLs raised to deSEC's minimum_ttl, and the apex NS rrset beside other providers), from terraform/hosting's new apex_nameservers and records outputs. It is apart because the deSEC provider will not start without a token. terraform/dns-zone lists deSEC's nameservers (dns.external_nameservers in pubkit.json) in the apex NS rrset and for the registrar, and multi-provider mode now means two or more providers"
-    },
-    {
-      "category": "added",
-      "change": "A zone's dnssec block in pubkit.json pins each of its DNS providers' public keys (dnssec.keys, DNSKEY values by provider name) and signs the zone with every provider (RFC 8901 multi-signer): Cloudflare's DNSSEC is turned on with multi-signer and serves the other providers' keys as DNSKEY records, and deSEC serves Cloudflare's. Denial of existence is left to Cloudflare's plan (NSEC on Free). pubkit sync stops on a signed zone Hetzner serves, keys missing for a provider, a provider without a key-signing key, or mixed algorithms. Outputs cloudflare_ds (terraform/hosting) and ds and keys (terraform/desec-zones) give the DS records and keys"
-    },
-    {
-      "category": "added",
-      "change": "pubkit dns check ZONE [--record NAME/TYPE]: asks every nameserver of a zone in the hosting block (configured, resolved, and listed in each one's apex NS rrset), without recursion, for every rrset the block describes and fails when they differ or one does not serve the zone; for a signed zone, each must serve exactly the pinned keys and validate alone under delv, with the pinned key-signing keys as trust anchors, for every rrset and a name that does not exist. It only reads, through dig and delv"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
