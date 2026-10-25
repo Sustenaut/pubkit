@@ -31,11 +31,27 @@ def triggers(data):
     return data.get("on", data.get(True))
 
 
+KINDS = {"Node": "utility", "Python": "utility", "Rust": "rust", "service": "service"}
+
+
 @given(parsers.parse("a {language} repository whose ci block is '{text}'"))
 def repository(repo, language, text):
     if language == "Node":
         (repo / "package.json").write_text("{}\n")
-    (repo / "pubkit.json").write_text(json.dumps({"kind": "utility", "ci": json.loads(text)}))
+    if language == "Rust":
+        # A crate with a library, which cargo metadata reads; nothing is built.
+        (repo / "Cargo.toml").write_text(
+            '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n')
+        (repo / "src").mkdir()
+        (repo / "src" / "lib.rs").write_text("")
+    (repo / "pubkit.json").write_text(json.dumps({"kind": KINDS[language], "ci": json.loads(text)}))
+
+
+@given(parsers.parse('pubkit.json excepts "{rule}"'))
+def excepts(repo, rule):
+    config = json.loads((repo / "pubkit.json").read_text())
+    config["exceptions"] = [{"rule": rule, "reason": "not yet", "until": "2099-01-01"}]
+    (repo / "pubkit.json").write_text(json.dumps(config))
 
 
 @given(parsers.parse("the file \"{path}\" reads '{text}'"))
@@ -48,6 +64,11 @@ def runs(repo, name, expected):
     assert list(jobs(repo, name)) == expected.split(", ")
 
 
+@then(parsers.parse('"{name}" has no release'))
+def no_release(repo, name):
+    assert "release" not in jobs(repo, name)
+
+
 @then(parsers.parse('no workflow is written for "{event}"'))
 def not_written(repo, event):
     assert not (repo / ".github" / "workflows" / f"{event}.yml").exists()
@@ -55,7 +76,9 @@ def not_written(repo, event):
 
 @then('no job in "pr.yml" or "main.yml" has a condition but passed')
 def unconditional(repo):
-    for name in ("pr.yml", "main.yml"):
+    for name in ("pr.yml", "main.yml", "nightly.yml"):
+        if not (repo / ".github" / "workflows" / name).exists():
+            continue
         for job, spec in jobs(repo, name).items():
             assert "if" not in spec or job == "passed", f"{name}: {job} has if: {spec.get('if')}"
 

@@ -1,4 +1,4 @@
-Feature: pubkit sync writes a utility's CI from pubkit.json, with no skipped jobs
+Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped jobs
   A reusable workflow that serves every repository skips the jobs one does
   not use, and GitHub shows each as skipped. With a ci block, pubkit.json
   says which jobs run on which events, and `pubkit sync` writes one
@@ -33,6 +33,47 @@ Feature: pubkit sync writes a utility's CI from pubkit.json, with no skipped job
     When I run pubkit "sync"
     Then "nightly.yml" runs the jobs "test, audit, osv, sonar, passed"
     And "nightly.yml" runs on the schedule "5 4 * * *" and by hand
+
+  Scenario: A Rust crate runs the jobs the standard asks for, with its targets
+    Given a Rust repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, review, sonar, passed, release"
+    And "main.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
+    And "nightly.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, toolchains, sonar, passed"
+    And no job in "pr.yml" or "main.yml" has a condition but passed
+    And in "pr.yml" the "gates" job is given "required" "fmt-check lint doc doc-coverage-check publish-check"
+    And in "pr.yml" the "audit" job is given "required" "deny vet"
+    And in "pr.yml" the "sonar" job needs "functional"
+
+  Scenario: A Rust crate's release checks semver, at the pubrel the ci block names
+    Given a Rust repository whose ci block is '{"release": {"pubrel": "0.5.4"}}'
+    When I run pubkit "sync"
+    Then "pr.yml" calls pubrel's release workflow at "0.5.4" with "semver-checks-version" "0.51.0"
+
+  Scenario: An exception from the standard drops the job it would have asked for
+    Given a Rust repository whose ci block is '{}'
+    And pubkit.json excepts "RS-VER-02"
+    When I run pubkit "sync"
+    Then "pr.yml" runs the jobs "gates, test, functional, fuzz, cross, audit, osv, review, sonar, passed, release"
+
+  Scenario: No cross-targets drops the cross job
+    Given a Rust repository whose ci block is '{"with": {"cross-targets": "[]"}}'
+    When I run pubkit "sync"
+    Then "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, review, sonar, passed, release"
+
+  Scenario: A service runs its checks, and Terraform and tests when it names them
+    Given a service repository whose ci block is '{"with": {"terraform-dir": ".", "test": "make test"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" runs the jobs "checks, terraform, tests, passed"
+    And "pr.yml" has no release
+    And in "pr.yml" the "terraform" job is given "terraform-dir" "."
+
+  Scenario: A service without Terraform or tests runs only its checks
+    Given a service repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "main.yml" runs the jobs "checks, passed"
 
   Scenario: The jobs block narrows a job's events or drops it
     Given a Node repository whose ci block is '{"jobs": {"review": false, "sonar": {"events": ["main"]}}}'
@@ -94,6 +135,18 @@ Feature: pubkit sync writes a utility's CI from pubkit.json, with no skipped job
       | {"cron": "daily"}                          | cron must be a schedule of five fields          |
       | {"release": {"pubrel": "latest"}}          | release.pubrel must be a version                |
 
+  Scenario Outline: A setting another kind's CI cannot use stops sync with a message
+    Given a <kind> repository whose ci block is '<ci>'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | kind    | ci                          | message                                   |
+      | service | {"release": true}           | release is not for a service              |
+      | service | {"with": {"browser-test": "x"}} | with gives browser-test, which no service job takes |
+      | Rust    | {"language": "node"}        | language is for a utility                 |
+
   Scenario Outline: The job table passes each job exactly the inputs its workflow takes
     When I read the job table for "<language>"
     Then every job's inputs are the ones its workflow declares
@@ -103,6 +156,8 @@ Feature: pubkit sync writes a utility's CI from pubkit.json, with no skipped job
       | language |
       | node     |
       | python   |
+      | rust     |
+      | service  |
 
   Scenario Outline: A job's workflow runs the same steps as the job in the shared workflow
     Then "<job>" runs the steps of the "<name>" job in "<shared>"
@@ -117,6 +172,12 @@ Feature: pubkit sync writes a utility's CI from pubkit.json, with no skipped job
       | job-python-audit.yml      | audit      | python-ci.yml |
       | job-osv.yml               | osv        | python-ci.yml |
       | job-review.yml            | review     | python-ci.yml |
+      | job-rust-test.yml         | test       | rust-ci.yml   |
+      | job-rust-msrv.yml         | msrv       | rust-ci.yml   |
+      | job-rust-toolchains.yml   | toolchains | rust-ci.yml   |
+      | job-service-checks.yml    | checks     | service-ci.yml |
+      | job-service-terraform.yml | terraform  | service-ci.yml |
+      | job-service-tests.yml     | tests      | service-ci.yml |
 
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'

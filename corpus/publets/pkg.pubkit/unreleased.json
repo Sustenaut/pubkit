@@ -1,4 +1,17 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "pubkit.json's ci block now writes a rust or service repository's CI too, and pubkit init and pubkit new give every kind a ci block in place of a ci.yml. Rust's pr.yml, main.yml and nightly.yml call job-rust-gates, test, functional, msrv, fuzz, cross, audit and toolchains (nightly only) beside job-osv, job-review and job-sonar, each only when the Rust crate standard asks for it here, from the rules and pubkit.json's exceptions; pubkit sync writes each job's required make targets into the workflow, and job-rust-gates runs make sync-check. On a pull request that touches no Rust code, Cargo files, fuzz/ or workflow files, fuzz and cross pass at once with a notice instead of being skipped. Rust's release checks semver (semver-checks-version 0.51.0). A service's pr.yml and main.yml call job-service-checks, and job-service-terraform and job-service-tests when the ci block gives a terraform-dir and a test; a service has no release. pubkit conform accepts the job-rust-*.yml pins as it does rust-ci.yml's"
+    },
+    {
+      "category": "added",
+      "change": "pubkit required also prints slow=true or slow=false: false when a pull request touches no Rust code, Cargo files, fuzz/ or workflow files, which the generated fuzz and cross jobs read"
+    },
+    {
+      "category": "changed",
+      "change": "job-sonar.yml takes reports, space-separated property=pattern pairs, in place of report-property and report-pattern, so one scan can send reports to more than one property (Rust's LCOV and Python's Cobertura XML). Only workflows pubkit sync writes call it, and they are rewritten with it"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

@@ -1,0 +1,26 @@
+# A service's Terraform, checked without a backend (fmt, init, validate),
+# so no state or credentials are touched.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-service-terraform
+
+on:
+  workflow_call:
+    inputs:
+      terraform-dir: { type: string, required: true, description: Where the Terraform files are. }
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with: { terraform_wrapper: false }
+      - run: terraform -chdir="$DIR" fmt -check -recursive
+        env: { DIR: '${{ inputs.terraform-dir }}' }
+      - run: terraform -chdir="$DIR" init -backend=false -input=false
+        env: { DIR: '${{ inputs.terraform-dir }}' }
+      - run: terraform -chdir="$DIR" validate
+        env: { DIR: '${{ inputs.terraform-dir }}' }

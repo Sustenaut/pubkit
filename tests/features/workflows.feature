@@ -22,6 +22,16 @@ Feature: The reusable workflows parse as GitHub reads them
       | job-python-browser.yml    |
       | job-python-audit.yml      |
       | job-sonar.yml             |
+      | job-rust-gates.yml        |
+      | job-rust-test.yml         |
+      | job-rust-functional.yml   |
+      | job-rust-fuzz.yml         |
+      | job-rust-cross.yml        |
+      | job-rust-audit.yml        |
+      | job-rust-toolchains.yml   |
+      | job-service-checks.yml    |
+      | job-service-terraform.yml |
+      | job-service-tests.yml     |
 
   Scenario Outline: A reusable workflow ends in the one check a ruleset requires
     When I parse the workflow "<workflow>"
@@ -103,6 +113,17 @@ Feature: The reusable workflows parse as GitHub reads them
       | job-osv.yml               |
       | job-review.yml            |
       | job-sonar.yml             |
+      | job-rust-gates.yml        |
+      | job-rust-test.yml         |
+      | job-rust-functional.yml   |
+      | job-rust-msrv.yml         |
+      | job-rust-fuzz.yml         |
+      | job-rust-cross.yml        |
+      | job-rust-audit.yml        |
+      | job-rust-toolchains.yml   |
+      | job-service-checks.yml    |
+      | job-service-terraform.yml |
+      | job-service-tests.yml     |
 
   Scenario: node-ci installs dependencies without running their scripts
     When I parse the workflow "node-ci.yml"

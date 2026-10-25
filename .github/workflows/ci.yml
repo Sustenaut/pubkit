@@ -46,8 +46,7 @@ jobs:
     needs: functional
     uses: ./.github/workflows/job-sonar.yml
     with:
-      report-property: sonar.python.coverage.reportPaths
-      report-pattern: '*.xml'
+      reports: sonar.python.coverage.reportPaths=*.xml
       sonar-args: >-
         -Dsonar.coverage.exclusions=tests/**
         -Dsonar.issue.ignore.multicriteria=pylock,cargolock

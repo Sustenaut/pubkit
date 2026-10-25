@@ -4,14 +4,14 @@ Feature: A service runs its secret-needing commands through ./with-secrets
   a Bitwarden Secrets Manager project with bws and runs one command with the
   secrets in its environment, set up by the repository's with-secrets.json.
 
-  Scenario: init writes the wrapper, its settings and the CI that calls service-ci
+  Scenario: init writes the wrapper, its settings and the CI its ci block gives
     Given an empty repository
     When I run pubkit "init" "--kind=service" "--project=infra"
     Then it succeeds
-    And the repository has "with-secrets", "with-secrets.json", ".github/workflows/ci.yml", "tests/requirements-pubkit.txt"
+    And the repository has "with-secrets", "with-secrets.json", ".github/workflows/pr.yml", ".github/workflows/main.yml", "tests/requirements-pubkit.txt"
     And "with-secrets" is executable
     And "with-secrets.json" contains ""project": "infra""
-    And ".github/workflows/ci.yml" contains "service-ci.yml@v"
+    And ".github/workflows/pr.yml" contains "job-service-checks.yml@v"
 
   Scenario: A service names the project its secrets are in
     Given an empty repository

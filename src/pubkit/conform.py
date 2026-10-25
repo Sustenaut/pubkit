@@ -18,7 +18,8 @@ Each check belongs to a rule the standard tags `pubkit conform`:
   name: its label is public in every release it signs.
 
 It also checks, without an exception possible, that every workflow calling
-pubkit's `rust-ci.yml` pins the pubkit this repository's lock pins, so the
+pubkit's `rust-ci.yml`, or the `job-rust-*.yml` jobs a ci block's
+generated workflows call, pins the pubkit this repository's lock pins, so the
 workflow and the standard it enforces never drift apart.
 
 Exceptions are declared in `pubkit.json`, each with a rule ID, a reason, and
@@ -57,7 +58,8 @@ DENY_BASELINE = {
     ("sources", "unknown-registry"): "deny",
     ("sources", "unknown-git"): "deny",
 }
-WORKFLOW_PIN = re.compile(r"schryer/pubkit/\.github/workflows/rust-ci\.yml@v([0-9][^\s'\"]*)")
+WORKFLOW_PIN = re.compile(
+    r"schryer/pubkit/\.github/workflows/(rust-ci|job-rust-[a-z]+)\.yml@v([0-9][^\s'\"]*)")
 
 
 def today() -> datetime.date:
@@ -253,17 +255,19 @@ def audit_declared(root: Path) -> list[str]:
 
 
 def workflow_pins(root: Path) -> list[str]:
-    """Problems with the rust-ci.yml pins in this repository's workflows."""
+    """Problems with the pins of rust-ci.yml, or of the job-rust-*.yml jobs
+    the ci block's workflows call, in this repository's workflows."""
     problems, uses = [], 0
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         for m in WORKFLOW_PIN.finditer(path.read_text(encoding="utf-8")):
             uses += 1
-            if m.group(1) != __version__:
-                problems.append(f"{path.relative_to(root)}: rust-ci.yml@v{m.group(1)} is not "
+            if m.group(2) != __version__:
+                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@v{m.group(2)} is not "
                                 f"pubkit {__version__}, which tests/requirements.lock pins; "
                                 f"use @v{__version__}")
     if not uses:
-        problems.append("no workflow calls schryer/pubkit/.github/workflows/rust-ci.yml")
+        problems.append("no workflow calls schryer/pubkit/.github/workflows/rust-ci.yml; "
+                        "give pubkit.json a ci block, and `pubkit sync` writes them")
     return problems
 
 
