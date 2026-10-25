@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.13.0 is released as v0.13.0 from commit ab19081ce4506f404a794d763701e4f3b29a27f0.",
+      "content": "pubkit 0.14.0 is released as v0.14.0 from commit 09a4c2a9e6cba8c6ad229b276357a48139a9d14f.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.13.0",
+            "0.14.0",
             "pubkit --version",
-            "pubkit 0.13.0",
-            "v0.13.0",
-            "ab19081ce4506f404a794d763701e4f3b29a27f0"
+            "pubkit 0.14.0",
+            "v0.14.0",
+            "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
           ]
         ]
       },
-      "scope": "the published release v0.13.0 of pubkit",
+      "scope": "the published release v0.14.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "ab19081ce4506f404a794d763701e4f3b29a27f0"
+          "revision": "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.13.0 was released on 2026-10-25 from commit ab19081ce4506f404a794d763701e4f3b29a27f0 with these changes.",
+      "content": "pubkit 0.14.0 was released on 2026-10-25 from commit 09a4c2a9e6cba8c6ad229b276357a48139a9d14f with these changes.",
       "data": {
         "columns": [
           {
@@ -57,27 +57,27 @@
         ],
         "rows": [
           [
+            "added",
+            "pubkit.json's ci block now writes a rust or service repository's CI too, and pubkit init and pubkit new give every kind a ci block in place of a ci.yml. Rust's pr.yml, main.yml and nightly.yml call job-rust-gates, test, functional, msrv, fuzz, cross, audit and toolchains (nightly only) beside job-osv, job-review and job-sonar, each only when the Rust crate standard asks for it here, from the rules and pubkit.json's exceptions; pubkit sync writes each job's required make targets into the workflow, and job-rust-gates runs make sync-check. On a pull request that touches no Rust code, Cargo files, fuzz/ or workflow files, fuzz and cross pass at once with a notice instead of being skipped. Rust's release checks semver (semver-checks-version 0.51.0). A service's pr.yml and main.yml call job-service-checks, and job-service-terraform and job-service-tests when the ci block gives a terraform-dir and a test; a service has no release. pubkit conform accepts the job-rust-*.yml pins as it does rust-ci.yml's"
+          ],
+          [
+            "added",
+            "pubkit required also prints slow=true or slow=false: false when a pull request touches no Rust code, Cargo files, fuzz/ or workflow files, which the generated fuzz and cross jobs read"
+          ],
+          [
             "changed",
-            "terraform/dns-zone keys each Cloudflare record by its rrset and its value (\"nameservers ns1.desec.io\", \"email_mx 10 mxext1.mailbox.org\") instead of its position, except A, AAAA and CNAME records, whose values may be known only after apply. A provider joining a zone shifted position keys, and Cloudflare refused a record created while another, being changed, still held its value. A root module moving from 0.12.6 or earlier adds the moved blocks pubkit dns moves writes from terraform show -json, so its plan shows only moves"
-          ],
-          [
-            "added",
-            "./pubkit, a managed script in every repository, runs the pubkit the repository pins through uvx and that release's wheel, in the repository's root from any directory, whichever pubkit is installed; without uv it says how to install it"
-          ],
-          [
-            "added",
-            "pubkit dns moves reads terraform show -json on stdin and writes the moved blocks taking terraform/dns-zone's Cloudflare records from position keys to keys by value. README: the deSEC provider's retry_max (30) keeps a zone's first apply within deSEC's 15 rrset writes a minute"
+            "job-sonar.yml takes reports, space-separated property=pattern pairs, in place of report-property and report-pattern, so one scan can send reports to more than one property (Rust's LCOV and Python's Cobertura XML). Only workflows pubkit sync writes call it, and they are rewritten with it"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.13.0 of pubkit",
+      "scope": "the published release v0.14.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "ab19081ce4506f404a794d763701e4f3b29a27f0"
+          "revision": "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
         }
       ]
     }
