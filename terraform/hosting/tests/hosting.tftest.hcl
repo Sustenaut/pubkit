@@ -1,8 +1,9 @@
 # Runs without credentials: every provider is mocked. testdata/pubkit.json
-# has two zones: example.eu on Hetzner and Cloudflare, with mailbox.org
-# email, a server at the apex, a Pages site and a Cloud Run site; and
+# has three zones: example.eu on Hetzner and Cloudflare, with mailbox.org
+# email, a server at the apex, a Pages site and a Cloud Run site;
 # example.org on Hetzner alone, with a server and a Pages site served from
-# its standby server. Assertions read the providers' facts from var.config,
+# its standby server; and example.net on deSEC and Cloudflare, signed by
+# both, with a server at the apex. Assertions read the providers' facts from var.config,
 # the same file, so none are written here.
 
 mock_provider "hcloud" {
@@ -20,6 +21,11 @@ mock_provider "cloudflare" {
     defaults = {
       id           = "0123456789abcdef0123456789abcdef"
       name_servers = ["ns1.cloudflare.example", "ns2.cloudflare.example"]
+    }
+  }
+  mock_resource "cloudflare_zone_dnssec" {
+    defaults = {
+      ds = "example.net. 3600 IN DS 2371 13 2 B30B5BF3A16AA4C258BB336821564F033A9E53F034E0650210F4EB8901888AE8"
     }
   }
   mock_resource "cloudflare_pages_project" {
@@ -102,7 +108,30 @@ run "zones" {
 
   assert {
     condition     = output.cloudflare_zone_ids["example.eu"] == "0123456789abcdef0123456789abcdef" && output.cloudflare_zone_ids["example.org"] == null
-    error_message = "Only example.eu is at Cloudflare."
+    error_message = "example.org is not at Cloudflare."
+  }
+
+  assert {
+    condition = (
+      output.nameservers["example.net"] == sort(concat(var.config.providers.desec.dns.external_nameservers, ["ns1.cloudflare.example.", "ns2.cloudflare.example."])) &&
+      output.apex_nameservers["example.net"].values == output.nameservers["example.net"] &&
+      output.apex_nameservers["example.org"] == null
+    )
+    error_message = "example.net: deSEC's nameservers and Cloudflare's, for the registrar and in the apex NS rrset, which deSEC takes too."
+  }
+
+  assert {
+    condition = (
+      module.zone["example.net"].cloudflare_ds == "2371 13 2 B30B5BF3A16AA4C258BB336821564F033A9E53F034E0650210F4EB8901888AE8" &&
+      output.cloudflare_ds["example.net"] == module.zone["example.net"].cloudflare_ds &&
+      output.cloudflare_ds["example.eu"] == null
+    )
+    error_message = "Only example.net is signed, and its DS record at Cloudflare is an output."
+  }
+
+  assert {
+    condition     = toset(keys(output.records["example.net"])) == toset(["apex_a"])
+    error_message = "example.net's records are its server site's; deSEC writes them in terraform/desec-zones."
   }
 
   assert {
@@ -218,4 +247,21 @@ run "server_needs_addresses" {
   }
 
   expect_failures = [var.servers]
+}
+
+run "dnssec_keys_follow_dns" {
+  command = plan
+
+  variables {
+    config = merge(jsondecode(file("../testdata/pubkit.json")).hosting, {
+      zones = {
+        "example.net" = {
+          dns    = ["desec"]
+          dnssec = jsondecode(file("../testdata/pubkit.json")).hosting.zones["example.net"].dnssec
+        }
+      }
+    })
+  }
+
+  expect_failures = [var.config]
 }

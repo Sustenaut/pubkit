@@ -8,6 +8,8 @@ Everything provider-specific is here, in the repository, not in pubkit:
         "hetzner": {"type": "hetzner",
                     "dns": {"external_nameservers": ["helium.ns.hetzner.de.", ...]}},
         "cloudflare": {"type": "cloudflare", "account_id": "0123...cdef"},
+        "desec": {"type": "desec",
+                  "dns": {"external_nameservers": ["ns1.desec.io.", "ns2.desec.org."]}},
         "gcp": {"type": "google-cloud", "project": "example", "region": "europe-north1",
                 "cloud_run": {"domain_target": "ghs.googlehosted.com."}},
         "mailbox": {"type": "mailbox-org", "mx": ["10 mxext1.mailbox.org.", ...],
@@ -20,6 +22,8 @@ Everything provider-specific is here, in the repository, not in pubkit:
           "email": {"provider": "mailbox", "verification": {"f67e...": "fa0e..."},
                     "dmarc": {"policy": "none", "rua": "alerts@example.eu"}},
           "apex_txt": ["google-site-verification=..."],
+          "dnssec": {"keys": {"cloudflare": ["257 3 13 mdss...", "256 3 13 oJMR..."],
+                              "desec": ["257 3 13 quFX..."]}},
           "sites": {
             "@": {"provider": "hetzner", "kind": "server", "server": "web"},
             "recipes": {"provider": "cloudflare", "kind": "pages", "project": "example-recipes",
@@ -31,7 +35,9 @@ Everything provider-specific is here, in the repository, not in pubkit:
     }
 
 A provider is any name the repository chooses, with one of the types in
-TYPES. `ttl`, in the hosting block, a zone or a site, sets TTLs over the
+TYPES. A zone's `dnssec` pins each of its DNS providers' public keys, as
+DNSKEY values: every provider signs the zone with its own, and publishes
+the others' (multi-signer), so a provider that cannot sign cannot serve it. `ttl`, in the hosting block, a zone or a site, sets TTLs over the
 defaults (TTL_KINDS: a day for the apex NS rrset, an hour for email, five
 minutes for sites); the nearest wins. A type is what pubkit supports: its settings, whether it serves
 DNS, mail, and which kind of site it hosts. A new type needs pubkit to
@@ -45,6 +51,8 @@ anything it does not know or cannot use.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import sys
 from collections.abc import Callable
 from typing import Any, NoReturn
@@ -57,6 +65,9 @@ MAX_PRIORITY = 65535
 ACCOUNT_ID_LENGTH = 32
 TTL_KINDS = ("nameservers", "email", "sites")
 TTL_RANGE = (60, 604800)
+KEY_FLAGS = (256, 257)
+SEP = 257
+DNSSEC_PROTOCOL = 3
 
 
 def stop(message: str) -> NoReturn:
@@ -136,6 +147,15 @@ def check_hetzner(given: dict[str, Any], where: str) -> None:
             'a list of host names with their trailing dots, such as "helium.ns.hetzner.de."')
 
 
+def check_desec(given: dict[str, Any], where: str) -> None:
+    dns = known(given.get("dns", {}), f"{where}.dns", ("external_nameservers",))
+    names = dns.get("external_nameservers")
+    if not isinstance(names, list) or not names or not all(is_host(n) for n in names):
+        stop(f"{where}.dns.external_nameservers must list the names deSEC serves zones from, "
+             'with their trailing dots, such as ["ns1.desec.io.", "ns2.desec.org."]; '
+             "its API does not report them")
+
+
 def check_cloudflare(given: dict[str, Any], where: str) -> None:
     account = given.get("account_id")
     if not isinstance(account, str) or len(account) != ACCOUNT_ID_LENGTH or not set(account) <= HEX:
@@ -169,7 +189,8 @@ def check_mailbox_org(given: dict[str, Any], where: str) -> None:
 TYPES: dict[str, dict[str, Any]] = {
     "hetzner": {"settings": ("dns",), "check": check_hetzner, "dns": True, "site": "server"},
     "cloudflare": {"settings": ("account_id",), "check": check_cloudflare, "dns": True,
-                   "site": "pages"},
+                   "signs": True, "site": "pages"},
+    "desec": {"settings": ("dns",), "check": check_desec, "dns": True, "signs": True},
     "google-cloud": {"settings": ("project", "region", "cloud_run"), "check": check_google_cloud,
                      "dns": False, "site": "cloud-run"},
     "mailbox-org": {"settings": ("mx", "spf", "dkim"), "check": check_mailbox_org, "dns": False,
@@ -203,6 +224,51 @@ def check_email(email: Any, where: str, types: dict[str, str]) -> None:
             stop(f"{where}.dmarc.policy must be one of {', '.join(POLICIES)}")
         if not is_email(dmarc.get("rua")):
             stop(f"{where}.dmarc.rua must be the address reports go to, such as alerts@example.eu")
+
+
+def dnskey(text: Any) -> tuple[int, int, int, bytes] | None:
+    """A DNSKEY value, "flags 3 algorithm public-key" with the key in base64
+    and no spaces, as flags, protocol, algorithm and key; None if it is not
+    one, or its flags are neither a zone key (256) nor a key-signing one
+    (257)."""
+    parts = text.split(" ") if isinstance(text, str) else []
+    if len(parts) != 4 or not all(p.isdigit() for p in parts[:3]):
+        return None
+    flags, protocol, algorithm = (int(p) for p in parts[:3])
+    try:
+        key = base64.b64decode(parts[3], validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if flags not in KEY_FLAGS or protocol != DNSSEC_PROTOCOL or not key:
+        return None
+    return flags, protocol, algorithm, key
+
+
+def check_dnssec(dnssec: Any, where: str, dns: list[str], types: dict[str, str]) -> None:
+    dnssec = known(dnssec, where, ("keys",))
+    for name in dns:
+        if not TYPES[types[name]].get("signs"):
+            stop(f"{where} cannot be set while {name} serves the zone: a {types[name]} provider "
+                 "cannot sign, and resolvers reject its unsigned answers once the registrar has "
+                 "a DS record")
+    keys = dnssec.get("keys")
+    if not isinstance(keys, dict) or sorted(keys) != sorted(dns):
+        stop(f"{where}.keys must map each provider in the zone's dns ({', '.join(dns)}) to its "
+             "public keys")
+    algorithms = set()
+    for name, values in keys.items():
+        parsed = [dnskey(v) for v in values] if isinstance(values, list) else [None]
+        if not parsed or None in parsed:
+            stop(f'{where}.keys.{name} must be a list of DNSKEY values, "flags 3 algorithm key", '
+                 'such as "257 3 13 mdss...GQ==": flags 256 or 257, the key in base64 without '
+                 "spaces")
+        if not any(key[0] == SEP for key in parsed):
+            stop(f"{where}.keys.{name} must have a key-signing key (flags 257), which a DS "
+                 "record names")
+        algorithms |= {key[2] for key in parsed}
+    if len(algorithms) > 1:
+        stop(f"{where}.keys must all use one algorithm: every provider signs the same zone "
+             "(RFC 8901), and these use " + ", ".join(map(str, sorted(algorithms))))
 
 
 def check_server(site: dict[str, Any], where: str, setting: str) -> None:
@@ -259,7 +325,7 @@ def check_zone(name: str, zone: Any, providers: dict[str, Any], types: dict[str,
     where = f"zones.{name}"
     if not is_name(name) or "." not in name:
         stop(f"{where} must be named by the domain, in lowercase, such as example.eu")
-    zone = known(zone, where, ("dns", "ttl", "email", "apex_txt", "sites"))
+    zone = known(zone, where, ("dns", "ttl", "dnssec", "email", "apex_txt", "sites"))
     if "ttl" in zone:
         check_ttl(zone["ttl"], f"{where}.ttl")
     dns = zone.get("dns")
@@ -268,6 +334,8 @@ def check_zone(name: str, zone: Any, providers: dict[str, Any], types: dict[str,
             or len({types[p] for p in dns}) != len(dns)):
         stop(f"{where}.dns must list the providers in hosting.providers that serve the zone, "
              "at most one of each type: " + ", ".join(t for t in TYPES if TYPES[t]["dns"]))
+    if "dnssec" in zone:
+        check_dnssec(zone["dnssec"], f"{where}.dnssec", dns, types)
     if "email" in zone:
         check_email(zone["email"], f"{where}.email", types)
     require(zone, where, "apex_txt", lambda v: isinstance(v, list) and all(map(is_unquoted, v)),

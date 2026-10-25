@@ -18,7 +18,7 @@ variable "config" {
     providers = map(object({
       type = string
 
-      # hetzner
+      # hetzner, desec
       dns = optional(object({
         external_nameservers = optional(list(string), [])
       }), {})
@@ -48,6 +48,11 @@ variable "config" {
         email       = optional(number)
         sites       = optional(number)
       }), {})
+
+      # Each signing provider's public keys, by the provider's name.
+      dnssec = optional(object({
+        keys = map(list(string))
+      }))
 
       email = optional(object({
         provider     = string
@@ -82,18 +87,25 @@ variable "config" {
 
   validation {
     condition = alltrue([
-      for provider in values(var.config.providers) : contains(["hetzner", "cloudflare", "google-cloud", "mailbox-org"], provider.type)
+      for provider in values(var.config.providers) : contains(["hetzner", "cloudflare", "desec", "google-cloud", "mailbox-org"], provider.type)
     ])
-    error_message = "A provider's type is hetzner, cloudflare, google-cloud or mailbox-org."
+    error_message = "A provider's type is hetzner, cloudflare, desec, google-cloud or mailbox-org."
   }
 
   validation {
     condition = alltrue([
       for zone in values(var.config.zones) : length(zone.dns) > 0 && alltrue([
-        for name in zone.dns : contains(["hetzner", "cloudflare"], try(var.config.providers[name].type, ""))
+        for name in zone.dns : contains(["hetzner", "cloudflare", "desec"], try(var.config.providers[name].type, ""))
       ]) && length(distinct([for name in zone.dns : var.config.providers[name].type])) == length(zone.dns)
     ])
-    error_message = "A zone's dns lists providers of type hetzner or cloudflare, at most one of each."
+    error_message = "A zone's dns lists providers of type hetzner, cloudflare or desec, at most one of each."
+  }
+
+  validation {
+    condition = alltrue([
+      for zone in values(var.config.zones) : zone.dnssec == null || try(toset(keys(zone.dnssec.keys)) == toset(zone.dns), false)
+    ])
+    error_message = "A zone's dnssec.keys has the keys of each provider in its dns, and no other."
   }
 
   validation {
