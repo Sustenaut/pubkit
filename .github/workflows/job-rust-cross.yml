@@ -1,0 +1,73 @@
+# Rust: the tests under emulation on cross-targets, built for each target
+# with its own gcc and run under qemu-user: i686 (32-bit) and s390x
+# (big-endian) by default, which find word-size and byte-order bugs.
+# Doctests are not cross-compiled on stable Rust, so these run the unit and
+# integration tests.
+#
+# A pull request that touches no Rust code, Cargo files, fuzz/ or workflow
+# files cannot change what this job tests, so it says so and passes at once
+# (`pubkit required` decides, as slow=false); a release pull request, a
+# push and the nightly run it in full.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-cross
+
+on:
+  workflow_call:
+    inputs:
+      python-version: { type: string, default: '3.14' }
+      cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
+      cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cross:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(inputs.cross-targets) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 2 }
+      - if: github.event_name == 'pull_request'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: { python-version: '${{ inputs.python-version }}' }
+      - if: github.event_name == 'pull_request'
+        id: changes
+        run: |
+          make venv
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
+          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
+            --changed-files "$RUNNER_TEMP/changed-files" > /dev/null
+          if grep -qx 'slow=false' "$GITHUB_OUTPUT"; then
+            echo "::notice::This pull request touches no Rust code, Cargo files, fuzz/ or workflow files, so the emulated tests have nothing new to test; releases and the nightly run it in full."
+          fi
+        env: { EVENT: '${{ github.event_name }}', HEAD_REF: '${{ github.head_ref }}' }
+      - if: steps.changes.outputs.slow != 'false'
+        name: Install the target's linker and emulator
+        run: |
+          case "$TARGET" in
+            i686-unknown-linux-gnu)
+              sudo apt-get update && sudo apt-get install -y gcc-multilib ;;
+            s390x-unknown-linux-gnu)
+              sudo apt-get update && sudo apt-get install -y gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user
+              echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_LINKER=s390x-linux-gnu-gcc" >> "$GITHUB_ENV"
+              echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_RUNNER=qemu-s390x -L /usr/s390x-linux-gnu" >> "$GITHUB_ENV" ;;
+            aarch64-unknown-linux-gnu)
+              sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross qemu-user
+              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64 -L /usr/aarch64-linux-gnu" >> "$GITHUB_ENV" ;;
+            *) echo "::error::no recipe for $TARGET (i686, s390x and aarch64 linux-gnu are known)"; exit 1 ;;
+          esac
+        env: { TARGET: '${{ matrix.target }}' }
+      - if: steps.changes.outputs.slow != 'false'
+        run: rustup target add "$TARGET"
+        env: { TARGET: '${{ matrix.target }}' }
+      - if: steps.changes.outputs.slow != 'false'
+        run: cargo test --target "$TARGET" $ARGS
+        env: { TARGET: '${{ matrix.target }}', ARGS: '${{ inputs.cross-test-args }}' }

@@ -1,0 +1,35 @@
+# Rust: a build on the oldest Rust the packages promise, the lowest
+# `rust-version` their manifests state, by `make msrv MSRV=<version>`.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-msrv
+
+on:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      # The oldest rust-version any package states: the oldest Rust the
+      # repository promises anything on. Its `make msrv` builds whichever
+      # packages make that promise.
+      - name: Find the oldest promised Rust
+        id: msrv
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[].rust_version // empty' | sort -V | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::msrv is on, but no package states a rust-version"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: rustup toolchain install "$MSRV" --profile minimal
+        env: { MSRV: '${{ steps.msrv.outputs.version }}' }
+      - run: make msrv MSRV="$MSRV"
+        env: { MSRV: '${{ steps.msrv.outputs.version }}' }

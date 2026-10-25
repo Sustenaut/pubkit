@@ -55,6 +55,7 @@ Feature: The required checks come from the standard
     Then it succeeds
     And the plan line for "fuzz" is "<fuzz>"
     And it prints "cross_job=<cross>"
+    And it prints "slow=<cross>"
 
     Examples:
       | event             | branch          | paths                          | fuzz       | cross |

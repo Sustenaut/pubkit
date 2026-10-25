@@ -6,7 +6,7 @@ Feature: Keeping a repository's shared files in step
     Given an empty repository
     When I run pubkit "init" "--kind=rust" "--bin=demo"
     Then it succeeds
-    And the repository has "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/ci.yml"
+    And the repository has "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/pr.yml", ".github/workflows/main.yml", ".github/workflows/nightly.yml"
     And "Makefile" contains "DEMO_BIN_DIR"
     And "tests/requirements-pubkit.txt" pins this pubkit's wheel
 

@@ -772,7 +772,7 @@ jobs:
 
 ### Generated CI: only the jobs a repository runs
 
-A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A utility (Python or Node) avoids that with a `ci` block in `pubkit.json`. `pubkit sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-sonar.yml` and so on) at this pubkit's tag, so the Actions pins still live in pubkit. `pubkit init --kind=utility` writes `"ci": {}`.
+A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubkit.json`. `pubkit sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubkit's tag, so the Actions pins still live in pubkit. `pubkit init` and `pubkit new` write `"ci": {}`.
 
 ```json
 "ci": {
@@ -785,13 +785,17 @@ A shared reusable workflow has to skip the jobs a repository doesn't use, and Gi
 }
 ```
 
-- **`events`:** which workflows to write. `pr` writes `pr.yml` (pull requests), `main` writes `main.yml` (pushes to main), and `nightly` writes `nightly.yml` (`cron`, or by hand). The default is pr and main.
-- **`with`:** the jobs' inputs, the same ones `python-ci.yml` and `node-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
+- **`events`:** which workflows to write. `pr` writes `pr.yml` (pull requests), `main` writes `main.yml` (pushes to main), and `nightly` writes `nightly.yml` (`cron`, or by hand). The default is pr and main, and all three for Rust.
+- **`with`:** the jobs' inputs, the same ones `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
 - **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only. `browser` runs only when `with` gives a `browser-test`.
-- **`language`:** `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node.
-- **`release`:** adds pubrel's release workflow to `pr.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs. `false` leaves it out. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
+- **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust or service repository's CI is its kind's.
+- **`release`:** adds pubrel's release workflow to `pr.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
 
-The checks keep the names a ruleset requires: each job is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on. Every workflow ends in `ci / passed`, which passes only when every job succeeded. The generated workflows are managed files, so `pubkit sync --check` fails when one is edited, and also while a hand-written `ci.yml` is still beside them. The Rust and service workflows aren't generated yet: those repositories keep their `ci.yml`.
+A Rust repository runs the jobs the Rust crate standard asks for here, worked out at sync time from the rules and `pubkit.json`'s exceptions: `gates`, `test`, `functional`, `msrv`, `fuzz`, `cross` and `audit` as required, beside `osv`, `review` and `sonar`, and `toolchains` (the latest stable and beta Rust) on the nightly. Sync writes each job's required make targets into the workflow (`required`), so an exception added or expired shows as a change there, and `make sync-check` in `gates` fails until `pubkit sync` writes it. An empty `cross-targets` (`"[]"`) drops `cross`. On a pull request that touches no Rust code, Cargo files, `fuzz/` or workflow files, `fuzz` and `cross` pass at once with a notice (from `pubkit required`, which says `slow=false`) rather than being skipped; release pull requests, pushes and the nightly run them in full.
+
+A service runs `checks` (the sync check and shellcheck), and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`.
+
+The checks keep the names a ruleset requires: each job is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on. Every workflow ends in `ci / passed`, which passes only when every job succeeded. The generated workflows are managed files, so `pubkit sync --check` fails when one is edited, and also while a hand-written `ci.yml` is still beside them. A repository without a ci block keeps its own `ci.yml`, which can still call `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` or `service-ci.yml`.
 
 ### SonarQube Cloud
 

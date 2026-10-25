@@ -1,0 +1,31 @@
+# Rust, on the nightly workflow only: the tests on Rust newer than the
+# pinned toolchain, so a release that breaks the build is seen the day it
+# ships rather than when the pin moves.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-toolchains
+
+on:
+  workflow_call:
+    inputs:
+      scheduled-toolchains: { type: string, default: '["stable", "beta"]', description: JSON list of toolchains a scheduled run tests on. }
+      test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  toolchains:
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ${{ fromJSON(inputs.scheduled-toolchains) }}
+    runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+      - run: cargo --version && cargo test ${{ inputs.test-args }}

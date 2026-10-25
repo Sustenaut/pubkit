@@ -1,0 +1,71 @@
+# Rust: `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust, briefly on
+# every change and longer on a schedule unless pubkit.json sets
+# "security": { "fuzz": { "rust": false } }.
+#
+# A pull request that touches no Rust code, Cargo files, fuzz/ or workflow
+# files cannot change what this job tests, so it says so and passes at once
+# (`pubkit required` decides, as slow=false); a release pull request, a
+# push and the nightly run it in full.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-fuzz
+
+on:
+  workflow_call:
+    inputs:
+      python-version: { type: string, default: '3.14' }
+      fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
+      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
+      cargo-fuzz-version: { type: string, default: 0.13.2 }
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 2 }
+      - if: github.event_name == 'pull_request'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with: { python-version: '${{ inputs.python-version }}' }
+      - if: github.event_name == 'pull_request'
+        id: changes
+        run: |
+          make venv
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
+          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
+            --changed-files "$RUNNER_TEMP/changed-files" > /dev/null
+          if grep -qx 'slow=false' "$GITHUB_OUTPUT"; then
+            echo "::notice::This pull request touches no Rust code, Cargo files, fuzz/ or workflow files, so there is nothing new to fuzz; releases and the nightly run it in full."
+          fi
+        env: { EVENT: '${{ github.event_name }}', HEAD_REF: '${{ github.head_ref }}' }
+      - if: steps.changes.outputs.slow != 'false'
+        run: rustup toolchain install nightly --profile minimal
+      - if: steps.changes.outputs.slow != 'false'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-${{ inputs.cargo-fuzz-version }}-${{ runner.os }}
+      - if: steps.changes.outputs.slow != 'false'
+        run: |
+          command -v cargo-fuzz >/dev/null && cargo-fuzz --version | grep -q " ${VERSION}$" \
+            || cargo install --locked cargo-fuzz --version "$VERSION"
+        env: { VERSION: '${{ inputs.cargo-fuzz-version }}' }
+      # A scheduled run fuzzes for longer, unless pubkit.json sets
+      # "security": { "fuzz": { "rust": false } }; then it fuzzes as briefly
+      # as any other.
+      - if: steps.changes.outputs.slow != 'false'
+        run: |
+          seconds=$SHORT
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+            seconds=$LONG
+          fi
+          make fuzz-smoke FUZZ_SECONDS="$seconds"
+        env:
+          EVENT: '${{ github.event_name }}'
+          SHORT: '${{ inputs.fuzz-seconds }}'
+          LONG: '${{ inputs.fuzz-seconds-scheduled }}'

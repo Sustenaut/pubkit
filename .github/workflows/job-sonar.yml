@@ -3,8 +3,9 @@
 # in a private repository or a pull request from a fork, it says so and
 # passes. The full history lets it tell new code from old, and every
 # coverage* artifact of the run, each in coverage-download/<artifact>/,
-# gives the coverage SonarQube Cloud's quality gate asks of new code: the
-# files matching report-pattern go to report-property. Properties
+# gives the coverage SonarQube Cloud's quality gate asks of new code. Each
+# `property=pattern` in reports sends the files whose names match the
+# pattern (find -name) to that property. Properties
 # pubkit.json adds (security.sonar.args) come after sonar-args.
 #
 # One job of the CI `pubkit sync` writes from the ci block of pubkit.json
@@ -16,8 +17,7 @@ on:
   workflow_call:
     inputs:
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
-      report-property: { type: string, required: true, description: "The property the coverage reports go to, such as sonar.javascript.lcov.reportPaths." }
-      report-pattern: { type: string, default: '*', description: "The file names, as a find -name pattern, of the coverage reports to send." }
+      reports: { type: string, required: true, description: "Where the coverage reports go: space-separated property=pattern pairs, such as sonar.rust.lcov.reportPaths=lcov.info sonar.python.coverage.reportPaths=*.xml." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
 
@@ -41,8 +41,15 @@ jobs:
       # The reports keep the file names the test commands gave them.
       - if: env.SONAR_TOKEN != ''
         id: report
-        run: echo "paths=$(find coverage-download -type f -name "$PATTERN" 2>/dev/null | paste -sd, -)" >> "$GITHUB_OUTPUT"
-        env: { PATTERN: '${{ inputs.report-pattern }}' }
+        run: |
+          set -f
+          args=()
+          for report in $REPORTS; do
+            paths=$(find coverage-download -type f -name "${report#*=}" 2>/dev/null | paste -sd, -)
+            args+=("-D${report%%=*}=$paths")
+          done
+          echo "args=${args[*]}" >> "$GITHUB_OUTPUT"
+        env: { REPORTS: '${{ inputs.reports }}' }
       - if: env.SONAR_TOKEN != ''
         id: settings
         run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
@@ -52,6 +59,6 @@ jobs:
           args: >-
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
-            -D${{ inputs.report-property }}=${{ steps.report.outputs.paths }}
+            ${{ steps.report.outputs.args }}
             ${{ inputs.sonar-args }}
             ${{ steps.settings.outputs.args }}

@@ -146,10 +146,9 @@ def init(root: Path, kind: str, binary: str | None, project: str | None = None) 
         config["bin"] = binary
     if kind == "service" and not project:
         sys.exit("pubkit: a service names the Bitwarden Secrets Manager project its secrets are in: --project=NAME")
-    # A utility's CI is generated from the ci block (ci.py): Node's for a
-    # package.json without a pyproject.toml, Python's otherwise.
-    if kind == "utility":
-        config["ci"] = {}
+    # The CI is generated from the ci block (ci.py): a utility's is Node's
+    # for a package.json without a pyproject.toml, Python's otherwise.
+    config["ci"] = {}
     init_files(root, config, extra={"project": project or ""})
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
@@ -288,7 +287,8 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     """The make targets each rust-ci.yml job must run here, from the standard.
 
     Given the event, the pull request's branch and the files it changes, a
-    pull request that touches no code skips fuzz and cross."""
+    pull request that touches no code skips fuzz and cross, and says
+    slow=false."""
     from . import conform as checks
     from . import standard
     config = read_config(root)
@@ -310,6 +310,9 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     lines = [f"{job}={' '.join(targets)}" for job, targets in plan["targets"].items()]
     lines += [f"{job}_job={'true' if job in plan['jobs'] else 'false'}"
               for job in sorted(standard.WORKFLOW_JOBS)]
+    # Whether this change can change what the slow jobs test: the generated
+    # CI's fuzz and cross jobs read it, and pass at once when it is false.
+    lines.append(f"slow={'false' if reason else 'true'}")
     if reason:
         print(f"pubkit: {reason}", file=sys.stderr)
     if github_output:

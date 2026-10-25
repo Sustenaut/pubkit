@@ -1,9 +1,0 @@
-name: ci
-
-on:
-  push: { branches: [main] }
-  pull_request:
-
-jobs:
-  ci:
-    uses: schryer/pubkit/.github/workflows/service-ci.yml@v{version}

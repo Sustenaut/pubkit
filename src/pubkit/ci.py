@@ -15,16 +15,22 @@ only the jobs that event runs: one reusable workflow per job
       "release": {"pubrel": "0.5.4", "with": {}}
     }
 
-`language` is node or python; without it, a package.json with no
-pyproject.toml beside it makes it node. `events` are the workflows written:
-pr.yml (pull requests), main.yml (pushes to main) and nightly.yml (the
-schedule `cron`, and by hand); pr and main by default. `with` gives the
+`language` is a utility's, node or python; without it, a package.json
+with no pyproject.toml beside it makes it node. A rust or service
+repository's CI is its kind's. `events` are the workflows written: pr.yml
+(pull requests), main.yml (pushes to main) and nightly.yml (the schedule
+`cron`, and by hand); pr and main by default, and all three for Rust. `with` gives the
 jobs' inputs: each goes to every job that takes it, and an input no job
 takes stops sync. A job runs on the events JOBS gives it unless `jobs`
 narrows them, and `false` drops it, as a private repository drops review.
-The browser job runs only when `with` gives a browser-test. `release`
-adds pubrel's release workflow to pr.yml and main.yml, at this pubkit's
-pubrel unless it names one; `false` leaves it out.
+The browser job runs only when `with` gives a browser-test, and a
+service's terraform and tests jobs only when it gives a terraform-dir and
+a test. Rust's jobs are the ones the Rust crate standard asks for here,
+from the rules and pubkit.json's exceptions, and sync writes each job's
+required make targets into its workflow, so a change to either shows as a
+change there. `release` adds pubrel's release workflow to pr.yml and
+main.yml, at this pubkit's pubrel unless it names one; `false` leaves it
+out, and a service, which deploys, has none.
 
 Each workflow ends in `passed` (the check a ruleset requires, `ci /
 passed`), which passes only when every job it needs succeeded. Every job
@@ -71,13 +77,18 @@ class Job:
     # Inputs that are pubkit's to give, whether or not this language gives
     # them, never the repository's.
     internal: tuple[str, ...] = ()
+    # Rust: the job of the Rust crate standard this one runs. Its required
+    # targets, if it has any, go in the input `required`; with none, or a
+    # workflow job the standard does not turn on, the job is left out.
+    standard: str | None = None
 
 
 NODE_TEST = ("node-version", "python-version", "apt-packages", "setup", "test", "sync-check",
              "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
 PYTHON_TEST = ("python-version", "apt-packages", "setup", "test", "sync-check",
                "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
-SONAR_INTERNAL = ("report-property", "report-pattern")
+SONAR_INTERNAL = ("reports",)
+RUST_REQUIRED = ("required",)
 JOBS: dict[str, dict[str, Job]] = {
     "node": {
         "test": Job("job-node-test.yml", NODE_TEST),
@@ -88,7 +99,7 @@ JOBS: dict[str, dict[str, Job]] = {
         "osv": Job("job-osv.yml"),
         "review": Job("job-review.yml", events=("pr",)),
         "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("test", "browser"), secrets=True,
-                     fixed={"report-property": "sonar.javascript.lcov.reportPaths"},
+                     fixed={"reports": "sonar.javascript.lcov.reportPaths=*"},
                      internal=SONAR_INTERNAL),
     },
     "python": {
@@ -100,11 +111,50 @@ JOBS: dict[str, dict[str, Job]] = {
         "osv": Job("job-osv.yml"),
         "review": Job("job-review.yml", events=("pr",)),
         "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("functional", "browser"), secrets=True,
-                     fixed={"report-property": "sonar.python.coverage.reportPaths",
-                            "report-pattern": "*.xml"},
+                     fixed={"reports": "sonar.python.coverage.reportPaths=*.xml"},
                      internal=SONAR_INTERNAL),
     },
+    "rust": {
+        "gates": Job("job-rust-gates.yml", ("python-version", "gates"), internal=RUST_REQUIRED,
+                     standard="gates"),
+        "test": Job("job-rust-test.yml", ("os-matrix", "test-args"), needs=("gates",),
+                    standard="test"),
+        "functional": Job("job-rust-functional.yml",
+                          ("python-version", "apt-packages", "pub-version", "functional",
+                           "cargo-llvm-cov-version"), needs=("gates",), secrets=True,
+                          internal=RUST_REQUIRED, standard="functional"),
+        "msrv": Job("job-rust-msrv.yml", needs=("gates",), standard="msrv"),
+        "fuzz": Job("job-rust-fuzz.yml",
+                    ("python-version", "fuzz-seconds", "fuzz-seconds-scheduled", "cargo-fuzz-version"),
+                    needs=("gates",), standard="fuzz"),
+        "cross": Job("job-rust-cross.yml", ("python-version", "cross-targets", "cross-test-args"),
+                     needs=("gates",), standard="cross"),
+        "audit": Job("job-rust-audit.yml", ("cargo-deny-version", "cargo-vet-version"),
+                     internal=RUST_REQUIRED, standard="audit"),
+        "osv": Job("job-osv.yml"),
+        "review": Job("job-review.yml", events=("pr",)),
+        "toolchains": Job("job-rust-toolchains.yml", ("scheduled-toolchains", "test-args"),
+                          needs=("gates",), events=("nightly",)),
+        "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("functional",), secrets=True,
+                     fixed={"reports": "sonar.rust.lcov.reportPaths=lcov.info "
+                                       "sonar.python.coverage.reportPaths=*.xml"},
+                     internal=SONAR_INTERNAL),
+    },
+    # A service deploys rather than releases, and is private: no release,
+    # and no scan or dependency review, which need a public repository.
+    "service": {
+        "checks": Job("job-service-checks.yml", ("python-version", "shellcheck", "sync-check")),
+        "terraform": Job("job-service-terraform.yml", ("terraform-dir",), when="terraform-dir"),
+        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test"), when="test"),
+    },
 }
+# The languages a utility can be; a rust or service repository is its kind.
+UTILITY = ("node", "python")
+# Inputs the release workflow takes besides pubrel-version, by language.
+RELEASE_WITH = {"rust": {"semver-checks-version": "0.51.0"}}
+# The events a language runs on unless the ci block names them: Rust adds
+# the nightly, for longer fuzzing and the latest stable and beta Rust.
+LANGUAGE_EVENTS = {"rust": EVENTS}
 
 
 def stop(text: str) -> None:
@@ -116,24 +166,49 @@ def is_node(root: Path) -> bool:
     return (root / "package.json").exists() and not (root / "pyproject.toml").exists()
 
 
+def plan(config: dict[str, Any], root: Path) -> dict:
+    """What the Rust crate standard requires here: the make targets of each
+    job and the workflow jobs it turns on, as `pubkit required` gives them."""
+    from . import conform, standard  # noqa: PLC0415
+    rules = standard.load()
+    waived, _, _ = conform.exceptions(config, {r["id"] for r in rules["rules"]})
+    # Before there is a crate, every rule a library would meet.
+    library = not (root / "Cargo.toml").exists() or standard.has_library(root)
+    return standard.required(rules, library, frozenset(waived))
+
+
+def planned(job: Job, rules: dict | None) -> bool:
+    """Whether the standard asks for this job: some required targets, or a
+    workflow job it turns on."""
+    if job.standard is None or rules is None:
+        return True
+    if job.standard in rules["targets"]:
+        return bool(rules["targets"][job.standard])
+    return job.standard in rules["jobs"]
+
+
 def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     """The ci block, checked and filled in, or None when pubkit.json has
     none and the repository writes its own workflows."""
     given = config.get("ci")
     if given is None:
         return None
-    if config.get("kind") != "utility":
-        stop("block is for a utility repository so far; a rust or service one keeps its ci.yml")
+    kind = config.get("kind")
     if not isinstance(given, dict):
         stop('block must be an object, such as {"with": {"test": "npm test"}}')
     unknown = sorted(set(given) - set(SETTINGS))
     if unknown:
         stop(f"block has no setting {', '.join(unknown)}; it takes {', '.join(SETTINGS)}")
-    language = given.get("language", "node" if is_node(root) else "python")
-    if language not in JOBS:
-        stop(f"language must be one of {', '.join(JOBS)}, not {language!r}")
+    if kind == "utility":
+        language = given.get("language", "node" if is_node(root) else "python")
+        if language not in UTILITY:
+            stop(f"language must be one of {', '.join(UTILITY)}, not {language!r}")
+    else:
+        language = kind
+        if "language" in given and given["language"] != kind:
+            stop(f"language is for a utility; a {kind} repository's CI is {kind}'s")
     table = JOBS[language]
-    events = given.get("events", list(DEFAULT_EVENTS))
+    events = given.get("events", list(LANGUAGE_EVENTS.get(language, DEFAULT_EVENTS)))
     if not isinstance(events, list) or not events or not set(events) <= set(EVENTS):
         stop(f"events must list some of {', '.join(EVENTS)}")
     cron = given.get("cron", CRON)
@@ -151,6 +226,7 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     overrides = given.get("jobs", {})
     if not isinstance(overrides, dict):
         stop('jobs must be an object, such as {"review": false}')
+    rules = plan(config, root) if language == "rust" else None
     jobs: dict[str, tuple[str, ...]] = {}
     for name, job in table.items():
         override = overrides.get(name, {})
@@ -163,12 +239,16 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             stop(f"jobs.{name}.events must list some of {', '.join(EVENTS)}")
         if job.when and inputs.get(job.when, "") == "":
             continue
+        if not planned(job, rules) or (name == "cross" and inputs.get("cross-targets") == "[]"):
+            continue
         jobs[name] = tuple(e for e in EVENTS if e in on and e in events)
     unknown = sorted(set(overrides) - set(table))
     if unknown:
         stop(f"jobs names {', '.join(unknown)}, which {language} has not; it has {', '.join(table)}")
     from .new import PUBREL_PIN  # noqa: PLC0415
-    release = given.get("release", True)
+    release = given.get("release", language != "service")
+    if language == "service" and release is not False:
+        stop("release is not for a service, which deploys rather than releases")
     if release is True:
         release = {}
     if release is not False:
@@ -180,9 +260,10 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             stop('release.pubrel must be a version, such as "0.5.4"')
         if not isinstance(extra, dict):
             stop("release.with must be an object of the release workflow's inputs")
-        release = {"pubrel": pubrel, "with": extra}
+        release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
-            "with": inputs, "jobs": jobs, "release": release}
+            "with": inputs, "jobs": jobs, "release": release,
+            "targets": rules["targets"] if rules else {}}
 
 
 def flow(values: dict[str, Any]) -> str:
@@ -199,6 +280,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     for name in names:
         job = table[name]
         given = {**{i: ci["with"][i] for i in job.inputs if i in ci["with"]}, **job.fixed}
+        if "required" in job.internal:
+            given["required"] = " ".join(ci["targets"][job.standard])
         needs = [n for n in job.needs if n in names]
         out.append(f"{'' if name == names[0] else chr(10)}  {name}:\n    name: ci\n")
         if needs:

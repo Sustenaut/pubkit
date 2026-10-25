@@ -162,7 +162,7 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
             print(f"pubkit: {p}", file=sys.stderr)
         return 1
 
-    config = {"kind": "rust", "bin": name}
+    config = {"kind": "rust", "bin": name, "ci": {}}
     extra = {"name": name, "crate": name.replace("-", "_"), "tag": tag,
              "description": description or f"{name}: a pub* package."}
     init_files(root, config, layers=("common", "rust", "new-rust"), extra=extra,

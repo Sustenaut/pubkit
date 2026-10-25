@@ -1,0 +1,27 @@
+# Rust: cargo test on every platform of os-matrix. It runs cargo directly:
+# macOS ships make 3.81, and Windows has no /bin/bash.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-test
+
+on:
+  workflow_call:
+    inputs:
+      os-matrix: { type: string, default: '["ubuntu-latest", "macos-latest", "windows-latest"]' }
+      test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os-matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: cargo test ${{ inputs.test-args }}

@@ -1,0 +1,41 @@
+# Rust: advisories, licences, bans and sources (cargo deny), and every
+# dependency audited, trusted or exempt with its evidence (cargo vet): the
+# audit targets the standard requires, which `pubkit sync` gives.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# none shows as skipped.
+name: job-rust-audit
+
+on:
+  workflow_call:
+    inputs:
+      cargo-deny-version: { type: string, default: 0.20.2 }
+      cargo-vet-version: { type: string, default: 0.10.2 }
+      required: { type: string, default: '', description: "The make targets the standard requires, which pubkit sync gives." }
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny
+            ~/.cargo/bin/cargo-vet
+          key: audit-tools-${{ inputs.cargo-deny-version }}-${{ inputs.cargo-vet-version }}-${{ runner.os }}
+      - run: |
+          command -v cargo-deny >/dev/null && cargo deny --version | grep -q " ${DENY}$" \
+            || cargo install --locked cargo-deny --version "$DENY"
+          command -v cargo-vet >/dev/null && cargo vet --version | grep -q " ${VET}$" \
+            || cargo install --locked cargo-vet --version "$VET"
+        env: { DENY: '${{ inputs.cargo-deny-version }}', VET: '${{ inputs.cargo-vet-version }}' }
+      - run: |
+          for target in $REQUIRED; do
+            echo "::group::make $target"; make "$target"; echo "::endgroup::"
+          done
+        env: { REQUIRED: '${{ inputs.required }}' }
