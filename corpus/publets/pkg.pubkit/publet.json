@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.12.6 is released as v0.12.6 from commit d16519adc5f5f4aec0d6594ecb26602401cc2002.",
+      "content": "pubkit 0.13.0 is released as v0.13.0 from commit ab19081ce4506f404a794d763701e4f3b29a27f0.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.12.6",
+            "0.13.0",
             "pubkit --version",
-            "pubkit 0.12.6",
-            "v0.12.6",
-            "d16519adc5f5f4aec0d6594ecb26602401cc2002"
+            "pubkit 0.13.0",
+            "v0.13.0",
+            "ab19081ce4506f404a794d763701e4f3b29a27f0"
           ]
         ]
       },
-      "scope": "the published release v0.12.6 of pubkit",
+      "scope": "the published release v0.13.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d16519adc5f5f4aec0d6594ecb26602401cc2002"
+          "revision": "ab19081ce4506f404a794d763701e4f3b29a27f0"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.12.6 was released on 2026-10-25 from commit d16519adc5f5f4aec0d6594ecb26602401cc2002 with these changes.",
+      "content": "pubkit 0.13.0 was released on 2026-10-25 from commit ab19081ce4506f404a794d763701e4f3b29a27f0 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,27 +57,27 @@
         ],
         "rows": [
           [
-            "added",
-            "A desec provider type in pubkit.json's hosting block, and terraform/desec-zones, which writes every record terraform/hosting writes at the other providers to each zone a desec provider serves (the domain, its rrsets with TTLs raised to deSEC's minimum_ttl, and the apex NS rrset beside other providers), from terraform/hosting's new apex_nameservers and records outputs. It is apart because the deSEC provider will not start without a token. terraform/dns-zone lists deSEC's nameservers (dns.external_nameservers in pubkit.json) in the apex NS rrset and for the registrar, and multi-provider mode now means two or more providers"
+            "changed",
+            "terraform/dns-zone keys each Cloudflare record by its rrset and its value (\"nameservers ns1.desec.io\", \"email_mx 10 mxext1.mailbox.org\") instead of its position, except A, AAAA and CNAME records, whose values may be known only after apply. A provider joining a zone shifted position keys, and Cloudflare refused a record created while another, being changed, still held its value. A root module moving from 0.12.6 or earlier adds the moved blocks pubkit dns moves writes from terraform show -json, so its plan shows only moves"
           ],
           [
             "added",
-            "A zone's dnssec block in pubkit.json pins each of its DNS providers' public keys (dnssec.keys, DNSKEY values by provider name) and signs the zone with every provider (RFC 8901 multi-signer): Cloudflare's DNSSEC is turned on with multi-signer and serves the other providers' keys as DNSKEY records, and deSEC serves Cloudflare's. Denial of existence is left to Cloudflare's plan (NSEC on Free). pubkit sync stops on a signed zone Hetzner serves, keys missing for a provider, a provider without a key-signing key, or mixed algorithms. Outputs cloudflare_ds (terraform/hosting) and ds and keys (terraform/desec-zones) give the DS records and keys"
+            "./pubkit, a managed script in every repository, runs the pubkit the repository pins through uvx and that release's wheel, in the repository's root from any directory, whichever pubkit is installed; without uv it says how to install it"
           ],
           [
             "added",
-            "pubkit dns check ZONE [--record NAME/TYPE]: asks every nameserver of a zone in the hosting block (configured, resolved, and listed in each one's apex NS rrset), without recursion, for every rrset the block describes and fails when they differ or one does not serve the zone; for a signed zone, each must serve exactly the pinned keys and validate alone under delv, with the pinned key-signing keys as trust anchors, for every rrset and a name that does not exist. It only reads, through dig and delv"
+            "pubkit dns moves reads terraform show -json on stdin and writes the moved blocks taking terraform/dns-zone's Cloudflare records from position keys to keys by value. README: the deSEC provider's retry_max (30) keeps a zone's first apply within deSEC's 15 rrset writes a minute"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.12.6 of pubkit",
+      "scope": "the published release v0.13.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d16519adc5f5f4aec0d6594ecb26602401cc2002"
+          "revision": "ab19081ce4506f404a794d763701e4f3b29a27f0"
         }
       ]
     }
