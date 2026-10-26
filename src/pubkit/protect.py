@@ -13,7 +13,9 @@ line. pubkit's own list is the protected.json in its checkout.
 `tag-ruleset.json`, also in the wheel, keeps the release tags (`v*`) to
 CI: nobody may create, move or delete one, and only GitHub Actions, where
 `pubrel tag` runs once a release pull request merges, may bypass it. A
-hand-pushed tag cannot release code that CI did not pass.
+hand-pushed tag cannot release code that CI did not pass. A repository
+that releases no tags goes without it: `"tags": false` in its entry, or
+`--no-tags`.
 
 `pubkit protect [REPO...]` creates each ruleset in each repository, or
 updates the one already on its default branch or its release tags,
@@ -149,13 +151,31 @@ def differences(want: dict, have: dict) -> list[str]:
     return out
 
 
-def protect(api: Api, repo: str, checks: list[str], check: bool) -> tuple[list[str], bool]:
-    """Bring one repository to both rulesets; its report lines, and whether
-    it differed (with `check`) or could not be brought in line."""
-    lines, bad = bring(api, repo, ruleset(checks), current(api, repo), "its default branch", check)
-    tag_lines, tag_bad = bring(api, repo, tag_ruleset(), current(api, repo, "tag"),
-                               "its release tags", check)
+def protect(api: Api, repo: str, checks: list[str], check: bool,
+            tags: bool = True) -> tuple[list[str], bool]:
+    """Bring one repository to both rulesets (with `tags` false, only its
+    default branch's); its report lines, and whether it differed (with
+    `check`) or could not be brought in line."""
+    lines, bad = attempt(lambda: bring(api, repo, ruleset(checks), current(api, repo),
+                                       "its default branch", check), repo, check)
+    if not tags:
+        return lines, bad
+    tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(), current(api, repo, "tag"),
+                                               "its release tags", check), repo, check)
     return lines + tag_lines, bad or tag_bad
+
+
+def attempt(step, repo: str, check: bool) -> tuple[list[str], bool]:
+    """Run one ruleset's step, reporting GitHub's refusal as a failed line,
+    so the other ruleset's report is not lost."""
+    try:
+        return step()
+    except ApiError as e:
+        lines = [f"{repo}: {e}"]
+        if not check and e.status in (403, 404):
+            lines.append("  changing a ruleset needs a repository admin: "
+                         "`gh auth login` as its owner, then run this again")
+        return lines, True
 
 
 def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
@@ -201,9 +221,10 @@ def load(config: Path | None) -> list[dict]:
 
 
 def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
-        api: Api = gh) -> int:
+        api: Api = gh, tags: bool = True) -> int:
     """Protect `repos` (by default every one listed). Given `requires`, the
-    named repositories require those checks, and no list is read."""
+    named repositories require those checks, and no list is read. With
+    `tags` false, no repository gets the tag ruleset."""
     if requires:
         if not repos:
             sys.exit("pubkit protect: --require names a check; name the repositories too")
@@ -220,13 +241,8 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
                  f'{{"repo": "{unknown[0]}", "checks": [...]}} to it first')
     failed = False
     for entry in [known[r] for r in repos] or entries:
-        try:
-            lines, bad = protect(api, entry["repo"], entry["checks"], check)
-        except ApiError as e:
-            lines, bad = [f"{entry['repo']}: {e}"], True
-            if not check and e.status in (403, 404):
-                lines.append("  changing a ruleset needs a repository admin: "
-                             "`gh auth login` as its owner, then run this again")
+        lines, bad = protect(api, entry["repo"], entry["checks"], check,
+                             tags and entry.get("tags", True))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

@@ -393,6 +393,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="the repositories and their checks (default: ./protected.json)")
     p.add_argument("--require", action="append", metavar="CHECK",
                    help="a check the named repositories require, instead of any list; repeat it")
+    p.add_argument("--no-tags", dest="tags", action="store_false",
+                   help="leave out the release tag ruleset, for repositories that release no tags")
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME; by default every repository the config lists")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
@@ -461,7 +463,7 @@ def main(argv: list[str] | None = None) -> int:
         from .paths import confined
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
-        return protect(config, args.repos, args.check, args.require)
+        return protect(config, args.repos, args.check, args.require, tags=args.tags)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())
