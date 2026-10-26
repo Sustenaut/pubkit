@@ -396,7 +396,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-tags", dest="tags", action="store_false",
                    help="leave out the release tag ruleset, for repositories that release no tags")
     p.add_argument("repos", nargs="*", metavar="REPO",
-                   help="OWNER/NAME; by default every repository the config lists")
+                   help="OWNER/NAME; by default every repository the config lists, or this "
+                        "repository from ./pubkit.json; one not listed is read from its own "
+                        "pubkit.json on GitHub")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "

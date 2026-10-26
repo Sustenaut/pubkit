@@ -634,6 +634,12 @@ The repositories come from one of:
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.
+- the repository's own `pubkit.json`, which says how it is protected:
+  `"protect": {"checks": ["ci / passed"], "tags": false}` (`tags` defaults
+  to true). A `REPO` the list does not name is read from the `pubkit.json`
+  on its default branch, and `pubkit protect` with no list and no `REPO`,
+  run inside a repository, reads `./pubkit.json` for the repository
+  `origin` points at.
 
 pubkit's own list, the pub* repositories, is
 [`protected.json`](protected.json) at the root of this checkout: `ci /
