@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "fixed",
+      "change": "terraform/hosting names a Pages site's CNAME target at plan time, <project>.pages.dev or the site's new optional subdomain in pubkit.json, so the first apply that creates the Pages project no longer fails at deSEC with \"Provider produced inconsistent final plan\". Apply stops with the subdomain to set if Cloudflare gave the project another pages.dev name"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

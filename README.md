@@ -171,7 +171,7 @@ The provider types pubkit supports, and what each holds:
 | type | settings | serves DNS | sites |
 | --- | --- | --- | --- |
 | `hetzner` | `dns.external_nameservers`: the names Hetzner also serves a zone from, which a registrar such as Hetzner's own (konsoleH) lists next to another provider's; without them the registrar gets the assigned ones | yes; the zone must already exist at Hetzner | `server`: A (and AAAA) records to a server's addresses |
-| `cloudflare` | `account_id` | yes; with another provider too, in multi-provider mode; signs with `dnssec` | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
+| `cloudflare` | `account_id` | yes; with another provider too, in multi-provider mode; signs with `dnssec` | `pages`: a Pages project (`project`; `subdomain` when Cloudflare gave it a pages.dev name other than `<project>.pages.dev`), served from Pages or, with `served_by: "server"`, from its `standby` server |
 | `desec` | `dns.external_nameservers`: the names deSEC serves every zone from (`ns1.desec.io.`, `ns2.desec.org.`), which its API does not report | yes, through `terraform/desec-zones`; the zone must already exist at deSEC; always signs | no |
 | `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a CNAME to `domain_target`, and a domain mapping to the Cloud Run `service` (`terraform/cloud-run-sites`) |
 | `mailbox-org` | `mx` (`"priority host."`), `spf` (its mechanisms, such as `include:mailbox.org`), `dkim` (selector, in lowercase, to host) | no | no; a zone's `email.provider` |
