@@ -197,6 +197,27 @@ def no_block(repo):
     (repo / "pubkit.json").write_text(json.dumps({"kind": "service"}))
 
 
+@given(parsers.parse("its pubkit.json's protect block is {block}"))
+def raw_block(repo, block):
+    (repo / "pubkit.json").write_text(json.dumps({"kind": "service", "protect": json.loads(block)}))
+
+
+@given(parsers.parse('its pubkit.json is "{text}"'))
+def raw_local(repo, text):
+    (repo / "pubkit.json").write_text(text)
+
+
+@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubkit.json on GitHub is "(?P<text>.*)"$'))
+def raw_remote(github, slug, text):
+    content = base64.b64encode(text.encode()).decode()
+    _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
+
+
+@given(parsers.parse("protected.json is {text}"))
+def raw_protected(repo, github, text):
+    (repo / "protected.json").write_text(text)
+
+
 @given(parsers.parse('GitHub has no ruleset in "{slug}"'))
 def no_ruleset(github, slug):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, []))

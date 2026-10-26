@@ -2,7 +2,7 @@
   "changes": [
     {
       "category": "added",
-      "change": "A repository can say how it is protected in its own pubkit.json, \"protect\": {\"checks\": [...], \"tags\": false}. pubkit protect reads it from GitHub for a repository protected.json does not list, and from ./pubkit.json when run inside a repository with no list and nothing named"
+      "change": "A repository can say how it is protected in its own pubkit.json, \"protect\": {\"checks\": [...], \"tags\": false}. pubkit protect reads it from GitHub for a repository protected.json does not list, and from ./pubkit.json when run inside a repository with no list and nothing named. A block, or a protected.json entry, is refused before GitHub is asked when its checks are not a list of distinct names, its tags are not true or false, it has another key, or its file is not JSON; a named repository must be OWNER/NAME, and protected.json may list a repository only once"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
