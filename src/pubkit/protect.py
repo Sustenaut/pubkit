@@ -17,6 +17,12 @@ hand-pushed tag cannot release code that CI did not pass. A repository
 that releases no tags goes without it: `"tags": false` in its entry, or
 `--no-tags`.
 
+A repository may instead say how it is protected in its own pubkit.json:
+`"protect": {"checks": [...], "tags": false}` (`tags` defaults to true).
+`pubkit protect OWNER/NAME` reads it from GitHub for a repository the list
+does not name, and `pubkit protect` with no list and no repositories reads
+`./pubkit.json`, for the repository `origin` points at.
+
 `pubkit protect [REPO...]` creates each ruleset in each repository, or
 updates the one already on its default branch or its release tags,
 renaming it, so a repository never carries two. It calls the GitHub API through `gh`, which
@@ -28,6 +34,7 @@ as an edited one not yet released.
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import subprocess
@@ -44,6 +51,7 @@ APPS = {"SonarCloud Code Analysis": 12526}
 Api = Callable[[str, str, Any], Any]
 
 LOCAL = "protected.json"
+OWN = "pubkit.json"
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
@@ -202,13 +210,40 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
             *(f"  was: {d}" for d in diff), *lines], bool(others)
 
 
-def load(config: Path | None) -> list[dict]:
+def entry(repo: str, config: dict, where: str) -> dict:
+    """A repository's entry from its pubkit.json's protect block."""
+    block = config.get("protect")
+    if not isinstance(block, dict) or not block.get("checks"):
+        raise ValueError(f"{where} has no protect block; add "
+                         f'"protect": {{"checks": ["ci / passed"]}} to it')
+    return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True)}
+
+
+def remote(api: Api, repo: str) -> dict:
+    """`repo`'s entry, from the pubkit.json on its default branch."""
+    try:
+        found = api("GET", f"repos/{repo}/contents/{OWN}", None)
+    except ApiError as e:
+        raise ValueError(f"no {OWN} on its default branch ({e})") from e
+    return entry(repo, json.loads(base64.b64decode(found["content"])), f"its {OWN}")
+
+
+def origin() -> str:
+    """OWNER/NAME of the GitHub repository `origin` points at."""
+    proc = subprocess.run(["git", "remote", "get-url", "origin"],
+                          capture_output=True, text=True, check=False)
+    m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?/?$", proc.stdout.strip())
+    if not m:
+        sys.exit("pubkit protect: origin is not a GitHub repository; name it as OWNER/NAME")
+    return m.group(1)
+
+
+def load(config: Path | None) -> list[dict] | None:
     """The repositories and their checks: `config`, else the protected.json
-    in the working directory."""
+    in the working directory; None when there is neither."""
     if config is None:
         if not Path(LOCAL).is_file():
-            sys.exit(f"pubkit protect: no ./{LOCAL}; pass --config FILE, or name the "
-                     f"repositories with --require CHECK for each check they require")
+            return None
         config = Path(LOCAL)
     elif not config.is_file():
         sys.exit(f"pubkit protect: no {config}")
@@ -234,15 +269,31 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
         entries = [{"repo": r, "checks": requires} for r in repos]
     else:
         entries = load(config)
-    known = {e["repo"]: e for e in entries}
-    unknown = [r for r in repos if r not in known]
-    if unknown:
-        sys.exit(f"pubkit protect: {', '.join(unknown)} not in protected.json; add "
-                 f'{{"repo": "{unknown[0]}", "checks": [...]}} to it first')
+        if entries is None and not repos:
+            if not Path(OWN).is_file():
+                sys.exit(f"pubkit protect: no ./{LOCAL} or ./{OWN}; pass --config FILE, or "
+                         f"name the repositories with --require CHECK for each check they "
+                         f"require")
+            own = origin()
+            try:
+                entries = [entry(own, json.loads(Path(OWN).read_text(encoding="utf-8")),
+                                 f"./{OWN}")]
+            except ValueError as e:
+                sys.exit(f"pubkit protect: {e}")
+    known = {e["repo"]: e for e in entries or []}
     failed = False
-    for entry in [known[r] for r in repos] or entries:
-        lines, bad = protect(api, entry["repo"], entry["checks"], check,
-                             tags and entry.get("tags", True))
+    for name in repos or list(known):
+        if name in known:
+            item = known[name]
+        else:
+            try:
+                item = remote(api, name)
+            except ValueError as e:
+                print(f"{name}: not in {LOCAL}, and {e}")
+                failed = True
+                continue
+        lines, bad = protect(api, item["repo"], item["checks"], check,
+                             tags and item.get("tags", True))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

@@ -4,8 +4,10 @@ repository's rulesets in a JSON file and records what it was sent."""
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,6 +26,14 @@ path = os.environ["FAKE_GH"]
 state = json.load(open(path))
 args = sys.argv[1:]
 method, url = args[args.index("-X") + 1], args[-1] if "--input" not in args else args[args.index("--input") - 1]
+f = re.match(r"repos/([^/]+/[^/]+)/contents/pubkit.json$", url)
+if f:
+    if f.group(1) not in state.get("files", {{}}):
+        print(json.dumps({{"message": "Not Found"}}))
+        sys.stderr.write("gh: Not Found (HTTP 404)\\n")
+        sys.exit(1)
+    print(json.dumps({{"content": state["files"][f.group(1)]}}))
+    sys.exit(0)
 m = re.match(r"repos/([^/]+/[^/]+)/rulesets(?:/(\\d+))?", url)
 repo, rid = m.group(1), m.group(2)
 rulesets = state["rulesets"].setdefault(repo, [])
@@ -157,6 +167,34 @@ def lists(repo, github, slug, checks):
 def lists_without_tags(repo, github, slug, checks):
     (repo / "protected.json").write_text(json.dumps(
         {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False}]}))
+
+
+def _block(checks, tags):
+    block = {"checks": _checks(checks)}
+    if tags == "without":
+        block["tags"] = False
+    return {"kind": "service", "protect": block}
+
+
+@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubkit.json on GitHub requires "(?P<checks>[^"]+)"'
+                  r'(?:, (?P<tags>without) tags)?$'))
+def remote_config(github, slug, checks, tags):
+    content = base64.b64encode(json.dumps(_block(checks, tags)).encode()).decode()
+    _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
+
+
+@given(parsers.re(r'the working directory is a clone of "(?P<slug>[^"]+)" whose pubkit.json '
+                  r'requires "(?P<checks>[^"]+)"(?:, (?P<tags>without) tags)?$'))
+def local_config(repo, slug, checks, tags):
+    (repo / "pubkit.json").write_text(json.dumps(_block(checks, tags)))
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
+                    f"git@github.com:{slug}.git"], check=True)
+
+
+@given("its pubkit.json has no protect block")
+def no_block(repo):
+    (repo / "pubkit.json").write_text(json.dumps({"kind": "service"}))
 
 
 @given(parsers.parse('GitHub has no ruleset in "{slug}"'))
