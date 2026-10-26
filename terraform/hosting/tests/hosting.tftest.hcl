@@ -35,6 +35,14 @@ mock_provider "cloudflare" {
   }
 }
 
+# testdata/pubkit.json gives recipes.example.eu the subdomain above, the
+# name Cloudflare picks when the project's own is taken; docs.example.org
+# has its project's own name.
+override_resource {
+  target = cloudflare_pages_project.site["docs.example.org"]
+  values = { subdomain = "example-docs.pages.dev" }
+}
+
 variables {
   config = jsondecode(file("../testdata/pubkit.json")).hosting
   servers = {
@@ -264,4 +272,19 @@ run "dnssec_keys_follow_dns" {
   }
 
   expect_failures = [var.config]
+}
+
+# Cloudflare gave the project another pages.dev name than pubkit.json
+# says: the apply stops instead of pointing the name at the wrong one. Its
+# own state, so the project is created afresh with the overridden name.
+run "pages_subdomain_must_match" {
+  command   = apply
+  state_key = "pages_subdomain_must_match"
+
+  override_resource {
+    target = cloudflare_pages_project.site["docs.example.org"]
+    values = { subdomain = "example-docs-9xy.pages.dev" }
+  }
+
+  expect_failures = [cloudflare_pages_project.site]
 }

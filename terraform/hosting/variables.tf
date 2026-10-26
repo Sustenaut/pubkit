@@ -68,6 +68,7 @@ variable "config" {
         kind      = string
         server    = optional(string)
         project   = optional(string)
+        subdomain = optional(string)
         served_by = optional(string, "pages")
         standby   = optional(string)
         service   = optional(string)

@@ -63,6 +63,8 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages"}}}      | project must be the Pages project's name        |
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "served_by": "server"}}} | standby must name a server |
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "served_by": "cdn"}}} | served_by must be one of |
+      | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "subdomain": "p-2ab"}}} | subdomain must be the project's pages.dev name |
+      | {"dns": ["hetzner"], "sites": {"www": {"provider": "cloudflare", "kind": "pages", "project": "p", "subdomain": "p.example.eu"}}} | subdomain must be the project's pages.dev name |
       | {"dns": ["hetzner"], "sites": {"WWW": {"provider": "hetzner", "kind": "server", "server": "web"}}} | must be named by the name relative     |
       | {"dns": ["hetzner"], "ttl": {"email": "1h"}}                                            | ttl.email must be a number of seconds           |
       | {"dns": ["hetzner"], "sites": {"www": {"provider": "hetzner", "kind": "server", "server": "web", "ttl": 1000000}}} | www.ttl must be a number of seconds |

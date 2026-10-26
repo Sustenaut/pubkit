@@ -41,6 +41,9 @@ locals {
         key      = name == "@" ? "apex" : replace(name, ".", "_")
         ttl      = coalesce(site.ttl, local.ttl[zone_name].sites)
         settings = local.providers[site.provider]
+        # A Pages project's pages.dev name: its name, unless pubkit.json
+        # gives the one Cloudflare chose.
+        pages_subdomain = site.kind == "pages" ? coalesce(site.subdomain, "${site.project}.pages.dev") : null
       })
     }
   ]...)
@@ -57,7 +60,7 @@ locals {
             name   = site.name
             type   = "CNAME"
             ttl    = site.ttl
-            values = [site.kind == "pages" ? "${cloudflare_pages_project.site[fqdn].subdomain}." : site.settings.cloud_run.domain_target]
+            values = [site.kind == "pages" ? "${site.pages_subdomain}." : site.settings.cloud_run.domain_target]
           }
         }
         : merge(
@@ -149,15 +152,27 @@ module "zone" {
 #
 # Each project holds files deployed from CI (actions/deploy-static): no Git
 # connection, no builds on Cloudflare. A server can hold the same files as
-# a standby; served_by chooses which of the two the name points at. The
-# project's pages.dev name is its name, or that name with a suffix if
-# someone else has it, so the CNAME uses the subdomain Cloudflare reports.
+# a standby; served_by chooses which of the two the name points at.
+#
+# The CNAME points at the project's pages.dev name, worked out from
+# pubkit.json so that it is known when Terraform plans: deSEC's provider
+# fails an apply on a record whose value was unknown at plan time. That
+# name is the project's name, or, if someone else has it, the name with a
+# suffix Cloudflare picks; the postcondition stops the apply then, and
+# says what to put in the site's subdomain.
 resource "cloudflare_pages_project" "site" {
   for_each = local.pages_sites
 
   account_id        = each.value.settings.account_id
   name              = each.value.project
   production_branch = "main"
+
+  lifecycle {
+    postcondition {
+      condition     = self.subdomain == each.value.pages_subdomain
+      error_message = "Cloudflare named the Pages project ${each.value.project}'s address ${self.subdomain}, not ${each.value.pages_subdomain}. Set \"subdomain\": \"${self.subdomain}\" on ${each.key}'s site in pubkit.json, and apply again."
+    }
+  }
 }
 
 resource "cloudflare_pages_domain" "site" {
