@@ -1,14 +1,6 @@
 {
   "changes": [
     {
-      "category": "fixed",
-      "change": "terraform/hosting names a Pages site's CNAME target at plan time, <project>.pages.dev or the site's new optional subdomain in pubkit.json, so the first apply that creates the Pages project no longer fails at deSEC with \"Provider produced inconsistent final plan\". Apply stops with the subdomain to set if Cloudflare gave the project another pages.dev name"
-    },
-    {
-      "category": "added",
-      "change": "pubkit protect can leave out the release tag ruleset for a repository that releases no tags: \"tags\": false in its protected.json entry, or --no-tags. When GitHub refuses one ruleset, the other's result is still printed"
-    },
-    {
       "category": "added",
       "change": "A repository can say how it is protected in its own pubkit.json, \"protect\": {\"checks\": [...], \"tags\": false}. pubkit protect reads it from GitHub for a repository protected.json does not list, and from ./pubkit.json when run inside a repository with no list and nothing named"
     }
