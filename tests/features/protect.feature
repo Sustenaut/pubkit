@@ -93,6 +93,30 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it fails
     And stderr mentions "pass --config FILE, or name the repositories with --require"
 
+  Scenario: A repository listed with "tags": false gets only main's ruleset
+    Given protected.json lists "schryer/site" requiring "ci / passed", without tags
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it succeeds
+    And it prints "schryer/site: created "main changes by pull request, after CI""
+    And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed"
+    And GitHub was sent no tag ruleset
+
+  Scenario: --no-tags leaves out the tag ruleset
+    Given GitHub has no ruleset in "schryer/baz"
+    When I run pubkit "protect" "--no-tags" "--require" "ci / passed" "schryer/baz"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/baz" requiring "ci / passed"
+    And GitHub was sent no tag ruleset
+
+  Scenario: When GitHub rejects only the tag ruleset, main's is still reported
+    Given GitHub has no ruleset in "schryer/foo"
+    And GitHub rejects the tag ruleset for "schryer/foo" because "Actor GitHub Actions integration must be part of the ruleset source or owner organization"
+    When I run pubkit "protect" "--require" "ci / passed" "schryer/foo"
+    Then it fails
+    And it prints "schryer/foo: created "main changes by pull request, after CI""
+    And it prints "Actor GitHub Actions integration must be part of the ruleset source"
+
   Scenario: protect shows why GitHub rejected a ruleset
     Given protected.json lists "schryer/foo" requiring "ci / passed, SonarCloud Code Analysis"
     And GitHub rejects the ruleset for "schryer/foo" because "Invalid rule 'required_status_checks': integration 12526 is not installed"

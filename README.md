@@ -610,7 +610,7 @@ request (no approval needed), only after the required checks pass, and
 nobody may bypass it. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--no-tags] [--config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
@@ -618,7 +618,9 @@ tags' ruleset, [`src/pubkit/tag-ruleset.json`](src/pubkit/tag-ruleset.json):
 nobody may create, move or delete a `v*` tag, and only GitHub Actions may
 bypass it. So the one way to release is the signed one: `pubrel prepare`
 on your machine, then merging the release pull request, after which CI
-runs `pubrel tag` on main. A tag pushed by hand is refused. It calls the GitHub API through
+runs `pubrel tag` on main. A tag pushed by hand is refused. A repository
+that releases no tags, such as a site, goes without the tag ruleset:
+`"tags": false` in its entry, or `--no-tags`. It calls the GitHub API through
 `gh`, signed in as the repositories' owner, since only an admin may change
 a ruleset. `--check` changes nothing: it prints how each repository
 differs, a setting GitHub adds with its own default aside, and fails when
@@ -627,7 +629,8 @@ one does. When GitHub rejects a ruleset, it prints GitHub's reasons.
 The repositories come from one of:
 
 - a `protected.json` in the working directory, or the file `--config`
-  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`.
+  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
+  `"tags": false` where the repository releases no tags.
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.

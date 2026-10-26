@@ -31,11 +31,13 @@ if method != "GET":
     if repo in state["refuse"]:
         sys.stderr.write("gh: Resource not accessible by integration (HTTP 403)\\n")
         sys.exit(1)
-    if repo in state["reject"]:
-        print(json.dumps({{"message": "Validation Failed", "errors": state["reject"][repo]}}))
+    body = json.load(sys.stdin)
+    reasons = state["reject"].get(repo) or state["reject"].get(repo + " " + body["target"])
+    if reasons:
+        print(json.dumps({{"message": "Validation Failed", "errors": reasons}}))
         sys.stderr.write("gh: Validation Failed (HTTP 422)\\n")
         sys.exit(1)
-    state["sent"].append({{"method": method, "url": url, "body": json.load(sys.stdin)}})
+    state["sent"].append({{"method": method, "url": url, "body": body}})
     json.dump(state, open(path, "w"))
     print("{{}}")
 elif rid:
@@ -151,6 +153,12 @@ def lists(repo, github, slug, checks):
         {"repositories": [{"repo": slug, "checks": _checks(checks)}]}))
 
 
+@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", without tags'))
+def lists_without_tags(repo, github, slug, checks):
+    (repo / "protected.json").write_text(json.dumps(
+        {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False}]}))
+
+
 @given(parsers.parse('GitHub has no ruleset in "{slug}"'))
 def no_ruleset(github, slug):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, []))
@@ -192,6 +200,11 @@ def rejects(github, slug, reason):
     _edit(github, lambda s: s["reject"].__setitem__(slug, [reason]))
 
 
+@given(parsers.parse('GitHub rejects the tag ruleset for "{slug}" because "{reason}"'))
+def rejects_tags(github, slug, reason):
+    _edit(github, lambda s: s["reject"].__setitem__(f"{slug} tag", [reason]))
+
+
 @given(parsers.parse('GitHub refuses to change rulesets in "{slug}"'))
 def refuses(github, slug):
     _edit(github, lambda s: s["refuse"].append(slug))
@@ -217,6 +230,11 @@ def sent_tags(github, slug):
     (call,) = [c for c in _sent(github) if c["body"]["target"] == "tag"]
     assert (call["method"], call["url"], call["body"]) == (
         "POST", f"repos/{slug}/rulesets", protect.tag_ruleset())
+
+
+@then("GitHub was sent no tag ruleset")
+def sent_no_tags(github):
+    assert [c for c in _sent(github) if c["body"]["target"] == "tag"] == []
 
 
 @then("GitHub was sent nothing")
