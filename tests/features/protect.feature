@@ -69,11 +69,44 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it prints "schryer/foo: no ruleset on its release tags"
     And GitHub was sent nothing
 
-  Scenario: protect names the line to add for a repository protected.json lacks
+  Scenario: A repository neither listed nor carrying a protect block is not protected
     Given protected.json lists "schryer/foo" requiring "ci / passed"
     When I run pubkit "protect" "--config" "protected.json" "schryer/bar"
     Then it fails
-    And stderr mentions "schryer/bar not in protected.json"
+    And it prints "schryer/bar: not in protected.json, and no pubkit.json on its default branch"
+    And GitHub was sent nothing
+
+  Scenario: A repository protected.json lacks is protected as its own pubkit.json says
+    Given protected.json lists "schryer/foo" requiring "ci / passed"
+    And "schryer/site"'s pubkit.json on GitHub requires "ci / passed", without tags
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect" "schryer/site"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed"
+    And GitHub was sent no tag ruleset
+
+  Scenario: Without any list, the named repositories' own pubkit.json are read
+    Given "schryer/site"'s pubkit.json on GitHub requires "ci / passed, build"
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect" "schryer/site"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed, build"
+    And GitHub was sent the tag ruleset for "schryer/site"
+
+  Scenario: Inside a repository, with nothing named, protect reads ./pubkit.json
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed", without tags
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect"
+    Then it succeeds
+    And it prints "schryer/site: created "main changes by pull request, after CI""
+    And GitHub was sent no tag ruleset
+
+  Scenario: A pubkit.json without a protect block says what to add
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json has no protect block
+    When I run pubkit "protect"
+    Then it fails
+    And stderr mentions "./pubkit.json has no protect block"
 
   Scenario: protect says who may change a ruleset when GitHub refuses
     Given protected.json lists "schryer/foo" requiring "ci / passed"
@@ -142,3 +175,60 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     When I run pubkit "protect" "--require" "ci / passed"
     Then it fails
     And stderr mentions "name the repositories too"
+
+  Scenario Outline: A protect block that is not sound is refused before GitHub is asked
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json's protect block is <block>
+    When I run pubkit "protect"
+    Then it fails
+    And stderr mentions "<reason>"
+    And GitHub was sent nothing
+
+    Examples:
+      | block                                     | reason                                    |
+      | {"checks": []}                            | "checks" must list at least one check     |
+      | {"checks": "ci / passed"}                 | "checks" must list at least one check     |
+      | {"checks": ["ci / passed", ""]}           | every check must be a name                |
+      | {"checks": [" ci / passed"]}              | without surrounding spaces                |
+      | {"checks": ["build", "build"]}            | "checks" lists a check twice              |
+      | {"checks": ["build"], "tags": "no"}       | "tags" must be true or false, not "no"    |
+      | {"checks": ["build"], "tag": false}       | tag is not a protect setting              |
+      | ["build"]                                 | it is ["build"], not an object            |
+
+  Scenario: A ./pubkit.json that is not JSON is refused
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json is "{not json"
+    When I run pubkit "protect"
+    Then it fails
+    And stderr mentions "./pubkit.json is not JSON"
+
+  Scenario: A repository's pubkit.json on GitHub that is not JSON is reported, and nothing sent
+    Given "schryer/site"'s pubkit.json on GitHub is "{not json"
+    When I run pubkit "protect" "schryer/site"
+    Then it fails
+    And it prints "schryer/site: not in protected.json, and its pubkit.json is not JSON"
+    And GitHub was sent nothing
+
+  Scenario: A repository's unsound protect block on GitHub is reported, and nothing sent
+    Given "schryer/site"'s pubkit.json on GitHub is "{"protect": {"checks": ["build"], "tags": 0}}"
+    When I run pubkit "protect" "schryer/site"
+    Then it fails
+    And it prints "its pubkit.json's protect block: "tags" must be true or false, not 0"
+    And GitHub was sent nothing
+
+  Scenario: protect refuses a named repository that is not OWNER/NAME
+    When I run pubkit "protect" "schryer/foo/../bar"
+    Then it fails
+    And stderr mentions "schryer/foo/../bar is not OWNER/NAME"
+
+  Scenario: protect refuses a protected.json entry whose tags are not true or false
+    Given protected.json is {"repositories": [{"repo": "schryer/foo", "checks": ["build"], "tags": "no"}]}
+    When I run pubkit "protect" "--check"
+    Then it fails
+    And stderr mentions "schryer/foo: "tags" must be true or false"
+
+  Scenario: protect refuses a protected.json that lists a repository twice
+    Given protected.json is {"repositories": [{"repo": "schryer/foo", "checks": ["build"]}, {"repo": "schryer/foo", "checks": ["ci / passed"]}]}
+    When I run pubkit "protect" "--check"
+    Then it fails
+    And stderr mentions "lists schryer/foo more than once"
