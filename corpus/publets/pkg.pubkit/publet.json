@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.14.1 is released as v0.14.1 from commit c373c1d9b139aa87a0a230c4934f1426597b9085.",
+      "content": "pubkit 0.14.2 is released as v0.14.2 from commit e806a94ca10001d4db2bfd0d8184013638c17b04.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.14.1",
+            "0.14.2",
             "pubkit --version",
-            "pubkit 0.14.1",
-            "v0.14.1",
-            "c373c1d9b139aa87a0a230c4934f1426597b9085"
+            "pubkit 0.14.2",
+            "v0.14.2",
+            "e806a94ca10001d4db2bfd0d8184013638c17b04"
           ]
         ]
       },
-      "scope": "the published release v0.14.1 of pubkit",
+      "scope": "the published release v0.14.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c373c1d9b139aa87a0a230c4934f1426597b9085"
+          "revision": "e806a94ca10001d4db2bfd0d8184013638c17b04"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.14.1 was released on 2026-10-26 from commit c373c1d9b139aa87a0a230c4934f1426597b9085 with these changes.",
+      "content": "pubkit 0.14.2 was released on 2026-10-26 from commit e806a94ca10001d4db2bfd0d8184013638c17b04 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "fixed",
-            "terraform/hosting names a Pages site's CNAME target at plan time, <project>.pages.dev or the site's new optional subdomain in pubkit.json, so the first apply that creates the Pages project no longer fails at deSEC with \"Provider produced inconsistent final plan\". Apply stops with the subdomain to set if Cloudflare gave the project another pages.dev name"
-          ],
-          [
             "added",
-            "pubkit protect can leave out the release tag ruleset for a repository that releases no tags: \"tags\": false in its protected.json entry, or --no-tags. When GitHub refuses one ruleset, the other's result is still printed"
+            "A repository can say how it is protected in its own pubkit.json, \"protect\": {\"checks\": [...], \"tags\": false}. pubkit protect reads it from GitHub for a repository protected.json does not list, and from ./pubkit.json when run inside a repository with no list and nothing named. A block, or a protected.json entry, is refused before GitHub is asked when its checks are not a list of distinct names, its tags are not true or false, it has another key, or its file is not JSON; a named repository must be OWNER/NAME, and protected.json may list a repository only once"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.14.1 of pubkit",
+      "scope": "the published release v0.14.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c373c1d9b139aa87a0a230c4934f1426597b9085"
+          "revision": "e806a94ca10001d4db2bfd0d8184013638c17b04"
         }
       ]
     }
