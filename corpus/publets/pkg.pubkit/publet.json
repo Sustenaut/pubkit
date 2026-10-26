@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.14.0 is released as v0.14.0 from commit 09a4c2a9e6cba8c6ad229b276357a48139a9d14f.",
+      "content": "pubkit 0.14.1 is released as v0.14.1 from commit c373c1d9b139aa87a0a230c4934f1426597b9085.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.14.0",
+            "0.14.1",
             "pubkit --version",
-            "pubkit 0.14.0",
-            "v0.14.0",
-            "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
+            "pubkit 0.14.1",
+            "v0.14.1",
+            "c373c1d9b139aa87a0a230c4934f1426597b9085"
           ]
         ]
       },
-      "scope": "the published release v0.14.0 of pubkit",
+      "scope": "the published release v0.14.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
+          "revision": "c373c1d9b139aa87a0a230c4934f1426597b9085"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.14.0 was released on 2026-10-25 from commit 09a4c2a9e6cba8c6ad229b276357a48139a9d14f with these changes.",
+      "content": "pubkit 0.14.1 was released on 2026-10-26 from commit c373c1d9b139aa87a0a230c4934f1426597b9085 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,32 +57,28 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit.json's ci block now writes a rust or service repository's CI too, and pubkit init and pubkit new give every kind a ci block in place of a ci.yml. Rust's pr.yml, main.yml and nightly.yml call job-rust-gates, test, functional, msrv, fuzz, cross, audit and toolchains (nightly only) beside job-osv, job-review and job-sonar, each only when the Rust crate standard asks for it here, from the rules and pubkit.json's exceptions; pubkit sync writes each job's required make targets into the workflow, and job-rust-gates runs make sync-check. On a pull request that touches no Rust code, Cargo files, fuzz/ or workflow files, fuzz and cross pass at once with a notice instead of being skipped. Rust's release checks semver (semver-checks-version 0.51.0). A service's pr.yml and main.yml call job-service-checks, and job-service-terraform and job-service-tests when the ci block gives a terraform-dir and a test; a service has no release. pubkit conform accepts the job-rust-*.yml pins as it does rust-ci.yml's"
+            "fixed",
+            "terraform/hosting names a Pages site's CNAME target at plan time, <project>.pages.dev or the site's new optional subdomain in pubkit.json, so the first apply that creates the Pages project no longer fails at deSEC with \"Provider produced inconsistent final plan\". Apply stops with the subdomain to set if Cloudflare gave the project another pages.dev name"
           ],
           [
             "added",
-            "pubkit required also prints slow=true or slow=false: false when a pull request touches no Rust code, Cargo files, fuzz/ or workflow files, which the generated fuzz and cross jobs read"
-          ],
-          [
-            "changed",
-            "job-sonar.yml takes reports, space-separated property=pattern pairs, in place of report-property and report-pattern, so one scan can send reports to more than one property (Rust's LCOV and Python's Cobertura XML). Only workflows pubkit sync writes call it, and they are rewritten with it"
+            "pubkit protect can leave out the release tag ruleset for a repository that releases no tags: \"tags\": false in its protected.json entry, or --no-tags. When GitHub refuses one ruleset, the other's result is still printed"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.14.0 of pubkit",
+      "scope": "the published release v0.14.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "09a4c2a9e6cba8c6ad229b276357a48139a9d14f"
+          "revision": "c373c1d9b139aa87a0a230c4934f1426597b9085"
         }
       ]
     }
   },
-  "created": "2026-10-25T00:00:00Z",
+  "created": "2026-10-26T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
