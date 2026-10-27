@@ -186,7 +186,8 @@ class Connector:
         self.transport = transport
         self.headers = headers or {}
 
-    def get(self, method: str, url: str) -> tuple[Response, str]:
-        """GET `url` for the query `method`; the response and its call id."""
+    def get(self, method: str, url: str, endpoint: str | None = None) -> tuple[Response, str]:
+        """GET `url` for the query `method`; the response and its call id.
+        The call is logged under `endpoint`, by default the URL."""
         response = self.transport.fetch(url, self.headers)
-        return response, self.ledger.log(self.name, method, url, response)
+        return response, self.ledger.log(self.name, method, endpoint or url, response)

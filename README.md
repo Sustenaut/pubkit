@@ -713,7 +713,8 @@ fact and every notch to the calls it rests on, which the breakdown names.
 such a file instead of the network.
 
 [`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
-checks out the caller, installs the pubkit release `pubkit-version` names,
+checks out the caller, installs what its `tests/requirements.lock` pins
+(wheels only, by hash: the caller's own pubkit),
 runs `pubkit board` with the caller's read-only `token` and its lists, and
 uploads board.json and index.html as the `board` artifact, kept 90 days. It
 deploys nothing.

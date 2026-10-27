@@ -34,7 +34,6 @@ that are switched off or absent are listed with no notch.
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from importlib import resources
@@ -103,7 +102,10 @@ def worse(*letters: str) -> str:
 
 def short(job: str) -> str:
     """"ci / test (ubuntu-latest)" -> "test"."""
-    return re.sub(r"\s*\(.*\)$", "", job.rsplit(" / ", 1)[-1]).strip()
+    name = job.rsplit(" / ", 1)[-1]
+    if name.endswith(")") and " (" in name:
+        name = name[:name.rindex(" (")]
+    return name.strip()
 
 
 # Sonar's starting letter, per category, from its ratings.

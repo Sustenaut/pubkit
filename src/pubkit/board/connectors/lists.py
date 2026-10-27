@@ -12,7 +12,8 @@ class Lists(Connector):
     name = "lists"
 
     def _entries(self, method: str, path: Path) -> Fact:
-        response, call = self.get(method, f"file:{path}")
+        # Logged by name only: board.json does not name the runner's directories.
+        response, call = self.get(method, f"file:{path}", f"file:{path.name}")
         if not response.ok:
             return Fact(None, (call,), response.message())
         try:

@@ -483,12 +483,12 @@ def main(argv: list[str] | None = None) -> int:
         from .board import run as board
         from .paths import confined
         governed = args.governed or (Path("governed.json") if Path("governed.json").is_file() else None)
-        # Checked, but passed as given: board.json names the lists as they were named.
-        for name, path in (("config", args.config), ("governed", governed), ("rules", args.rules),
-                           ("replay", args.replay), ("record", args.record), ("out", args.out)):
-            if path:
-                confined(path, f"the --{name} {'directory' if name == 'out' else 'file'}")
-        return board(args.config, governed, args.out, args.rules, args.replay, args.record)
+        files = {name: confined(path, f"the --{name} file") if path else None
+                 for name, path in (("config", args.config), ("governed", governed),
+                                    ("rules", args.rules), ("replay", args.replay),
+                                    ("record", args.record))}
+        return board(files["config"], files["governed"], confined(args.out, "the --out directory"),
+                     files["rules"], files["replay"], files["record"])
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())
