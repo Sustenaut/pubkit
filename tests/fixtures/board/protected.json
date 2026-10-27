@@ -1,0 +1,7 @@
+{
+  "comment": "A made-up list for the board's recorded build.",
+  "repositories": [
+    { "repo": "schryer/pubthing", "checks": ["ci / passed", "release / release"] },
+    { "repo": "schryer/visit-thing", "checks": ["ci / passed"], "tags": false }
+  ]
+}

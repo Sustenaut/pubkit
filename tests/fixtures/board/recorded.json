@@ -1,0 +1,709 @@
+{
+ "recorded": "2026-10-27T12:00:00Z",
+ "responses": {
+  "https://api.github.com/repos/schryer/private-thing": {
+   "json": {
+    "default_branch": "main",
+    "private": true,
+    "visibility": "private"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/actions/runs/31/jobs?per_page=100": {
+   "json": {
+    "jobs": [
+     {
+      "conclusion": "success",
+      "name": "ci / checks"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/actions/runs?branch=main&event=push&status=completed&per_page=30": {
+   "json": {
+    "total_count": 1,
+    "workflow_runs": [
+     {
+      "conclusion": "success",
+      "created_at": "2026-10-26T09:00:00Z",
+      "event": "push",
+      "html_url": "https://github.com/x/actions/runs/31",
+      "id": 31,
+      "path": ".github/workflows/main.yml",
+      "status": "completed",
+      "updated_at": "2026-10-26T09:00:00Z"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/code-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": {
+    "message": "Code scanning is not enabled for this repository."
+   },
+   "status": 403
+  },
+  "https://api.github.com/repos/schryer/private-thing/contents/.github/workflows": {
+   "json": [
+    {
+     "name": "main.yml",
+     "type": "file"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/contents/.github/workflows/main.yml": {
+   "json": {
+    "content": "am9iczoKICBjaGVja3M6CiAgICB1c2VzOiBzY2hyeWVyL3B1YmtpdC8uZ2l0aHViL3dvcmtmbG93cy9qb2Itc2VydmljZS1jaGVja3MueW1sQHYwLjEyLjYK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/contents/pubkit.json": {
+   "json": {
+    "content": "eyJraW5kIjogInNlcnZpY2UiLCAiY2kiOiB7fSwgInByb3RlY3QiOiB7ImNoZWNrcyI6IFsiY2kgLyBwYXNzZWQiXSwgInRhZ3MiOiBmYWxzZX19",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/contents/release.json": {
+   "json": {
+    "message": "Not Found"
+   },
+   "status": 404
+  },
+  "https://api.github.com/repos/schryer/private-thing/contents/tests/requirements.lock": {
+   "json": {
+    "content": "cHVia2l0IEAgaHR0cHM6Ly9naXRodWIuY29tL3NjaHJ5ZXIvcHVia2l0L3JlbGVhc2VzL2Rvd25sb2FkL3YwLjEyLjYvcHVia2l0LTAuMTIuNi1weTMtbm9uZS1hbnkud2hsIFwKICAgIC0taGFzaD1zaGEyNTY6MDAK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/dependabot/alerts?state=open&per_page=100&page=1": {
+   "json": {
+    "message": "Dependabot alerts are disabled for this repository."
+   },
+   "status": 403
+  },
+  "https://api.github.com/repos/schryer/private-thing/issues?state=open&per_page=100&page=1": {
+   "json": [
+    {
+     "number": 1
+    },
+    {
+     "number": 2
+    },
+    {
+     "number": 3
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/private-thing/rulesets?includes_parents=false": {
+   "json": {
+    "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+   },
+   "status": 403
+  },
+  "https://api.github.com/repos/schryer/private-thing/secret-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": {
+    "message": "Secret scanning is disabled on this repository."
+   },
+   "status": 404
+  },
+  "https://api.github.com/repos/schryer/pubkit/releases?per_page=10": {
+   "json": [
+    {
+     "draft": false,
+     "published_at": "2026-10-26T15:00:00Z",
+     "tag_name": "v0.14.2"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubrel/releases?per_page=10": {
+   "json": [
+    {
+     "draft": false,
+     "published_at": "2026-10-26T15:00:00Z",
+     "tag_name": "v0.5.4"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing": {
+   "json": {
+    "archived": false,
+    "default_branch": "main",
+    "private": false,
+    "visibility": "public"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/actions/runs/11/jobs?per_page=100": {
+   "json": {
+    "jobs": [
+     {
+      "conclusion": "success",
+      "name": "ci / gates"
+     },
+     {
+      "conclusion": "success",
+      "name": "ci / test (ubuntu-latest)"
+     },
+     {
+      "conclusion": "success",
+      "name": "ci / audit"
+     },
+     {
+      "conclusion": "success",
+      "name": "ci / passed"
+     },
+     {
+      "conclusion": "success",
+      "name": "release / release"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/actions/runs?branch=main&event=push&status=completed&per_page=30": {
+   "json": {
+    "total_count": 1,
+    "workflow_runs": [
+     {
+      "conclusion": "success",
+      "created_at": "2026-10-27T08:00:00Z",
+      "event": "push",
+      "html_url": "https://github.com/x/actions/runs/11",
+      "id": 11,
+      "path": ".github/workflows/ci.yml",
+      "status": "completed",
+      "updated_at": "2026-10-27T08:00:00Z"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/code-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": [],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/contents/.github/workflows": {
+   "json": [
+    {
+     "name": "ci.yml",
+     "type": "file"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/contents/.github/workflows/ci.yml": {
+   "json": {
+    "content": "am9iczoKICBjaToKICAgIHVzZXM6IHNjaHJ5ZXIvcHVia2l0Ly5naXRodWIvd29ya2Zsb3dzL3J1c3QtY2kueW1sQHYwLjE0LjIKICByZWxlYXNlOgogICAgdXNlczogc2Nocnllci9wdWJyZWwvLmdpdGh1Yi93b3JrZmxvd3MvcmVsZWFzZS55bWxAdjAuNS40CiAgICB3aXRoOiB7IHB1YnJlbC12ZXJzaW9uOiB2MC41LjQgfQo=",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/contents/pubkit.json": {
+   "json": {
+    "content": "eyJraW5kIjogInJ1c3QiLCAicHJvdGVjdCI6IHsiY2hlY2tzIjogWyJjaSAvIHBhc3NlZCIsICJyZWxlYXNlIC8gcmVsZWFzZSJdfX0=",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/contents/release.json": {
+   "json": {
+    "content": "eyJuYW1lIjogInB1YnRoaW5nIn0=",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/contents/tests/requirements.lock": {
+   "json": {
+    "content": "cHVia2l0IEAgaHR0cHM6Ly9naXRodWIuY29tL3NjaHJ5ZXIvcHVia2l0L3JlbGVhc2VzL2Rvd25sb2FkL3YwLjE0LjIvcHVia2l0LTAuMTQuMi1weTMtbm9uZS1hbnkud2hsIFwKICAgIC0taGFzaD1zaGEyNTY6MDAK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/dependabot/alerts?state=open&per_page=100&page=1": {
+   "json": {
+    "message": "Dependabot alerts are disabled for this repository."
+   },
+   "status": 403
+  },
+  "https://api.github.com/repos/schryer/pubthing/issues?state=open&per_page=100&page=1": {
+   "json": [
+    {
+     "number": 7,
+     "title": "a bug"
+    },
+    {
+     "number": 8,
+     "pull_request": {},
+     "title": "a change"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/releases?per_page=10": {
+   "json": [
+    {
+     "draft": false,
+     "published_at": "2026-10-20T10:00:00Z",
+     "tag_name": "v1.4.0"
+    },
+    {
+     "draft": true,
+     "published_at": null,
+     "tag_name": "v1.5.0-draft"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/rulesets/1": {
+   "json": {
+    "bypass_actors": [],
+    "conditions": {
+     "ref_name": {
+      "exclude": [],
+      "include": [
+       "~DEFAULT_BRANCH"
+      ]
+     }
+    },
+    "enforcement": "active",
+    "id": 1,
+    "name": "main changes by pull request, after CI",
+    "rules": [
+     {
+      "type": "deletion"
+     },
+     {
+      "type": "non_fast_forward"
+     },
+     {
+      "parameters": {
+       "allowed_merge_methods": [
+        "merge",
+        "squash",
+        "rebase"
+       ],
+       "dismiss_stale_reviews_on_push": false,
+       "require_code_owner_review": false,
+       "require_last_push_approval": false,
+       "required_approving_review_count": 0,
+       "required_review_thread_resolution": false,
+       "required_reviewers": []
+      },
+      "type": "pull_request"
+     },
+     {
+      "parameters": {
+       "do_not_enforce_on_create": false,
+       "required_status_checks": [
+        {
+         "context": "ci / passed",
+         "integration_id": 15368
+        },
+        {
+         "context": "release / release",
+         "integration_id": 15368
+        }
+       ],
+       "strict_required_status_checks_policy": false
+      },
+      "type": "required_status_checks"
+     }
+    ],
+    "target": "branch"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/rulesets/2": {
+   "json": {
+    "bypass_actors": [
+     {
+      "actor_id": 15368,
+      "actor_type": "Integration",
+      "bypass_mode": "always"
+     }
+    ],
+    "conditions": {
+     "ref_name": {
+      "exclude": [],
+      "include": [
+       "refs/tags/v*"
+      ]
+     }
+    },
+    "enforcement": "active",
+    "id": 2,
+    "name": "release tags only from CI",
+    "rules": [
+     {
+      "type": "creation"
+     },
+     {
+      "type": "update"
+     },
+     {
+      "type": "deletion"
+     }
+    ],
+    "target": "tag"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/rulesets?includes_parents=false": {
+   "json": [
+    {
+     "id": 1,
+     "name": "main changes by pull request, after CI",
+     "target": "branch"
+    },
+    {
+     "id": 2,
+     "name": "release tags only from CI",
+     "target": "tag"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/pubthing/secret-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": [],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing": {
+   "json": {
+    "default_branch": "main",
+    "private": false,
+    "visibility": "public"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/actions/runs/21/jobs?per_page=100": {
+   "json": {
+    "jobs": [
+     {
+      "conclusion": "success",
+      "name": "ci / checks"
+     },
+     {
+      "conclusion": "failure",
+      "name": "ci / tests"
+     },
+     {
+      "conclusion": "failure",
+      "name": "ci / passed"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/actions/runs?branch=main&event=push&status=completed&per_page=30": {
+   "json": {
+    "total_count": 2,
+    "workflow_runs": [
+     {
+      "conclusion": "success",
+      "created_at": "2026-10-27T09:00:00Z",
+      "event": "push",
+      "html_url": "https://github.com/x/actions/runs/22",
+      "id": 22,
+      "path": ".github/workflows/deploy.yml",
+      "status": "completed",
+      "updated_at": "2026-10-27T09:00:00Z"
+     },
+     {
+      "conclusion": "failure",
+      "created_at": "2026-10-27T09:00:00Z",
+      "event": "push",
+      "html_url": "https://github.com/x/actions/runs/21",
+      "id": 21,
+      "path": ".github/workflows/main.yml",
+      "status": "completed",
+      "updated_at": "2026-10-27T09:00:00Z"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/actions/workflows/deploy.yml/runs?status=completed&per_page=10": {
+   "json": {
+    "total_count": 1,
+    "workflow_runs": [
+     {
+      "conclusion": "success",
+      "created_at": "2026-10-27T09:00:00Z",
+      "event": "push",
+      "html_url": "https://github.com/x/actions/runs/22",
+      "id": 22,
+      "path": ".github/workflows/deploy.yml",
+      "status": "completed",
+      "updated_at": "2026-10-27T09:00:00Z"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/actions/workflows/live.yml/runs?status=completed&per_page=10": {
+   "json": {
+    "total_count": 1,
+    "workflow_runs": [
+     {
+      "conclusion": "success",
+      "created_at": "2026-10-27T11:00:00Z",
+      "event": "schedule",
+      "html_url": "https://github.com/x/actions/runs/23",
+      "id": 23,
+      "path": ".github/workflows/live.yml",
+      "status": "completed",
+      "updated_at": "2026-10-27T11:00:00Z"
+     }
+    ]
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/code-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": {
+    "message": "no analysis found"
+   },
+   "status": 404
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/.github/workflows": {
+   "json": [
+    {
+     "name": "deploy.yml",
+     "type": "file"
+    },
+    {
+     "name": "live.yml",
+     "type": "file"
+    },
+    {
+     "name": "main.yml",
+     "type": "file"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/.github/workflows/deploy.yml": {
+   "json": {
+    "content": "b246IHB1c2gK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/.github/workflows/live.yml": {
+   "json": {
+    "content": "b246IHsgc2NoZWR1bGU6IFt7IGNyb246ICcwICogKiAqIConIH1dIH0K",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/.github/workflows/main.yml": {
+   "json": {
+    "content": "am9iczoKICBjaGVja3M6CiAgICB1c2VzOiBzY2hyeWVyL3B1YmtpdC8uZ2l0aHViL3dvcmtmbG93cy9qb2Itc2VydmljZS1jaGVja3MueW1sQHYwLjE0LjIK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/pubkit.json": {
+   "json": {
+    "content": "eyJraW5kIjogInNlcnZpY2UiLCAiY2kiOiB7fSwgInByb3RlY3QiOiB7ImNoZWNrcyI6IFsiY2kgLyBwYXNzZWQiXSwgInRhZ3MiOiBmYWxzZX0sICJsaXZlIjogeyJoZWFsdGgiOiAiaHR0cHM6Ly92aXNpdC5leGFtcGxlLmV1L2hlYWx0aCIsICJ0ZXN0IjogImxpdmUueW1sIn19",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/release.json": {
+   "json": {
+    "message": "Not Found"
+   },
+   "status": 404
+  },
+  "https://api.github.com/repos/schryer/visit-thing/contents/tests/requirements.lock": {
+   "json": {
+    "content": "cHVia2l0IEAgaHR0cHM6Ly9naXRodWIuY29tL3NjaHJ5ZXIvcHVia2l0L3JlbGVhc2VzL2Rvd25sb2FkL3YwLjE0LjIvcHVia2l0LTAuMTQuMi1weTMtbm9uZS1hbnkud2hsIFwKICAgIC0taGFzaD1zaGEyNTY6MDAK",
+    "encoding": "base64",
+    "type": "file"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/dependabot/alerts?state=open&per_page=100&page=1": {
+   "json": [
+    {
+     "number": 1
+    },
+    {
+     "number": 2
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/issues?state=open&per_page=100&page=1": {
+   "json": [],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/rulesets/3": {
+   "json": {
+    "bypass_actors": [],
+    "conditions": {
+     "ref_name": {
+      "exclude": [],
+      "include": [
+       "~DEFAULT_BRANCH"
+      ]
+     }
+    },
+    "enforcement": "active",
+    "id": 3,
+    "name": "main changes by pull request, after CI",
+    "rules": [
+     {
+      "type": "deletion"
+     },
+     {
+      "type": "non_fast_forward"
+     },
+     {
+      "parameters": {
+       "allowed_merge_methods": [
+        "merge",
+        "squash",
+        "rebase"
+       ],
+       "dismiss_stale_reviews_on_push": false,
+       "require_code_owner_review": false,
+       "require_last_push_approval": false,
+       "required_approving_review_count": 0,
+       "required_review_thread_resolution": false,
+       "required_reviewers": []
+      },
+      "type": "pull_request"
+     },
+     {
+      "parameters": {
+       "do_not_enforce_on_create": false,
+       "required_status_checks": [
+        {
+         "context": "ci / passed",
+         "integration_id": 15368
+        }
+       ],
+       "strict_required_status_checks_policy": false
+      },
+      "type": "required_status_checks"
+     }
+    ],
+    "target": "branch"
+   },
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/rulesets?includes_parents=false": {
+   "json": [
+    {
+     "id": 3,
+     "name": "main changes by pull request, after CI",
+     "target": "branch"
+    }
+   ],
+   "status": 200
+  },
+  "https://api.github.com/repos/schryer/visit-thing/secret-scanning/alerts?state=open&per_page=100&page=1": {
+   "json": [],
+   "status": 200
+  },
+  "https://api.securityscorecards.dev/projects/github.com/schryer/pubthing": {
+   "json": {
+    "checks": [
+     {
+      "name": "Branch-Protection",
+      "score": 3
+     },
+     {
+      "name": "Maintained",
+      "score": 10
+     },
+     {
+      "name": "Fuzzing",
+      "score": -1
+     }
+    ],
+    "score": 6.1
+   },
+   "status": 200
+  },
+  "https://api.securityscorecards.dev/projects/github.com/schryer/visit-thing": {
+   "json": {
+    "message": "not found"
+   },
+   "status": 404
+  },
+  "https://down.example.eu/health": {
+   "error": "no answer: [Errno -2] Name or service not known"
+  },
+  "https://sonarcloud.io/api/measures/component?component=schryer_private-thing&metricKeys=reliability_rating,sqale_rating,security_rating,alert_status": {
+   "json": {
+    "errors": [
+     {
+      "msg": "Component key 'schryer_private-thing' not found"
+     }
+    ]
+   },
+   "status": 404
+  },
+  "https://sonarcloud.io/api/measures/component?component=schryer_pubthing&metricKeys=reliability_rating,sqale_rating,security_rating,alert_status": {
+   "json": {
+    "component": {
+     "key": "schryer_pubthing",
+     "measures": [
+      {
+       "metric": "reliability_rating",
+       "value": "1.0"
+      },
+      {
+       "metric": "sqale_rating",
+       "value": "2.0"
+      },
+      {
+       "metric": "security_rating",
+       "value": "1.0"
+      },
+      {
+       "metric": "alert_status",
+       "value": "OK"
+      }
+     ]
+    }
+   },
+   "status": 200
+  },
+  "https://sonarcloud.io/api/measures/component?component=schryer_visit-thing&metricKeys=reliability_rating,sqale_rating,security_rating,alert_status": {
+   "json": {
+    "errors": [
+     {
+      "msg": "Component key 'schryer_visit-thing' not found"
+     }
+    ]
+   },
+   "status": 404
+  },
+  "https://visit.example.eu/health": {
+   "status": 200,
+   "text": "ok"
+  }
+ }
+}
