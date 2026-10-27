@@ -1,0 +1,28 @@
+{
+  "comment": "The facts of a made-up service with nothing wrong, as collect.py would write them; the rules' scenarios change one fact at a time.",
+  "now": "2026-10-27T12:00:00Z",
+  "facts": {
+    "visibility": { "value": "public" },
+    "kind": { "value": "service" },
+    "integration": { "value": { "pubkit": true, "pubrel": false } },
+    "pins": { "value": { "pubkit": ["0.14.2"], "pubrel": [] } },
+    "latest": { "value": { "pubkit": "0.14.2", "pubrel": "0.5.4" } },
+    "live": { "value": { "health": "https://example.eu/health", "test": "live.yml" } },
+    "health": { "value": { "answers": true, "status": 200 } },
+    "live_test": { "value": { "conclusion": "success", "at": "2026-10-27T11:00:00Z" } },
+    "released": { "value": { "at": "2026-10-27T09:00:00Z" } },
+    "issues": { "value": 0 },
+    "dependabot_alerts": { "value": 0 },
+    "code_scanning_alerts": { "value": 0 },
+    "secret_scanning_alerts": { "value": 0 },
+    "ci": { "value": { "workflow": "main.yml", "conclusion": "success", "at": "2026-10-27T08:00:00Z", "jobs": [
+      { "name": "ci / checks", "conclusion": "success" },
+      { "name": "ci / tests", "conclusion": "success" },
+      { "name": "ci / passed", "conclusion": "success" }
+    ] } },
+    "nightly": { "value": { "governed": false, "last": { "conclusion": "success", "at": "2026-10-27T01:41:00Z" } } },
+    "protection": { "value": { "differences": [], "limit": false } },
+    "sonar": { "value": { "reliability": "A", "maintainability": "A", "security": "A", "gate": "OK" } },
+    "scorecard": { "value": { "score": 7.5, "failing": [] } }
+  }
+}

@@ -650,6 +650,74 @@ and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
 requests. Here, `make protect` (or `make protect-check`, or `make protect
 REPOS=schryer/recipes`) runs it, making the venv first if there is none.
 
+## The release board
+
+    pubkit board --out DIR [--config protected.json] [--governed governed.json] [--rules FILE]
+
+grades every repository the lists name, public and private, A to E for
+quality, security and delivery, and writes `DIR/board.json` and a static
+`DIR/index.html`: no scripts, rows worst first, each grade a dot in
+SonarQube's colours whose breakdown opens on hover or keyboard focus. It
+only reads, and keeps nothing between builds. `GITHUB_TOKEN` (or
+`GH_TOKEN`) is the token it reads GitHub with; `SONAR_TOKEN`, when set,
+reads private SonarQube Cloud projects.
+
+The rules are [`src/pubkit/board/rules.json`](src/pubkit/board/rules.json),
+applied by `rules.py`; `--rules FILE` reads others, such as a client's.
+Each grade is a starting letter less one letter per notch, never below E,
+with every notch listed; the overall grade is the worst of the three.
+
+- **Quality** starts at SonarQube Cloud's worse rating of reliability and
+  maintainability, **Security** at its security rating. With no analysis,
+  each starts at A and takes a notch. Then each other tool with findings
+  takes one: a CI job on main's last run that failed (format and lint,
+  tests, functional and browser tests, MSRV, fuzzing, cross builds and
+  toolchains for Quality; the dependency audit, OSV-Scanner and dependency
+  review for Security), open Dependabot, code scanning or secret scanning
+  alerts, and an OpenSSF Scorecard under 7 for a public repository.
+  Alerts that are switched off are listed with no notch.
+- **Delivery** starts at A and takes a notch for each of: a pinned pubkit
+  or pubrel behind its latest release; not integrated with pubkit
+  (services) or with pubkit and pubrel (packages, which have a
+  release.json); for a service, no observability (its health URL does not
+  answer) and no continuous live testing (its live-test workflow not green
+  in the last 24 hours); no release (a package's tag, a service's
+  production deploy) in two months; any open issue (pull requests aside);
+  no nightly (not in governed.json, and no `nightly.yml` run in two days);
+  protection that differs from what `pubkit protect --check` wants, or no
+  ruleset at all on a private repository GitHub's plan gives none; and a
+  red last CI run on main. A fact the board could not read takes its
+  notch: a board that cannot see does not grade green.
+
+A service declares what its observability and live testing are in its
+`pubkit.json`:
+
+```json
+"live": { "health": "https://example.eu/health", "test": "live.yml", "deploy": "deploy.yml" }
+```
+
+`health` is the URL that must answer, `test` the scheduled workflow that
+tests the live site, and `deploy` the workflow whose successful runs are
+its production deploys (`deploy.yml` by default).
+
+Each source has one connector in `src/pubkit/board/connectors/`, and
+nothing else reads it: `lists` (the two lists), `github` (the REST API:
+visibility, pubkit.json, release.json, the lock and workflow pins,
+rulesets, releases, issues and alerts), `actions` (runs and jobs on main,
+nightly, live-test and deploy runs), `sonarcloud` (project `OWNER_REPO`),
+`scorecard` (public repositories) and `live` (the health URLs). Each
+query is a named method, and each call is recorded with its connector,
+method, endpoint and time: board.json lists every call, and links every
+fact and every notch to the calls it rests on, which the breakdown names.
+`--record FILE` keeps every response, and `--replay FILE` builds from
+such a file instead of the network.
+
+[`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
+checks out the caller, installs the pubkit release `pubkit-version` names,
+runs `pubkit board` with the caller's read-only `token` and its lists, and
+uploads board.json and index.html as the `board` artifact, kept 90 days. It
+deploys nothing.
+
 ## The nightly
 
 `.github/workflows/nightly.yml` runs every night over the repositories

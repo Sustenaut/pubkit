@@ -30,6 +30,7 @@ pubkit = [
     "standard.json",
     "ruleset.json",
     "tag-ruleset.json",
+    "board/rules.json",
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]

@@ -18,6 +18,7 @@
     pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
+    pubkit board --out DIR [--config FILE] [--governed FILE] [--rules FILE]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -399,6 +400,18 @@ def main(argv: list[str] | None = None) -> int:
                    help="OWNER/NAME; by default every repository the config lists, or this "
                         "repository from ./pubkit.json; one not listed is read from its own "
                         "pubkit.json on GitHub")
+    p = commands.add_parser("board", help="grade every listed repository A to E into "
+                                          "board.json and a static index.html")
+    p.add_argument("--out", type=Path, required=True, help="the directory to write them to")
+    p.add_argument("--config", type=Path, default=Path("protected.json"),
+                   help="the repositories and their checks (default: ./protected.json)")
+    p.add_argument("--governed", type=Path,
+                   help="the repositories a nightly updates (default: ./governed.json, if any)")
+    p.add_argument("--rules", type=Path, help="other rules than the ones pubkit ships")
+    p.add_argument("--replay", type=Path,
+                   help="read recorded responses from this file instead of the network")
+    p.add_argument("--record", type=Path,
+                   help="also keep every response in this file, for --replay")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -466,6 +479,16 @@ def main(argv: list[str] | None = None) -> int:
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
         return protect(config, args.repos, args.check, args.require, tags=args.tags)
+    if args.command == "board":
+        from .board import run as board
+        from .paths import confined
+        governed = args.governed or (Path("governed.json") if Path("governed.json").is_file() else None)
+        # Checked, but passed as given: board.json names the lists as they were named.
+        for name, path in (("config", args.config), ("governed", governed), ("rules", args.rules),
+                           ("replay", args.replay), ("record", args.record), ("out", args.out)):
+            if path:
+                confined(path, f"the --{name} {'directory' if name == 'out' else 'file'}")
+        return board(args.config, governed, args.out, args.rules, args.replay, args.record)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

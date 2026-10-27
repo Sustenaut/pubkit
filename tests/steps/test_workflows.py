@@ -249,3 +249,30 @@ def review_job(workflow, name):
 def review_may_skip(workflow):
     run = workflow["data"]["jobs"]["passed"]["steps"][0]["run"]
     assert '.key == "review"' in run or '.result == "skipped"' in run
+
+
+@then(parsers.parse('it takes a required "{name}" secret and reads the repository\'s contents only'))
+def board_secret(workflow, name):
+    assert triggers(workflow)["workflow_call"]["secrets"][name]["required"] is True
+    assert workflow["data"]["permissions"] == {"contents": "read"}
+    assert all("permissions" not in job for job in workflow["data"]["jobs"].values())
+
+
+@then("it runs pubkit board with the token as GITHUB_TOKEN")
+def board_runs(workflow):
+    steps = workflow["data"]["jobs"]["board"]["steps"]
+    step = next(s for s in steps if "pubkit board" in s.get("run", ""))
+    assert step["env"]["GITHUB_TOKEN"] == "${{ secrets.token }}"
+    assert step["shell"] == "bash"
+
+
+@then(parsers.parse('it uploads board.json as the "{name}" artifact, kept 90 days, and nothing else runs'))
+def board_artifact(workflow, name):
+    steps = workflow["data"]["jobs"]["board"]["steps"]
+    upload = steps[-1]
+    assert upload["uses"].startswith("actions/upload-artifact@")
+    assert upload["with"]["name"] == name and upload["with"]["retention-days"] == 90
+    assert "site/board.json" in upload["with"]["path"]
+    uses = [s["uses"].split("@")[0] for s in steps if "uses" in s]
+    assert uses == ["actions/checkout", "actions/setup-python", "actions/upload-artifact"]
+    assert list(workflow["data"]["jobs"]) == ["board"]
