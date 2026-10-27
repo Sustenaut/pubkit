@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "added",
-      "change": "pubkit board grades every repository protected.json and governed.json list, public and private, A to E for quality, security and delivery, into board.json and a static index.html whose grade breakdowns open on hover or focus. Quality and Security start at SonarQube Cloud's letters and Delivery at A, each losing a letter per notch by src/pubkit/board/rules.json (or --rules FILE), never below E; the overall grade is the worst. One connector per source (lists, github, actions, sonarcloud, scorecard, live) records every call, and board.json links each fact and notch to its calls; --record and --replay keep and reuse the responses. A service declares its health URL, live-test and deploy workflows in pubkit.json's live block. The reusable workflow board.yml runs it with a read-only token and keeps board.json as an artifact for 90 days"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
