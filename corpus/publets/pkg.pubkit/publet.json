@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.14.2 is released as v0.14.2 from commit e806a94ca10001d4db2bfd0d8184013638c17b04.",
+      "content": "pubkit 0.14.3 is released as v0.14.3 from commit eb5dd58253e4f9d241cc44cf0c03f7112fd78de7.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.14.2",
+            "0.14.3",
             "pubkit --version",
-            "pubkit 0.14.2",
-            "v0.14.2",
-            "e806a94ca10001d4db2bfd0d8184013638c17b04"
+            "pubkit 0.14.3",
+            "v0.14.3",
+            "eb5dd58253e4f9d241cc44cf0c03f7112fd78de7"
           ]
         ]
       },
-      "scope": "the published release v0.14.2 of pubkit",
+      "scope": "the published release v0.14.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e806a94ca10001d4db2bfd0d8184013638c17b04"
+          "revision": "eb5dd58253e4f9d241cc44cf0c03f7112fd78de7"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.14.2 was released on 2026-10-26 from commit e806a94ca10001d4db2bfd0d8184013638c17b04 with these changes.",
+      "content": "pubkit 0.14.3 was released on 2026-10-27 from commit eb5dd58253e4f9d241cc44cf0c03f7112fd78de7 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,23 @@
         "rows": [
           [
             "added",
-            "A repository can say how it is protected in its own pubkit.json, \"protect\": {\"checks\": [...], \"tags\": false}. pubkit protect reads it from GitHub for a repository protected.json does not list, and from ./pubkit.json when run inside a repository with no list and nothing named. A block, or a protected.json entry, is refused before GitHub is asked when its checks are not a list of distinct names, its tags are not true or false, it has another key, or its file is not JSON; a named repository must be OWNER/NAME, and protected.json may list a repository only once"
+            "pubkit board grades every repository protected.json and governed.json list, public and private, A to E for quality, security and delivery, into board.json and a static index.html whose grade breakdowns open on hover or focus. Quality and Security start at SonarQube Cloud's letters and Delivery at A, each losing a letter per notch by src/pubkit/board/rules.json (or --rules FILE), never below E; the overall grade is the worst. One connector per source (lists, github, actions, sonarcloud, scorecard, live) records every call, and board.json links each fact and notch to its calls; --record and --replay keep and reuse the responses. A service declares its health URL, live-test and deploy workflows in pubkit.json's live block. The reusable workflow board.yml runs it with a read-only token and keeps board.json as an artifact for 90 days"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.14.2 of pubkit",
+      "scope": "the published release v0.14.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e806a94ca10001d4db2bfd0d8184013638c17b04"
+          "revision": "eb5dd58253e4f9d241cc44cf0c03f7112fd78de7"
         }
       ]
     }
   },
-  "created": "2026-10-26T00:00:00Z",
+  "created": "2026-10-27T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
