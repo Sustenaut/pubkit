@@ -37,6 +37,7 @@ Feature: The reusable workflows parse as GitHub reads them
   Scenario: board.yml grades with the caller's token, keeps board.json and deploys nothing
     When I parse the workflow "board.yml"
     Then it takes a required "token" secret and reads the repository's contents only
+    And it reads the lists from the caller, or from the public repository lists-repository names
     And it runs pubkit board with the token as GITHUB_TOKEN
     And it uploads board.json as the "board" artifact, kept 90 days, and nothing else runs
 

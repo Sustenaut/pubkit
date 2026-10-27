@@ -715,7 +715,9 @@ such a file instead of the network.
 [`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
 checks out the caller, installs what its `tests/requirements.lock` pins
 (wheels only, by hash: the caller's own pubkit),
-runs `pubkit board` with the caller's read-only `token` and its lists, and
+runs `pubkit board` with the caller's read-only `token` and its lists (or
+those on the default branch of the public repository `lists-repository`
+names, such as `schryer/pubkit`), and
 uploads board.json and index.html as the `board` artifact, kept 90 days. It
 deploys nothing.
 

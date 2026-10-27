@@ -258,6 +258,17 @@ def board_secret(workflow, name):
     assert all("permissions" not in job for job in workflow["data"]["jobs"].values())
 
 
+@then("it reads the lists from the caller, or from the public repository lists-repository names")
+def board_lists(workflow):
+    steps = workflow["data"]["jobs"]["board"]["steps"]
+    lists = steps[1]
+    assert lists["if"] == "inputs.lists-repository != ''"
+    assert lists["with"]["repository"] == "${{ inputs.lists-repository }}"
+    assert lists["with"]["path"] == "lists" and lists["with"]["persist-credentials"] is False
+    run = next(s for s in steps if "pubkit board" in s.get("run", ""))
+    assert 'PROTECTED="lists/$PROTECTED" GOVERNED="lists/$GOVERNED"' in run["run"]
+
+
 @then("it runs pubkit board with the token as GITHUB_TOKEN")
 def board_runs(workflow):
     steps = workflow["data"]["jobs"]["board"]["steps"]
@@ -274,5 +285,6 @@ def board_artifact(workflow, name):
     assert upload["with"]["name"] == name and upload["with"]["retention-days"] == 90
     assert "site/board.json" in upload["with"]["path"]
     uses = [s["uses"].split("@")[0] for s in steps if "uses" in s]
-    assert uses == ["actions/checkout", "actions/setup-python", "actions/upload-artifact"]
+    assert uses == ["actions/checkout", "actions/checkout", "actions/setup-python",
+                    "actions/upload-artifact"]
     assert list(workflow["data"]["jobs"]) == ["board"]
