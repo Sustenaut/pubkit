@@ -15,8 +15,12 @@ languages, gated on CI, so Dependabot doing the same would open duplicate
 pull requests. `"dependabot": false` leaves `.github/dependabot.yml` to the
 repository.
 
-`security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**"}`: properties
-every workflow's sonar job adds, after its `sonar-args` input.
+`security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**", "organization":
+"sustenaut"}`: `args` are properties every workflow's sonar job adds, after
+its `sonar-args` input, and `organization` is the SonarQube Cloud
+organization key the scan sends the project to. By default that is the
+GitHub owner in lower case, as SonarQube Cloud's keys are; the project key
+stays `OWNER_REPO` with the owner as GitHub spells it.
 
 The advisory checks (cargo deny, npm audit, pip-audit, OSV-Scanner,
 dependency review) have no setting: every run makes them.
@@ -25,13 +29,16 @@ dependency review) have no setting: every run makes them.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Any
 
 DEPENDABOT_PATH = ".github/dependabot.yml"
 SCHEDULES = ("daily", "weekly", "monthly")
 DEPENDABOT = {"schedule": "weekly", "ecosystems": ["github-actions"], "options": {}}
-SONAR = ("args",)
+SONAR = ("args", "organization")
+# SonarQube Cloud's organization keys: lower-case letters, digits and dashes.
+ORGANIZATION = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
 def block(config: dict[str, Any], name: str) -> Any:
@@ -94,4 +101,8 @@ def sonar_settings(config: dict[str, Any]) -> dict[str, str]:
                  f"it takes {', '.join(SONAR)}")
     if not isinstance(given.get("args", ""), str):
         sys.exit("pubkit: security.sonar.args must be a string of -D properties")
-    return {"args": given.get("args", "")}
+    organization = given.get("organization", "")
+    if organization != "" and not (isinstance(organization, str) and ORGANIZATION.fullmatch(organization)):
+        sys.exit("pubkit: security.sonar.organization must be a SonarQube Cloud organization key: "
+                 "lower-case letters, digits and dashes, such as sustenaut")
+    return {"args": given.get("args", ""), "organization": organization}

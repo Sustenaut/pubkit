@@ -109,11 +109,16 @@ def sonar_job(workflow, name):
     assert any(s.get("if") == "env.SONAR_TOKEN == ''" and "::notice::" in s["run"] for s in steps)
 
 
-@then("the scan names the project OWNER_REPO in the organization OWNER")
+@then("the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubkit.json names it")
 def sonar_project(workflow):
     steps = workflow["data"]["jobs"]["sonar"]["steps"]
     args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"]
-    assert "-Dsonar.organization=${{ github.repository_owner }}" in args
+    assert "-Dsonar.organization=${{ steps.settings.outputs.organization }}" in args
+    settings = next(s for s in steps if s.get("id") == "settings")
+    assert ".security.sonar.organization" in settings["run"]
+    assert 'organization=${organization:-${OWNER,,}}' in settings["run"]
+    assert "2>/dev/null || true)" in settings["run"]  # no pubkit.json is no failure
+    assert settings["env"]["OWNER"] == "${{ github.repository_owner }}"
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
 
