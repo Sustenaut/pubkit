@@ -64,7 +64,7 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "<workflow>"
     Then it takes an optional SONAR_TOKEN secret
     And its "sonar" job runs the pinned SonarQube scan only when the token is set
-    And the scan names the project OWNER_REPO in the organization OWNER
+    And the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubkit.json names it
     And the scan waits for the quality gate, so a failing gate fails the job
 
     Examples:

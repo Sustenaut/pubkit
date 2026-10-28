@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "added",
+      "change": "Every sonar job sends the code to the SonarQube Cloud organization whose key is the GitHub owner in lower case, as SonarQube Cloud's keys are, or to pubkit.json's new security.sonar.organization; the project key stays OWNER_REPO. A repository owned by an organization with capitals in its name, such as Sustenaut, could not be analysed before"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

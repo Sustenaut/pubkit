@@ -372,12 +372,18 @@ jobs:
       # Properties pubkit.json adds (security.sonar.args), after the input's.
       - if: env.SONAR_TOKEN != ''
         id: settings
-        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+        # The organization: security.sonar.organization, or the owner in
+        # lower case, since SonarQube Cloud's organization keys are.
+        run: |
+          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null)
+          echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
+        env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
           args: >-
-            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.organization=${{ steps.settings.outputs.organization }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300

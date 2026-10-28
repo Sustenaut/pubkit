@@ -1,5 +1,6 @@
 # SonarQube Cloud's analysis, into the project OWNER_REPO of the
-# organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as
+# organization owner, in lower case (or pubkit.json's
+# security.sonar.organization), when the caller passes a SONAR_TOKEN. Without one, as
 # in a private repository or a pull request from a fork, it says so and
 # passes. The full history lets it tell new code from old, and every
 # coverage* artifact of the run, each in coverage-download/<artifact>/,
@@ -52,12 +53,18 @@ jobs:
         env: { REPORTS: '${{ inputs.reports }}' }
       - if: env.SONAR_TOKEN != ''
         id: settings
-        run: echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+        # The organization: security.sonar.organization, or the owner in
+        # lower case, since SonarQube Cloud's organization keys are.
+        run: |
+          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null)
+          echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
+        env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         with:
           args: >-
-            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.organization=${{ steps.settings.outputs.organization }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300

@@ -881,7 +881,7 @@ ecosystem's lock):
 | `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
 | `security.fuzz.<language>` | `true` | a scheduled run fuzzes as briefly as any other: `rust-ci.yml` runs cargo-fuzz for `fuzz-seconds` instead of `fuzz-seconds-scheduled`, and `python-ci.yml` and `node-ci.yml` give each property test `fuzz-runs` inputs instead of `fuzz-runs-scheduled` (see [Property tests](#property-tests)) |
 | `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out |
-| `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input |
+| `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input; `organization` is the SonarQube Cloud organization key, by default the GitHub owner in lower case |
 
 A setting pubkit does not know stops the nightly with a message, rather
 than being ignored.
@@ -990,9 +990,9 @@ The checks keep the names a ruleset requires: each job is named `ci`, so its che
 
 ### SonarQube Cloud
 
-`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret (pass `secrets: inherit`), it sends the code to SonarQube Cloud as the project `OWNER_REPO` in the organization `OWNER`, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret (pass `secrets: inherit`), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
 
-1. In SonarQube Cloud, analyse the repository as a new project in the organization named like its GitHub owner, keeping the key `OWNER_REPO`.
+1. In SonarQube Cloud, analyse the repository as a new project in the organization whose key is its GitHub owner in lower case (or the one `security.sonar.organization` names), keeping the key `OWNER_REPO`.
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.
 3. Add the token as the repository's `SONAR_TOKEN` Actions secret.
 
