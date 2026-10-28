@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "fixed",
-      "change": "Every sonar job (rust-ci.yml, python-ci.yml, node-ci.yml and the generated CI's job-sonar.yml) waits for SonarQube Cloud's quality gate, with -Dsonar.qualitygate.wait=true and a 300-second timeout, so a failing gate fails the job and `ci / passed` with it; before, the job only uploaded the analysis and passed whatever the gate said (on publet#56, `ci / passed` was green while the gate failed)"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

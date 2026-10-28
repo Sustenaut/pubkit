@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.14.4 is released as v0.14.4 from commit cb793b2a83c48df62a149f740c78e1ccd04bf6f2.",
+      "content": "pubkit 0.14.5 is released as v0.14.5 from commit 02197aa196ae25c75366da88d4a3787ecf90c457.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.14.4",
+            "0.14.5",
             "pubkit --version",
-            "pubkit 0.14.4",
-            "v0.14.4",
-            "cb793b2a83c48df62a149f740c78e1ccd04bf6f2"
+            "pubkit 0.14.5",
+            "v0.14.5",
+            "02197aa196ae25c75366da88d4a3787ecf90c457"
           ]
         ]
       },
-      "scope": "the published release v0.14.4 of pubkit",
+      "scope": "the published release v0.14.5 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "cb793b2a83c48df62a149f740c78e1ccd04bf6f2"
+          "revision": "02197aa196ae25c75366da88d4a3787ecf90c457"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.14.4 was released on 2026-10-28 from commit cb793b2a83c48df62a149f740c78e1ccd04bf6f2 with these changes.",
+      "content": "pubkit 0.14.5 was released on 2026-10-28 from commit 02197aa196ae25c75366da88d4a3787ecf90c457 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "added",
-            "A ci block's release can be {\"uses\": \"local\"}: the generated pr.yml and main.yml then call the repository's own .github/workflows/release.yml, from the checkout, in place of pubrel's published release workflow, as pubrel's own CI does so a change to its release workflow is tested before it ships. Only release.with goes with it; release.pubrel with it, or any other uses, stops sync with a message"
-          ],
-          [
             "fixed",
-            "pubkit dns check, when answers differ, names any nameserver serving an older SOA serial than the others with the same primary (deSEC's ns2.desec.org trails ns1.desec.io for a moment after a write), so a check run straight after an apply says to wait and run it again rather than only reporting the differences. pubkit dns moves' header names 0.13.0, the release that keyed Cloudflare records by value"
+            "Every sonar job (rust-ci.yml, python-ci.yml, node-ci.yml and the generated CI's job-sonar.yml) waits for SonarQube Cloud's quality gate, with -Dsonar.qualitygate.wait=true and a 300-second timeout, so a failing gate fails the job and `ci / passed` with it; before, the job only uploaded the analysis and passed whatever the gate said (on publet#56, `ci / passed` was green while the gate failed)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.14.4 of pubkit",
+      "scope": "the published release v0.14.5 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "cb793b2a83c48df62a149f740c78e1ccd04bf6f2"
+          "revision": "02197aa196ae25c75366da88d4a3787ecf90c457"
         }
       ]
     }
