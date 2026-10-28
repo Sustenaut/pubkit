@@ -44,6 +44,16 @@ Feature: pubkit dns check compares a zone's nameservers and validates each one a
     Then it fails
     And stderr mentions "ns3.desec.example. does not serve example.net"
 
+  Scenario: A nameserver behind the others of its provider is reported as not caught up yet
+    Given every nameserver of "example.net" serves it alike
+    And "ns1.desec.io." answers "example.net. SOA" with "get.desec.io. get.desec.io. 2026105481 86400 3600 2419200 3600"
+    And "ns2.desec.org." answers "example.net. SOA" with "get.desec.io. get.desec.io. 2026105480 86400 3600 2419200 3600"
+    And "ns2.desec.org." answers "example.net. A" with "192.0.2.9"
+    When I run pubkit "dns" "check" "example.net"
+    Then it fails
+    And stderr mentions "ns2.desec.org. serves serial 2026105480 of the zone, older than 2026105481 at the other nameservers of get.desec.io.: it has not caught up with the last change yet"
+    And stderr does not mention "ns1.desec.io. serves serial"
+
   Scenario: A name in a nameserver's answer that is not a host name is never asked
     Given every nameserver of "example.net" serves it alike
     And "ns1.desec.io." answers "example.net. NS" with "ns1.cloudflare.example., ns2.cloudflare.example., ns1.desec.io., ns2.desec.org., -fevil."

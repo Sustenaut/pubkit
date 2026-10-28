@@ -256,6 +256,30 @@ def validate(zone: str, servers: list[str], wanted: list[tuple[str, str]], pinne
     return problems
 
 
+SERIAL = 2  # the serial's place in an SOA value: mname rname serial ...
+
+
+def lagging(zone: str, servers: list[str]) -> list[str]:
+    """Nameservers serving an older version of the zone than another with
+    the same primary (one provider's): written moments ago, they have not
+    caught up yet, so the check is worth running again in a minute."""
+    serials: dict[str, dict[str, int]] = {}
+    for server in servers:
+        for value in dig(server, f"{zone}.", "SOA").values:
+            fields = value.split()
+            if len(fields) > SERIAL and fields[SERIAL].isdigit():
+                serials.setdefault(fields[0].lower(), {})[server] = int(fields[SERIAL])
+    hints = []
+    for primary, by_server in sorted(serials.items()):
+        newest = max(by_server.values())
+        for server, serial in sorted(by_server.items()):
+            if serial < newest:
+                hints.append(f"{server} serves serial {serial} of the zone, older than {newest} at "
+                             f"the other nameservers of {primary}: it has not caught up with the "
+                             "last change yet, so run the check again in a minute")
+    return hints
+
+
 def check(root: Path, zone: str, extra: list[str]) -> int:
     from .cli import read_config  # noqa: PLC0415
     hosting = settings(read_config(root))
@@ -276,6 +300,8 @@ def check(root: Path, zone: str, extra: list[str]) -> int:
     for problem in problems:
         print(f"pubkit: {problem}", file=sys.stderr)
     if problems:
+        for hint in lagging(zone, servers):
+            print(f"pubkit: {hint}", file=sys.stderr)
         return 1
     print(f"{zone}: {len(wanted)} rrsets agree at {len(servers)} nameservers: {', '.join(servers)}")
     if "dnssec" in config:
@@ -321,7 +347,7 @@ def moves(state: str) -> int:
         base = address[:address.index(marker) + len(marker) - 1]
         blocks.append(f"moved {{\n  from = {base}[{hcl(index)}]\n  to   = {base}[{hcl(f'{key} {value}')}]\n}}\n")
     if blocks:
-        print("# Cloudflare records keyed by value since pubkit 0.12.7 (terraform/dns-zone);\n"
+        print("# Cloudflare records keyed by value since pubkit 0.13.0 (terraform/dns-zone);\n"
               "# written by `pubkit dns moves`. Once applied, this file can go.\n")
         print("\n".join(blocks), end="")
     else:

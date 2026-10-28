@@ -401,7 +401,7 @@ TTLs aside, or a nameserver does not serve the zone. With `dnssec`, each
 nameserver must also serve exactly the pinned keys, and validate alone:
 `delv` asks it for each rrset and for a name that does not exist, with
 the pinned key-signing keys as trust anchors, as a resolver will once the
-registrar has the DS records. Run it after each step of a move, and
+registrar has the DS records. When answers differ and one nameserver serves an older SOA serial than its provider's others (deSEC copies a change to ns2.desec.org a moment after ns1.desec.io), it says so: run it again in a minute. Run it after each step of a move, and
 before any DS record goes to the registrar; it only reads, and needs
 `dig` and `delv` (BIND 9; Debian's `bind9-dnsutils`).
 
