@@ -117,6 +117,7 @@ def sonar_project(workflow):
     settings = next(s for s in steps if s.get("id") == "settings")
     assert ".security.sonar.organization" in settings["run"]
     assert 'organization=${organization:-${OWNER,,}}' in settings["run"]
+    assert "2>/dev/null || true)" in settings["run"]  # no pubkit.json is no failure
     assert settings["env"]["OWNER"] == "${{ github.repository_owner }}"
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
