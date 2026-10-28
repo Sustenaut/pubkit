@@ -49,7 +49,7 @@ when `pubkit.json` still names an old one.
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
 
-- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel) and `pubkit` (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
+- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel), `pubkit` (below), and `AGENTS.md`, the working rules agents and people follow in every repository, starting with when a pull request is draft (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
 - **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, for a Rust package a `Makefile` that includes `pubkit.mk`, and for a service `with-secrets.json`.
 
 Extensions go in the seeded files, so nothing managed is ever edited by
@@ -649,6 +649,16 @@ passed` from a pubkit workflow, `release / release` where pubrel releases,
 and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
 requests. Here, `make protect` (or `make protect-check`, or `make protect
 REPOS=schryer/recipes`) runs it, making the venv first if there is none.
+
+### Pull requests: ready, or draft
+
+A pull request opens **ready for review** by default: the required checks
+above gate the merge, and `ci / passed` fails when any CI job does,
+SonarQube Cloud's quality gate included (below), so draft adds no safety.
+It is **draft** only when something else must happen first -- another
+pull request merged, a release published, a pin moved, someone's decision
+-- and its description says what it waits on. The managed `AGENTS.md`
+carries this rule into every repository, where coding agents read it.
 
 ## The release board
 

@@ -49,7 +49,8 @@ KINDS = ("rust", "utility", "service")
 RENAMED_KINDS = {"python": "utility", "python-utility": "utility"}
 MANAGED = {
     # The pinned pubkit, and a way to run exactly it.
-    "common": ["tests/requirements-pubkit.txt", "pubkit"],
+    # The rules agents and people follow in every repository (AGENTS.md).
+    "common": ["tests/requirements-pubkit.txt", "pubkit", "AGENTS.md"],
     "rust": ["rust-toolchain.toml", "pubkit.mk"],
     "utility": [],
     # A private repository that deploys: the one secrets wrapper every
