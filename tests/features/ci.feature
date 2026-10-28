@@ -14,6 +14,19 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And no workflow is written for "nightly"
     And no job in "pr.yml" or "main.yml" has a condition but passed
 
+  Scenario Outline: The token reaches pubkit's jobs by name, which works across owners
+    Given a <language> repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And no written workflow passes "secrets: inherit"
+    And every job "<jobs>" in "pr.yml" passes SONAR_TOKEN by name
+
+    Examples:
+      | language | jobs               |
+      | Node     | sonar              |
+      | Python   | sonar              |
+      | Rust     | functional, sonar  |
+
   Scenario: A Python package runs the functional suite in their place
     Given a Python repository whose ci block is '{"release": false}'
     When I run pubkit "sync"

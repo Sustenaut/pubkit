@@ -295,3 +295,13 @@ def board_artifact(workflow, name):
     uses = [s["uses"].split("@")[0] for s in steps if "uses" in s]
     assert uses == ["actions/checkout", "actions/setup-python", "actions/upload-artifact"]
     assert list(workflow["data"]["jobs"]) == ["board"]
+
+
+@then("without a token it warns, unless the pull request comes from a fork")
+def sonar_warns(workflow):
+    steps = workflow["data"]["jobs"]["sonar"]["steps"]
+    step = next(s for s in steps if s.get("if") == "env.SONAR_TOKEN == ''")
+    assert "::warning::" in step["run"] and "secrets: inherit" in step["run"]
+    assert "::notice::" in step["run"]
+    assert step["env"]["FORK"] == "${{ github.event.pull_request.head.repo.fork || false }}"
+    assert "${{" not in step["run"]  # nothing in the message is an expression

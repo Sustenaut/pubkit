@@ -54,7 +54,7 @@ jobs:
         -Dsonar.issue.ignore.multicriteria.pylock.resourceKey=pyproject.toml
         -Dsonar.issue.ignore.multicriteria.cargolock.ruleKey=text:S8570
         -Dsonar.issue.ignore.multicriteria.cargolock.resourceKey=src/pubkit/templates/**/Cargo.toml
-    secrets: inherit
+    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push.
   passed:

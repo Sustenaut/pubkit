@@ -3,7 +3,7 @@
 #   ci:
 #     uses: schryer/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
 #     with: { pub-version: v0.1.1 }
-#     secrets: inherit
+#     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
 # Every check the Rust crate standard tags `[checked: ..., make TARGET]` runs
 # here, for every repository: the plan job asks `pubkit required` (from the
@@ -29,7 +29,8 @@
 # - audit runs `make deny` and `make vet`.
 #
 # The sonar job sends the code to SonarQube Cloud when the caller passes a
-# SONAR_TOKEN (`secrets: inherit`), and otherwise passes with a notice. With
+# SONAR_TOKEN (by name: `secrets: inherit` reaches no workflow of
+# another owner), and otherwise passes with a notice. With
 # a token, the functional job runs `make coverage` in place of `make
 # functional`: the same suite, and the Rust tests, on a build cargo-llvm-cov
 # instruments, whose report the sonar job sends along.
@@ -62,7 +63,7 @@ on:
       scheduled-toolchains: { type: string, default: '["stable", "beta"]', description: JSON list of toolchains a scheduled run tests on. }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
     secrets:
-      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it with secrets: inherit." }
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
 
 env:
   CARGO_TERM_COLOR: always
@@ -359,7 +360,16 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - if: env.SONAR_TOKEN == ''
-        run: echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+        # A pull request from a fork gets no secrets, by design: a notice.
+        # Anything else got none because the caller passed none: a warning
+        # naming the usual cause, since the job still passes.
+        run: |
+          if [ "$FORK" = true ]; then
+            echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+          else
+            echo "::warning::No SONAR_TOKEN reached the sonar job, so SonarQube Cloud did not analyse this commit. Either the repository (or its organization) has no SONAR_TOKEN secret, or the caller passes it with secrets: inherit to a workflow of another owner, which GitHub drops; pass SONAR_TOKEN by name under the job's secrets."
+          fi
+        env: { FORK: '${{ github.event.pull_request.head.repo.fork || false }}' }
       - if: env.SONAR_TOKEN != ''
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 0 }

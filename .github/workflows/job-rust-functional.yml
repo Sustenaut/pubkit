@@ -1,6 +1,6 @@
 # Rust: the functional targets the Rust crate standard requires, which
 # `pubkit sync` gives, then the repository's own. With a SONAR_TOKEN
-# (`secrets: inherit`) it runs `make coverage` in place of `make
+# (passed by name) it runs `make coverage` in place of `make
 # functional`: the same suite, and the Rust tests, on a build cargo-llvm-cov
 # instruments, whose report goes to the sonar job as the `coverage`
 # artifact.
@@ -20,7 +20,7 @@ on:
       cargo-llvm-cov-version: { type: string, default: 0.9.1, description: "The cargo-llvm-cov the functional job measures coverage with, when there is a SONAR_TOKEN." }
       required: { type: string, default: '', description: "The make targets the standard requires, which pubkit sync gives." }
     secrets:
-      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with one, the suite runs under cargo-llvm-cov and its report goes to the sonar job. Pass it with secrets: inherit." }
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with one, the suite runs under cargo-llvm-cov and its report goes to the sonar job. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
 
 env:
   CARGO_TERM_COLOR: always
