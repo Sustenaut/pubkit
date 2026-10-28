@@ -11,6 +11,13 @@
 #       deploy-key: ${{ secrets.DEPLOY_KEY }}
 #       deploy-target: deploy@example.eu:./
 #       known-hosts: example.eu ssh-ed25519 AAAA...
+#       site-url: https://example.eu/
+#
+# Before deploying, it runs `pubkit site check` on the directory (README,
+# "Checking a public site"): every page needs a title, a description, a
+# language and an Open Graph card, and robots.txt must let link-preview bots
+# in. A failing check deploys nothing. Set check: false for a site that is
+# not public.
 name: deploy-static
 description: Deploy a directory of static files to a web server over rsync, to Cloudflare Pages, or to both.
 
@@ -45,6 +52,16 @@ inputs:
     description: 'With cloudflare-api-token: the Pages project, which must already exist (terraform/static-site makes it).'
     default: ''
 
+  site-url:
+    description: >
+      The site's https:// address, so the check can find each og:image the
+      site serves in dir and read its size. Leave empty to check the pages
+      alone.
+    default: ''
+  check:
+    description: "Run `pubkit site check` on dir first, and deploy nothing if it fails: 'true' or 'false'."
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -61,6 +78,14 @@ runs:
         ACCOUNT: ${{ inputs.cloudflare-account-id }}
         PROJECT: ${{ inputs.cloudflare-project }}
       run: '"$GITHUB_ACTION_PATH/check-inputs.sh"'
+
+    - name: Check the site
+      if: inputs.check != 'false'
+      shell: bash
+      env:
+        DIR: ${{ inputs.dir }}
+        SITE_URL: ${{ inputs.site-url }}
+      run: '"$GITHUB_ACTION_PATH/check-site.sh"'
 
     - name: Deploy to the server
       if: inputs.deploy-key != ''

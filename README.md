@@ -332,7 +332,10 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   host key; without it the key is scanned on every run), to Cloudflare
   Pages (`cloudflare-api-token`, `cloudflare-account-id`,
   `cloudflare-project`, with wrangler pinned), or to both. It fails rather
-  than deploy nowhere or to half a target.
+  than deploy nowhere or to half a target. It runs `pubkit site check`
+  (below) on the directory first and deploys nothing if that fails; give
+  `site-url` so the check finds the og:image files, or `check: false` for
+  a site that is not public.
 
   ```yaml
   - uses: schryer/pubkit/actions/deploy-static@vX.Y.Z
@@ -344,6 +347,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
       deploy-key: ${{ secrets.DEPLOY_KEY }}
       deploy-target: deploy@example.eu:./
       known-hosts: example.eu ssh-ed25519 AAAA...
+      site-url: https://example.eu/
   ```
 
 **Moving a zone that is already in use.** Hetzner made the apex NS rrset
@@ -408,6 +412,32 @@ before any DS record goes to the registrar; it only reads, and needs
 Each module's tests (`terraform test` in its directory) mock the providers
 and need no credentials; CI runs them on Terraform 1.11, with `fmt`,
 `validate`, and the action's scripts under shellcheck and stubs.
+
+## Checking a public site
+
+`pubkit site check DIR [--url URL]` reads a built site the way robots and
+other sites do, so that search results, screen readers and link previews
+(LinkedIn, Facebook, Slack, WhatsApp) get what they need. It reads DIR
+only, never the network, and `deploy-static` runs it before every deploy.
+
+| Rule | Checked |
+|---|---|
+| WEB-PAGE-01 | every page names its language, `<html lang>` |
+| WEB-PAGE-02 | every page has a `<title>` and a `<meta name="description">` |
+| WEB-OG-01 | every page has og:title, og:description, og:type, og:url (https) and og:image |
+| WEB-OG-02 | og:image is an https address; one under `--url` is in DIR, a PNG or JPEG of at least 1200×627 (LinkedIn's large card) and under 5 MB, and matches og:image:width and og:image:height where given |
+| WEB-OG-03 | every page has `<meta name="twitter:card" content="summary_large_image">` |
+| WEB-ROBOTS-01 | robots.txt lets LinkedInBot, facebookexternalhit, Twitterbot and Slackbot read every page and its og:image: they obey it, so a `Disallow: /` meant for search engines hides the card too (keep a preview out of search with `<meta name="robots" content="noindex">` instead) |
+
+Every `*.html` file is a page, except `404.html` and redirects (`<meta
+http-equiv="refresh">`). A rule that a site cannot meet yet takes an
+exception in `pubkit.json`, as the Rust crate standard's do (a rule, a
+reason, an until date); `pubkit conform` reads only its own rules'.
+The rules live in `src/pubkit/site.py` as `RULES`, one function per
+family, so accessibility and other compliance checks join as new families.
+
+LinkedIn keeps a link's card for about a week: after fixing a page, paste
+its address into the [Post Inspector](https://www.linkedin.com/post-inspector/).
 
 ## The supply-chain report
 

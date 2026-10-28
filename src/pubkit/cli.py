@@ -422,6 +422,12 @@ def main(argv: list[str] | None = None) -> int:
                    help="another rrset to compare, such as www/A; repeat it")
     dns.add_parser("moves", help="moved blocks taking Cloudflare records to keys by value, "
                                  "from `terraform show -json` on stdin")
+    p = commands.add_parser("site", help="check a public site's built pages")
+    site = p.add_subparsers(dest="site_command", required=True)
+    p = site.add_parser("check", help="every page names itself, has an Open Graph card with a "
+                                      "large enough image, and robots.txt lets preview bots in")
+    p.add_argument("dir", type=Path, help="the built site, such as _site")
+    p.add_argument("--url", help="the site's https:// address, to find og:image files in DIR")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -496,6 +502,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "dns":
         from .dns import check
         return check(root, args.zone, args.record)
+    if args.command == "site":
+        from .paths import confined
+        from .site import run as site
+        return site(root, confined(args.dir, "the site directory"), args.url)
     if args.command == "audit":
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)
