@@ -654,22 +654,31 @@ def check_related(pkg: Package, audit: Audit, lines, where: str, key: str):
     """Each row of a Related crates (or tools) table: its version, against
     Cargo.lock when the crate is a dependency."""
     lock = pkg.lock_versions()
-    rows = [(n, t) for n, t in lines if t.strip().startswith("|") and not re.match(r"\|\s*:?-", t.strip())]
-    for n, t in rows[1:]:
-        cells = [c.strip() for c in t.strip().strip("|").split("|")]
+    table = [(n, t.strip()) for n, t in lines if t.strip().startswith("|")]
+    separator = re.compile(r"\|\s*:?-")
+    # A row over a |---| line is a header; a section may hold several tables.
+    headers = {table[i][0] for i in range(len(table) - 1) if separator.match(table[i + 1][1])}
+    rows = [(n, t) for n, t in table if not separator.match(t) and n not in headers]
+    for n, t in rows:
+        cells = [c.strip() for c in t.strip("|").split("|")]
         name = re.sub(r"[`*\[\]]|\(.*?\)", "", cells[0]).strip().split()[0] if cells and cells[0] else ""
-        version = VERSION.search(t)
+        found = next((m for c in cells[1:] for m in [re.fullmatch(r"v?(\d+(?:\.\d+){0,2})", c)] if m), None) \
+            or VERSION.search(" ".join(cells[1:]))
+        version = found.group(1) if found else ""
         if not name:
             continue
         locked = lock.get(name) or lock.get(name.replace("-", "_")) or set()
+        # A version short of three parts ("1", "0.22") is a requirement: it
+        # matches each locked version it covers.
+        covered = any(v == version or v.startswith(version + ".") for v in locked)
         if not version:
             audit.find("short", f"§{key} Related crates", f"{where}:{n}",
                        f"the row for `{name}` gives no version checked")
-        elif locked and version.group(1) not in locked:
+        elif locked and not covered:
             audit.find("consider", f"§{key} Related crates", f"{where}:{n}",
-                       f"the row for `{name}` says {version.group(1)}; Cargo.lock has "
+                       f"the row for `{name}` says {version}; Cargo.lock has "
                        f"{', '.join(sorted(locked))}: re-check the claim at that version")
-        audit.evidence(key, f"`{where}:{n}`: `{name}` {version.group(1) if version else '(no version)'}"
+        audit.evidence(key, f"`{where}:{n}`: `{name}` {version or '(no version)'}"
                             f"{'; Cargo.lock: ' + ', '.join(sorted(locked)) if locked else '; not a dependency'}"
                             f": is the claim checked by a run?")
 
