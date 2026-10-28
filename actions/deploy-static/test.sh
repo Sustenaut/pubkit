@@ -66,4 +66,28 @@ else
   failures=$((failures + 1))
 fi
 
+# The site check, run from this checkout's pubkit.
+mkdir -p "$work/public"
+cat > "$work/public/index.html" <<'HTML'
+<!doctype html><html lang="en"><head><title>Example</title>
+<meta name="description" content="An example.">
+<meta property="og:type" content="website"><meta property="og:title" content="Example">
+<meta property="og:description" content="An example."><meta property="og:url" content="https://example.eu/">
+<meta property="og:image" content="https://cdn.example/card.png">
+<meta name="twitter:card" content="summary_large_image"></head></html>
+HTML
+if (cd "$work" && DIR=public SITE_URL=https://example.eu/ "$here/check-site.sh") > /dev/null; then
+  echo "ok: a complete page passes the site check"
+else
+  echo "FAIL: a complete page fails the site check"
+  failures=$((failures + 1))
+fi
+printf 'User-agent: *\nDisallow: /\n' > "$work/public/robots.txt"
+if (cd "$work" && DIR=public SITE_URL='' "$here/check-site.sh") > /dev/null 2>&1; then
+  echo "FAIL: a robots.txt that keeps LinkedInBot out passes the site check"
+  failures=$((failures + 1))
+else
+  echo "ok: a robots.txt that keeps LinkedInBot out fails the site check"
+fi
+
 [[ "$failures" -eq 0 ]]

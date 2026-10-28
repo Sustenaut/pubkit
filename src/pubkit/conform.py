@@ -68,12 +68,17 @@ def today() -> datetime.date:
     return datetime.date.fromisoformat(fixed) if fixed else datetime.date.today()
 
 
-def exceptions(config: dict, known: set[str]) -> tuple[set[str], list[str], list[str]]:
+def exceptions(config: dict, known: set[str],
+               family=lambda rule: not str(rule).startswith("WEB-")) -> tuple[set[str], list[str], list[str]]:
     """The rule IDs waived, a description of each open exception, and the
-    problems with the declarations."""
+    problems with the declarations. Only the exceptions whose rule is in
+    `family` are read: the Rust crate standard's by default, and the site
+    rules' (WEB-) when `pubkit site check` asks."""
     waived, open_, problems = set(), [], []
     for i, e in enumerate(config.get("exceptions", [])):
         where = f"pubkit.json exceptions[{i}]"
+        if isinstance(e, dict) and "rule" in e and not family(e["rule"]):
+            continue
         if not isinstance(e, dict) or set(e) != {"rule", "reason", "until"}:
             problems.append(f"{where}: give exactly a rule, a reason and an until date")
             continue
