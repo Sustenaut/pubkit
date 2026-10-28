@@ -1,9 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "added",
-      "change": "A managed AGENTS.md in every repository, written by `pubkit init` and kept by `pubkit sync`: the working rules coding agents and people follow, starting with when a pull request is draft (only when something else must be merged, released or done first, saying what it waits on; otherwise ready, since the required checks gate the merge). The README states the rule beside main's protection"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
