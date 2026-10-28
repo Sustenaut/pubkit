@@ -177,6 +177,8 @@ jobs:
           args: >-
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
             -Dsonar.python.coverage.reportPaths=coverage-download/**/*.xml
             ${{ inputs.sonar-args }}
             ${{ steps.settings.outputs.args }}
