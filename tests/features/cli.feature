@@ -6,9 +6,27 @@ Feature: Keeping a repository's shared files in step
     Given an empty repository
     When I run pubkit "init" "--kind=rust" "--bin=demo"
     Then it succeeds
-    And the repository has "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/pr.yml", ".github/workflows/main.yml", ".github/workflows/nightly.yml"
+    And the repository has "AGENTS.md", "pubkit.mk", "rust-toolchain.toml", "tests/requirements-pubkit.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/pr.yml", ".github/workflows/main.yml", ".github/workflows/nightly.yml"
     And "Makefile" contains "DEMO_BIN_DIR"
     And "tests/requirements-pubkit.txt" pins this pubkit's wheel
+
+  Scenario: every repository gets the managed AGENTS.md, with the draft rule
+    Given an empty repository
+    When I run pubkit "init" "--kind=utility"
+    Then it succeeds
+    And it prints "managed  AGENTS.md"
+    And "AGENTS.md" contains "Mark it **draft** only when something else must happen first"
+    And "AGENTS.md" contains "Managed by pubkit"
+
+  Scenario: An edited AGENTS.md fails the check, and sync restores it
+    Given a repository initialised as "rust"
+    And the file "AGENTS.md" reads "# Our own rules"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "AGENTS.md differs"
+    When I run pubkit "sync"
+    Then it succeeds
+    And it prints "updated  AGENTS.md"
 
   Scenario: init keeps the repository's own files
     Given an empty repository
