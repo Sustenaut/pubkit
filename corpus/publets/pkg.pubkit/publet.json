@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.15.0 is released as v0.15.0 from commit a306d071d928838d34c1391f1bc2dbc07902c908.",
+      "content": "pubkit 0.15.1 is released as v0.15.1 from commit e2db28b6381e9d7bede886c8a24a1402d4bd39ed.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.15.0",
+            "0.15.1",
             "pubkit --version",
-            "pubkit 0.15.0",
-            "v0.15.0",
-            "a306d071d928838d34c1391f1bc2dbc07902c908"
+            "pubkit 0.15.1",
+            "v0.15.1",
+            "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
           ]
         ]
       },
-      "scope": "the published release v0.15.0 of pubkit",
+      "scope": "the published release v0.15.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a306d071d928838d34c1391f1bc2dbc07902c908"
+          "revision": "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.15.0 was released on 2026-10-28 from commit a306d071d928838d34c1391f1bc2dbc07902c908 with these changes.",
+      "content": "pubkit 0.15.1 was released on 2026-10-28 from commit e2db28b6381e9d7bede886c8a24a1402d4bd39ed with these changes.",
       "data": {
         "columns": [
           {
@@ -58,38 +58,18 @@
         "rows": [
           [
             "added",
-            "`pubkit site check DIR [--url URL]` checks a built public site for what robots and link previews need: each page's language, title, description and Open Graph card (WEB-PAGE-01/02, WEB-OG-01/03), an og:image LinkedIn accepts (WEB-OG-02), and a robots.txt that lets preview bots in (WEB-ROBOTS-01). Exceptions go in pubkit.json as for the Rust standard."
-          ],
-          [
-            "changed",
-            "deploy-static runs `pubkit site check` on its directory before deploying and deploys nothing if it fails. Give the new `site-url` input so it can check og:image files, or set `check: false` for a site that is not public."
-          ],
-          [
-            "added",
-            "`pubkit audit prepare --package NAME` writes a release's audit report with every machine-decidable rule decided, each finding with its file and line, and each judged rule marked `[needs review]` with what the machine found"
-          ],
-          [
-            "added",
-            "`pubkit audit draft --package NAME` has Claude draft the judged rules from the diff since the last release, as structured JSON merged into the report and marked for human review"
-          ],
-          [
-            "changed",
-            "`pubkit audit --check` refuses a report that still marks a rule `[needs review]` or machine-drafted, and a missing report names `pubkit audit prepare --package NAME`"
-          ],
-          [
-            "added",
-            "standard.json lists the standard's judged rules, keyed by section and place"
+            "Every sonar job sends the code to the SonarQube Cloud organization whose key is the GitHub owner in lower case, as SonarQube Cloud's keys are, or to pubkit.json's new security.sonar.organization; the project key stays OWNER_REPO. A repository owned by an organization with capitals in its name, such as Sustenaut, could not be analysed before"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.15.0 of pubkit",
+      "scope": "the published release v0.15.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a306d071d928838d34c1391f1bc2dbc07902c908"
+          "revision": "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
         }
       ]
     }
