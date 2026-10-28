@@ -191,6 +191,8 @@ jobs:
           args: >-
             -Dsonar.organization=${{ github.repository_owner }}
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
             -Dsonar.javascript.lcov.reportPaths=${{ steps.report.outputs.paths }}
             ${{ inputs.sonar-args }}
             ${{ steps.settings.outputs.args }}

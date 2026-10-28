@@ -117,6 +117,20 @@ def sonar_project(workflow):
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
 
+@then("the scan waits for the quality gate, so a failing gate fails the job")
+def sonar_gate(workflow):
+    """Without the wait the scan only uploads, so `ci / passed` stays green
+    while SonarQube Cloud's quality gate fails (publet#56). The timeout
+    keeps a stuck analysis from holding the job for the default 5 minutes
+    longer than it needs."""
+    steps = workflow["data"]["jobs"]["sonar"]["steps"]
+    args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"].split()
+    assert "-Dsonar.qualitygate.wait=true" in args
+    assert "-Dsonar.qualitygate.timeout=300" in args
+    # Before the caller's properties, so a caller can still override it.
+    assert args.index("-Dsonar.qualitygate.wait=true") < args.index("${{")
+
+
 @then("every action it uses is pinned to a full commit hash, with its version in a comment")
 def pinned(workflow):
     for line in workflow["text"].splitlines():
