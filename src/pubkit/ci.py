@@ -30,7 +30,9 @@ from the rules and pubkit.json's exceptions, and sync writes each job's
 required make targets into its workflow, so a change to either shows as a
 change there. `release` adds pubrel's release workflow to pr.yml and
 main.yml, at this pubkit's pubrel unless it names one; `false` leaves it
-out, and a service, which deploys, has none.
+out, and a service, which deploys, has none. `{"uses": "local"}` calls the
+repository's own .github/workflows/release.yml instead, as pubrel does, so
+a change to its release workflow is tested before it ships.
 
 Each workflow ends in `passed` (the check a ruleset requires, `ci /
 passed`), which passes only when every job it needs succeeded. Every job
@@ -252,15 +254,22 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     if release is True:
         release = {}
     if release is not False:
-        if not isinstance(release, dict) or set(release) - {"pubrel", "with"}:
+        if not isinstance(release, dict) or set(release) - {"pubrel", "with", "uses"}:
             stop('release must be true, false or {"pubrel": "0.5.4", "with": {...}}')
-        pubrel = release.get("pubrel", PUBREL_PIN)
         extra = release.get("with", {})
-        if not isinstance(pubrel, str) or not pubrel[:1].isdigit():
-            stop('release.pubrel must be a version, such as "0.5.4"')
         if not isinstance(extra, dict):
             stop("release.with must be an object of the release workflow's inputs")
-        release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
+        if "uses" in release:
+            # pubrel itself: its own release workflow, from the checkout.
+            if release["uses"] != "local" or "pubrel" in release:
+                stop('release.uses can only be "local", the repository\'s own '
+                     '.github/workflows/release.yml, and then names no pubrel')
+            release = {"local": True, "with": extra}
+        else:
+            pubrel = release.get("pubrel", PUBREL_PIN)
+            if not isinstance(pubrel, str) or not pubrel[:1].isdigit():
+                stop('release.pubrel must be a version, such as "0.5.4"')
+            release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
             "with": inputs, "jobs": jobs, "release": release,
             "targets": rules["targets"] if rules else {}}
@@ -300,7 +309,15 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         "          echo \"$RESULTS\" | jq -e 'all(.[]; .result == \"success\")' > /dev/null\n"
         "        env: { RESULTS: '${{ toJSON(needs) }}' }\n")
     release = ci["release"]
-    if release and event in RELEASE_EVENTS:
+    if release and event in RELEASE_EVENTS and release.get("local"):
+        out.append(
+            "\n  # The repository's own release workflow, built from this checkout,\n"
+            "  # so a change to it is tested here before a release carries it to\n"
+            "  # anyone else.\n"
+            "  release:\n    needs: passed\n    uses: ./.github/workflows/release.yml\n"
+            + (f"    with: {flow(release['with'])}\n" if release["with"] else "")
+            + "    permissions:\n      contents: write\n")
+    elif release and event in RELEASE_EVENTS:
         pubrel = release["pubrel"]
         out.append(
             "\n  # pubrel's release workflow: on a pull request, a code change records\n"

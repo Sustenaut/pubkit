@@ -62,6 +62,13 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync"
     Then "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, review, sonar, passed, release"
 
+  Scenario: pubrel's own CI calls its release workflow from the checkout
+    Given a Rust repository whose ci block is '{"release": {"uses": "local"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" calls the repository's own release workflow
+    And "main.yml" calls the repository's own release workflow
+
   Scenario: A service runs its checks, and Terraform and tests when it names them
     Given a service repository whose ci block is '{"with": {"terraform-dir": ".", "test": "make test"}}'
     When I run pubkit "sync"
@@ -134,6 +141,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | {"matrix": {}}                             | block has no setting matrix                     |
       | {"cron": "daily"}                          | cron must be a schedule of five fields          |
       | {"release": {"pubrel": "latest"}}          | release.pubrel must be a version                |
+      | {"release": {"uses": "remote"}}            | release.uses can only be "local"                |
+      | {"release": {"uses": "local", "pubrel": "0.5.4"}} | and then names no pubrel                 |
 
   Scenario Outline: A setting another kind's CI cannot use stops sync with a message
     Given a <kind> repository whose ci block is '<ci>'
