@@ -1,0 +1,30 @@
+{
+  "comment": "The facts of a made-up package with nothing wrong, as collect.py would write them; the rules' scenarios change one fact at a time.",
+  "now": "2026-10-27T12:00:00Z",
+  "facts": {
+    "visibility": { "value": "public" },
+    "kind": { "value": "package" },
+    "integration": { "value": { "pubkit": true, "pubrel": true } },
+    "pins": { "value": { "pubkit": ["0.14.2"], "pubrel": ["0.5.4"] } },
+    "latest": { "value": { "pubkit": "0.14.2", "pubrel": "0.5.4" } },
+    "live": { "value": {} },
+    "released": { "value": { "tag": "v1.4.0", "at": "2026-10-20T10:00:00Z" } },
+    "issues": { "value": 0 },
+    "dependabot_alerts": { "value": 0 },
+    "code_scanning_alerts": { "value": 0 },
+    "secret_scanning_alerts": { "value": 0 },
+    "ci": { "value": { "workflow": "ci.yml", "conclusion": "success", "at": "2026-10-27T08:00:00Z", "jobs": [
+      { "name": "ci / gates", "conclusion": "success" },
+      { "name": "ci / test (ubuntu-latest)", "conclusion": "success" },
+      { "name": "ci / test (windows-latest)", "conclusion": "success" },
+      { "name": "ci / audit", "conclusion": "success" },
+      { "name": "ci / osv", "conclusion": "success" },
+      { "name": "ci / review", "conclusion": "skipped" },
+      { "name": "ci / passed", "conclusion": "success" }
+    ] } },
+    "nightly": { "value": { "governed": true, "last": null } },
+    "protection": { "value": { "differences": [], "limit": false } },
+    "sonar": { "value": { "reliability": "A", "maintainability": "A", "security": "A", "gate": "OK" } },
+    "scorecard": { "value": { "score": 8.2, "failing": [] } }
+  }
+}

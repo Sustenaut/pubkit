@@ -64,6 +64,15 @@ def runs(repo, name, expected):
     assert list(jobs(repo, name)) == expected.split(", ")
 
 
+@then(parsers.parse('"{name}" calls the repository\'s own release workflow'))
+def local_release(repo, name):
+    job = jobs(repo, name)["release"]
+    assert job["uses"] == "./.github/workflows/release.yml"
+    assert job["needs"] == "passed"
+    assert "with" not in job
+    assert job["permissions"] == {"contents": "write"}
+
+
 @then(parsers.parse('"{name}" has no release'))
 def no_release(repo, name):
     assert "release" not in jobs(repo, name)

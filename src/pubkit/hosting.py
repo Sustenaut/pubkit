@@ -284,6 +284,10 @@ def check_server_site(site: dict[str, Any], where: str, _provider: dict[str, Any
 def check_pages_site(site: dict[str, Any], where: str, _provider: dict[str, Any]) -> None:
     if not is_slug(site.get("project"), 58):
         stop(f"{where}.project must be the Pages project's name, such as \"example-docs\"")
+    subdomain = site.get("subdomain", "x.pages.dev")
+    if not (isinstance(subdomain, str) and subdomain.endswith(".pages.dev")
+            and is_slug(subdomain.removesuffix(".pages.dev"), 63)):
+        stop(f"{where}.subdomain must be the project's pages.dev name, such as \"example-docs-2ab.pages.dev\"")
     if site.get("served_by", "pages") not in SERVED_BY:
         stop(f"{where}.served_by must be one of {', '.join(SERVED_BY)}")
     if site.get("served_by") == "server" or "standby" in site:
@@ -299,7 +303,7 @@ def check_cloud_run_site(site: dict[str, Any], where: str, provider: dict[str, A
 
 SITES: dict[str, tuple[tuple[str, ...], Callable[[dict[str, Any], str, dict[str, Any]], None]]] = {
     "server": (("server",), check_server_site),
-    "pages": (("project", "served_by", "standby"), check_pages_site),
+    "pages": (("project", "subdomain", "served_by", "standby"), check_pages_site),
     "cloud-run": (("service",), check_cloud_run_site),
 }
 

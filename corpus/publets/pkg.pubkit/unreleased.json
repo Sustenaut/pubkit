@@ -1,6 +1,10 @@
 {
   "changes": [
     {
+      "category": "added",
+      "change": "A ci block's release can be {\"uses\": \"local\"}: the generated pr.yml and main.yml then call the repository's own .github/workflows/release.yml, from the checkout, in place of pubrel's published release workflow, as pubrel's own CI does so a change to its release workflow is tested before it ships. Only release.with goes with it; release.pubrel with it, or any other uses, stops sync with a message"
+    },
+    {
       "category": "fixed",
       "change": "pubkit dns check, when answers differ, names any nameserver serving an older SOA serial than the others with the same primary (deSEC's ns2.desec.org trails ns1.desec.io for a moment after a write), so a check run straight after an apply says to wait and run it again rather than only reporting the differences. pubkit dns moves' header names 0.13.0, the release that keyed Cloudflare records by value"
     }

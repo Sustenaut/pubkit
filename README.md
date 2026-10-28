@@ -171,7 +171,7 @@ The provider types pubkit supports, and what each holds:
 | type | settings | serves DNS | sites |
 | --- | --- | --- | --- |
 | `hetzner` | `dns.external_nameservers`: the names Hetzner also serves a zone from, which a registrar such as Hetzner's own (konsoleH) lists next to another provider's; without them the registrar gets the assigned ones | yes; the zone must already exist at Hetzner | `server`: A (and AAAA) records to a server's addresses |
-| `cloudflare` | `account_id` | yes; with another provider too, in multi-provider mode; signs with `dnssec` | `pages`: a Pages project (`project`), served from Pages or, with `served_by: "server"`, from its `standby` server |
+| `cloudflare` | `account_id` | yes; with another provider too, in multi-provider mode; signs with `dnssec` | `pages`: a Pages project (`project`; `subdomain` when Cloudflare gave it a pages.dev name other than `<project>.pages.dev`), served from Pages or, with `served_by: "server"`, from its `standby` server |
 | `desec` | `dns.external_nameservers`: the names deSEC serves every zone from (`ns1.desec.io.`, `ns2.desec.org.`), which its API does not report | yes, through `terraform/desec-zones`; the zone must already exist at deSEC; always signs | no |
 | `google-cloud` | `project`, `region`, `cloud_run.domain_target` (the host a custom domain's CNAME names) | no | `cloud-run`: a CNAME to `domain_target`, and a domain mapping to the Cloud Run `service` (`terraform/cloud-run-sites`) |
 | `mailbox-org` | `mx` (`"priority host."`), `spf` (its mechanisms, such as `include:mailbox.org`), `dkim` (selector, in lowercase, to host) | no | no; a zone's `email.provider` |
@@ -610,7 +610,7 @@ request (no approval needed), only after the required checks pass, and
 nobody may bypass it. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--no-tags] [--config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
@@ -618,7 +618,9 @@ tags' ruleset, [`src/pubkit/tag-ruleset.json`](src/pubkit/tag-ruleset.json):
 nobody may create, move or delete a `v*` tag, and only GitHub Actions may
 bypass it. So the one way to release is the signed one: `pubrel prepare`
 on your machine, then merging the release pull request, after which CI
-runs `pubrel tag` on main. A tag pushed by hand is refused. It calls the GitHub API through
+runs `pubrel tag` on main. A tag pushed by hand is refused. A repository
+that releases no tags, such as a site, goes without the tag ruleset:
+`"tags": false` in its entry, or `--no-tags`. It calls the GitHub API through
 `gh`, signed in as the repositories' owner, since only an admin may change
 a ruleset. `--check` changes nothing: it prints how each repository
 differs, a setting GitHub adds with its own default aside, and fails when
@@ -627,10 +629,19 @@ one does. When GitHub rejects a ruleset, it prints GitHub's reasons.
 The repositories come from one of:
 
 - a `protected.json` in the working directory, or the file `--config`
-  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`.
+  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
+  `"tags": false` where the repository releases no tags.
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.
+- the repository's own `pubkit.json`, which says how it is protected:
+  `"protect": {"checks": ["ci / passed"], "tags": false}` (`tags` defaults
+  to true). A `REPO` the list does not name is read from the `pubkit.json`
+  on its default branch, and `pubkit protect` with no list and no `REPO`,
+  run inside a repository, reads `./pubkit.json` for the repository
+  `origin` points at. The block takes only `checks`, distinct non-empty
+  names, and `tags`, true or false; anything else, or a pubkit.json that is
+  not JSON, is refused before GitHub is asked.
 
 pubkit's own list, the pub* repositories, is
 [`protected.json`](protected.json) at the root of this checkout: `ci /
@@ -638,6 +649,75 @@ passed` from a pubkit workflow, `release / release` where pubrel releases,
 and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
 requests. Here, `make protect` (or `make protect-check`, or `make protect
 REPOS=schryer/recipes`) runs it, making the venv first if there is none.
+
+## The release board
+
+    pubkit board --out DIR [--config protected.json] [--governed governed.json] [--rules FILE]
+
+grades every repository the lists name, public and private, A to E for
+quality, security and delivery, and writes `DIR/board.json` and a static
+`DIR/index.html`: no scripts, rows worst first, each grade a dot in
+SonarQube's colours whose breakdown opens on hover or keyboard focus. It
+only reads, and keeps nothing between builds. `GITHUB_TOKEN` (or
+`GH_TOKEN`) is the token it reads GitHub with; `SONAR_TOKEN`, when set,
+reads private SonarQube Cloud projects.
+
+The rules are [`src/pubkit/board/rules.json`](src/pubkit/board/rules.json),
+applied by `rules.py`; `--rules FILE` reads others, such as a client's.
+Each grade is a starting letter less one letter per notch, never below E,
+with every notch listed; the overall grade is the worst of the three.
+
+- **Quality** starts at SonarQube Cloud's worse rating of reliability and
+  maintainability, **Security** at its security rating. With no analysis,
+  each starts at A and takes a notch. Then each other tool with findings
+  takes one: a CI job on main's last run that failed (format and lint,
+  tests, functional and browser tests, MSRV, fuzzing, cross builds and
+  toolchains for Quality; the dependency audit, OSV-Scanner and dependency
+  review for Security), open Dependabot, code scanning or secret scanning
+  alerts, and an OpenSSF Scorecard under 7 for a public repository.
+  Alerts that are switched off are listed with no notch.
+- **Delivery** starts at A and takes a notch for each of: a pinned pubkit
+  or pubrel behind its latest release; not integrated with pubkit
+  (services) or with pubkit and pubrel (packages, which have a
+  release.json); for a service, no observability (its health URL does not
+  answer) and no continuous live testing (its live-test workflow not green
+  in the last 24 hours); no release (a package's tag, a service's
+  production deploy) in two months; any open issue (pull requests aside);
+  no nightly (not in governed.json, and no `nightly.yml` run in two days);
+  protection that differs from what `pubkit protect --check` wants, or no
+  ruleset at all on a private repository GitHub's plan gives none; and a
+  red last CI run on main. A fact the board could not read takes its
+  notch: a board that cannot see does not grade green.
+
+A service declares what its observability and live testing are in its
+`pubkit.json`:
+
+```json
+"live": { "health": "https://example.eu/health", "test": "live.yml", "deploy": "deploy.yml" }
+```
+
+`health` is the URL that must answer, `test` the scheduled workflow that
+tests the live site, and `deploy` the workflow whose successful runs are
+its production deploys (`deploy.yml` by default).
+
+Each source has one connector in `src/pubkit/board/connectors/`, and
+nothing else reads it: `lists` (the two lists), `github` (the REST API:
+visibility, pubkit.json, release.json, the lock and workflow pins,
+rulesets, releases, issues and alerts), `actions` (runs and jobs on main,
+nightly, live-test and deploy runs), `sonarcloud` (project `OWNER_REPO`),
+`scorecard` (public repositories) and `live` (the health URLs). Each
+query is a named method, and each call is recorded with its connector,
+method, endpoint and time: board.json lists every call, and links every
+fact and every notch to the calls it rests on, which the breakdown names.
+`--record FILE` keeps every response, and `--replay FILE` builds from
+such a file instead of the network.
+
+[`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
+checks out the caller, installs what its `tests/requirements.lock` pins
+(wheels only, by hash: the caller's own pubkit),
+runs `pubkit board` with the caller's read-only `token` and its lists, and
+uploads board.json and index.html as the `board` artifact, kept 90 days. It
+deploys nothing.
 
 ## The nightly
 
@@ -789,7 +869,7 @@ A shared reusable workflow has to skip the jobs a repository doesn't use, and Gi
 - **`with`:** the jobs' inputs, the same ones `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
 - **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only. `browser` runs only when `with` gives a `browser-test`.
 - **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust or service repository's CI is its kind's.
-- **`release`:** adds pubrel's release workflow to `pr.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
+- **`release`:** adds pubrel's release workflow to `pr.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
 
 A Rust repository runs the jobs the Rust crate standard asks for here, worked out at sync time from the rules and `pubkit.json`'s exceptions: `gates`, `test`, `functional`, `msrv`, `fuzz`, `cross` and `audit` as required, beside `osv`, `review` and `sonar`, and `toolchains` (the latest stable and beta Rust) on the nightly. Sync writes each job's required make targets into the workflow (`required`), so an exception added or expired shows as a change there, and `make sync-check` in `gates` fails until `pubkit sync` writes it. An empty `cross-targets` (`"[]"`) drops `cross`. On a pull request that touches no Rust code, Cargo files, `fuzz/` or workflow files, `fuzz` and `cross` pass at once with a notice (from `pubkit required`, which says `slow=false`) rather than being skipped; release pull requests, pushes and the nightly run them in full.
 

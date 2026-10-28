@@ -1,0 +1,36 @@
+{
+  "comment": "The rules `pubkit board` grades repositories by (rules.py says how each is applied). Each row gets three grades, A to E. Quality starts at SonarQube Cloud's worse rating of reliability and maintainability, Security at its security rating; with no analysis, each starts at A and takes the sonar notch. Then each tool below with findings takes one letter off its category's grade: a CI job on main's last run that failed, or open alerts, or a Scorecard score under `below`. Delivery starts at A and takes one letter for each notch in `delivery` that applies (to all, packages or services) and finds a gap. A grade never goes below E, but every notch is listed. The overall grade is the worst of the three. Drop an entry to drop its notch; `pubkit board --rules FILE` reads another file. `workflows` and `repositories` tell the board where to look: which workflow files are CI, nightly and deploy, and which repositories release pubkit and pubrel.",
+  "name": "pubkit 2026-10",
+  "sonar": "No SonarQube Cloud analysis",
+  "tools": [
+    { "tool": "format and lint", "category": "quality", "jobs": ["gates", "lint"], "covers": "rustfmt, clippy, ruff, eslint, doc coverage" },
+    { "tool": "tests", "category": "quality", "jobs": ["test", "tests"] },
+    { "tool": "functional tests", "category": "quality", "jobs": ["functional"] },
+    { "tool": "browser tests", "category": "quality", "jobs": ["browser"] },
+    { "tool": "MSRV", "category": "quality", "jobs": ["msrv"] },
+    { "tool": "fuzzing", "category": "quality", "jobs": ["fuzz"] },
+    { "tool": "cross builds", "category": "quality", "jobs": ["cross"] },
+    { "tool": "toolchains", "category": "quality", "jobs": ["toolchains"] },
+    { "tool": "service checks", "category": "quality", "jobs": ["checks", "terraform"], "covers": "managed files, shellcheck, terraform" },
+    { "tool": "dependency audit", "category": "security", "jobs": ["audit"], "covers": "cargo deny, cargo vet, pip-audit, npm audit" },
+    { "tool": "OSV-Scanner", "category": "security", "jobs": ["osv"] },
+    { "tool": "dependency review", "category": "security", "jobs": ["review"] },
+    { "tool": "Dependabot", "category": "security", "alerts": "dependabot_alerts" },
+    { "tool": "code scanning", "category": "security", "alerts": "code_scanning_alerts" },
+    { "tool": "secret scanning", "category": "security", "alerts": "secret_scanning_alerts" },
+    { "tool": "OpenSSF Scorecard", "category": "security", "scorecard_below": 7 }
+  ],
+  "delivery": [
+    { "notch": "pins", "applies": "all" },
+    { "notch": "integration", "applies": "all" },
+    { "notch": "observability", "applies": "service" },
+    { "notch": "live-testing", "applies": "service", "hours": 24 },
+    { "notch": "release", "applies": "all", "days": 61 },
+    { "notch": "issues", "applies": "all" },
+    { "notch": "nightly", "applies": "all", "days": 2 },
+    { "notch": "protection", "applies": "all" },
+    { "notch": "ci", "applies": "all" }
+  ],
+  "workflows": { "ci": ["ci.yml", "main.yml"], "nightly": "nightly.yml", "deploy": "deploy.yml" },
+  "repositories": { "pubkit": "schryer/pubkit", "pubrel": "schryer/pubrel" }
+}

@@ -8,6 +8,8 @@
     { "repo": "schryer/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
     { "repo": "schryer/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
     { "repo": "schryer/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/recipes", "checks": ["build"] }
+    { "repo": "schryer/recipes", "checks": ["ci / passed", "build"], "tags": false },
+    { "repo": "schryer/visit-ee", "checks": ["ci / passed"], "tags": false },
+    { "repo": "schryer/maps", "checks": ["ci / passed"], "tags": false }
   ]
 }
