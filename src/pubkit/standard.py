@@ -41,6 +41,15 @@ WORKFLOW_JOBS = {"test", "cross", "fuzz"}
 # `[^\]]*` could match the same spaces either way, which backtracks.
 TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),([^\]]*)\]")
 HEADING = re.compile(r"^## (\d+)\. (.+)$", re.M)
+# The question after `judged:` keeps its leading space (stripped later):
+# `\s*` before `[^\]]*` could match the same spaces either way.
+JUDGED = re.compile(r"\[judged(?::([^\]]*))?\]|; *judged:([^\]]*)\]")
+# Sections whose judged rules only a crate of one kind is held to: the crate
+# root and item docs are a library's, section 9 a command-line tool's.
+JUDGED_APPLIES = {"1": "library", "2": "library", "9": "binary"}
+# Judged rules, by key, that apply to a library only though their section
+# applies to every crate: docs.rs renders nothing for a binary.
+LIBRARY_ONLY = {"5.4"}
 
 
 def job_of(target: str) -> str:
@@ -83,6 +92,73 @@ def parse(text: str) -> list[dict]:
     return rules
 
 
+def _blocks(body: str) -> list[str]:
+    """A section's text as its top-level items: each list item or paragraph
+    starting at the margin, with everything indented under it."""
+    blocks, current, blank = [], [], True
+    for line in body.splitlines():
+        if not line.strip():
+            blank = True
+            if current:
+                current.append("")
+            continue
+        margin = not line.startswith((" ", "\t"))
+        if margin and (re.match(r"(- |\d+\. )", line) or blank) and current:
+            blocks.append("\n".join(current).strip())
+            current = []
+        current.append(line)
+        blank = False
+    if current:
+        blocks.append("\n".join(current).strip())
+    return blocks
+
+
+def _title(block: str) -> str:
+    """A judged rule's short name: its bold lead, or its first sentence."""
+    bold = re.match(r"(?:- |\d+\. )?\*\*(.+?)\*\*", block)
+    if bold:
+        return bold.group(1).rstrip(":.").strip()
+    text = " ".join(re.sub(r"^(- |\d+\. )", "", block).split())
+    text = re.sub(r"\*\*([^*`/]+?)\*\*", r"\1", text)
+    return re.split(r"(?<=[.:])\s", text, maxsplit=1)[0].rstrip(":.")
+
+
+def judged(text: str) -> list[dict]:
+    """The judged rules of the standard's text, in order.
+
+    The standard tags only its checked rules with IDs. A judged rule is
+    keyed here by its section and its place among the section's judged
+    rules (`1.6`, Related crates), which holds for as long as the text does:
+    a report names the standard's sha256, so a key never outlives the text
+    it was read from. Section 10, on writing, carries no tags and is judged
+    throughout, as one rule.
+    """
+    heads = list(HEADING.finditer(text))
+    rules = []
+    for i, head in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+        body = text[head.end():end].split("\n## ", 1)[0]
+        number, name = head.group(1), head.group(2)
+        found = 0
+        for block in _blocks(body):
+            for m in JUDGED.finditer(block):
+                found += 1
+                key = f"{number}.{found}"
+                checked = TAG.search(block)
+                applies = "library" if key in LIBRARY_ONLY else JUDGED_APPLIES.get(number, "every crate")
+                rules.append({
+                    "id": key, "section": f"{number}. {name}", "title": _title(block),
+                    "applies": applies, "question": (m.group(1) or m.group(2) or "").strip(),
+                    "checked": checked.group(1) if checked else "",
+                    "text": " ".join(block.split()),
+                })
+        if not found and name == "Writing":
+            rules.append({"id": f"{number}.1", "section": f"{number}. {name}", "title": "Writing",
+                          "applies": "every crate", "question": "", "checked": "",
+                          "text": " ".join(body.split())})
+    return rules
+
+
 def generate(root: Path) -> str:
     text = (root / SOURCE).read_text(encoding="utf-8")
     data = {
@@ -91,6 +167,7 @@ def generate(root: Path) -> str:
         "sha256": hashlib.sha256(text.encode()).hexdigest(),
         "baseline": [{"target": t, "job": j} for t, j in BASELINE.items()],
         "rules": parse(text),
+        "judged": judged(text),
     }
     return json.dumps(data, indent=2) + "\n"
 

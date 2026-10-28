@@ -91,6 +91,11 @@ auditor: rust-crate-quality
 ---
 ```
 
+If `pubkit audit prepare` has already written that file, start from it:
+keep its machine findings, judge each rule it marks `[needs review]` or
+`[machine-drafted ...]`, move what you find into the sections above,
+remove the mark, and count `blocking` again.
+
 `pubkit audit --check` reads that header when the release is cut. It refuses
 a report on another version, against another version of the standard, or
 with `blocking` above 0. Count `blocking` honestly: it is what lets a

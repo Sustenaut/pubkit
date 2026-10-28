@@ -21,6 +21,12 @@ declares it in `release.json` as a security check, so `pubrel prepare` cuts
 no release without one, and the release's signed security record cites the
 report. `pubkit audit --standard` prints the standard's sha256, for the
 header.
+
+`pubkit audit prepare` writes a report with every machine-decidable rule
+decided and each rule that needs judgement marked `[needs review]`;
+`pubkit audit draft` marks what Claude drafts for those rules
+`[machine-drafted by MODEL: needs human review]`. Either mark fails the
+check, so no report passes until a person has judged every rule.
 """
 
 from __future__ import annotations
@@ -34,6 +40,8 @@ from . import standard
 
 DIR = "audit"
 FIELDS = ("package", "version", "standard", "blocking", "date", "auditor")
+# What prepare and draft leave for a person: each a rule nobody has judged.
+PENDING = re.compile(r"\[(?:needs review|machine-drafted[^\]]*)\]")
 
 
 def current() -> str:
@@ -59,9 +67,11 @@ def check(root: Path, package: str, version: str) -> tuple[str | None, str]:
     rel = f"{DIR}/{package}-{version}.md"
     path = root / rel
     if not path.is_file():
-        return (f"no {rel}: run the rust-crate-quality agent on {package} {version}, "
-                f"and have it write its report there"), rel
-    fields = header(path.read_text(encoding="utf-8"))
+        return (f"no {rel}: run `pubkit audit prepare --package {package}`, which writes it "
+                f"with every rule a machine can decide, then review the rules it marks (or have "
+                f"the rust-crate-quality agent write it)"), rel
+    text = path.read_text(encoding="utf-8")
+    fields = header(text)
     if fields is None:
         return f"{rel} has no header (--- package, version, standard, blocking ... ---)", rel
     missing = [f for f in FIELDS if not fields.get(f)]
@@ -77,6 +87,10 @@ def check(root: Path, package: str, version: str) -> tuple[str | None, str]:
         blocking = int(fields["blocking"])
     except ValueError:
         return f"{rel}: blocking is {fields['blocking']!r}, not a count", rel
+    pending = PENDING.findall(text)
+    if pending:
+        return (f"{rel} has {len(pending)} rule(s) nobody has judged yet (marked {pending[0]}): "
+                f"review each, record what you find, and remove its mark"), rel
     if blocking:
         return f"{rel} lists {blocking} finding(s) that block a release: resolve them and audit again", rel
     return None, (f"{rel}: {package} {version} audited on {fields['date']} by "

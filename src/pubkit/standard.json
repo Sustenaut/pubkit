@@ -305,5 +305,331 @@
         }
       ]
     }
+  ],
+  "judged": [
+    {
+      "id": "1.1",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "One sentence on what the crate is for",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "1. **One sentence on what the crate is for**, then a runnable example of its central use. [judged]"
+    },
+    {
+      "id": "1.2",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Overview",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "2. **Overview:** the main types and functions, each linked, and the invariants they keep. A table works well for a crate of modules. [judged]"
+    },
+    {
+      "id": "1.3",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "A map of the rest of the page",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "3. **A map of the rest of the page**, with links to its sections. [judged]"
+    },
+    {
+      "id": "1.4",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Examples",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "4. **Examples:** a cookbook of `## Example: <what it does>` blocks. They show edge cases and failures, not only the happy path: a rejected input, a boundary, a cycle, saturation. [judged]"
+    },
+    {
+      "id": "1.5",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Why this crate?",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "5. **Why this crate?** What it does that a general-purpose crate would get wrong for this use. Say why, concretely. [judged]"
+    },
+    {
+      "id": "1.6",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Related crates",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "6. **Related crates:** a table of crates doing similar jobs. Give the version checked and why this crate takes another approach. [judged] Every claim rests on a check that was actually run: an input tried, a root compared. A crate adopted rather than reimplemented is named too, as something this one builds on."
+    },
+    {
+      "id": "1.7",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Crate features",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "7. **Crate features:** every feature, or \"None\", said plainly. [judged]"
+    },
+    {
+      "id": "1.8",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Minimum Rust version",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "8. **Minimum Rust version:** the `rust-version`, and the policy. It may rise in a release that bumps the second number (`y` in `x.y.z`, and in `0.y.z`), never in one that bumps only the third. [judged]"
+    },
+    {
+      "id": "1.9",
+      "section": "1. Crate documentation, in `lib.rs`",
+      "title": "Versioning",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "9. **Versioning:** Cargo's convention, and that the public API is checked against the last release. [judged]"
+    },
+    {
+      "id": "2.1",
+      "section": "2. Item documentation",
+      "title": "Examples use `?`, with the error plumbing hidden",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- Examples use `?`, with the error plumbing hidden: `# Ok::<(), Box<dyn std::error::Error>>(())`. [judged]"
+    },
+    {
+      "id": "2.2",
+      "section": "2. Item documentation",
+      "title": "Hidden setup lines (`# let ...`) are used sparingly",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- Hidden setup lines (`# let ...`) are used sparingly. A reader must be able to tell where every name in a visible example comes from. [judged]"
+    },
+    {
+      "id": "2.3",
+      "section": "2. Item documentation",
+      "title": "`# Errors`",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- **`# Errors`** says exactly when an error happens. Where that is a promise, it is part of the semver contract, so word it as one: \"fails only if...\". [judged]"
+    },
+    {
+      "id": "2.4",
+      "section": "2. Item documentation",
+      "title": "`# Panics`",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- **`# Panics`** wherever something can panic. [judged]"
+    },
+    {
+      "id": "2.5",
+      "section": "2. Item documentation",
+      "title": "Domain sections where they matter",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- Domain sections where they matter: `# Complexity` for traversals and proofs, `# Platform behavior` when results could differ. [judged]"
+    },
+    {
+      "id": "2.6",
+      "section": "2. Item documentation",
+      "title": "Public error types are `#[non_exhaustive]`, or opaque structs with a `kind()`",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- Public error types are `#[non_exhaustive]`, or opaque structs with a `kind()`. An enum left exhaustive says why in its docs. [judged]"
+    },
+    {
+      "id": "2.7",
+      "section": "2. Item documentation",
+      "title": "Types of values that come from someone else (sizes, indexes and lengths read from the wire or a peer) do not depend on the target's word size",
+      "applies": "library",
+      "question": "",
+      "checked": "",
+      "text": "- Types of values that come from someone else (sizes, indexes and lengths read from the wire or a peer) do not depend on the target's word size. Use `u64`, not `usize`, so a 32-bit or `wasm32` machine can check anything a 64-bit one can. Use `usize` only for what indexes this machine's memory. [judged]"
+    },
+    {
+      "id": "3.1",
+      "section": "3. Tests, and showing how each item is tested",
+      "title": "Test vectors from independent sources",
+      "applies": "every crate",
+      "question": "are the sources really independent?",
+      "checked": "RS-TEST-01",
+      "text": "- **Test vectors from independent sources** live in `testdata/` as JSON: RFCs, other implementations, published test suites. Every case names its source. They are read by `tests/vectors.rs`, and regenerated and compared in CI (`make vectors-check`). [checked: RS-TEST-01, make vectors-check, pubkit conform; judged: are the sources really independent?]"
+    },
+    {
+      "id": "3.2",
+      "section": "3. Tests, and showing how each item is tested",
+      "title": "Property tests",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- **Property tests** (proptest) cover invariants over many inputs: round-trips, and consistency at random sizes. [judged]"
+    },
+    {
+      "id": "3.3",
+      "section": "3. Tests, and showing how each item is tested",
+      "title": "Oracles",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- **Oracles:** where an established crate implements the same standard, its results are compared with ours in the tests. It is a dev-dependency only. [judged]"
+    },
+    {
+      "id": "3.4",
+      "section": "3. Tests, and showing how each item is tested",
+      "title": "Every test says what it covers",
+      "applies": "every crate",
+      "question": "is the claim true?",
+      "checked": "RS-TEST-02",
+      "text": "- **Every test says what it covers** with a `// covers: module::item` comment. A test claims only items in its own module's area. [checked: RS-TEST-02, make doc-coverage-check, library; the guard fails on a name that does not exist; judged: is the claim true?]"
+    },
+    {
+      "id": "4.1",
+      "section": "4. Untrusted input",
+      "title": "Every function that parses or verifies something from outside (bytes, text, proofs, signatures) has a cargo-fuzz target in `fuzz/`",
+      "applies": "every crate",
+      "question": "is any entry point missing a target?",
+      "checked": "",
+      "text": "- Every function that parses or verifies something from outside (bytes, text, proofs, signatures) has a **cargo-fuzz target** in `fuzz/`. [judged: is any entry point missing a target?]"
+    },
+    {
+      "id": "5.1",
+      "section": "5. Packaging and metadata",
+      "title": "`Cargo.toml` states",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- `Cargo.toml` states: - `description`, `license`, `repository`, `documentation`, `keywords` and `categories`; - an explicit `include` list; - `rust-version`; - `[package.metadata.docs.rs]` with `all-features = true` and `rustdoc-args = [\"--generate-link-to-definition\"]`. [judged]"
+    },
+    {
+      "id": "5.2",
+      "section": "5. Packaging and metadata",
+      "title": "The `include` patterns are anchored with `/` (`\"/README.md\"`, `\"/src/**/*.rs\"`)",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- The `include` patterns are anchored with `/` (`\"/README.md\"`, `\"/src/**/*.rs\"`). Cargo reads them like gitignore patterns, so a bare `README.md` or `LICENSE` also matches any file of that name below, such as one in a Python test environment. `cargo package --list` shows exactly what ships. [judged]"
+    },
+    {
+      "id": "5.3",
+      "section": "5. Packaging and metadata",
+      "title": "`make publish-check` runs `cargo publish --dry-run --locked` with a target directory of its own (`CARGO_TARGET_DIR=target/publish-check`)",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- `make publish-check` runs `cargo publish --dry-run --locked` with a target directory of its own (`CARGO_TARGET_DIR=target/publish-check`). If the verify build shares `target/`, its dep-info names the packaged copy's sources. After that, cargo reports the crate up to date however `src/` changes, so tests run a stale binary. [judged]"
+    },
+    {
+      "id": "5.4",
+      "section": "5. Packaging and metadata",
+      "title": "Docs build as docs.rs builds them",
+      "applies": "library",
+      "question": "run it before each release",
+      "checked": "",
+      "text": "- **Docs build as docs.rs builds them.** That means from the packaged crate, on nightly, with `--cfg docsrs` and the metadata's flags, with no warnings. [judged: run it before each release]"
+    },
+    {
+      "id": "5.5",
+      "section": "5. Packaging and metadata",
+      "title": "The README is short and different from the crate docs",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- The **README** is short and different from the crate docs: - a Documentation link that says what the docs cover; - Usage; - one example; - Minimum Rust version; - Security: how to report, and where the checks are described. [judged]"
+    },
+    {
+      "id": "7.1",
+      "section": "7. Supply chain and security",
+      "title": "`SECURITY.md`",
+      "applies": "every crate",
+      "question": "",
+      "checked": "RS-SUP-04",
+      "text": "- **`SECURITY.md`** says how to report a vulnerability (private reporting), what is checked and when, and what fuzzing has found. [judged] Every repository has one. [checked: RS-SUP-04, pubkit conform]"
+    },
+    {
+      "id": "9.1",
+      "section": "9. Crates that are command-line tools",
+      "title": "Its documentation is its README and its `--help`",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Its documentation is its README and its `--help`.** docs.rs renders no pages for a binary-only crate. The README carries what section 1 puts in the crate root: - what the tool is for, and its central use as a runnable command; - an overview of its commands; - why this tool; - related tools; - installation; - Minimum Rust version; - versioning. `--help` names every command and flag, and the README agrees with it. [judged]"
+    },
+    {
+      "id": "9.2",
+      "section": "9. Crates that are command-line tools",
+      "title": "Module docs still matter",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Module docs still matter.** `//!` docs on `main.rs` and each module say what it does and why, for whoever maintains it. Section 2's rules apply to anything `pub` that another module relies on, with these changes: - `#![deny(missing_docs)]` checks nothing in a binary, because nothing is exported. Find undocumented items with `cargo clippy -- -W clippy::missing_docs_in_private_items`. - Doctests do not run in a binary target, so section 2's example rule does not apply. The README's example commands and the functional scenarios take their place. [judged]"
+    },
+    {
+      "id": "9.3",
+      "section": "9. Crates that are command-line tools",
+      "title": "Its versioned interface is what users depend on",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Its versioned interface is what users depend on:** - commands and flags; - exit codes; - output meant for scripts; - the configuration files it reads. The README or a dedicated document names that interface. A change to it is recorded as `changed` or `removed`, like an API break. cargo-semver-checks does not apply, because there is no library API. [judged]"
+    },
+    {
+      "id": "9.4",
+      "section": "9. Crates that are command-line tools",
+      "title": "Its behaviour is tested end to end",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Its behaviour is tested end to end.** That means a functional suite (pubkit's Gherkin plugin) that runs the built binary as a user would, in addition to unit tests. [judged]"
+    },
+    {
+      "id": "9.5",
+      "section": "9. Crates that are command-line tools",
+      "title": "Its usage text is documentation",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Its usage text is documentation.** The `--help` output, usually a string constant, is held to the same standard as the README. `--help` exits 0 and prints to stdout. [judged]"
+    },
+    {
+      "id": "9.6",
+      "section": "9. Crates that are command-line tools",
+      "title": "Metadata",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Metadata:** `documentation` points at the README in the repository. `[package.metadata.docs.rs]` is not needed, since docs.rs renders no pages for a binary. [judged]"
+    },
+    {
+      "id": "9.7",
+      "section": "9. Crates that are command-line tools",
+      "title": "`// covers:` comments",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **`// covers:` comments** may name module-private items by their module path (`api::allowed`). `TESTING.md` and the doc-coverage guard are for libraries, and are not required of a binary. [judged]"
+    },
+    {
+      "id": "9.8",
+      "section": "9. Crates that are command-line tools",
+      "title": "Related tools",
+      "applies": "binary",
+      "question": "",
+      "checked": "",
+      "text": "- **Related tools** may include tools that are not Rust crates. Name the version or date checked, and how: their documentation, their source, or a run. [judged]"
+    },
+    {
+      "id": "10.1",
+      "section": "10. Writing",
+      "title": "Writing",
+      "applies": "every crate",
+      "question": "",
+      "checked": "",
+      "text": "- Plain, specific sentences. Say what something does and why. No marketing, no \"simply\" or \"just\", no claims nobody checked. - One idea per sentence. If a sentence needs a semicolon to carry two, split it. - Name things exactly: the type, the function, the RFC section. - Never describe something that is planned as done."
+    }
   ]
 }

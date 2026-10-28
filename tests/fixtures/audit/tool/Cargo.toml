@@ -1,0 +1,12 @@
+[package]
+name = "demo-tool"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "A tool the audit tests read."
+license = "Apache-2.0"
+repository = "https://example.org/demo-tool"
+documentation = "https://docs.rs/demo-tool"
+keywords = ["demo"]
+categories = ["command-line-utilities"]
+include = ["/src/**/*.rs", "/README.md"]

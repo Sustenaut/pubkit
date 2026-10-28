@@ -542,7 +542,7 @@ auditor: rust-crate-quality
 
 `pubkit audit --check [PACKAGE VERSION]` passes only on a report for that
 release, made against the standard this pubkit ships, with no finding that
-blocks a release. Without arguments it reads the release `pubrel prepare` is
+blocks a release and no rule left unjudged. Without arguments it reads the release `pubrel prepare` is
 cutting from `PUBREL_PACKAGE` and `PUBREL_VERSION`. A repository declares it
 in `release.json`:
 
@@ -556,6 +556,77 @@ cuts no release without a current audit. It records each check's last line
 in the release's signed security record, so the release cites its report.
 Changing the standard makes earlier reports stale: a release after that
 needs a new audit.
+
+### Preparing the report
+
+```sh
+./pubkit audit prepare --package publet-core          # audit/publet-core-<next>.md
+with-secrets ./pubkit audit draft --package publet-core   # optional: Claude drafts the judged rules
+```
+
+`pubkit audit prepare --package NAME` writes the report for the release
+`pubrel next --package NAME` gives (or `--version`). It decides every rule a
+machine can decide, and leaves the rest for a person:
+
+- **The header**, as above, adds `commit` (the commit audited) and
+  `last-release` (the package's last release tag).
+- **Each finding** goes under its severity, with its rule, file and line.
+  Builds and lints:
+  - `cargo doc` and `cargo clippy` warnings for the package, and its
+    doctests;
+  - a library's docs built from the packaged crate on nightly, as docs.rs
+    builds them;
+  - `cargo publish --dry-run`, and the build on the package's
+    `rust-version`;
+  - the make targets the standard names: `doc-coverage-check`,
+    `supply-chain-check`, `vectors-check`, `deny` and `vet`.
+
+  The docs and the manifest:
+  - public functions with no example, or returning a `Result` with no
+    `# Errors`;
+  - examples that unwrap, or use `?` without the hidden `Ok`;
+  - public error enums that are not `#[non_exhaustive]`;
+  - crate-root sections that are missing or out of order, and
+    features, MSRV and versioning against `Cargo.toml` and `release.json`;
+  - each "Related crates" row's version against `Cargo.lock`;
+  - the README's sections, the `Cargo.toml` metadata, and unanchored
+    `include` patterns;
+  - each tool `SECURITY.md` names, against the workflows that run it and
+    when, and its imported audit sets against `supply-chain/config.toml`;
+  - for a command-line tool, `--help` run: does it exit 0 to stdout?
+- **Each rule that needs judgement** is under "Needs review", marked
+  `[needs review]`, with what the machine found for it. Examples: the
+  hidden setup lines, the functions that can panic, `usize` in
+  signatures, the Related crates rows, the test vectors' sources, the
+  entry points beside the fuzz targets, and the sentences section 10
+  rules out.
+
+The judged rules have no IDs in the standard. `standard.json` keys them by
+section and place (`1.6` is Related crates), which holds while the
+standard's text does, and a report names that text's sha256. `--check`
+fails while any `[needs review]` mark remains. A person judges each rule,
+moves what they find into the sections above, counts `blocking` again, and
+removes the mark. `--quick` skips what takes minutes (the docs.rs, MSRV and
+publish builds, and the make targets). An existing report is written over
+only with `--force`, since it may hold a review.
+
+`pubkit audit draft --package NAME` asks Claude to draft those rules. It
+sends the Messages API:
+
+- the package's diff since its last release tag, without lockfiles and
+  generated files;
+- the rules still marked, each with what the machine found;
+- the last release's report, when there is one.
+
+It asks for JSON matching a schema: per rule a verdict, findings with file
+and line, and the reasoning. It merges each draft into the report, marked
+`[machine-drafted by MODEL: needs human review]`, and adds the drafted
+findings that block to `blocking`. `--check` refuses that mark too, so a
+person still reads every draft. The key is `ANTHROPIC_API_KEY`: run it
+through a `with-secrets` whose Bitwarden project holds a secret of that
+name, or export it. The model is `--model`, `PUBKIT_AUDIT_MODEL`, or
+`claude-opus-5-5`. `ANTHROPIC_BASE_URL` points it elsewhere, as the tests
+do. A refusal, an error or an answer cut short writes nothing.
 
 ## The Rust crate standard, and an agent that audits against it
 

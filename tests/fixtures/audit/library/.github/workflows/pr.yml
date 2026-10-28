@@ -1,0 +1,6 @@
+name: pr
+on:
+  pull_request:
+jobs:
+  audit:
+    uses: schryer/pubkit/.github/workflows/job-rust-audit.yml@v0.14.6

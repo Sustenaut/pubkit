@@ -7,6 +7,22 @@
     {
       "category": "changed",
       "change": "deploy-static runs `pubkit site check` on its directory before deploying and deploys nothing if it fails. Give the new `site-url` input so it can check og:image files, or set `check: false` for a site that is not public."
+    },
+    {
+      "category": "added",
+      "change": "`pubkit audit prepare --package NAME` writes a release's audit report with every machine-decidable rule decided, each finding with its file and line, and each judged rule marked `[needs review]` with what the machine found"
+    },
+    {
+      "category": "added",
+      "change": "`pubkit audit draft --package NAME` has Claude draft the judged rules from the diff since the last release, as structured JSON merged into the report and marked for human review"
+    },
+    {
+      "category": "changed",
+      "change": "`pubkit audit --check` refuses a report that still marks a rule `[needs review]` or machine-drafted, and a missing report names `pubkit audit prepare --package NAME`"
+    },
+    {
+      "category": "added",
+      "change": "standard.json lists the standard's judged rules, keyed by section and place"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

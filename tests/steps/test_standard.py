@@ -146,3 +146,30 @@ def plan_line(result, job, targets):
     lines = result.stdout.decode().splitlines() if isinstance(result.stdout, bytes) else result.stdout.splitlines()
     targets = "" if targets == "(none)" else targets
     assert f"{job}={targets}" in lines, lines
+
+
+@then(parsers.parse('it lists as many judged rules as the standard has "[judged" marks, and section 10'))
+def judged_count(shipped):
+    from pubkit.standard import SOURCE
+    text = (Path(__file__).resolve().parents[2] / SOURCE).read_text()
+    # The legend above section 1 explains the mark; it marks no rule.
+    text = text[text.index("\n## 1. "):]
+    marks = text.count("[judged") + text.count("; judged:")
+    assert len(shipped["judged"]) == marks + 1, [r["id"] for r in shipped["judged"]]
+    assert shipped["judged"][-1]["id"] == "10.1"
+
+
+def judged_rule(shipped, key):
+    return next(r for r in shipped["judged"] if r["id"] == key)
+
+
+@then(parsers.parse('the judged rule "{key}" is "{title}", for a {applies}'))
+def judged_title(shipped, key, title, applies):
+    rule = judged_rule(shipped, key)
+    assert rule["title"] == title and rule["applies"] == applies, rule
+
+
+@then(parsers.parse('the judged rule "{key}" asks "{question}" of {checked}'))
+def judged_question(shipped, key, question, checked):
+    rule = judged_rule(shipped, key)
+    assert rule["question"] == question and rule["checked"] == checked, rule
