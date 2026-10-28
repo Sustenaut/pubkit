@@ -9,6 +9,8 @@
     pubkit required [--github-output]
     pubkit conform
     pubkit audit --check [PACKAGE VERSION] | --standard
+    pubkit audit prepare --package NAME [--version V] [--out FILE] [--quick] [--force]
+    pubkit audit draft --package NAME [--report FILE] [--model ID]
     pubkit bump
     pubkit pins --pubrel V --pub V [--no-lock]
     pubkit crates [--report FILE]
@@ -356,12 +358,26 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("crates", nargs="*", metavar="CRATE",
                    help="the crates; by default every published library here")
     p = commands.add_parser("audit",
-                            help="check a release's quality audit is current (RS-REL-01)")
-    group = p.add_mutually_exclusive_group(required=True)
+                            help="prepare, draft or check a release's quality audit (RS-REL-01)")
+    p.add_argument("step", nargs="?", choices=("prepare", "draft"),
+                   help="prepare: write the report with every rule a machine can decide; "
+                        "draft: have Claude draft the rules left for review")
+    p.add_argument("--package", help="for prepare and draft: the package being released")
+    p.add_argument("--version", dest="release_version",
+                   help="for prepare: the version being released; by default `pubrel next --package NAME`")
+    p.add_argument("--out", help="for prepare: write here, not audit/PACKAGE-VERSION.md")
+    p.add_argument("--quick", action="store_true",
+                   help="for prepare: skip the docs.rs, MSRV and publish builds and the make targets")
+    p.add_argument("--force", action="store_true",
+                   help="for prepare: write over an existing report")
+    p.add_argument("--report", help="for draft: the report to draft into; by default audit/PACKAGE-VERSION.md")
+    p.add_argument("--model", help="for draft: the Claude model; by default $PUBKIT_AUDIT_MODEL, "
+                                   "or claude-opus-5-5")
+    group = p.add_mutually_exclusive_group()
     group.add_argument("--check", nargs="*", metavar="PACKAGE VERSION",
-                       help="pass only if audit/PACKAGE-VERSION.md is current and blocks nothing; "
-                            "without them, the release pubrel prepare is cutting "
-                            "($PUBREL_PACKAGE, $PUBREL_VERSION)"),
+                       help="pass only if audit/PACKAGE-VERSION.md is current, blocks nothing and has "
+                            "nothing left to review; without them, the release pubrel prepare is "
+                            "cutting ($PUBREL_PACKAGE, $PUBREL_VERSION)"),
     group.add_argument("--standard", action="store_true",
                        help="print the sha256 of the standard this pubkit ships, for a report's header")
     p = commands.add_parser("pins", help="move every outdated pub* pin to its latest release")
@@ -506,7 +522,19 @@ def main(argv: list[str] | None = None) -> int:
         from .paths import confined
         from .site import run as site
         return site(root, confined(args.dir, "the site directory"), args.url)
+    if args.command == "audit" and args.step:
+        if not args.package:
+            sys.exit(f"pubkit: audit {args.step} needs --package NAME")
+        if args.check is not None or args.standard:
+            sys.exit(f"pubkit: audit {args.step} takes neither --check nor --standard")
+        if args.step == "prepare":
+            from .audit_prepare import prepare
+            return prepare(root, args.package, args.release_version, args.out, args.quick, args.force)
+        from .audit_draft import draft
+        return draft(root, args.package, args.report, args.model)
     if args.command == "audit":
+        if args.check is None and not args.standard:
+            sys.exit("pubkit: audit takes prepare, draft, --check or --standard")
         from .audit import run as audit
         return audit(root, args.check if args.check is not None else [], args.standard)
     return lock(root)

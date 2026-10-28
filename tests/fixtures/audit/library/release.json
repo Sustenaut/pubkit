@@ -1,0 +1,2 @@
+{ "name": "demo", "package": "pkg.demo", "tag": "PKG-DEMOPK-10-2026", "corpus": "corpus",
+  "manifest": { "kind": "cargo-package", "path": "Cargo.toml" }, "code": ["src/", "Cargo.toml"] }

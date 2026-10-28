@@ -34,6 +34,22 @@ Feature: A release cites a current quality audit
       | an audit report on "demo" "0.2.0" against an older standard with 0 blocking          | audited against another version of the standard |
       | an audit report on "demo" "0.2.0" with no header                                     | has no header                                 |
 
+  Scenario: A missing report names the command that starts one
+    When I run pubkit "audit" "--check" "demo" "0.2.0"
+    Then it fails
+    And stderr mentions "run `pubkit audit prepare --package demo`"
+
+  Scenario Outline: A rule nobody has judged keeps the release back
+    Given an audit report on "demo" "0.2.0" against the current standard with 0 blocking, and a rule marked "<mark>"
+    When I run pubkit "audit" "--check" "demo" "0.2.0"
+    Then it fails
+    And stderr mentions "1 rule(s) nobody has judged yet (marked <mark>)"
+
+    Examples:
+      | mark                                                   |
+      | [needs review]                                         |
+      | [machine-drafted by claude-opus-5-5: needs human review] |
+
   Scenario: The standard's digest is printed for a report's header
     When I run pubkit "audit" "--standard"
     Then it succeeds

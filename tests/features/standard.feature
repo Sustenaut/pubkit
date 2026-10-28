@@ -14,6 +14,13 @@ Feature: The required checks come from the standard
     Then every "[checked" tag names a rule ID
     And no rule ID tags two rules
 
+  Scenario: Every judged rule is keyed by its section and its place there
+    When I read the standard.json pubkit ships
+    Then it lists as many judged rules as the standard has "[judged" marks, and section 10
+    And the judged rule "1.6" is "Related crates", for a library
+    And the judged rule "3.1" asks "are the sources really independent?" of RS-TEST-01
+    And the judged rule "9.5" is "Its usage text is documentation", for a binary
+
   Scenario: pubkit.mk provides every make target the standard names
     When I read the standard.json pubkit ships
     Then the rust pubkit.mk defines every target it names
