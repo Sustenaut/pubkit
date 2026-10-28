@@ -987,7 +987,7 @@ def check_slow(pkg: Package, audit: Audit, waived: set[str]):
 
 def rule_text(rule: dict) -> str:
     """A judged rule's words, without its list marker or its tags."""
-    text = re.sub(r"\s*\[(?:judged|checked)[^\]]*\]", "", rule["text"])
+    text = " ".join(re.sub(r"\[(?:judged|checked)[^\]]*\]", "", rule["text"]).split())
     return re.sub(r"^(?:- |\d+\. )", "", text).strip()
 
 
@@ -1089,7 +1089,8 @@ def prepare(root: Path, name: str, version: str | None, out: str | None,
         audit.judged[r["id"]] = Judged(r, "review" if applies else "n/a")
     if "RS-TEST-01" in waived_ids:
         audit.judged["3.1"].status = "n/a"
-    target = Path(out) if out else root / DIR / f"{pkg.name}-{pkg.version}.md"
+    from .paths import confined
+    target = confined(out, "the --out file") if out else root / DIR / f"{pkg.name}-{pkg.version}.md"
     if target.exists() and not force:
         sys.exit(f"pubkit: {pkg.rel(target)} exists, and may hold a person's review: give --force "
                  f"to write over it, or --out for another file")

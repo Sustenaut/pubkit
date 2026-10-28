@@ -41,7 +41,9 @@ WORKFLOW_JOBS = {"test", "cross", "fuzz"}
 # `[^\]]*` could match the same spaces either way, which backtracks.
 TAG = re.compile(r"(?<!`)\[checked:\s*(RS-[A-Z]+-\d{2}),([^\]]*)\]")
 HEADING = re.compile(r"^## (\d+)\. (.+)$", re.M)
-JUDGED = re.compile(r"\[judged(?::([^\]]*))?\]|;\s*judged:\s*([^\]]*)\]")
+# The question after `judged:` keeps its leading space (stripped later):
+# `\s*` before `[^\]]*` could match the same spaces either way.
+JUDGED = re.compile(r"\[judged(?::([^\]]*))?\]|; *judged:([^\]]*)\]")
 # Sections whose judged rules only a crate of one kind is held to: the crate
 # root and item docs are a library's, section 9 a command-line tool's.
 JUDGED_APPLIES = {"1": "library", "2": "library", "9": "binary"}

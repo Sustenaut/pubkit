@@ -225,7 +225,7 @@ def merged(text: str, drafts: list[dict], model: str) -> tuple[str, int]:
 
 
 def draft(root: Path, name: str, report: str | None, model: str | None,
-          send: Post | None = None) -> int:
+          send: Post | None = None) -> None:
     from . import standard
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not key:
@@ -233,7 +233,8 @@ def draft(root: Path, name: str, report: str | None, model: str | None,
                  "through with-secrets (with-secrets ./pubkit audit draft --package NAME), or "
                  "export the key")
     model = model or os.environ.get("PUBKIT_AUDIT_MODEL") or DEFAULT_MODEL
-    path = Path(report) if report else None
+    from .paths import confined
+    path = confined(report, "the --report file") if report else None
     version = None
     if path and path.is_file():
         version = (header(path.read_text(encoding="utf-8")) or {}).get("version")
@@ -245,7 +246,7 @@ def draft(root: Path, name: str, report: str | None, model: str | None,
     pending = {m.group(1): m.group(2) for m in RULE.finditer(text)}
     if not pending:
         print(f"{pkg.rel(path)} has no rule left marked for review; nothing to draft")
-        return 0
+        return
     rules = {r["id"]: r for r in standard.load()["judged"]}
     unknown = [k for k in pending if k not in rules]
     if unknown:
@@ -292,4 +293,3 @@ def draft(root: Path, name: str, report: str | None, model: str | None,
     print(f"drafted {len(drafts)} rule(s) into {pkg.rel(path)}, {blocking} drafted finding(s) block"
           + (f"; not drafted: {', '.join(missed)}" if missed else "")
           + ". Each is marked for human review; `pubkit audit --check` fails until a person has read them")
-    return 0

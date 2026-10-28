@@ -531,7 +531,8 @@ def main(argv: list[str] | None = None) -> int:
             from .audit_prepare import prepare
             return prepare(root, args.package, args.release_version, args.out, args.quick, args.force)
         from .audit_draft import draft
-        return draft(root, args.package, args.report, args.model)
+        draft(root, args.package, args.report, args.model)
+        return 0
     if args.command == "audit":
         if args.check is None and not args.standard:
             sys.exit("pubkit: audit takes prepare, draft, --check or --standard")
