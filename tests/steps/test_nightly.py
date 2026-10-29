@@ -109,6 +109,41 @@ def retests(workflow):
     assert script.index('wait_ci "$head"') < script.index('wait_ci "$pins"')
 
 
+def _steps(workflow):
+    return workflow["data"]["jobs"]["update"]["steps"]
+
+
+@then("each repository's token comes from the Sustenaut nightly app, for that repository alone")
+def app_token(workflow):
+    app = next(s for s in _steps(workflow) if s.get("id") == "app")
+    assert re.fullmatch(r"actions/create-github-app-token@[0-9a-f]{40}", app["uses"])
+    assert app["if"] == "vars.NIGHTLY_APP_ID != ''"
+    given = app["with"]
+    assert given["app-id"] == "${{ vars.NIGHTLY_APP_ID }}"
+    assert given["private-key"] == "${{ secrets.NIGHTLY_APP_KEY }}"
+    assert given["owner"] == "${{ steps.where.outputs.owner }}"
+    assert given["repositories"] == "${{ steps.where.outputs.name }}"
+    update = next(s for s in _steps(workflow) if "update.sh" in s.get("run", ""))
+    assert update["env"]["GH_TOKEN"] == "${{ steps.token.outputs.token }}"
+
+
+@then("the token may write only contents, pull requests and workflows, and read actions")
+def app_permissions(workflow):
+    given = next(s for s in _steps(workflow) if s.get("id") == "app")["with"]
+    asked = {k: v for k, v in given.items() if k.startswith("permission-")}
+    assert asked == {"permission-contents": "write", "permission-pull-requests": "write",
+                     "permission-workflows": "write", "permission-actions": "read"}
+
+
+@then("without the app it falls back to PUBKIT_BUMP_TOKEN with a warning")
+def fallback(workflow):
+    token = next(s for s in _steps(workflow) if s.get("id") == "token")
+    assert token["env"]["BUMP_TOKEN"] == "${{ secrets.PUBKIT_BUMP_TOKEN }}"
+    assert "::warning::No NIGHTLY_APP_ID" in token["run"]
+    assert token["run"].index("APP_TOKEN") < token["run"].index("BUMP_TOKEN")
+    assert "GH_TOKEN" not in workflow["data"]["jobs"]["update"].get("env", {})
+
+
 @when(parsers.parse("the repository's pubkit.json reads '{text}'"))
 def pubkit_json(repo, text):
     (repo / "pubkit.json").write_text(text)

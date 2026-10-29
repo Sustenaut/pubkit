@@ -27,8 +27,14 @@
 # dropped when that passes. Nothing merges it: the Sustenaut bot DMs on
 # Slack when it is green or fails.
 #
-# Secrets: PUBKIT_BUMP_TOKEN, a token that may push branches and open pull
-# requests in the governed repositories (without it the job only reports);
+# It pushes and opens pull requests as the "Sustenaut nightly" GitHub App:
+# the variable NIGHTLY_APP_ID and the secret NIGHTLY_APP_KEY (its private
+# key) give, for each governed repository, a token for that repository
+# alone, with only contents, pull-requests and workflows write (and
+# actions read, to wait for its CI), that expires within the hour. The app is installed on every owner whose
+# repositories governed.json lists. Without NIGHTLY_APP_ID it falls back,
+# with a warning, to PUBKIT_BUMP_TOKEN, a token that may push branches and
+# open pull requests there; with neither, the job only reports.
 # SUSTENAUT_SLACK_BOT_TOKEN (chat:write) and SLACK_DM_USER_ID, whom it DMs.
 name: nightly
 
@@ -71,15 +77,40 @@ jobs:
       matrix:
         repo: ${{ fromJSON(needs.report.outputs.repos) }}
     env:
-      GH_TOKEN: '${{ secrets.PUBKIT_BUMP_TOKEN }}'
       REPO: '${{ matrix.repo }}'
     steps:
+      # The app's token covers this repository alone: its owner and name.
+      - id: where
+        run: |
+          echo "owner=${REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
+      - if: vars.NIGHTLY_APP_ID != ''
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: '${{ vars.NIGHTLY_APP_ID }}'
+          private-key: '${{ secrets.NIGHTLY_APP_KEY }}'
+          owner: '${{ steps.where.outputs.owner }}'
+          repositories: '${{ steps.where.outputs.name }}'
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+          permission-actions: read
       - id: token
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "No PUBKIT_BUMP_TOKEN: reporting only, no pull request for $REPO." >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$APP_TOKEN" ]; then
+            echo "::add-mask::$APP_TOKEN"
+            echo "token=$APP_TOKEN" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BUMP_TOKEN" ]; then
+            echo "::warning::No NIGHTLY_APP_ID: falling back to PUBKIT_BUMP_TOKEN for $REPO. Set up the Sustenaut nightly app (README, The nightly)."
+            echo "token=$BUMP_TOKEN" >> "$GITHUB_OUTPUT"
+          else
+            echo "No NIGHTLY_APP_ID or PUBKIT_BUMP_TOKEN: reporting only, no pull request for $REPO." >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "present=$([ -n "$GH_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "present=$([ -n "$APP_TOKEN$BUMP_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        env:
+          APP_TOKEN: '${{ steps.app.outputs.token }}'
+          BUMP_TOKEN: '${{ secrets.PUBKIT_BUMP_TOKEN }}'
       - if: steps.token.outputs.present == 'true'
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { path: pubkit }
@@ -117,6 +148,7 @@ jobs:
           cd repo
           ../pubkit/.github/nightly/update.sh
         env:
+          GH_TOKEN: '${{ steps.token.outputs.token }}'
           PUBREL: '${{ steps.latest.outputs.pubrel }}'
           PUB: '${{ steps.latest.outputs.pub }}'
           SLACK_TOKEN: '${{ secrets.SUSTENAUT_SLACK_BOT_TOKEN }}'

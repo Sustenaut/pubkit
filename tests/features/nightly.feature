@@ -132,6 +132,12 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And its script updates an open pull request before opening one
     And its script re-tests the pins alone when CI fails
 
+  Scenario: The nightly pushes as its GitHub App, one repository at a time
+    When I parse the workflow "nightly.yml"
+    Then each repository's token comes from the Sustenaut nightly app, for that repository alone
+    And the token may write only contents, pull requests and workflows, and read actions
+    And without the app it falls back to PUBKIT_BUMP_TOKEN with a warning
+
   Scenario: pubkit new writes a package that conforms but for its release key
     When I start the package "pubfoo" without a key
     Then the repository has "Cargo.toml", "src/lib.rs", "release.json", "SECURITY.md", "TESTING.md", "SUPPLY-CHAIN.md", "fuzz/fuzz_targets/greet.rs", ".gitignore"
