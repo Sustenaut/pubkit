@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.15.1 is released as v0.15.1 from commit e2db28b6381e9d7bede886c8a24a1402d4bd39ed.",
+      "content": "pubkit 0.15.2 is released as v0.15.2 from commit d2f0ebfb70552d5c584e7747bf1ce9a930e3ae8c.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.15.1",
+            "0.15.2",
             "pubkit --version",
-            "pubkit 0.15.1",
-            "v0.15.1",
-            "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
+            "pubkit 0.15.2",
+            "v0.15.2",
+            "d2f0ebfb70552d5c584e7747bf1ce9a930e3ae8c"
           ]
         ]
       },
-      "scope": "the published release v0.15.1 of pubkit",
+      "scope": "the published release v0.15.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
+          "revision": "d2f0ebfb70552d5c584e7747bf1ce9a930e3ae8c"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.15.1 was released on 2026-10-28 from commit e2db28b6381e9d7bede886c8a24a1402d4bd39ed with these changes.",
+      "content": "pubkit 0.15.2 was released on 2026-10-29 from commit d2f0ebfb70552d5c584e7747bf1ce9a930e3ae8c with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,24 @@
         ],
         "rows": [
           [
-            "added",
-            "Every sonar job sends the code to the SonarQube Cloud organization whose key is the GitHub owner in lower case, as SonarQube Cloud's keys are, or to pubkit.json's new security.sonar.organization; the project key stays OWNER_REPO. A repository owned by an organization with capitals in its name, such as Sustenaut, could not be analysed before"
+            "fixed",
+            "The CI pubkit sync writes passes SONAR_TOKEN to pubkit's sonar and functional jobs by name instead of secrets: inherit, which GitHub drops without a word when the repository and pubkit have different owners, so a repository moved to another organization lost its SonarQube Cloud analysis while CI stayed green. Every sonar job now warns, rather than notes, when no token arrived on a run that is not a pull request from a fork, naming that cause"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.15.1 of pubkit",
+      "scope": "the published release v0.15.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e2db28b6381e9d7bede886c8a24a1402d4bd39ed"
+          "revision": "d2f0ebfb70552d5c584e7747bf1ce9a930e3ae8c"
         }
       ]
     }
   },
-  "created": "2026-10-28T00:00:00Z",
+  "created": "2026-10-29T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
