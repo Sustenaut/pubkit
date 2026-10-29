@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The pull request workflow pubkit sync writes (pr.yml) also runs on merge_group, the merge queue's run of a pull request, so ci / passed and release / release report on the queue's merge and a queued pull request can merge. pubrel's release workflow only reports the check there: it tags from a push to main alone"
+}

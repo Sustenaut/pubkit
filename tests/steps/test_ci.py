@@ -110,6 +110,37 @@ def scheduled(repo, name, cron):
     assert set(on) == {"schedule", "workflow_dispatch"}
 
 
+@then(parsers.parse('"{name}" runs on pull requests and in the merge queue'))
+def queued(repo, name):
+    assert set(triggers(generated(repo, name))) == {"pull_request", "merge_group"}
+
+
+@then(parsers.parse('"{name}" runs on pushes to main alone'))
+def on_main(repo, name):
+    assert triggers(generated(repo, name)) == {"push": {"branches": ["main"]}}
+
+
+@when("I read pubkit's own ci.yml", target_fixture="own")
+def own_ci():
+    return yaml.safe_load((WORKFLOWS / "ci.yml").read_text())
+
+
+@then("it runs on pull requests, in the merge queue and on pushes to main")
+def own_triggers(own):
+    on = triggers(own)
+    assert set(on) == {"pull_request", "merge_group", "push"}
+    assert on["push"] == {"branches": ["main"]}
+
+
+@then("its wheel job runs only on a push to main")
+def own_wheel(own):
+    # The release itself tags from a push to main alone: pubrel's
+    # release.yml runs `pubrel tag` only then. The wheel is pubkit's own.
+    condition = own["jobs"]["wheel"]["if"]
+    assert "github.event_name == 'push'" in condition
+    assert "github.ref == 'refs/heads/main'" in condition
+
+
 @given(parsers.parse('the repository has the directories "{names}"'))
 def directories(repo, names):
     for name in names.split(", "):

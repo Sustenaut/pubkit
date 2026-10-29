@@ -1,7 +1,7 @@
 {
-  "comment": "A made-up list for the board's recorded build.",
+  "comment": "A made-up list for the board's recorded build. Both are a user's repositories, which GitHub gives no merge queue.",
   "repositories": [
-    { "repo": "schryer/pubthing", "checks": ["ci / passed", "release / release"] },
-    { "repo": "schryer/visit-thing", "checks": ["ci / passed"], "tags": false }
+    { "repo": "schryer/pubthing", "checks": ["ci / passed", "release / release"], "queue": false },
+    { "repo": "schryer/visit-thing", "checks": ["ci / passed"], "tags": false, "queue": false }
   ]
 }

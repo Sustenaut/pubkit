@@ -82,9 +82,10 @@ def _checks(text):
     return [c.strip() for c in text.split(",")]
 
 
-@when(parsers.parse('I build the ruleset requiring "{checks}"'), target_fixture="built")
-def build(checks):
-    return protect.ruleset(_checks(checks))
+@when(parsers.re(r'I build the ruleset requiring "(?P<checks>[^"]+)"'
+                 r'(?P<queue>, without the merge queue)?$'), target_fixture="built")
+def build(checks, queue):
+    return protect.ruleset(_checks(checks), not queue)
 
 
 def _rule(built, kind):
@@ -122,6 +123,22 @@ def strict(built):
     # same tree, and tagging a release needs no tests of its own.
     params = _rule(built, "required_status_checks")["parameters"]
     assert params["strict_required_status_checks_policy"] is True
+
+
+@then("it merges through the merge queue, by merge commit, without asking the branch to be up to date")
+def queued(built):
+    # The queue tests the pull request merged into main as main will hold
+    # it, which is what an up-to-date branch gave, without updating one.
+    params = _rule(built, "merge_queue")["parameters"]
+    assert params["merge_method"] == "MERGE" and params["grouping_strategy"] == "ALLGREEN"
+    assert params["min_entries_to_merge"] == 1
+    checks = _rule(built, "required_status_checks")["parameters"]
+    assert checks["strict_required_status_checks_policy"] is False
+
+
+@then("it has no merge queue")
+def no_queue(built):
+    assert "merge_queue" not in {r["type"] for r in built["rules"]}
 
 
 @when("I build the tag ruleset", target_fixture="built")
@@ -175,6 +192,12 @@ def lists(repo, github, slug, checks):
 def lists_without_tags(repo, github, slug, checks):
     (repo / "protected.json").write_text(json.dumps(
         {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False}]}))
+
+
+@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", without the merge queue'))
+def lists_without_queue(repo, github, slug, checks):
+    (repo / "protected.json").write_text(json.dumps(
+        {"repositories": [{"repo": slug, "checks": _checks(checks), "queue": False}]}))
 
 
 def _block(checks, tags):
@@ -244,8 +267,8 @@ def has_ruleset(github, name, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs, _tags()]))
 
 
-def _pubkit_ruleset(slug, checks):
-    rs = protect.ruleset(_checks(checks))
+def _pubkit_ruleset(slug, checks, queue=True):
+    rs = protect.ruleset(_checks(checks), queue)
     rs.update(id=7, source=slug, current_user_can_bypass="never")
     # Settings GitHub adds with its own default are no difference.
     _rule(rs, "pull_request")["parameters"]["require_extra_approval_for_unattributed_changes"] = True
@@ -255,6 +278,13 @@ def _pubkit_ruleset(slug, checks):
 @given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}"'))
 def has_pubkit_ruleset(github, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubkit_ruleset(slug, checks), _tags()]))
+
+
+@given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}", '
+                     'without the merge queue'))
+def has_unqueued_ruleset(github, slug, checks):
+    _edit(github, lambda s: s["rulesets"].__setitem__(
+        slug, [_pubkit_ruleset(slug, checks, queue=False), _tags()]))
 
 
 @given(parsers.parse('GitHub has only main\'s ruleset in "{slug}" requiring "{checks}"'))
@@ -282,10 +312,10 @@ def _sent(github):
 
 
 @then(parsers.re(r'GitHub was sent the ruleset for "(?P<slug>[^"]+)" requiring "(?P<checks>[^"]+)"'
-                 r'(?:, replacing "(?P<old>[^"]+)")?$'))
-def sent_ruleset(github, slug, checks, old):
+                 r'(?:, replacing "(?P<old>[^"]+)")?(?P<queue>, without the merge queue)?$'))
+def sent_ruleset(github, slug, checks, old, queue):
     (call,) = [c for c in _sent(github) if c["body"]["target"] == "branch"]
-    assert call["body"] == protect.ruleset(_checks(checks))
+    assert call["body"] == protect.ruleset(_checks(checks), not queue)
     if old:
         assert (call["method"], call["url"]) == ("PUT", f"repos/{slug}/rulesets/7")
     else:
