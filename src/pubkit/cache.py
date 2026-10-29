@@ -1,42 +1,51 @@
-"""Keep what a build fetched or made, by rules the repository states.
+"""Keep what a build fetched or made between runs, by rules the repository states.
 
-pubkit.json's `cache` block names two kinds of thing:
+pubkit.json's `cache` block is one map of named entries, each with the
+same keys:
 
     "cache": {
-      "inputs": {
-        "data": {"path": "data", "refresh": "week"}
-      },
-      "outputs": {
-        "packs": {
-          "dir": ".packcache",
-          "unit": ["data/areas/{path}/", "data/boundaries.geojsonl"],
-          "shared": ["mapbuild/*.py", "tool: tippecanoe --version"]
-        }
-      }
+      "data":     {"path": "data", "refresh": "week"},
+      "packs":    {"path": ".packcache", "unit": "data/areas/{unit}/",
+                   "inputs": ["data/boundaries.geojsonl", "mapbuild/*.py"],
+                   "tools": ["tippecanoe --version"]},
+      "overview": {"path": ".packcache/overview",
+                   "inputs": ["data/national/", "data/boundaries.geojsonl", "mapbuild/*.py"],
+                   "tools": ["tippecanoe --version"]}
     }
 
-- An **input** is something slow to fetch and slow to change, such as
-  open data downloaded from an agency. It is kept for a period, `refresh`:
-  `day`, `week` (ISO week), `month`, or `never`; `version` adds a string of
-  the repository's own, such as a pinned release, so changing it fetches
-  anew. A run asked to be fresh restores none.
-- An **output** is something a build makes once per unit, such as one map
-  pack per area. `pubkit cache run NAME --unit KEY=VALUE ... --output FILE
-  ... -- COMMAND` fingerprints the unit by the rules and copies the files
-  from `dir` when a build with the same fingerprint made them; otherwise it
-  runs COMMAND, which must write every `--output`, and keeps them. A
-  fingerprint covers the output's name, the unit's values, and every entry
-  of `unit` (with `{KEY}` filled in from the unit) and `shared`: a file, a
-  directory (all its files), a glob, or `tool: COMMAND`, the output of a
-  command such as a tool's version. A missing path counts as missing, so
-  creating it changes the fingerprint.
+- `path`: the file or directory kept between runs.
+- `refresh`: `run`, `day`, `week` (ISO week), `month` or `never`: how long
+  what is kept stands before it is fetched anew.
+- `version`: a free string; changing it fetches anew.
+- `inputs`: files, directories or globs what is kept depends on.
+- `tools`: commands whose output counts, such as `tippecanoe --version`.
+- `unit`: one pattern with `{unit}`, filled from `pubkit cache run
+  --unit`, so each unit gets a fingerprint of its own.
 
-`pubkit cache prune` removes the outputs no `run` used since the last prune,
-so `dir` holds one build's worth. `pubkit cache plan` gives the
-`actions/cache` keys and paths the `actions/cache` step of pubkit uses.
+An entry needs `refresh` or `inputs` (or both).
 
-Only Python's standard library is used, so the action runs this module from
-its own copy of pubkit without installing anything.
+**Fetched entries** (`refresh` other than `run`, and no `inputs` or
+`unit`) are kept under a key that changes with the period and the version:
+the first run of a period fetches them, and later runs restore them. A
+fresh run restores none.
+
+**Made entries** (with `inputs`, `unit` or `refresh: run`) are restored
+from the latest run and saved under a key of each run. The build makes
+them through
+
+    pubkit cache run NAME [--unit VALUE] --output FILE ... -- COMMAND
+
+which fingerprints them (the entry's name, the unit, the `unit` pattern
+filled in, every `inputs` entry, every `tools` command's output, and the
+version), copies the outputs from `path` when a build with the same
+fingerprint made them, and otherwise runs COMMAND, which must write every
+`--output`, and keeps what it wrote. Saving the cache drops whatever no run
+used since the last save, so `path` holds one build's worth.
+
+`pubkit cache plan` gives the key for each entry, and `actions/cache`
+restores and saves them. Only Python's standard library is used, so the
+action runs this module from its own copy of pubkit without installing
+anything.
 """
 
 from __future__ import annotations
@@ -54,12 +63,45 @@ import tempfile
 from pathlib import Path
 
 CONFIG = "pubkit.json"
-REFRESH = ("day", "week", "month", "never")
-USED = ".used"
+KEYS = ("path", "refresh", "version", "inputs", "tools", "unit")
+REFRESH = ("run", "day", "week", "month", "never")
+USED = ".pubkit-used"
+# actions/cache gives this many slots: the most entries one cache block takes.
+SLOTS = 8
 
 
 class CacheError(Exception):
     """The cache block or a request does not fit the rules."""
+
+
+def check(block: object) -> dict:
+    """The cache block, refused with a message naming what is wrong."""
+    if not isinstance(block, dict):
+        raise CacheError(f"{CONFIG}'s cache is a map of named entries")
+    if len(block) > SLOTS:
+        raise CacheError(f"{CONFIG}'s cache has {len(block)} entries; it takes at most {SLOTS}")
+    for name, entry in block.items():
+        if not isinstance(entry, dict):
+            raise CacheError(f"cache entry {name} is a map of {', '.join(KEYS)}")
+        unknown = sorted(set(entry) - set(KEYS))
+        if unknown:
+            raise CacheError(f"cache entry {name} has no setting {', '.join(unknown)}; "
+                             f"it takes {', '.join(KEYS)}")
+        if not isinstance(entry.get("path"), str) or not entry["path"]:
+            raise CacheError(f"cache entry {name} needs a path: the file or directory kept")
+        if "refresh" not in entry and "inputs" not in entry:
+            raise CacheError(f"cache entry {name} needs refresh or inputs (or both)")
+        if entry.get("refresh", "run") not in REFRESH:
+            raise CacheError(f"cache entry {name}: refresh is one of {', '.join(REFRESH)}")
+        if "version" in entry and not isinstance(entry["version"], str):
+            raise CacheError(f"cache entry {name}: version is a string")
+        for key in ("inputs", "tools"):
+            items = entry.get(key, [])
+            if not isinstance(items, list) or not all(isinstance(e, str) for e in items):
+                raise CacheError(f"cache entry {name}: {key} is a list of strings")
+        if "unit" in entry and (not isinstance(entry["unit"], str) or "{unit}" not in entry["unit"]):
+            raise CacheError(f"cache entry {name}: unit is one pattern with {{unit}} in it")
+    return block
 
 
 def rules(root: Path) -> dict:
@@ -68,30 +110,18 @@ def rules(root: Path) -> dict:
     if not path.is_file():
         raise CacheError(f"no {CONFIG} here")
     block = json.loads(path.read_text(encoding="utf-8")).get("cache")
-    if not isinstance(block, dict):
+    if block is None:
         raise CacheError(f"{CONFIG} has no cache block")
-    unknown = set(block) - {"inputs", "outputs"}
-    if unknown:
-        raise CacheError(f"{CONFIG}'s cache has no setting {', '.join(sorted(unknown))}; "
-                         "it takes inputs and outputs")
-    for name, entry in block.get("inputs", {}).items():
-        extra = set(entry) - {"path", "refresh", "version"}
-        if extra or not isinstance(entry.get("path"), str):
-            raise CacheError(f"cache input {name} takes path, refresh and version, with path a string")
-        if entry.get("refresh", "week") not in REFRESH:
-            raise CacheError(f"cache input {name}: refresh is one of {', '.join(REFRESH)}")
-    for name, entry in block.get("outputs", {}).items():
-        extra = set(entry) - {"dir", "unit", "shared"}
-        if extra or not isinstance(entry.get("dir"), str):
-            raise CacheError(f"cache output {name} takes dir, unit and shared, with dir a string")
-        for key in ("unit", "shared"):
-            if not all(isinstance(e, str) for e in entry.get(key, [])):
-                raise CacheError(f"cache output {name}: {key} is a list of strings")
-    return block
+    return check(block)
+
+
+def fetched(entry: dict) -> bool:
+    """Whether an entry is kept for a period rather than made by the build."""
+    return entry.get("refresh", "run") != "run" and "unit" not in entry and "inputs" not in entry
 
 
 def period(refresh: str, today: dt.date) -> str:
-    """The part of an input's key that changes when it should be fetched anew."""
+    """The part of a fetched entry's key that changes when it should be fetched anew."""
     if refresh == "day":
         return today.isoformat()
     if refresh == "week":
@@ -102,37 +132,29 @@ def period(refresh: str, today: dt.date) -> str:
     return "kept"
 
 
-def _digest(parts: list[str]) -> str:
-    return hashlib.sha256("\0".join(parts).encode()).hexdigest()[:16]
+def _digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
-def plan(root: Path, today: dt.date, run_id: str) -> dict:
-    """The keys and paths for actions/cache: one key for every input, which
-    changes when any input's period or version does, and a fresh key for the
-    outputs each run, restored from the latest by its prefix."""
-    block = rules(root)
-    inputs = block.get("inputs", {})
-    outputs = block.get("outputs", {})
-    parts = [f"{n}:{e['path']}:{period(e.get('refresh', 'week'), today)}:{e.get('version', '')}"
-             for n, e in sorted(inputs.items())]
-    dirs = sorted(n + ":" + e["dir"] for n, e in outputs.items())
-    prefix = f"pubkit-outputs-{_digest(dirs)}-"
-    return {
-        "inputs-paths": "\n".join(e["path"] for _, e in sorted(inputs.items())),
-        "inputs-key": f"pubkit-inputs-{_digest(parts)}" if inputs else "",
-        "outputs-paths": "\n".join(e["dir"] for _, e in sorted(outputs.items())),
-        "outputs-prefix": prefix if outputs else "",
-        "outputs-key": f"{prefix}{run_id}" if outputs else "",
-    }
+def plan(root: Path, today: dt.date, run_id: str) -> list[dict]:
+    """For each entry, in name order: its path and its actions/cache key. A
+    fetched entry's key changes with its period and version and is restored
+    exactly; a made entry's key is new each run and is restored from the
+    latest by its prefix."""
+    out = []
+    for name, entry in sorted(rules(root).items()):
+        prefix = f"pubkit-cache-{name}-{_digest(json.dumps(entry, sort_keys=True))}-"
+        if fetched(entry):
+            key = prefix + period(entry["refresh"], today) + "-" + _digest(entry.get("version", ""))
+            out.append({"name": name, "path": entry["path"], "key": key, "prefix": "", "fetched": True})
+        else:
+            out.append({"name": name, "path": entry["path"], "key": prefix + run_id, "prefix": prefix,
+                        "fetched": False})
+    return out
 
 
 def _entry(root: Path, entry: str, h) -> None:
-    """Feed one rule entry into the fingerprint `h`."""
-    if entry.startswith("tool:"):
-        command = entry[len("tool:"):].strip()
-        out = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)
-        h.update(f"tool {command}\0{out.returncode}\0{out.stdout}\0{out.stderr}\0".encode())
-        return
+    """Feed one file, directory or glob into the fingerprint `h`."""
     # Each file is named relative to its entry, which may lie outside the
     # repository (an absolute path, or a unit value naming one).
     if any(c in entry for c in "*?["):
@@ -156,32 +178,37 @@ def _entry(root: Path, entry: str, h) -> None:
             h.update(name.encode() + b"\0" + f.read_bytes() + b"\0")
 
 
-def fingerprint(root: Path, name: str, output: dict, unit: dict[str, str]) -> str:
-    """What a unit of `output` depends on, as a hex digest."""
-    h = hashlib.sha256(f"output {name}\0".encode())
-    for key, value in sorted(unit.items()):
-        h.update(f"unit {key}={value}\0".encode())
-    for entry in output.get("unit", []):
-        try:
-            filled = entry.format(**unit)
-        except KeyError as e:
-            raise CacheError(f"cache output {name}: {entry} needs --unit {e.args[0]}=...") from None
-        _entry(root, filled, h)
-    for entry in output.get("shared", []):
-        _entry(root, entry, h)
+def fingerprint(root: Path, name: str, entry: dict, unit: str | None) -> str:
+    """What one unit of a made entry depends on, as a hex digest."""
+    h = hashlib.sha256(f"entry {name}\0version {entry.get('version', '')}\0".encode())
+    if "unit" in entry:
+        if unit is None:
+            raise CacheError(f"cache entry {name} is made per unit: give --unit")
+        h.update(f"unit {unit}\0".encode())
+        _entry(root, entry["unit"].replace("{unit}", unit), h)
+    elif unit is not None:
+        raise CacheError(f"cache entry {name} has no unit pattern, so it takes no --unit")
+    for item in entry.get("inputs", []):
+        _entry(root, item, h)
+    for command in entry.get("tools", []):
+        out = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)
+        h.update(f"tool {command}\0{out.returncode}\0{out.stdout}\0{out.stderr}\0".encode())
     return h.hexdigest()[:32]
 
 
-def run(root: Path, name: str, unit: dict[str, str], outputs: list[Path], command: list[str]) -> str:
+def run(root: Path, name: str, unit: str | None, outputs: list[Path], command: list[str]) -> str:
     """Copy `outputs` from the cache when a build with this fingerprint made
     them, else run `command` and keep them. Answers "reused" or "built"."""
-    block = rules(root).get("outputs", {})
+    block = rules(root)
     if name not in block:
-        raise CacheError(f"{CONFIG}'s cache has no output {name}")
+        raise CacheError(f"{CONFIG}'s cache has no entry {name}")
+    entry = block[name]
+    if fetched(entry):
+        raise CacheError(f"cache entry {name} is fetched for a period, not made: it has no inputs or unit")
     if not outputs:
         raise CacheError("give each file the command writes as --output")
-    store = root / block[name]["dir"]
-    key = fingerprint(root, name, block[name], unit)
+    store = root / entry["path"]
+    key = fingerprint(root, name, entry, unit)
     kept = store / key
     files = [kept / f"{i}-{o.name}" for i, o in enumerate(outputs)]
     store.mkdir(parents=True, exist_ok=True)
@@ -211,20 +238,23 @@ def run(root: Path, name: str, unit: dict[str, str], outputs: list[Path], comman
 
 
 def prune(root: Path) -> list[str]:
-    """Remove each output's entries no run used since the last prune."""
+    """Drop what no run used since the last prune, in each made entry a run
+    used. An entry no run used this time is left as it is."""
     report = []
-    for name, entry in sorted(rules(root).get("outputs", {}).items()):
-        store = root / entry["dir"]
-        if not store.is_dir():
-            continue
+    for name, entry in sorted(rules(root).items()):
+        store = root / entry["path"]
         used_file = store / USED
-        used = set(used_file.read_text(encoding="utf-8").split()) if used_file.exists() else set()
+        if fetched(entry) or not used_file.is_file():
+            continue
+        used = set(used_file.read_text(encoding="utf-8").split())
         removed = 0
         for child in store.iterdir():
-            if child.is_dir() and child.name not in used:
+            # A made entry's path may hold another's (.packcache holds
+            # .packcache/overview): only fingerprints are this entry's.
+            if child.is_dir() and len(child.name) == 32 and child.name not in used:
                 shutil.rmtree(child)
                 removed += 1
-        used_file.unlink(missing_ok=True)
+        used_file.unlink()
         report.append(f"{name}: kept {len(used)}, removed {removed}")
     return report
 
@@ -232,14 +262,16 @@ def prune(root: Path) -> list[str]:
 def main(argv: list[str] | None = None, root: Path | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pubkit cache", description=__doc__.split("\n")[0])
     commands = parser.add_subparsers(dest="step", required=True)
-    p = commands.add_parser("plan", help="the actions/cache keys and paths for this repository")
+    p = commands.add_parser("plan", help="each entry's path and actions/cache key")
     p.add_argument("--github-output", action="store_true", help="also append them to $GITHUB_OUTPUT")
+    p.add_argument("--fresh", action="store_true", help="restore no fetched entry")
     p = commands.add_parser("run", help="reuse a unit's outputs, or make and keep them: "
-                                        "run NAME [--unit KEY=VALUE]... --output FILE... -- COMMAND")
+                                        "run NAME [--unit VALUE] --output FILE... -- COMMAND")
     p.add_argument("name")
-    p.add_argument("--unit", action="append", default=[], metavar="KEY=VALUE")
+    p.add_argument("--unit")
     p.add_argument("--output", action="append", default=[], type=Path, metavar="FILE")
-    commands.add_parser("prune", help="remove outputs no run used since the last prune")
+    commands.add_parser("prune", help="drop what no run used since the last prune "
+                                      "(actions/cache's save step does this)")
     argv = sys.argv[1:] if argv is None else list(argv)
     # Everything after -- is the command, given to it as it is.
     command = argv[argv.index("--") + 1:] if "--" in argv else []
@@ -251,23 +283,25 @@ def main(argv: list[str] | None = None, root: Path | None = None) -> int:
                 else dt.datetime.now(dt.UTC).date()
             run_id = (f"{os.environ['GITHUB_RUN_ID']}-{os.environ.get('GITHUB_RUN_ATTEMPT', '1')}"
                       if os.environ.get("GITHUB_RUN_ID") else dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S"))
-            out = plan(root, today, run_id)
-            for key, value in out.items():
-                print(f"{key}={value}" if "\n" not in value else f"{key}=" + value.replace("\n", " "))
+            slots = plan(root, today, run_id)
+            for s in slots:
+                print(f"{s['name']}: path={s['path']} key={s['key']}"
+                      + (f" restore-prefix={s['prefix']}" if s["prefix"] else "")
+                      + (" (fresh: not restored)" if args.fresh and s["fetched"] else ""))
             if args.github_output:
                 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as gh:
-                    for key, value in out.items():
-                        gh.write(f"{key}<<PUBKIT_CACHE\n{value}\nPUBKIT_CACHE\n")
+                    for i in range(1, SLOTS + 1):
+                        s = slots[i - 1] if i <= len(slots) else None
+                        restore = bool(s) and not (args.fresh and s["fetched"])
+                        gh.write(f"path-{i}={s['path'] if s else ''}\n")
+                        gh.write(f"key-{i}={s['key'] if s else ''}\n")
+                        gh.write(f"prefix-{i}={s['prefix'] if s else ''}\n")
+                        gh.write(f"restore-{i}={'true' if restore else 'false'}\n")
             return 0
         if args.step == "run":
-            unit = {}
-            for pair in args.unit:
-                key, sep, value = pair.partition("=")
-                if not sep or not key:
-                    raise CacheError(f"--unit takes KEY=VALUE, not {pair!r}")
-                unit[key] = value
-            verdict = run(root, args.name, unit, [root / o if not o.is_absolute() else o for o in args.output], command)
-            print(f"{verdict} {args.name}" + "".join(f" {k}={v}" for k, v in sorted(unit.items())))
+            verdict = run(root, args.name, args.unit,
+                          [o if o.is_absolute() else root / o for o in args.output], command)
+            print(f"{verdict} {args.name}" + (f" {args.unit}" if args.unit is not None else ""))
             return 0
         for line in prune(root):
             print(line)

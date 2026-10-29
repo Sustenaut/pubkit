@@ -1,27 +1,27 @@
-# Keeps what a build fetched or made between runs, by the rules in the
-# repository's pubkit.json `cache` block (README, "Caching a build"):
-# inputs, such as downloaded open data, for a period; outputs, such as one
-# map pack per area, under a fingerprint of what made them. Call it twice:
+# Keeps what a build fetched or made between runs, by the entries of the
+# repository's pubkit.json `cache` block (README, "Caching a build"). Each
+# entry gets a key of its own: a fetched entry (refresh: day, week, month
+# or never) is kept for its period; a made entry (inputs or unit) is
+# restored from the latest run, and the build makes it through
+# `pubkit cache run`. Call it twice:
 #
 #   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
 #     with: { step: restore, fresh: "${{ inputs.fresh || false }}" }
-#   - run: bin/build            # uses `pubkit cache run` for each unit
-#   - run: .venv/bin/pubkit cache prune
+#   - run: bin/build              # uses `pubkit cache run` for what it makes
 #   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
 #     with: { step: save }
 #
-# restore restores this period's inputs (none when fresh) and the latest
-# outputs; save keeps the inputs under this period's key, unless a run
-# already did, and the outputs under this run's key.
+# save first drops what no run used (pubkit cache prune), then keeps each
+# entry under its key. A cache block holds at most eight entries.
 name: cache
-description: Restore or save a build's inputs and outputs by the cache rules in pubkit.json.
+description: Restore or save a build's cache entries by the cache block in pubkit.json.
 
 inputs:
   step:
     description: "'restore' before the build, 'save' after it."
     required: true
   fresh:
-    description: "With step restore: 'true' restores no inputs, so they are fetched anew."
+    description: "With step restore: 'true' restores no fetched entry, so each is fetched anew."
     default: 'false'
 
 runs:
@@ -32,36 +32,154 @@ runs:
       shell: bash
       env:
         STEP: ${{ inputs.step }}
+        FRESH: ${{ inputs.fresh }}
       run: '"$GITHUB_ACTION_PATH/plan.sh"'
 
-    - name: Restore the inputs
-      if: inputs.step == 'restore' && inputs.fresh != 'true' && steps.plan.outputs.inputs-key != ''
+    - name: Restore cache entry 1
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-1 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: ${{ steps.plan.outputs.inputs-paths }}
-        key: ${{ steps.plan.outputs.inputs-key }}
+        path: ${{ steps.plan.outputs.path-1 }}
+        key: ${{ steps.plan.outputs.key-1 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-1 }}
 
-    - name: Restore the outputs
-      if: inputs.step == 'restore' && steps.plan.outputs.outputs-prefix != ''
+    - name: Restore cache entry 2
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-2 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: ${{ steps.plan.outputs.outputs-paths }}
-        key: ${{ steps.plan.outputs.outputs-key }}
-        restore-keys: ${{ steps.plan.outputs.outputs-prefix }}
+        path: ${{ steps.plan.outputs.path-2 }}
+        key: ${{ steps.plan.outputs.key-2 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-2 }}
 
-    # A key that exists is kept as it is: this period's inputs are saved
-    # once, by the first run that fetched them.
-    - name: Save the inputs
-      if: inputs.step == 'save' && steps.plan.outputs.inputs-key != ''
+    - name: Restore cache entry 3
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-3 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-3 }}
+        key: ${{ steps.plan.outputs.key-3 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-3 }}
+
+    - name: Restore cache entry 4
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-4 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-4 }}
+        key: ${{ steps.plan.outputs.key-4 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-4 }}
+
+    - name: Restore cache entry 5
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-5 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-5 }}
+        key: ${{ steps.plan.outputs.key-5 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-5 }}
+
+    - name: Restore cache entry 6
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-6 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-6 }}
+        key: ${{ steps.plan.outputs.key-6 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-6 }}
+
+    - name: Restore cache entry 7
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-7 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-7 }}
+        key: ${{ steps.plan.outputs.key-7 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-7 }}
+
+    - name: Restore cache entry 8
+      if: inputs.step == 'restore' && steps.plan.outputs.restore-8 == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-8 }}
+        key: ${{ steps.plan.outputs.key-8 }}
+        restore-keys: ${{ steps.plan.outputs.prefix-8 }}
+
+    - name: Drop what no run used
+      if: inputs.step == 'save'
+      shell: bash
+      run: '"$GITHUB_ACTION_PATH/prune.sh"'
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 1
+      if: inputs.step == 'save' && steps.plan.outputs.key-1 != ''
       continue-on-error: true
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: ${{ steps.plan.outputs.inputs-paths }}
-        key: ${{ steps.plan.outputs.inputs-key }}
+        path: ${{ steps.plan.outputs.path-1 }}
+        key: ${{ steps.plan.outputs.key-1 }}
 
-    - name: Save the outputs
-      if: inputs.step == 'save' && steps.plan.outputs.outputs-key != ''
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 2
+      if: inputs.step == 'save' && steps.plan.outputs.key-2 != ''
+      continue-on-error: true
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: ${{ steps.plan.outputs.outputs-paths }}
-        key: ${{ steps.plan.outputs.outputs-key }}
+        path: ${{ steps.plan.outputs.path-2 }}
+        key: ${{ steps.plan.outputs.key-2 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 3
+      if: inputs.step == 'save' && steps.plan.outputs.key-3 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-3 }}
+        key: ${{ steps.plan.outputs.key-3 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 4
+      if: inputs.step == 'save' && steps.plan.outputs.key-4 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-4 }}
+        key: ${{ steps.plan.outputs.key-4 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 5
+      if: inputs.step == 'save' && steps.plan.outputs.key-5 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-5 }}
+        key: ${{ steps.plan.outputs.key-5 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 6
+      if: inputs.step == 'save' && steps.plan.outputs.key-6 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-6 }}
+        key: ${{ steps.plan.outputs.key-6 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 7
+      if: inputs.step == 'save' && steps.plan.outputs.key-7 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-7 }}
+        key: ${{ steps.plan.outputs.key-7 }}
+
+    # A fetched entry's key that exists is kept as it is: this period's
+    # copy is saved once, by the first run that fetched it.
+    - name: Save cache entry 8
+      if: inputs.step == 'save' && steps.plan.outputs.key-8 != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.path-8 }}
+        key: ${{ steps.plan.outputs.key-8 }}
