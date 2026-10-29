@@ -3,8 +3,8 @@ default branch, and one on the release tags.
 
 `ruleset.json` is the ruleset every pub* repository's main carries: no
 deletion, no force push, changes only by pull request (no approval needed,
-since one person owns them), only after the required checks pass, and
-nobody may bypass it, and it ships with the wheel. Which repositories carry
+since one person owns them), only after the required checks pass on a
+branch up to date with main, and nobody may bypass it, and it ships with the wheel. Which repositories carry
 it, and the checks each requires (all that differs between them), is local
 configuration: a `protected.json` in the working directory, or one named
 with `--config`, or the repositories and `--require CHECK` on the command
