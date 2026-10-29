@@ -88,6 +88,20 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "rust-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit of pubkit"
 
+  Scenario: A workflow calling pubkit under another owner still conforms
+    Given a Rust crate that meets the standard
+    And the workflow calls "sustenaut"'s rust-ci.yml at "this pubkit"
+    When I run pubkit "conform"
+    Then it succeeds
+
+  Scenario: Without a workflow calling rust-ci.yml, conform names workflows_owner's
+    Given a Rust crate that meets the standard
+    And pubkit.json names the workflows owner "sustenaut"
+    And the file ".github/workflows/ci.yml" reads "jobs: {}"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "no workflow calls sustenaut/pubkit/.github/workflows/rust-ci.yml"
+
   Scenario: An exception skips its rule, and is listed
     Given a Rust crate that meets the standard
     And the directory "testdata" is removed

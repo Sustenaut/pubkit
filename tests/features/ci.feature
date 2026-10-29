@@ -237,17 +237,54 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And stderr mentions "could not read the commit of v0.5.4"
     And ".github/workflows/pr.yml" contains "release.yml@v0.5.4"
 
-  Scenario Outline: Every reader takes a pin by commit, and the older pin by tag
+  Scenario Outline: Every reader takes a pin by commit, and the older pin by tag, under any owner
     When every pin reader reads "<line>"
-    Then <readers> read version "<version>" and commit "<commit>"
+    Then <readers> read owner "<owner>", version "<version>" and commit "<commit>"
 
     Examples:
-      | line                                                                          | readers                       | version | commit |
-      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.15.1                    | conform, bump, nightly, board | 0.15.1  | none   |
-      | uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
-      | uses: schryer/pubrel/.github/workflows/release.yml@v0.5.4                     | release                       | 0.5.4   | none   |
+      | line                                                                                                        | readers                       | owner     | version | commit                                   |
+      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | schryer   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.15.1                                                  | conform, bump, nightly, board | schryer   | 0.15.1  | none                                     |
+      | uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | schryer   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | schryer   | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
+      | uses: schryer/pubrel/.github/workflows/release.yml@v0.5.4                                                   | release                       | schryer   | 0.5.4   | none                                     |
+      | uses: sustenaut/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.16.0     | conform, bump, nightly, board | sustenaut | 0.16.0  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: Sustenaut/pubkit/.github/workflows/job-rust-test.yml@v0.16.0                                          | conform, board                | Sustenaut | 0.16.0  | none                                     |
+      | uses: sustenaut/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.5      | release                       | sustenaut | 0.5.5   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
+
+  Scenario: workflows_owner moves every pubkit and pubrel workflow to another owner
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    And pubkit.json names the workflows owner "sustenaut"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    When I run pubkit "sync"
+    Then it succeeds
+    And every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "sustenaut"'s
+    And every pubkit and pubrel workflow ".github/workflows/main.yml" calls is "sustenaut"'s
+    And ".github/workflows/pr.yml" contains "sustenaut/pubkit/.github/workflows/job-osv.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v"
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: Without workflows_owner, pubkit and pubrel are pubkit's own owner's
+    Given a Node repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "schryer"'s
+
+  Scenario Outline: A workflows_owner that is not a GitHub owner stops sync
+    Given a Node repository whose ci block is '{}'
+    And pubkit.json names the workflows owner "<owner>"
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "workflows_owner must be a GitHub owner"
+
+    Examples:
+      | owner         |
+      | sustenaut/x   |
+      | -sustenaut    |
+      | ["sustenaut"] |
 
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'

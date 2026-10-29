@@ -776,8 +776,9 @@ def workflows(root: Path) -> list[dict]:
     out = []
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
-        jobs = set(re.findall(r"schryer/pubkit/\.github/workflows/(job-[a-z-]+)\.yml@", text))
-        if re.search(r"schryer/pubkit/\.github/workflows/rust-ci\.yml@", text):
+        # Under any owner: pubkit's, or the one before its transfer.
+        jobs = set(re.findall(r"[\w-]+/pubkit/\.github/workflows/(job-[a-z-]+)\.yml@", text))
+        if re.search(r"[\w-]+/pubkit/\.github/workflows/rust-ci\.yml@", text):
             jobs |= RUST_CI
         on = text.split("\njobs:", 1)[0]
         triggers = {t for t in ("pull_request", "push", "schedule", "workflow_dispatch") if re.search(rf"\b{t}\b", on)}
