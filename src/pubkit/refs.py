@@ -47,6 +47,34 @@ VERSION = r"(?P<version>[0-9][^\s'\"]*)"
 
 RELEASE_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrel/\.github/workflows/release\.yml@)"
                          + AT + VERSION)
+# A step's use of one of pubkit's actions (actions/<name>, such as
+# deploy-static), by commit with the version in a comment, or by tag. It
+# runs that pubkit's code, so it moves with the pubkit the lock pins.
+ACTION_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/actions/[\w.-]+@)" + AT + VERSION)
+# Any use of one of pubkit's actions, versioned or not.
+ACTION_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/actions/[\w.-]+@[^\s'\"]+")
+
+
+def stale_actions(root: Path, version: str, commit: str | None) -> tuple[list[str], list[str]]:
+    """(the uses of pubkit's actions in the repository's workflows that pin
+    another pubkit than `version`, or another commit than `commit`; those
+    that name no version, which nothing here moves)."""
+    stale, unversioned = [], []
+    for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        text, rel = path.read_text(encoding="utf-8"), path.relative_to(root).as_posix()
+        pinned = {m.start() for m in ACTION_PIN.finditer(text)}
+        for m in ACTION_PIN.finditer(text):
+            name = m["path"].removeprefix("pubkit/").removesuffix("@")
+            if m["version"] != version:
+                stale.append(f"{rel}: {name} is at pubkit {m['version']}, not {version}, which "
+                             f"tests/requirements.lock pins; run `pubkit bump`, or pin it "
+                             f"@{ref(version, commit)}")
+            elif commit and m["commit"] and m["commit"] != commit:
+                stale.append(f"{rel}: {name}@{m['commit']} is not the commit of pubkit "
+                             f"{version}'s tag; pin it @{ref(version, commit)}")
+        unversioned += [f"{rel}: {m[0]}" for m in ACTION_USE.finditer(text)
+                        if m.start() not in pinned]
+    return stale, unversioned
 
 
 def owner(config: dict[str, Any] | None) -> str:

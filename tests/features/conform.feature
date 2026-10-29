@@ -102,6 +102,13 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "no workflow calls sustenaut/pubkit/.github/workflows/rust-ci.yml"
 
+  Scenario: A pubkit action pinned to another pubkit fails
+    Given a Rust crate that meets the standard
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "another pubkit"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "deploy-static is at pubkit 0.0.1"
+
   Scenario: An exception skips its rule, and is listed
     Given a Rust crate that meets the standard
     And the directory "testdata" is removed

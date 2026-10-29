@@ -331,6 +331,38 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | -sustenaut    |
       | ["sustenaut"] |
 
+  Scenario Outline: sync --check fails on a pubkit action pinned to another pubkit or commit
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    Then it succeeds
+    Given the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | owner     | pin            | message                                           |
+      | Sustenaut | another pubkit | deploy-static is at pubkit 0.0.1                  |
+      | schryer   | another pubkit | deploy-static is at pubkit 0.0.1                  |
+      | Sustenaut | another commit | deploy-static@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
+
+  Scenario Outline: sync --check takes this pubkit's pin of an action, and reports one with no version
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    Then it succeeds
+    Given the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "<pin>"
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+    And stderr <reports>
+
+    Examples:
+      | pin                  | reports                                                    |
+      | this pubkit's commit | does not mention "deploy-static"                           |
+      | this pubkit's tag    | does not mention "deploy-static"                           |
+      | main                 | mentions "Sustenaut/pubkit/actions/deploy-static@main names no pubkit version" |
+
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'
     When I run pubkit "sync"

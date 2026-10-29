@@ -230,3 +230,8 @@ def token_by_name(repo, names, name):
     found = jobs(repo, name)
     for job in names.split(", "):
         assert found[job]["secrets"] == {"SONAR_TOKEN": "${{ secrets.SONAR_TOKEN }}"}, job
+
+
+@then(parsers.parse('stderr does not mention "{text}"'))
+def stderr_lacks(result, text):
+    assert text not in result.stderr, result.stderr

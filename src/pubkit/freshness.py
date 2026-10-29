@@ -9,7 +9,8 @@ nothing.
 
 `pubkit bump`, run in a repository, moves it to this pubkit: the managed
 files (`pubkit sync`), the lock (`pubkit lock`), and every workflow's pin of
-`rust-ci.yml`, to the commit of this pubkit's tag (refs.py). The nightly
+`rust-ci.yml` and of pubkit's actions (deploy-static), to the commit of
+this pubkit's tag (refs.py). The nightly
 workflow does this, and more, through `pubkit nightly` (nightly.py).
 """
 
@@ -21,7 +22,8 @@ import re
 from pathlib import Path
 
 from . import __version__
-from .refs import ANY_OWNER, AT, VERSION, owner_of, ref, release_commit, repin
+from .refs import (ACTION_PIN, ANY_OWNER, AT, VERSION, owner_of, ref, release_commit, repin,
+                   stale_actions)
 
 PIN = re.compile(r"/download/v([0-9][^/]*)/pubkit-")
 WORKFLOW_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/rust-ci\.yml@)"
@@ -92,9 +94,13 @@ def bump(root: Path) -> int:
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
         new = repin(WORKFLOW_PIN, text, calls, __version__, commit)
+        new = repin(ACTION_PIN, new, calls, __version__, commit)
         if new != text:
             path.write_text(new, encoding="utf-8")
-            print(f"updated  {path.relative_to(root)} (rust-ci.yml@{ref(__version__, commit)})")
+            print(f"updated  {path.relative_to(root)} (pubkit@{ref(__version__, commit)})")
+    for use in stale_actions(root, __version__, commit)[1]:
+        print(f"left     {use}: it names no pubkit version; pin it "
+              f"@{ref(__version__, commit)} for `pubkit bump` to move it")
     print(f"bumped to pubkit {__version__}; run `make check`, record nothing (no code "
           f"changed), and open the pull request")
     return 0
