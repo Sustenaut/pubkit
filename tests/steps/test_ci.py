@@ -117,6 +117,51 @@ def directories(repo, names):
         (repo / name / "README.md").write_text("")
 
 
+@given(parsers.parse('the workflow "{name}" deploys "{folder}" with deploy-static'))
+def deploys(repo, name, folder):
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("on: { push: { branches: [main] } }\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n"
+                    "    steps:\n      - run: make site\n"
+                    "      - uses: Sustenaut/pubkit/actions/deploy-static@v0.17.1\n"
+                    f"        with:\n          dir: {folder}\n          deploy-key: ${{{{ secrets.KEY }}}}\n")
+
+
+@given(parsers.parse("pubkit.json's site block is '{text}'"))
+def site_block(repo, text):
+    config = json.loads((repo / "pubkit.json").read_text())
+    config["site"] = json.loads(text)
+    (repo / "pubkit.json").write_text(json.dumps(config))
+
+
+@then(parsers.parse('"{name}" checks the site in "{folder}" after running "{build}", deploying nothing'))
+def site_checked(repo, name, folder, build):
+    data = generated(repo, name)
+    job = data["jobs"]["site"]
+    assert job["name"] == "ci / site"
+    assert "site" in data["jobs"]["passed"]["needs"]
+    steps = job["steps"]
+    assert steps[0]["uses"].startswith("actions/checkout@")
+    runs = [s["run"] for s in steps if "run" in s]
+    assert runs == ([] if build == "nothing" else [build]), runs
+    action = steps[-1]
+    assert re.fullmatch(rf"{refs.OWNER}/pubkit/actions/deploy-static@(v{re.escape(__version__)}|[0-9a-f]{{40}})",
+                        action["uses"]), action["uses"]
+    assert action["with"]["dir"] == folder
+    assert action["with"]["check-only"] == "true"
+    assert not set(action["with"]) & {"deploy-key", "cloudflare-api-token"}
+
+
+@then(parsers.parse('"{name}" has no site job'))
+def no_site(repo, name):
+    assert "site" not in generated(repo, name)["jobs"]
+
+
+@then(parsers.parse('in "{name}" the site check is given "{key}" "{value}"'))
+def site_given(repo, name, key, value):
+    assert generated(repo, name)["jobs"]["site"]["steps"][-1]["with"][key] == value
+
+
 @then(parsers.parse('in "{name}" the "{job}" job is given no "{key}"'))
 def not_given(repo, name, job, key):
     assert key not in jobs(repo, name)[job].get("with", {})

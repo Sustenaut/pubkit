@@ -56,6 +56,12 @@ check "wrangler deploys to the project's main branch" \
 # The inputs.
 base=(DIR="$work/site" DEPLOY_KEY_SET=false TARGET='' CLOUDFLARE_SET=false ACCOUNT='' PROJECT='')
 refuses "nothing to deploy to" "${base[@]}"
+if (env "${base[@]}" CHECK_ONLY=true "$here/check-inputs.sh") > /dev/null 2>&1; then
+  echo "ok: check-only needs no target"
+else
+  echo "FAIL: check-only needs no target"
+  failures=$((failures + 1))
+fi
 refuses "deploy-key without deploy-target" "${base[@]}" DEPLOY_KEY_SET=true
 refuses "cloudflare-api-token without a project" "${base[@]}" CLOUDFLARE_SET=true ACCOUNT=a
 refuses "a missing dir" "${base[@]}" DIR="$work/none" CLOUDFLARE_SET=true ACCOUNT=a PROJECT=p

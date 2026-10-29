@@ -35,6 +35,16 @@ out, and a service, which deploys, has none. `{"uses": "local"}` calls the
 repository's own .github/workflows/release.yml instead, as pubrel does, so
 a change to its release workflow is tested before it ships.
 
+A repository that deploys a static site with pubkit's deploy-static (a
+workflow of its own uses it, or pubkit.json has a `site` block) gets a
+`site` job in pr.yml: it builds the site (`site.pr_build`, else
+`site.build`, else nothing) and runs deploy-static, at this pubkit, with
+check-only, on `site.check_dir` (else the `dir` its deploy workflow gives
+deploy-static). A site that would fail to deploy fails the pull request.
+
+    "site": {"check_dir": "public", "pr_build": "npm run build:sample",
+             "url": "https://example.eu/"}
+
 Each workflow ends in `passed` (the check a ruleset requires, `ci /
 passed`), which passes only when every job it needs succeeded. Every job
 is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
@@ -43,6 +53,7 @@ is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -161,6 +172,13 @@ UTILITY = ("node", "python")
 # it, since the scan fails on a directory that is not there.
 LAYOUT = {"python": (("src",), ("tests",)),
           "rust": (("src", "crates"), ("tests", "fuzz", "benches"))}
+
+# The checkout the site job runs, pinned as pubkit's own workflows pin it.
+CHECKOUT = "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0"
+SITE = ("check_dir", "pr_build", "build", "url")
+DEPLOY_STATIC = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/actions/deploy-static@")
+# deploy-static's `dir`, in the lines of the step that uses it.
+DEPLOY_DIR = re.compile(r"""^\s*(?:with:\s*\{[^}\n]*?\b)?dir:\s*['"]?([^'"\s,}]+)""", re.M)
 
 # Inputs the release workflow takes besides pubrel-version, by language.
 RELEASE_WITH = {"rust": {"semver-checks-version": "0.51.0"}}
@@ -282,6 +300,7 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
             "with": inputs, "jobs": jobs, "release": release, "layout": layout(language, root),
+            "site": site(config, root),
             "targets": rules["targets"] if rules else {}}
 
 
@@ -299,6 +318,50 @@ def layout(language: str, root: Path) -> str:
     if not code:
         out.append(f"-Dsonar.exclusions={','.join(f'{d}/**' for d in tests)}")
     return " ".join(out)
+
+
+def site(config: dict[str, Any], root: Path) -> dict[str, str] | None:
+    """The site job's settings: pubkit.json's site block, checked, filled
+    in from the workflow that runs deploy-static; None when the repository
+    deploys no static site with it."""
+    given = config.get("site")
+    deploys = [p for p in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+               if not is_generated(text := p.read_text(encoding="utf-8"))
+               and DEPLOY_STATIC.search(text)]
+    if given is None and not deploys:
+        return None
+
+    def refuse(text: str) -> None:
+        sys.exit(f"pubkit: pubkit.json's site {text}")
+
+    given = {} if given is None else given
+    if not isinstance(given, dict):
+        refuse('block must be an object, such as {"check_dir": "public"}')
+    unknown = sorted(set(given) - set(SITE))
+    if unknown:
+        refuse(f"block has no setting {', '.join(unknown)}; it takes {', '.join(SITE)}")
+    for key, value in given.items():
+        if not isinstance(value, str) or not value.strip() or "\n" in value:
+            refuse(f"{key} must be one line of text")
+    if "url" in given and not re.fullmatch(r"https://[^\s/]+/\S*", given["url"]):
+        refuse("url must be the site's https:// address, such as https://example.eu/")
+    out = dict(given)
+    if "check_dir" not in out:
+        found = []
+        for path in deploys:
+            text = path.read_text(encoding="utf-8")
+            for m in DEPLOY_STATIC.finditer(text):
+                if d := DEPLOY_DIR.search("\n".join(text[m.end():].splitlines()[:12])):
+                    found.append(d[1])
+        if len(set(found)) != 1:
+            refuse("block needs check_dir, the directory deploy-static deploys: "
+                   + (f"the workflows give {', '.join(sorted(set(found)))}" if found
+                      else "no workflow's deploy-static step gives one pubkit can read"))
+        out["check_dir"] = found[0]
+    rel = Path(out["check_dir"])
+    if rel.is_absolute() or ".." in rel.parts:
+        refuse("check_dir must be a directory inside the repository")
+    return out
 
 
 def flow(values: dict[str, Any]) -> str:
@@ -332,6 +395,9 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         # them without a word for pubkit's, once the two owners differ.
         if job.secrets:
             out.append("    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }\n")
+    if ci["site"] and event == "pr":
+        names = [*names, "site"]
+        out.append(site_job(ci))
     out.append(
         "\n  # The one check a ruleset requires: it passes only when every job\n"
         "  # above succeeded. None of them is ever skipped for not being asked for.\n"
@@ -361,6 +427,21 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with']})}\n"
             "    permissions:\n      contents: write\n")
     return "".join(out)
+
+
+def site_job(ci: dict[str, Any]) -> str:
+    """The pull request's site job: the site built as it is for a deploy,
+    and checked by deploy-static at this pubkit, which deploys nothing."""
+    s = ci["site"]
+    build = s.get("pr_build") or s.get("build")
+    given = {"dir": s["check_dir"], "check-only": "true", **({"site-url": s["url"]} if "url" in s else {})}
+    return ("\n  # The site as deploy-static checks it before a deploy, so a site that\n"
+            "  # would fail to deploy fails the pull request. It deploys nothing.\n"
+            "  site:\n    name: ci / site\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"      - uses: {CHECKOUT}\n"
+            + (f"      - run: {json.dumps(build)}\n" if build else "")
+            + f"      - uses: {ci['owner']}/pubkit/actions/deploy-static@{ref(__version__, ci['commit'])}\n"
+            f"        with: {flow(given)}\n")
 
 
 def path(event: str) -> str:

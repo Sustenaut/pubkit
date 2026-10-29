@@ -60,6 +60,10 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "rust-ci.yml"
     Then the plan job compares a pull request with its base and passes it to pubkit required
 
+  Scenario: deploy-static's check-only mode runs the site check and no deploy step
+    When I read the action "deploy-static"
+    Then its site check runs with check-only, and every deploy step is skipped with it
+
   Scenario: The sonar job's layout comes before sonar-args, so a repository's own properties win
     When I parse the workflow "job-sonar.yml"
     Then the scan's layout comes before sonar-args and pubkit.json's sonar args
