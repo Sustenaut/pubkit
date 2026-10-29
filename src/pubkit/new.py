@@ -12,8 +12,10 @@ Run in an empty repository (a README or LICENSE already there is kept). It:
    target and Gherkin scenarios pass every check, `deny.toml`,
    `supply-chain/` with the shared imports, `SECURITY.md`;
 3. sets up the release side: `release.json` with its security checks (the
-   quality audit among them), `corpus/corpus.json` and an empty
-   `unreleased.json`, with `corpus/.publet` gitignored;
+   quality audit among them) and `corpus/corpus.json`, with
+   `corpus/.publet` gitignored. `pubrel add` records each change in a
+   file of its own under `corpus/publets/pkg.<name>/unreleased/`, so
+   nothing is written there yet;
 4. creates the corpus's workspace and its release key, labelled "<name>
    release key", names it in `release.json`, and writes its public object
    to `corpus/objects`, checked against its identifier;
@@ -35,27 +37,21 @@ from pathlib import Path
 
 from . import __version__, cbor
 
-# The releases a new package's pipeline needs on this machine: pubrel 0.5.3
-# gives security checks the release they check (the quality audit reads
-# it), and pub 0.2.1 rotates keys.
-MIN_PUBREL = (0, 5, 3)
+# The releases a new package's pipeline needs on this machine: pubrel 0.6.0
+# records each unreleased change in a file of its own (0.5.3 gave security
+# checks the release they check, which the quality audit reads), and pub
+# 0.2.1 rotates keys.
+MIN_PUBREL = (0, 6, 0)
 MIN_PUB = (0, 2, 1)
 # The pubrel release workflow a new package's CI calls, and the commit its
 # tag names, which the workflow pins (refs.py).
-PUBREL_PIN = "0.5.5"
-PUBREL_COMMIT = "16c6c9731b3f41639d45160e8bb73d59d8562e04"
+PUBREL_PIN = "0.6.0"
+PUBREL_COMMIT = "986872816b1bd11e177e3f664318c35d41dd08f2"
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")
 KEPT = {"README.md", "LICENSE"}
 RENAMED = {"gitignore": ".gitignore", "fuzz/gitignore": "fuzz/.gitignore"}
-
-UNRELEASED_COMMENT = (
-    "Changes not yet released. One row per change: category changed or removed "
-    "(a published interface changed: major), added (a feature: minor), or fixed or "
-    "security (patch). `pubrel add` appends one; `pubrel summary` sets the release's "
-    "summary; `pubrel prepare` moves them into the package publet."
-)
 
 # The checks a new package's ruleset requires: its CI and its release job.
 CHECKS = ["ci / passed", "release / release"]
@@ -176,11 +172,6 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
     (root / "fuzz" / "regressions" / "greet" / ".gitkeep").touch()
 
     release = release_json(name, tag)
-    unreleased = root / "corpus" / "publets" / f"pkg.{name}" / "unreleased.json"
-    unreleased.parent.mkdir(parents=True, exist_ok=True)
-    unreleased.write_text(json.dumps({"changes": [], "comment": UNRELEASED_COMMENT},
-                                     indent=2) + "\n")
-
     corpus = root / "corpus"
     if key:
         run_in(corpus, "pub", "init")

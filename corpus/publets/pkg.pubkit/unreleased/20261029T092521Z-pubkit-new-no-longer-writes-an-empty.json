@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "`pubkit new` no longer writes an empty corpus/publets/pkg.<name>/unreleased.json: pubrel 0.6 records each unreleased change in a file of its own under unreleased/, and a new package needs pubrel 0.6.0 on this machine; new packages' CI calls pubrel 0.6.0's release workflow"
+}
