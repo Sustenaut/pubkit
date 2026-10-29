@@ -166,6 +166,47 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it succeeds
     And GitHub was sent the ruleset for "schryer/baz" requiring "ci / passed", without the merge queue
 
+  Scenario: A private repository off Enterprise Cloud gets main's ruleset without the merge queue
+    Given "Sustenaut/storage" is a private repository of an organization on the "team" plan
+    And GitHub has no ruleset in "Sustenaut/storage"
+    When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/storage"
+    Then it succeeds
+    And it prints "Sustenaut/storage: no merge queue: GitHub offers a merge queue to a private repository only on Enterprise Cloud, and Sustenaut is on team"
+    And it prints "main merges only after its required checks pass on a branch up to date with main"
+    And GitHub was sent the ruleset for "Sustenaut/storage" requiring "ci / passed", without the merge queue
+
+  Scenario: A private repository on Enterprise Cloud keeps the merge queue
+    Given "Sustenaut/storage" is a private repository of an organization on the "enterprise" plan
+    And GitHub has no ruleset in "Sustenaut/storage"
+    When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/storage"
+    Then it succeeds
+    And it prints nothing about a merge queue
+    And GitHub was sent the ruleset for "Sustenaut/storage" requiring "ci / passed"
+
+  Scenario: A personal account's repository gets main's ruleset without the merge queue
+    Given "schryer/recipes" is a public repository of a personal account
+    And GitHub has no ruleset in "schryer/recipes"
+    When I run pubkit "protect" "--require" "ci / passed" "schryer/recipes"
+    Then it succeeds
+    And it prints "schryer/recipes: no merge queue: GitHub offers a merge queue only to an organization's repositories"
+    And GitHub was sent the ruleset for "schryer/recipes" requiring "ci / passed", without the merge queue
+
+  Scenario: Where GitHub still refuses the merge queue, protect tries once more without it
+    Given GitHub refuses the merge queue in "Sustenaut/foo"
+    And GitHub has no ruleset in "Sustenaut/foo"
+    When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/foo"
+    Then it succeeds
+    And it prints "Sustenaut/foo: warning: GitHub refused the merge_queue rule, so main goes without the queue"
+    And GitHub was sent the ruleset for "Sustenaut/foo" requiring "ci / passed", without the merge queue
+
+  Scenario: protect --check takes a private repository's ruleset without the merge queue as up to date
+    Given "Sustenaut/storage" is a private repository of an organization on the "team" plan
+    And GitHub has pubkit's ruleset in "Sustenaut/storage" requiring "ci / passed", without the merge queue
+    When I run pubkit "protect" "--require" "ci / passed" "--no-tags" "--check" "Sustenaut/storage"
+    Then it succeeds
+    And it prints "Sustenaut/storage: "main changes by pull request, after CI" up to date"
+    And GitHub was sent nothing
+
   Scenario: protect --check reports a ruleset without the merge queue
     Given protected.json lists "schryer/foo" requiring "ci / passed"
     And GitHub has pubkit's ruleset in "schryer/foo" requiring "ci / passed", without the merge queue

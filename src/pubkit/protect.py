@@ -10,7 +10,11 @@ tree main will hold, so a pull request need not be up to date with main.
 GitHub offers a merge queue only to an organization's public repositories
 (and Enterprise Cloud's private ones), so a repository without one, `"queue":
 false` in its entry or `--no-queue`, goes without the queue and instead
-merges only after the checks pass on a branch up to date with main. Which
+merges only after the checks pass on a branch up to date with main. pubkit
+reads each repository's owner and visibility (and, for a private one, its
+organization's plan) and leaves the queue out by itself where GitHub has
+none, saying so; should GitHub still refuse the merge_queue rule, it tries
+once more without it. Either way, what merges was tested on the latest main. Which
 repositories carry it, and the checks each requires, is local
 configuration: a `protected.json` in the working directory, or one named
 with `--config`, or the repositories and `--require CHECK` on the command
@@ -182,14 +186,58 @@ def differences(want: dict, have: dict) -> list[str]:
     return out
 
 
+NO_QUEUE = ("main merges only after its required checks pass on a branch up to date "
+            "with main")
+
+
+def no_queue(api: Api, repo: str) -> str | None:
+    """Why GitHub offers `repo` no merge queue, or None when it does, or
+    when that cannot be read (GitHub's answer to the ruleset then says)."""
+    try:
+        info = api("GET", f"repos/{repo}", None) or {}
+    except ApiError:
+        return None
+    if info.get("owner", {}).get("type", "Organization") != "Organization":
+        return "GitHub offers a merge queue only to an organization's repositories"
+    visibility = info.get("visibility", "public")
+    if visibility == "public":
+        return None
+    owner = repo.split("/", 1)[0]
+    try:
+        plan = ((api("GET", f"orgs/{owner}", None) or {}).get("plan") or {}).get("name", "")
+    except ApiError:
+        plan = ""
+    if plan == "enterprise":
+        return None
+    return (f"GitHub offers a merge queue to a {visibility} repository only on Enterprise "
+            f"Cloud" + (f", and {owner} is on {plan}" if plan else ""))
+
+
 def protect(api: Api, repo: str, checks: list[str], check: bool,
             tags: bool = True, queue: bool = True) -> tuple[list[str], bool]:
     """Bring one repository to both rulesets (with `tags` false, only its
-    default branch's; with `queue` false, main's without the merge queue);
-    its report lines, and whether it differed (with `check`) or could not
-    be brought in line."""
-    lines, bad = attempt(lambda: bring(api, repo, ruleset(checks, queue), current(api, repo),
-                                       "its default branch", check), repo, check)
+    default branch's; with `queue` false, or where GitHub offers none,
+    main's without the merge queue); its report lines, and whether it
+    differed (with `check`) or could not be brought in line."""
+    notes = []
+    if queue and (why := no_queue(api, repo)):
+        queue = False
+        notes.append(f"{repo}: no merge queue: {why}; {NO_QUEUE}")
+
+    def branch() -> tuple[list[str], bool]:
+        try:
+            return bring(api, repo, ruleset(checks, queue), current(api, repo),
+                         "its default branch", check)
+        except ApiError as e:
+            if not queue or e.status != 422 or "merge_queue" not in str(e):
+                raise
+        lines, bad = bring(api, repo, ruleset(checks, False), current(api, repo),
+                           "its default branch", check)
+        return [f"{repo}: warning: GitHub refused the merge_queue rule, so main goes without "
+                f"the queue; {NO_QUEUE}", *lines], bad
+
+    lines, bad = attempt(branch, repo, check)
+    lines = notes + lines
     if not tags:
         return lines, bad
     tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo), current(api, repo, "tag"),
