@@ -347,7 +347,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   a site that is not public.
 
   ```yaml
-  - uses: Sustenaut/pubkit/actions/deploy-static@vX.Y.Z
+  - uses: Sustenaut/pubkit/actions/deploy-static@<commit> # vX.Y.Z
     with:
       dir: site
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
@@ -358,6 +358,13 @@ own modules, which only a repository on Google Cloud or deSEC takes.
       known-hosts: example.eu ssh-ed25519 AAAA...
       site-url: https://example.eu/
   ```
+
+  Pin it as above, to the commit of the pubkit release your lock pins, with
+  the version in a comment, so the check it runs is that release's.
+  `pubkit bump` and the nightly move it with the lock, under the old owner
+  (`schryer/`) too, and `pubkit sync --check` (so `ci / passed`) and
+  `pubkit conform` fail while it pins another pubkit or another commit. A
+  pin with no version, such as `@main`, is left as it is and reported.
 
 - **`actions/deploy-ssh`:** deploys what is not a directory of files (a
   service the server rebuilds, a unit of a deploy script) by running one
@@ -373,7 +380,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   The command's exit status is the step's.
 
   ```yaml
-  - uses: Sustenaut/pubkit/actions/deploy-ssh@vX.Y.Z
+  - uses: Sustenaut/pubkit/actions/deploy-ssh@<commit> # vX.Y.Z
     with:
       command: share-edge
       bundle: scripts/photos/share
