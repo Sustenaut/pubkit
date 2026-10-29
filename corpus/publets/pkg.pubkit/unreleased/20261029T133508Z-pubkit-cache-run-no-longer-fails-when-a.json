@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pubkit cache run no longer fails when a rule entry, or a unit value filling one, names files outside the repository: each file is named relative to its entry"
-}
