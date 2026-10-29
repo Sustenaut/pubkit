@@ -169,7 +169,8 @@ def uses_action(repo, name, owner, action, pin):
     path = repo / ".github" / "workflows" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("on: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n"
-                    f"      - uses: {owner}/pubkit/actions/{action}@{ACTION_PINS[pin](__version__)}\n")
+                    f"      - uses: {owner}/pubkit/actions/{action}@{ACTION_PINS[pin](__version__)}\n"
+                    "        with:\n          dir: public\n")
 
 
 @then(parsers.parse('"{path}" uses "{owner}"\'s pubkit action "{action}" at "{pin}"'))

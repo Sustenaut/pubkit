@@ -334,9 +334,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario Outline: sync --check fails on a pubkit action pinned to another pubkit or commit
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
     When I run pubkit "sync"
     Then it succeeds
-    Given the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
     When I run pubkit "sync" "--check"
     Then it fails
     And stderr mentions "<message>"
@@ -350,9 +350,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario: A stale deploy-static pin fails sync --check until it is moved, then passes
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "schryer"'s pubkit action "deploy-static" at "another pubkit"
     When I run pubkit "sync"
     Then it succeeds
-    Given the workflow "deploy.yml" uses "schryer"'s pubkit action "deploy-static" at "another pubkit"
     When I run pubkit "sync" "--check"
     Then it fails
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
@@ -363,9 +363,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario Outline: sync --check takes this pubkit's pin of an action, and reports one with no version
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "<pin>"
     When I run pubkit "sync"
     Then it succeeds
-    Given the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "<pin>"
     When I run pubkit "sync" "--check"
     Then it succeeds
     And stderr <reports>
