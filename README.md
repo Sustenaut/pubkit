@@ -1030,6 +1030,15 @@ The default quality gate asks for 80% coverage on new code, and a scan without a
 
 A test command that writes no report leaves the scan as it was.
 
+In the CI `pubkit sync` writes, the scan also learns which code is tests, so SonarQube Cloud does not warn that files "look like test code" while `sonar.tests` is unset. Sync gives the sonar job a `layout` from the directories the repository has:
+
+| Language | `sonar.sources` | `sonar.tests` |
+|---|---|---|
+| Python | `src` | `tests` |
+| Rust | `src`, `crates` (a workspace) | `tests`, `fuzz`, `benches` |
+
+Each lists only the directories that exist, since the scan fails on one that does not. Without any test directory, and for Node and services, sync gives no layout and SonarQube Cloud keeps its defaults. With tests but no code directory, the code is the whole repository less its tests (`sonar.exclusions`), so no file is read as both. `sonar-args` and `security.sonar.args` come after the layout, and the scanner takes the last value a property is given, so a repository's own `sonar.sources` or `sonar.tests` wins. Set both if you set one, or a file can end up in both.
+
 Every action these workflows use, pubrel's release workflow included, is pinned to a commit, with its version in a comment, and a test fails on one that is not.
 
 ## Developing

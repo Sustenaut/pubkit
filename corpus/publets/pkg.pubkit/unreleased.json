@@ -11,6 +11,10 @@
     {
       "category": "fixed",
       "change": "pubkit.mk rebuilds .venv before any target that runs a tool from it when tests/requirements.lock has changed since make venv last ran, so a moved pin no longer leaves the old pubkit in .venv"
+    },
+    {
+      "category": "changed",
+      "change": "The sonar job in the CI pubkit sync writes tells SonarQube Cloud where the code and its tests are, through job-sonar.yml's new layout input: sonar.sources (src for Python; src or crates for Rust) and sonar.tests (tests for Python; tests, fuzz and benches for Rust), each only where the directory exists, so a Python or Rust repository no longer gets the warning that files look like test code while sonar.tests is unset. A repository's sonar-args come after the layout and win"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

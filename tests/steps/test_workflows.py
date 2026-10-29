@@ -122,6 +122,16 @@ def sonar_project(workflow):
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
 
+@then("the scan's layout comes before sonar-args and pubkit.json's sonar args")
+def layout_first(workflow):
+    steps = workflow["data"]["jobs"]["sonar"]["steps"]
+    args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"].split()
+    # The scanner takes the last value a property is given.
+    assert (args.index("inputs.layout") < args.index("inputs.sonar-args")
+            < args.index("steps.settings.outputs.args")), args
+    assert "layout" in triggers(workflow)["workflow_call"]["inputs"]
+
+
 @then("the scan waits for the quality gate, so a failing gate fails the job")
 def sonar_gate(workflow):
     """Without the wait the scan only uploads, so `ci / passed` stays green

@@ -110,6 +110,18 @@ def scheduled(repo, name, cron):
     assert set(on) == {"schedule", "workflow_dispatch"}
 
 
+@given(parsers.parse('the repository has the directories "{names}"'))
+def directories(repo, names):
+    for name in names.split(", "):
+        (repo / name).mkdir(parents=True, exist_ok=True)
+        (repo / name / "README.md").write_text("")
+
+
+@then(parsers.parse('in "{name}" the "{job}" job is given no "{key}"'))
+def not_given(repo, name, job, key):
+    assert key not in jobs(repo, name)[job].get("with", {})
+
+
 @then(parsers.parse('"{name}" calls pubrel\'s release workflow at "{version}" with "{key}" "{value}"'))
 def release(repo, name, version, key, value):
     job = jobs(repo, name)["release"]

@@ -6,8 +6,10 @@
 # coverage* artifact of the run, each in coverage-download/<artifact>/,
 # gives the coverage SonarQube Cloud's quality gate asks of new code. Each
 # `property=pattern` in reports sends the files whose names match the
-# pattern (find -name) to that property. Properties
-# pubkit.json adds (security.sonar.args) come after sonar-args.
+# pattern (find -name) to that property. layout, where the code and its
+# tests are, which `pubkit sync` works out, comes first: sonar-args, then
+# the properties pubkit.json adds (security.sonar.args), come after it, so
+# a repository's own setting of the same property wins.
 #
 # One job of the CI `pubkit sync` writes from the ci block of pubkit.json
 # (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
@@ -18,6 +20,7 @@ on:
   workflow_call:
     inputs:
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
+      layout: { type: string, default: '', description: "Where the code and its tests are, as SonarQube Cloud properties, such as -Dsonar.sources=src -Dsonar.tests=tests; pubkit sync gives it from the directories the repository has. sonar-args comes after it, so the repository's own wins." }
       reports: { type: string, required: true, description: "Where the coverage reports go: space-separated property=pattern pairs, such as sonar.rust.lcov.reportPaths=lcov.info sonar.python.coverage.reportPaths=*.xml." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
@@ -77,6 +80,7 @@ jobs:
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
+            ${{ inputs.layout }}
             ${{ steps.report.outputs.args }}
             ${{ inputs.sonar-args }}
             ${{ steps.settings.outputs.args }}

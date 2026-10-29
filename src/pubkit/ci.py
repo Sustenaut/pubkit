@@ -91,7 +91,7 @@ NODE_TEST = ("node-version", "python-version", "apt-packages", "setup", "test", 
              "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
 PYTHON_TEST = ("python-version", "apt-packages", "setup", "test", "sync-check",
                "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
-SONAR_INTERNAL = ("reports",)
+SONAR_INTERNAL = ("reports", "layout")
 RUST_REQUIRED = ("required",)
 JOBS: dict[str, dict[str, Job]] = {
     "node": {
@@ -154,6 +154,14 @@ JOBS: dict[str, dict[str, Job]] = {
 }
 # The languages a utility can be; a rust or service repository is its kind.
 UTILITY = ("node", "python")
+# Where SonarQube Cloud finds the code and its tests, by language: the
+# directories that hold code, in the order tried, and those that hold
+# tests. Without them it reads the whole repository as code, and warns that
+# some of it looks like tests. Each is given only when the repository has
+# it, since the scan fails on a directory that is not there.
+LAYOUT = {"python": (("src",), ("tests",)),
+          "rust": (("src", "crates"), ("tests", "fuzz", "benches"))}
+
 # Inputs the release workflow takes besides pubrel-version, by language.
 RELEASE_WITH = {"rust": {"semver-checks-version": "0.51.0"}}
 # The events a language runs on unless the ci block names them: Rust adds
@@ -273,8 +281,24 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
                 stop('release.pubrel must be a version, such as "0.5.4"')
             release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
-            "with": inputs, "jobs": jobs, "release": release,
+            "with": inputs, "jobs": jobs, "release": release, "layout": layout(language, root),
             "targets": rules["targets"] if rules else {}}
+
+
+def layout(language: str, root: Path) -> str:
+    """The sonar job's `layout`: sonar.sources and sonar.tests, from the
+    directories the repository has; empty without tests to name. With no
+    code directory the code is the repository, less its tests, so no file
+    is read as both."""
+    if language not in LAYOUT:
+        return ""
+    code, tests = ([d for d in dirs if (root / d).is_dir()] for dirs in LAYOUT[language])
+    if not tests:
+        return ""
+    out = [f"-Dsonar.sources={','.join(code or ['.'])}", f"-Dsonar.tests={','.join(tests)}"]
+    if not code:
+        out.append(f"-Dsonar.exclusions={','.join(f'{d}/**' for d in tests)}")
+    return " ".join(out)
 
 
 def flow(values: dict[str, Any]) -> str:
@@ -293,6 +317,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         given = {**{i: ci["with"][i] for i in job.inputs if i in ci["with"]}, **job.fixed}
         if "required" in job.internal:
             given["required"] = " ".join(ci["targets"][job.standard])
+        if "layout" in job.internal and ci["layout"]:
+            given["layout"] = ci["layout"]
         needs = [n for n in job.needs if n in names]
         out.append(f"{'' if name == names[0] else chr(10)}  {name}:\n    name: ci\n")
         if needs:
