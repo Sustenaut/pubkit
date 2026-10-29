@@ -13,7 +13,7 @@ authors = [{ name = "David Schryer", email = "schryer@gmail.com" }]
 dependencies = ["pytest>=8", "pytest-bdd>=8"]
 
 [project.urls]
-Repository = "https://github.com/schryer/pubkit"
+Repository = "https://github.com/Sustenaut/pubkit"
 
 [project.entry-points.pytest11]
 pubkit = "pubkit.plugin"

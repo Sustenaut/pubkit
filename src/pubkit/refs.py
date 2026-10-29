@@ -34,8 +34,8 @@ from pathlib import Path
 from typing import Any
 
 # The owner of pubkit's and pubrel's repositories, whose workflows a
-# repository calls. The release after their transfer changes it here.
-OWNER = "schryer"
+# repository calls, since their transfer from schryer.
+OWNER = "Sustenaut"
 OWNER_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
 # Any owner, as readers take it, before `/pubkit/` or `/pubrel/`.
 ANY_OWNER = r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]*)/"

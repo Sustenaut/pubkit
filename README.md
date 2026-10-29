@@ -238,7 +238,7 @@ the one account it deploys to. A repository with Cloud Run sites adds
 
 ```hcl
 module "hosting" {
-  source = "github.com/schryer/pubkit//terraform/hosting?ref=vX.Y.Z"
+  source = "github.com/Sustenaut/pubkit//terraform/hosting?ref=vX.Y.Z"
   config = jsondecode(file("${path.root}/pubkit.json")).hosting
 
   servers = {
@@ -247,7 +247,7 @@ module "hosting" {
 }
 
 module "cloud_run_sites" {
-  source = "github.com/schryer/pubkit//terraform/cloud-run-sites?ref=vX.Y.Z"
+  source = "github.com/Sustenaut/pubkit//terraform/cloud-run-sites?ref=vX.Y.Z"
   config = jsondecode(file("${path.root}/pubkit.json")).hosting
 
   # When the services are created in the same apply.
@@ -272,7 +272,7 @@ provider "desec" {
 }
 
 module "desec_zones" {
-  source           = "github.com/schryer/pubkit//terraform/desec-zones?ref=vX.Y.Z"
+  source           = "github.com/Sustenaut/pubkit//terraform/desec-zones?ref=vX.Y.Z"
   config           = jsondecode(file("${path.root}/pubkit.json")).hosting
   records          = module.hosting.records
   apex_nameservers = module.hosting.apex_nameservers
@@ -338,7 +338,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   a site that is not public.
 
   ```yaml
-  - uses: schryer/pubkit/actions/deploy-static@vX.Y.Z
+  - uses: Sustenaut/pubkit/actions/deploy-static@vX.Y.Z
     with:
       dir: site
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
@@ -650,7 +650,7 @@ plugin marketplace, so the agent installs once for every repository, and
 none of them needs a `.claude/` folder. In Claude Code:
 
 ```
-/plugin marketplace add schryer/pubkit
+/plugin marketplace add Sustenaut/pubkit
 /plugin install rust-crate-quality@pubkit
 ```
 
@@ -937,12 +937,12 @@ sha256: a release carries the wheel as an asset, and `pip install
 ```yaml
 jobs:
   ci:
-    uses: schryer/pubkit/.github/workflows/rust-ci.yml@<commit> # v0.1.0   (or python-ci.yml, node-ci.yml)
+    uses: Sustenaut/pubkit/.github/workflows/rust-ci.yml@<commit> # v0.1.0   (or python-ci.yml, node-ci.yml)
     with: { pub-version: v0.1.1 }
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }          # by name, not inherit
   release:
     needs: ci
-    uses: schryer/pubrel/.github/workflows/release.yml@<commit> # v0.1.0
+    uses: Sustenaut/pubrel/.github/workflows/release.yml@<commit> # v0.1.0
     with: { pub-version: v0.1.1, pubrel-version: v0.1.0 }
     permissions: { contents: write }
 ```
@@ -972,12 +972,12 @@ A shared reusable workflow has to skip the jobs a repository doesn't use, and Gi
 Sync pins each one, and pubrel's release workflow, to the full commit of the release's tag, with the version in a comment, so SonarQube Cloud's S7637 (a reusable workflow pinned to a tag, which can move) needs no exception:
 
 ```yaml
-    uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2
+    uses: Sustenaut/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2
 ```
 
 Usually neither needs the network. pubkit's commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubkit has none, and pins by tag. pubrel's commit is the one pubkit records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
-Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/refs.py` (`schryer` for now), so the release after the repositories' transfer moves every repository to the new owner on its next `pubkit sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubkit pins` (`pubkit bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubkit.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, `freshness`, the nightly, the board and the audit read a pin under any owner, so one still under the old owner keeps working.
+Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/refs.py`: `Sustenaut`, since both moved there from `schryer`. Every repository moves to it on its next `pubkit sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubkit pins` (`pubkit bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubkit.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, `freshness`, the nightly, the board and the audit read a pin under any owner, so one still under the old owner keeps working.
 
 ```json
 "ci": {
@@ -1034,7 +1034,7 @@ The suite drives the plugin through pytest's `pytester`. Each scenario
 builds a throwaway suite, runs it in a subprocess, and judges what pytest
 reports. It drives the command in a scratch repository. pubkit is its own
 first consumer: its CI runs through `python-ci.yml` from this checkout, and
-it is released with [pubrel](https://github.com/schryer/pubrel). Its
+it is released with [pubrel](https://github.com/Sustenaut/pubrel). Its
 package publet, `pkg.pubkit`, lives in `corpus/`.
 
 ## Licence

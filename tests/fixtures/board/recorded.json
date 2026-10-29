@@ -115,7 +115,7 @@
    },
    "status": 404
   },
-  "https://api.github.com/repos/schryer/pubkit/releases?per_page=10": {
+  "https://api.github.com/repos/Sustenaut/pubkit/releases?per_page=10": {
    "json": [
     {
      "draft": false,
@@ -125,7 +125,7 @@
    ],
    "status": 200
   },
-  "https://api.github.com/repos/schryer/pubrel/releases?per_page=10": {
+  "https://api.github.com/repos/Sustenaut/pubrel/releases?per_page=10": {
    "json": [
     {
      "draft": false,
