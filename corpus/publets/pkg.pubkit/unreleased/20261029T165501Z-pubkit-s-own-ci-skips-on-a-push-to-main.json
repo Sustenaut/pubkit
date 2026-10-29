@@ -1,4 +1,0 @@
-{
-  "category": "internal",
-  "change": "pubkit's own CI skips, on a push to main, the jobs the merge queue already passed on the commit (functional, audit, osv, terraform, deploy-static, cache-action), and runs the scan on the queue run's coverage, then the release and the wheel"
-}

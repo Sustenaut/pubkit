@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "The release job pubkit sync writes passes pubrel's release workflow the release app's RELEASE_APP_ID and RELEASE_APP_KEY secrets, by name, when the ci block's pubrel is 0.6.1 or later (the first to take them, and to tag with the app's token), and always to a repository's own release workflow (\"release\": {\"uses\": \"local\"})"
-}

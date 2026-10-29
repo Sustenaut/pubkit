@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "A Sustenaut repository's release-tag ruleset lets through the Sustenaut release GitHub App (app 5529889) instead of GitHub Actions, which GitHub refuses as a bypass actor in an organization's repository (\"Actor GitHub Actions integration must be part of the ruleset source or owner organization\"), so pubkit protect can put the tag ruleset on the organization's repositories again; other owners' keep GitHub Actions. pubkit protect --check and the board compare against the same"
-}

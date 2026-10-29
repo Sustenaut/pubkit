@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.19.0 is released as v0.19.0 from commit a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe.",
+      "content": "pubkit 0.20.0 is released as v0.20.0 from commit 711c44e4e7d63d717af6c4f8f6fd35018a308689.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.19.0",
+            "0.20.0",
             "pubkit --version",
-            "pubkit 0.19.0",
-            "v0.19.0",
-            "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
+            "pubkit 0.20.0",
+            "v0.20.0",
+            "711c44e4e7d63d717af6c4f8f6fd35018a308689"
           ]
         ]
       },
-      "scope": "the published release v0.19.0 of pubkit",
+      "scope": "the published release v0.20.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
+          "revision": "711c44e4e7d63d717af6c4f8f6fd35018a308689"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.19.0 was released on 2026-10-29 from commit a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe with these changes.",
+      "content": "pubkit 0.20.0 was released on 2026-10-29 from commit 711c44e4e7d63d717af6c4f8f6fd35018a308689 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,38 +58,34 @@
         "rows": [
           [
             "changed",
-            "pubkit's main ruleset merges through GitHub's merge queue (merge commits, one group of up to five at a time) instead of requiring a branch to be up to date with main: the queue runs the required checks on the pull request merged into main as main will hold it, so the tree the checks passed is still the tree main holds after the merge and tagging a release needs no tests of its own, and pull requests stacked behind one another merge one at a time without anyone updating a branch. GitHub offers a merge queue only to an organization's public repositories, so a repository without one says \"queue\": false in its protected.json entry or pubkit.json protect block, or `pubkit protect --no-queue`, and keeps requiring an up-to-date branch. `pubkit protect --check` and the board report a repository whose ruleset does not match"
-          ],
-          [
-            "changed",
-            "The pull request workflow pubkit sync writes (pr.yml) also runs on merge_group, the merge queue's run of a pull request, so ci / passed and release / release report on the queue's merge and a queued pull request can merge. pubrel's release workflow only reports the check there: it tags from a push to main alone"
+            "The main.yml pubkit sync writes skips the tests the merge queue already passed: a first job, tested (job-tested.yml), looks for a successful merge_group run of pr.yml on the pushed commit, which merging moves main to. Found, every job that only tests is skipped and sonar reads the queue run's coverage (job-sonar.yml's new coverage-run input), so main runs only the scan and the release; not found, as in a repository without the queue, every job runs as before. passed counts a job skipped for the queue's run, and the release runs whenever passed succeeds"
           ],
           [
             "internal",
-            "pubkit's own CI runs on merge_group too, so its required checks report in the merge queue; the release tags and the wheel is built from a push to main alone, as before"
+            "pubkit's own CI skips, on a push to main, the jobs the merge queue already passed on the commit (functional, audit, osv, terraform, deploy-static, cache-action), and runs the scan on the queue run's coverage, then the release and the wheel"
           ],
           [
             "fixed",
-            "pubkit cache run no longer fails when a rule entry, or a unit value filling one, names files outside the repository: each file is named relative to its entry"
-          ],
-          [
-            "fixed",
-            "pubkit bump, the nightly's pubkit pins, pubkit sync --check and pubkit conform cover every use of pubkit at a release in a repository's workflows, generated or hand-written: its reusable workflows (such as a hand-written ci.yml calling service-ci.yml or rust-ci.yml) as well as its actions. 0.18.0 moved and checked only the actions, so a hand-written service-ci.yml pin stayed at the old pubkit unnoticed"
+            "A Sustenaut repository's release-tag ruleset lets through the Sustenaut release GitHub App (app 5529889) instead of GitHub Actions, which GitHub refuses as a bypass actor in an organization's repository (\"Actor GitHub Actions integration must be part of the ruleset source or owner organization\"), so pubkit protect can put the tag ruleset on the organization's repositories again; other owners' keep GitHub Actions. pubkit protect --check and the board compare against the same"
           ],
           [
             "changed",
-            "The cache block is one map of named entries, each taking path (was dir), refresh (run, day, week, month or never), version, inputs (were unit and shared file entries), tools (were tool: entries) and unit (one pattern with {unit}; pubkit cache run takes --unit VALUE); an entry needs refresh or inputs, an unknown key fails pubkit sync naming it, each entry gets its own cache key, and actions/cache's save prunes, so pubkit cache prune is no longer a workflow step"
+            "The release job pubkit sync writes passes pubrel's release workflow the release app's RELEASE_APP_ID and RELEASE_APP_KEY secrets, by name, when the ci block's pubrel is 0.6.1 or later (the first to take them, and to tag with the app's token), and always to a repository's own release workflow (\"release\": {\"uses\": \"local\"})"
+          ],
+          [
+            "fixed",
+            "pubkit protect no longer fails on a private repository with \"Invalid rule 'merge_queue'\" (HTTP 422): GitHub offers a merge queue only to an organization's public repositories and Enterprise Cloud's private ones, so protect reads each repository's owner and visibility, and a private one's organization plan, and gives main's ruleset without the queue (strict up-to-date checks instead) where there is none, saying so; should GitHub still refuse the merge_queue rule, it warns and tries once more without it"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.19.0 of pubkit",
+      "scope": "the published release v0.20.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
+          "revision": "711c44e4e7d63d717af6c4f8f6fd35018a308689"
         }
       ]
     }
