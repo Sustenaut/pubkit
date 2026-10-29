@@ -252,7 +252,7 @@ class Gatherer:
         targets = [("branch", protect.ruleset(wanted["checks"], wanted.get("queue", True)),
                     "its default branch")]
         if wanted.get("tags", True):
-            targets.append(("tag", protect.tag_ruleset(), "its release tags"))
+            targets.append(("tag", protect.tag_ruleset(repo), "its release tags"))
         for target, want, where in targets:
             test = protect.on_default_branch if target == "branch" else protect.on_release_tags
             have = [r for r in found.value if r.get("target") == target and test(r)]

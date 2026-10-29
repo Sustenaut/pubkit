@@ -25,6 +25,18 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it blocks creating, moving and deleting them
     And only GitHub Actions may bypass it
 
+  Scenario: A Sustenaut repository's release tags let the release app through instead
+    When I build the tag ruleset for "Sustenaut/pubthing"
+    Then it targets the tags "refs/tags/v*"
+    And it blocks creating, moving and deleting them
+    And only the release app may bypass it
+
+  Scenario: protect gives a Sustenaut repository the release app's tag ruleset
+    Given GitHub has no ruleset in "Sustenaut/foo"
+    When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/foo"
+    Then it succeeds
+    And GitHub was sent the tag ruleset for "Sustenaut/foo"
+
   Scenario: protected.json covers every governed repository
     When I read pubkit's protected.json
     Then every repository in it requires at least one check, and is listed once

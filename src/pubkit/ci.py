@@ -31,7 +31,10 @@ a test. Rust's jobs are the ones the Rust crate standard asks for here,
 from the rules and pubkit.json's exceptions, and sync writes each job's
 required make targets into its workflow, so a change to either shows as a
 change there. `release` adds pubrel's release workflow to pr.yml and
-main.yml, at this pubkit's pubrel unless it names one; `false` leaves it
+main.yml, at this pubkit's pubrel unless it names one, passing it the
+release app's RELEASE_APP_ID and RELEASE_APP_KEY from pubrel 0.6.1, the
+first to take them, so `pubrel tag` tags with the app the tag ruleset lets
+through; `false` leaves it
 out, and a service, which deploys, has none. `{"uses": "local"}` calls the
 repository's own .github/workflows/release.yml instead, as pubrel does, so
 a change to its release workflow is tested before it ships.
@@ -190,6 +193,23 @@ SITE = ("check_dir", "pr_build", "build", "url")
 DEPLOY_STATIC = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/actions/deploy-static@")
 # deploy-static's `dir`, in the lines of the step that uses it.
 DEPLOY_DIR = re.compile(r"""^\s*(?:with:\s*\{[^}\n]*?\b)?dir:\s*['"]?([^'"\s,}]+)""", re.M)
+
+# The first pubrel whose release workflow takes the release app's secrets.
+# Passing a secret a reusable workflow does not declare fails the caller.
+RELEASE_APP_FROM = (0, 6, 1)
+RELEASE_SECRETS = ("    secrets: { RELEASE_APP_ID: '${{ secrets.RELEASE_APP_ID }}', "
+                   "RELEASE_APP_KEY: '${{ secrets.RELEASE_APP_KEY }}' }\n")
+
+
+def takes_app(pubrel: str) -> bool:
+    """Whether pubrel `pubrel`'s release workflow takes the app's secrets."""
+    parts = []
+    for part in pubrel.split("-", 1)[0].split(".")[:3]:
+        if not part.isdigit():
+            return False
+        parts.append(int(part))
+    return tuple(parts) >= RELEASE_APP_FROM
+
 
 # Inputs the release workflow takes besides pubrel-version, by language.
 RELEASE_WITH = {"rust": {"semver-checks-version": "0.51.0"}}
@@ -473,6 +493,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "  # anyone else.\n"
             "  release:\n    needs: passed\n" + after + "    uses: ./.github/workflows/release.yml\n"
             + (f"    with: {flow(release['with'])}\n" if release["with"] else "")
+            + RELEASE_SECRETS
             + "    permissions:\n      contents: write\n")
     elif release and event in RELEASE_EVENTS:
         pubrel = release["pubrel"]
@@ -484,7 +505,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             f"    uses: {ci['owner']}/pubrel/.github/workflows/release.yml"
             f"@{ref(pubrel, release['commit'])}\n"
             f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with']})}\n"
-            "    permissions:\n      contents: write\n")
+            + (RELEASE_SECRETS if takes_app(pubrel) else "")
+            + "    permissions:\n      contents: write\n")
     return "".join(out)
 
 

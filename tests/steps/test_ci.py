@@ -72,6 +72,7 @@ def local_release(repo, name):
     assert job["needs"] == "passed"
     assert "with" not in job
     assert job["permissions"] == {"contents": "write"}
+    assert job["secrets"] == APP_SECRETS
 
 
 @then(parsers.parse('"{name}" has no release'))
@@ -288,6 +289,21 @@ def release(repo, name, version, key, value):
     assert job["with"]["pubrel-version"] == f"v{version}"
     assert job["with"][key] == value
     assert job["needs"] == "passed"
+
+
+APP_SECRETS = {"RELEASE_APP_ID": "${{ secrets.RELEASE_APP_ID }}",
+               "RELEASE_APP_KEY": "${{ secrets.RELEASE_APP_KEY }}"}
+
+
+@then(parsers.re(r'in "pr.yml" and "main.yml" the release is (?P<given>given|not given) '
+                 r'the release app\'s secrets$'))
+def app_secrets(repo, given):
+    for name in ("pr.yml", "main.yml"):
+        release = jobs(repo, name)["release"]
+        if given == "given":
+            assert release["secrets"] == APP_SECRETS, (name, release)
+        else:
+            assert "secrets" not in release, (name, release)
 
 
 @then(parsers.parse('"{name}" pins pubrel\'s release workflow to the commit pubkit records'))

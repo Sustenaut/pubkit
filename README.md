@@ -841,9 +841,17 @@ creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
 tags' ruleset, [`src/pubkit/tag-ruleset.json`](src/pubkit/tag-ruleset.json):
 nobody may create, move or delete a `v*` tag, and only GitHub Actions may
-bypass it. So the one way to release is the signed one: `pubrel prepare`
-on your machine, then merging the release pull request, after which CI
-runs `pubrel tag` on main. A tag pushed by hand is refused. A repository
+bypass it. GitHub refuses the GitHub Actions app as a bypass actor in an
+organization's repository, so a Sustenaut repository's tags let through the
+Sustenaut release GitHub App (app 5529889) instead: installed on the organization, with contents
+write only, and its id and private key as the organization secrets
+`RELEASE_APP_ID` and `RELEASE_APP_KEY`, which the CI `pubkit sync` writes
+passes to pubrel's release workflow (pubrel 0.6.1 and later), where `pubrel
+tag` uses the app's token. So the one way to release is the signed one:
+`pubrel prepare` on your machine, then merging the release pull request,
+after which CI runs `pubrel tag` on main. Put the tag ruleset on a
+repository only once its CI passes the two secrets, or `pubrel tag` is
+refused there. A tag pushed by hand is refused. A repository
 that releases no tags, such as a site, goes without the tag ruleset:
 `"tags": false` in its entry, or `--no-tags`. It calls the GitHub API through
 `gh`, signed in as the repositories' owner, since only an admin may change
