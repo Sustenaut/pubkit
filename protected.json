@@ -3,13 +3,13 @@
   "repositories": [
     { "repo": "Sustenaut/pubkit", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
     { "repo": "Sustenaut/pubrel", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/publet", "checks": ["ci / passed", "release / release"] },
-    { "repo": "schryer/pubunit", "checks": ["ci / passed", "release / release"] },
-    { "repo": "schryer/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
+    { "repo": "Sustenaut/publet", "checks": ["ci / passed", "release / release"] },
+    { "repo": "Sustenaut/pubunit", "checks": ["ci / passed", "release / release"] },
+    { "repo": "Sustenaut/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
+    { "repo": "Sustenaut/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
+    { "repo": "Sustenaut/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
     { "repo": "schryer/recipes", "checks": ["ci / passed", "build"], "tags": false },
     { "repo": "schryer/visit-ee", "checks": ["ci / passed"], "tags": false },
-    { "repo": "schryer/maps", "checks": ["ci / passed"], "tags": false }
+    { "repo": "Sustenaut/maps", "checks": ["ci / passed"], "tags": false }
   ]
 }
