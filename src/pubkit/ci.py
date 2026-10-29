@@ -298,8 +298,11 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         out.append(f"    uses: schryer/pubkit/.github/workflows/{job.workflow}@v{__version__}\n")
         if given:
             out.append(f"    with: {flow(given)}\n")
+        # By name, not `secrets: inherit`: GitHub hands inherited secrets
+        # only to a reusable workflow of the caller's own owner, and drops
+        # them without a word for pubkit's, once the two owners differ.
         if job.secrets:
-            out.append("    secrets: inherit\n")
+            out.append("    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }\n")
     out.append(
         "\n  # The one check a ruleset requires: it passes only when every job\n"
         "  # above succeeded. None of them is ever skipped for not being asked for.\n"

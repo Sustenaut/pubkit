@@ -937,7 +937,7 @@ jobs:
   ci:
     uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.1.0      # or python-ci.yml, node-ci.yml
     with: { pub-version: v0.1.1 }
-    secrets: inherit                                                # for SONAR_TOKEN
+    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }          # by name, not inherit
   release:
     needs: ci
     uses: schryer/pubrel/.github/workflows/release.yml@v0.1.0
@@ -990,7 +990,7 @@ The checks keep the names a ruleset requires: each job is named `ci`, so its che
 
 ### SonarQube Cloud
 
-`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret (pass `secrets: inherit`), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubkit's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
 
 1. In SonarQube Cloud, analyse the repository as a new project in the organization whose key is its GitHub owner in lower case (or the one `security.sonar.organization` names), keeping the key `OWNER_REPO`.
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.

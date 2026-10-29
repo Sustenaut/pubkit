@@ -172,3 +172,18 @@ def same_steps(workflow, name, shared):
     theirs = yaml.safe_load((WORKFLOWS / shared).read_text())["jobs"][name]
     assert own["steps"] == theirs["steps"]
     assert own["runs-on"] == theirs["runs-on"]
+
+
+@then(parsers.parse('no written workflow passes "{text}"'))
+def no_inherit(repo, text):
+    written = list((repo / ".github" / "workflows").glob("*.yml"))
+    assert written
+    for path in written:
+        assert text not in path.read_text(), path.name
+
+
+@then(parsers.parse('every job "{names}" in "{name}" passes SONAR_TOKEN by name'))
+def token_by_name(repo, names, name):
+    found = jobs(repo, name)
+    for job in names.split(", "):
+        assert found[job]["secrets"] == {"SONAR_TOKEN": "${{ secrets.SONAR_TOKEN }}"}, job

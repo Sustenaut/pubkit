@@ -43,7 +43,7 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "pubkit.json" contains "ci"
     And ".github/workflows/pr.yml" contains "job-node-test.yml"
-    And ".github/workflows/main.yml" contains "secrets: inherit"
+    And ".github/workflows/main.yml" contains "secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }"
 
   Scenario: init gives a package with a pyproject.toml the Python CI, even beside a package.json
     Given an empty repository
