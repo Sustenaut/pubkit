@@ -116,6 +116,14 @@ def requires(built, a, b):
                       {"context": b, "integration_id": 12526}]
 
 
+@then("it requires a branch to be up to date with main before it merges")
+def strict(built):
+    # So the run on main after a merge repeats the pull request's, on the
+    # same tree, and tagging a release needs no tests of its own.
+    params = _rule(built, "required_status_checks")["parameters"]
+    assert params["strict_required_status_checks_policy"] is True
+
+
 @when("I build the tag ruleset", target_fixture="built")
 def build_tags():
     return protect.tag_ruleset()

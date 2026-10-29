@@ -12,6 +12,7 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it blocks deleting and force-pushing the branch
     And it takes changes only by pull request, with no approval needed
     And it requires "ci / passed" from GitHub Actions and "SonarCloud Code Analysis" from SonarCloud
+    And it requires a branch to be up to date with main before it merges
 
   Scenario: The tag ruleset leaves release tags to CI alone
     When I build the tag ruleset

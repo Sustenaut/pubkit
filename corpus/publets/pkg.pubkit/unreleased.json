@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "changed",
+      "change": "pubkit's main ruleset requires a branch to be up to date with main before it merges (strict_required_status_checks_policy true), so the tree a pull request tested is the tree main holds after the merge, the CI run on main repeats the pull request's, and tagging a release needs no tests of its own; `pubkit protect --check` reports a repository whose ruleset does not"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }

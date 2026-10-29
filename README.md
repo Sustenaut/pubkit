@@ -721,8 +721,11 @@ that protect its main branch and add it to `protected.json` and `governed.json`.
 Every repository's default branch carries the same ruleset,
 [`src/pubkit/ruleset.json`](src/pubkit/ruleset.json), which ships in the
 wheel: it cannot be deleted or force-pushed, it changes only by pull
-request (no approval needed), only after the required checks pass, and
-nobody may bypass it. Which repositories carry it, and the checks each
+request (no approval needed), only after the required checks pass on a
+branch that is up to date with it, and nobody may bypass it. Requiring
+the branch to be up to date means the tree a pull request tested is the
+tree main holds after the merge, so the run on main repeats the pull
+request's and tagging a release needs no tests of its own. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
     pubkit protect [--check] [--no-tags] [--config FILE | --require CHECK...] [REPO...]
