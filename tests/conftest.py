@@ -75,6 +75,11 @@ def has(repo, paths):
         assert (repo / path.strip('"')).is_file(), path
 
 
+@given("PUBKIT_ANY_VERSION is set")
+def any_version(env):
+    env["PUBKIT_ANY_VERSION"] = "1"
+
+
 @given(parsers.parse('pubkit is a release whose tag names "{commit}"'))
 def released(env, commit):
     env["PUBKIT_RELEASE_COMMIT"] = commit

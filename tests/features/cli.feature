@@ -80,9 +80,48 @@ Feature: Keeping a repository's shared files in step
   Scenario: A lock pinning another pubkit fails the check
     Given a repository initialised as "utility"
     And the file "tests/requirements.lock" reads "pubkit @ https://example.org/download/v0.0.0/pubkit-0.0.0-py3-none-any.whl"
+    And PUBKIT_ANY_VERSION is set
     When I run pubkit "sync" "--check"
     Then it fails
     And stderr mentions "does not pin pubkit"
+
+  Scenario: pubkit does not judge a repository that pins another release
+    A stale .venv ran pubkit 0.9.x in repositories pinning 0.14.6, and
+    those runs were taken for the pinned pubkit's.
+    Given a repository initialised as "utility"
+    And the file "tests/requirements.lock" reads "pubkit @ https://example.org/download/v0.0.0/pubkit-0.0.0-py3-none-any.whl"
+    When I run pubkit "sync" "--check"
+    Then the exit code is 2
+    And stderr mentions "this repository pins pubkit 0.0.0, and this is pubkit"
+    And stderr mentions "run `make venv`"
+    And stderr mentions "`pubkit bump` moves the repository to this one"
+    When I run pubkit "audit" "--check"
+    Then the exit code is 2
+    When I run pubkit "freshness" "."
+    Then it succeeds
+
+  Scenario: A moved pin rebuilds .venv before a target runs pubkit from it
+    Given a repository initialised as "rust"
+    And the lock pins this pubkit
+    When I run make "--dry-run" "sync-check"
+    Then it prints "python3 -m venv .venv"
+    And it prints "cp tests/requirements.lock .venv/requirements.lock"
+    And it prints ".venv/bin/pubkit sync --check"
+    Given .venv was built from the current lock
+    When I run make "--dry-run" "sync-check"
+    Then it prints ".venv/bin/pubkit sync --check"
+    And stdout does not mention "python3 -m venv"
+    Given the lock moves to another pubkit
+    When I run make "--dry-run" "sync-check"
+    Then it prints "python3 -m venv .venv"
+
+  Scenario: An older pubkit than the pin is not offered bump
+    Given a repository initialised as "utility"
+    And the file "tests/requirements.lock" reads "pubkit @ https://example.org/download/v999.0.0/pubkit-999.0.0-py3-none-any.whl"
+    When I run pubkit "conform"
+    Then the exit code is 2
+    And stderr mentions "this repository pins pubkit 999.0.0"
+    And stderr does not mention "pubkit bump"
 
   Scenario: sync outside an initialised repository says what to do
     Given an empty repository

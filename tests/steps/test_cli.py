@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import zipfile
 import sys
@@ -101,3 +102,43 @@ def vetted_crate(repo, name, a, b):
     (chain / "config.toml").write_text('[cargo-vet]\nversion = "0.10"\n' + imports)
     (chain / "audits.toml").write_text("[audits]\n")
     (chain / "imports.lock").write_text("")
+
+
+@then(parsers.parse('stderr does not mention "{text}"'))
+def stderr_lacks(result, text):
+    assert text not in result.stderr, result.stderr
+
+
+@when(parsers.re(r'I run make (?P<args>(?:"[^"]*" ?)+)'), target_fixture="result")
+def run_make(repo, run, args):
+    return run("make", *args.strip().strip('"').split('" "'), cwd=repo)
+
+
+@given("the lock pins this pubkit")
+def lock_pins_this(repo):
+    (repo / "tests" / "requirements.lock").write_text(
+        f"pubkit @ https://example.org/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl\n")
+
+
+@given(".venv was built from the current lock")
+def venv_built(repo):
+    # As `make venv` leaves it: a copy of the lock, newer than the lock.
+    lock = repo / "tests" / "requirements.lock"
+    stamp = repo / ".venv" / "requirements.lock"
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(lock, stamp)
+    later = lock.stat().st_mtime + 10
+    os.utime(stamp, (later, later))
+
+
+@given("the lock moves to another pubkit")
+def lock_moves(repo):
+    lock = repo / "tests" / "requirements.lock"
+    lock.write_text("pubkit @ https://example.org/download/v0.0.1/pubkit-0.0.1-py3-none-any.whl\n")
+    later = (repo / ".venv" / "requirements.lock").stat().st_mtime + 10
+    os.utime(lock, (later, later))
+
+
+@then(parsers.parse('stdout does not mention "{text}"'))
+def stdout_lacks(result, text):
+    assert text not in result.stdout, result.stdout

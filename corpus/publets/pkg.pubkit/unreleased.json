@@ -3,6 +3,14 @@
     {
       "category": "changed",
       "change": "pubkit and pubrel moved to the Sustenaut organization, so OWNER in src/pubkit/refs.py is now Sustenaut: pubkit sync, pubkit pins and pubkit bump write Sustenaut/pubkit and Sustenaut/pubrel workflow pins, and pubrel's tags are read from Sustenaut/pubrel. GitHub does not follow a transferred repository's redirect for a reusable workflow, so a pin to schryer/pubrel stopped working with the move; the next sync fixes it. Readers still take a pin under schryer, and pubkit.json's workflows_owner still overrides the owner. The managed files' links and the pubkit wheel URL name Sustenaut/pubkit too"
+    },
+    {
+      "category": "changed",
+      "change": "pubkit refuses to run sync, lock, supply-chain, doc-coverage, required, conform, audit or record in a repository whose tests/requirements.lock pins another pubkit, and says to run make venv, use ./pubkit, or, when it is the newer release, pubkit bump; PUBKIT_ANY_VERSION=1 runs it anyway. A stale .venv had run pubkit 0.9.x in repositories pinning 0.14.6"
+    },
+    {
+      "category": "fixed",
+      "change": "pubkit.mk rebuilds .venv before any target that runs a tool from it when tests/requirements.lock has changed since make venv last ran, so a moved pin no longer leaves the old pubkit in .venv"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

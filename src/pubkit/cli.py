@@ -329,6 +329,37 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     return 0
 
 
+# Commands that judge or write a repository by its pinned standard: run as
+# any other pubkit, they would check it against rules it does not pin, or
+# write files `sync --check` then rejects. Commands that move a repository
+# to this pubkit (bump, pins, nightly), start one (init, new), or act on
+# other repositories run as whichever pubkit is installed.
+PINNED_COMMANDS = {"sync", "lock", "supply-chain", "doc-coverage", "required", "conform", "audit",
+                   "record"}
+
+
+def wrong_pubkit(root: Path, command: str) -> str | None:
+    """Why this pubkit must not run `command` here: the repository's lock pins
+    another release. None when it pins this one or none, or with
+    $PUBKIT_ANY_VERSION set."""
+    if command not in PINNED_COMMANDS or os.environ.get("PUBKIT_ANY_VERSION"):
+        return None
+    from .freshness import pinned
+    pin = pinned(root)
+    if pin is None or pin == __version__:
+        return None
+    move = ("; `pubkit bump` moves the repository to this one"
+            if _release(__version__) > _release(pin) else "")
+    return (f"this repository pins pubkit {pin}, and this is pubkit {__version__}: run "
+            f"`make venv` to install the pinned one, or `./pubkit {command} ...`, which runs it"
+            f"{move} (PUBKIT_ANY_VERSION=1 runs this one anyway)")
+
+
+def _release(version: str) -> tuple[int, ...]:
+    """A release's numbers, for ordering: `0.15.2` is (0, 15, 2)."""
+    return tuple(int(n) for n in version.split("+")[0].split("-")[0].split(".") if n.isdigit())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
@@ -456,6 +487,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="a file listing the paths the pull request changes, one per line")
     args = parser.parse_args(argv)
     root = Path.cwd()
+    if (why := wrong_pubkit(root, args.command)) is not None:
+        print(f"pubkit: {why}", file=sys.stderr)
+        return 2
     if args.command == "init":
         return init(root, args.kind, args.bin, args.project)
     if args.command == "new":

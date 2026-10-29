@@ -56,6 +56,15 @@ Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
 pubkit, and in a Rust repository it runs `pubkit conform` (below).
 
+Run as any release but the one `tests/requirements.lock` pins, pubkit
+refuses the commands that judge or write the repository by its standard
+(`sync`, `lock`, `supply-chain`, `doc-coverage`, `required`, `conform`,
+`audit`, `record`) and says to run `make venv`, use `./pubkit`, or, when
+it is the newer one, `pubkit bump`. `PUBKIT_ANY_VERSION=1` runs it anyway.
+In a Rust repository, each `pubkit.mk` target that runs a tool from `.venv`
+rebuilds `.venv` first when the lock has changed since `make venv` last
+ran, so a moved pin never runs the old pubkit.
+
 **`./pubkit`** runs the pubkit this repository pins, whichever (if any) is
 installed: `./pubkit sync --check`, `./pubkit dns check example.eu`. It
 runs `uvx` on that release's wheel, which uv fetches once and caches, in
