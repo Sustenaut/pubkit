@@ -877,6 +877,15 @@ nothing new. When its CI fails, the pins are tested alone: if they pass,
 the dependency commits are dropped. Nothing merges it: the Sustenaut bot
 sends a Slack DM when it is green or fails.
 
+It pushes and opens the pull requests as the **Sustenaut nightly** GitHub
+App, which is installed on each owner whose repositories `governed.json`
+lists. For each repository it mints a token for that repository alone,
+with contents, pull-requests and workflows write and actions read, which
+expires within the hour (`actions/create-github-app-token`). pubkit's
+repository variable `NIGHTLY_APP_ID` and secret `NIGHTLY_APP_KEY` (the
+app's private key) set it up. Without them it falls back, with a warning,
+to a `PUBKIT_BUMP_TOKEN` secret, and with neither it only reports.
+
 ### Update and security settings
 
 A repository chooses what its nightly does in `pubkit.json`, per language

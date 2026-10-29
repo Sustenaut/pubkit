@@ -3,6 +3,10 @@
     {
       "category": "changed",
       "change": "pubkit's main ruleset requires a branch to be up to date with main before it merges (strict_required_status_checks_policy true), so the tree a pull request tested is the tree main holds after the merge, the CI run on main repeats the pull request's, and tagging a release needs no tests of its own; `pubkit protect --check` reports a repository whose ruleset does not"
+    },
+    {
+      "category": "internal",
+      "change": "The nightly pushes and opens its pull requests as the Sustenaut nightly GitHub App (NIGHTLY_APP_ID, NIGHTLY_APP_KEY): one token per governed repository, for it alone, with contents, pull-requests and workflows write and actions read, from actions/create-github-app-token. A fine-grained token covers one owner only, and the governed repositories moved to the Sustenaut organization. Without the app it falls back to PUBKIT_BUMP_TOKEN with a warning"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
