@@ -4,7 +4,7 @@ Managed by pubkit {version}: `pubkit sync` rewrites this file and `pubkit
 sync --check` fails when it differs, so every pub* repository gives agents
 and people the same rules. Repository-specific guidance lives in the
 README. The standard behind these rules is pubkit's README:
-<https://github.com/schryer/pubkit#readme>.
+<https://github.com/Sustenaut/pubkit#readme>.
 
 ## Pull requests: ready, or draft
 

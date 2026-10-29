@@ -267,11 +267,22 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync" "--check"
     Then it succeeds
 
-  Scenario: Without workflows_owner, pubkit and pubrel are pubkit's own owner's
+  Scenario: Without workflows_owner, pubkit and pubrel are Sustenaut's, where they moved
     Given a Node repository whose ci block is '{}'
     When I run pubkit "sync"
     Then it succeeds
-    And every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "schryer"'s
+    And every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "Sustenaut"'s
+
+  Scenario: sync moves workflows written for the old owner to Sustenaut's
+    Given a Node repository whose ci block is '{}'
+    And pubkit.json names the workflows owner "schryer"
+    When I run pubkit "sync"
+    Then every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "schryer"'s
+    When pubkit.json names the workflows owner "Sustenaut"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    When I run pubkit "sync"
+    Then every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "Sustenaut"'s
 
   Scenario Outline: A workflows_owner that is not a GitHub owner stops sync
     Given a Node repository whose ci block is '{}'

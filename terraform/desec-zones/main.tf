@@ -6,7 +6,7 @@
 # passes it terraform/hosting's records and apex_nameservers:
 #
 #   module "desec_zones" {
-#     source           = "github.com/schryer/pubkit//terraform/desec-zones?ref=vX.Y.Z"
+#     source           = "github.com/Sustenaut/pubkit//terraform/desec-zones?ref=vX.Y.Z"
 #     config           = jsondecode(file("${path.root}/pubkit.json")).hosting
 #     records          = module.hosting.records
 #     apex_nameservers = module.hosting.apex_nameservers

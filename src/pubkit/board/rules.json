@@ -32,5 +32,5 @@
     { "notch": "ci", "applies": "all" }
   ],
   "workflows": { "ci": ["ci.yml", "main.yml"], "nightly": "nightly.yml", "deploy": "deploy.yml" },
-  "repositories": { "pubkit": "schryer/pubkit", "pubrel": "schryer/pubrel" }
+  "repositories": { "pubkit": "Sustenaut/pubkit", "pubrel": "Sustenaut/pubrel" }
 }

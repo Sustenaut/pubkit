@@ -2,7 +2,7 @@
   "comment": "The pub* repositories pubkit governs: the nightly workflow reports each against the latest pubkit, and keeps one pull request in each moving it to the latest pub* releases and audited crate updates. `pubkit new` prints the line that adds a new package here.",
   "repositories": [
     { "repo": "schryer/publet" },
-    { "repo": "schryer/pubrel" },
+    { "repo": "Sustenaut/pubrel" },
     { "repo": "schryer/pubunit" }
   ]
 }

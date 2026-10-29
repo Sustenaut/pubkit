@@ -6,4 +6,4 @@ pytest==9.0.3
 pytest-bdd==8.1.0
 pytest-xdist==3.8.0
 hypothesis==6.170.5
-pubkit @ https://github.com/schryer/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl
+pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl

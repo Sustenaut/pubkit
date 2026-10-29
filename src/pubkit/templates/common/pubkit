@@ -20,4 +20,4 @@ if ! command -v uvx >/dev/null 2>&1; then
 fi
 
 cd "$(dirname "$0")"
-exec uvx --from "https://github.com/schryer/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl" pubkit "$@"
+exec uvx --from "https://github.com/Sustenaut/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl" pubkit "$@"

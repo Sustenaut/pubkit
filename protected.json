@@ -1,8 +1,8 @@
 {
   "comment": "The repositories whose default branch carries pubkit's ruleset (src/pubkit/ruleset.json), each with the checks a pull request must pass before it merges. `pubkit protect` applies it, as the repositories' owner; `pubkit protect --check` reports any that differ. Every check is a GitHub Actions job but SonarCloud Code Analysis, which the SonarCloud app reports: list it only for a repository whose pull requests SonarQube Cloud already analyses, or nothing there can merge.",
   "repositories": [
-    { "repo": "schryer/pubkit", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/pubrel", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
+    { "repo": "Sustenaut/pubkit", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
+    { "repo": "Sustenaut/pubrel", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
     { "repo": "schryer/publet", "checks": ["ci / passed", "release / release"] },
     { "repo": "schryer/pubunit", "checks": ["ci / passed", "release / release"] },
     { "repo": "schryer/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },

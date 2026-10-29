@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "changed",
+      "change": "pubkit and pubrel moved to the Sustenaut organization, so OWNER in src/pubkit/refs.py is now Sustenaut: pubkit sync, pubkit pins and pubkit bump write Sustenaut/pubkit and Sustenaut/pubrel workflow pins, and pubrel's tags are read from Sustenaut/pubrel. GitHub does not follow a transferred repository's redirect for a reusable workflow, so a pin to schryer/pubrel stopped working with the move; the next sync fixes it. Readers still take a pin under schryer, and pubkit.json's workflows_owner still overrides the owner. The managed files' links and the pubkit wheel URL name Sustenaut/pubkit too"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
