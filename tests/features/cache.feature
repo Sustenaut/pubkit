@@ -54,6 +54,15 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's ru
     Then the exit code is 2
     And stderr mentions "did not write"
 
+  Scenario: A unit's files may lie outside the repository
+    Given the cache rules make one pack per area from "{root}/{area}/" instead
+    And the file "elsewhere/north/roads.txt" outside the repository reads "far roads"
+    When I make the pack of "north" from "elsewhere"
+    Then it succeeds
+    And it prints "built packs"
+    When I make the pack of "north" from "elsewhere"
+    Then it prints "reused packs"
+
   Scenario: An entry naming a unit value the run does not give is refused
     When I run pubkit "cache" "run" "packs" "--output" "out/x.pack" "--" "true"
     Then the exit code is 2

@@ -133,13 +133,18 @@ def _entry(root: Path, entry: str, h) -> None:
         out = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)
         h.update(f"tool {command}\0{out.returncode}\0{out.stdout}\0{out.stderr}\0".encode())
         return
+    # Each file is named relative to its entry, which may lie outside the
+    # repository (an absolute path, or a unit value naming one).
     if any(c in entry for c in "*?["):
+        base = root
         files = sorted(Path(p) for p in glob.glob(str(root / entry), recursive=True))
     else:
         path = root / entry
         if path.is_dir():
+            base = path
             files = sorted(p for p in path.rglob("*") if p.is_file())
         elif path.is_file():
+            base = path.parent
             files = [path]
         else:
             h.update(f"missing {entry}\0".encode())
@@ -147,7 +152,8 @@ def _entry(root: Path, entry: str, h) -> None:
     h.update(f"entry {entry}\0".encode())
     for f in files:
         if f.is_file():
-            h.update(f.relative_to(root).as_posix().encode() + b"\0" + f.read_bytes() + b"\0")
+            name = Path(os.path.relpath(f, base)).as_posix()
+            h.update(name.encode() + b"\0" + f.read_bytes() + b"\0")
 
 
 def fingerprint(root: Path, name: str, output: dict, unit: dict[str, str]) -> str:
