@@ -66,6 +66,28 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "rust-ci.yml@v0.0.1 is not pubkit"
 
+  Scenario: A workflow pinning this pubkit's tag's commit conforms
+    Given a Rust crate that meets the standard
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow calls rust-ci.yml at commit "0f3574a72707a46bae149d3ed7a4644b4837795a" of "this pubkit"
+    When I run pubkit "conform"
+    Then it succeeds
+
+  Scenario: A workflow pinning another pubkit's commit fails
+    Given a Rust crate that meets the standard
+    And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "0.0.1"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "rust-ci.yml@v0.0.1 is not pubkit"
+
+  Scenario: A workflow pinning a commit other than this pubkit's tag's fails
+    Given a Rust crate that meets the standard
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "this pubkit"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "rust-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit of pubkit"
+
   Scenario: An exception skips its rule, and is listed
     Given a Rust crate that meets the standard
     And the directory "testdata" is removed

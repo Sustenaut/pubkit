@@ -143,10 +143,7 @@ def pinned(workflow):
         if not match or match.group(1).startswith("./") or line.lstrip().startswith("#"):
             continue
         action, rest = match.groups()
-        if action.startswith("schryer/"):
-            # Our own reusable workflows are pinned by release tag.
-            assert re.search(r"@v\d+\.\d+\.\d+$", action), line
-            continue
+        # pubrel's and pubkit's own reusable workflows too (SonarQube's S7637).
         assert re.search(r"@[0-9a-f]{40}$", action), f"not pinned to a commit: {line.strip()}"
         assert re.match(r"\s+# v\d+\.\d+\.\d+$", rest), f"no version comment: {line.strip()}"
 

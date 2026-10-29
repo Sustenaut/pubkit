@@ -134,6 +134,12 @@ def pinned(repo, version):
     (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(version))
 
 
+@given(parsers.parse('the workflow calls rust-ci.yml at commit "{commit}" of "{version}"'))
+def pinned_by_commit(repo, commit, version):
+    version = __version__ if version == "this pubkit" else version
+    (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(f"{commit} # v{version}"))
+
+
 @given(parsers.parse('an exception for "{rule}" until "{until}" because "{reason}"'))
 def exception(repo, rule, until, reason):
     path = repo / "pubkit.json"

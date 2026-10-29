@@ -1,4 +1,9 @@
 {
-  "changes": [],
+  "changes": [
+    {
+      "category": "changed",
+      "change": "pubkit sync pins the reusable workflows it writes, pubkit's job-*.yml and pubrel's release.yml, to the full commit of the release's tag with the version in a comment (@<commit> # vX.Y.Z) instead of the tag, so SonarQube Cloud's S7637 needs no exception. The release CI writes the tag's commit into the wheel as release-commit, so sync needs no network for pubkit's; pubrel's is recorded, reused from the workflows, or read once with git ls-remote. pubkit bump and the nightly's pubkit pins move the commit with the version. conform, freshness, the nightly and the board read both forms, so workflows pinned by tag still read and check"
+    }
+  ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
