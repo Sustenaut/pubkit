@@ -10,6 +10,8 @@ fail() {
 }
 
 [[ -d "$DIR" ]] || fail "dir: $DIR is not a directory"
+# Checking only deploys nowhere, so it needs no target.
+[[ "${CHECK_ONLY:-false}" = true ]] && exit 0
 if [[ "$DEPLOY_KEY_SET" != true ]] && [[ "$CLOUDFLARE_SET" != true ]]; then
   fail "nothing to deploy to: set deploy-key, cloudflare-api-token or both"
 fi

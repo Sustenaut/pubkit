@@ -122,6 +122,23 @@ def sonar_project(workflow):
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
 
+@when(parsers.parse('I read the action "{name}"'), target_fixture="action")
+def read_action(name):
+    return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())
+
+
+@then("its site check runs with check-only, and every deploy step is skipped with it")
+def check_only(action):
+    assert action["inputs"]["check-only"]["default"] == "false"
+    steps = {s["name"]: s for s in action["runs"]["steps"]}
+    assert "inputs.check-only == 'true'" in steps["Check the site"]["if"]
+    deploys = [s for name, s in steps.items() if name.startswith("Deploy")]
+    assert deploys
+    for step in deploys:
+        assert step["if"].startswith("inputs.check-only != 'true' && "), step["name"]
+    assert steps["Check the inputs"]["env"]["CHECK_ONLY"] == "${{ inputs.check-only }}"
+
+
 @then("the scan's layout comes before sonar-args and pubkit.json's sonar args")
 def layout_first(workflow):
     steps = workflow["data"]["jobs"]["sonar"]["steps"]

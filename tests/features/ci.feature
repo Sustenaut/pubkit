@@ -376,6 +376,58 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | this pubkit's tag    | does not mention "deploy-static"                           |
       | main                 | mentions "Sustenaut/pubkit/actions/deploy-static@main names no pubkit version" |
 
+  Scenario: A repository that deploys with deploy-static has its site checked on pull requests
+    Given a Node repository whose ci block is '{}'
+    And the workflow "deploy.yml" deploys "public" with deploy-static
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" checks the site in "public" after running "nothing", deploying nothing
+    And "main.yml" has no site job
+
+  Scenario Outline: The site block names the pull request's build, the directory and the address
+    Given a Node repository whose ci block is '{}'
+    And the workflow "deploy.yml" deploys "public" with deploy-static
+    And pubkit.json's site block is '<site>'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" checks the site in "<folder>" after running "<build>", deploying nothing
+
+    Examples:
+      | site                                                                   | folder | build       |
+      | {"pr_build": "make sample", "build": "make site", "check_dir": "site"} | site   | make sample |
+      | {"build": "make site"}                                                 | public | make site   |
+      | {"check_dir": "site"}                                                  | site   | nothing     |
+
+  Scenario: A site block alone, without a deploy workflow, has the site checked too
+    Given a Node repository whose ci block is '{}'
+    And pubkit.json's site block is '{"check_dir": "public", "url": "https://example.eu/"}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" checks the site in "public" after running "nothing", deploying nothing
+    And in "pr.yml" the site check is given "site-url" "https://example.eu/"
+
+  Scenario: A repository that deploys no site has no site job
+    Given a Node repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" has no site job
+
+  Scenario Outline: A site setting pubkit cannot use stops sync with a message
+    Given a Node repository whose ci block is '{}'
+    And pubkit.json's site block is '<site>'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | site                                       | message                                         |
+      | {"check_dir": "public", "deploy": "x"}     | site block has no setting deploy                |
+      | {"check_dir": 3}                           | check_dir must be one line of text              |
+      | {"check_dir": "../out"}                    | check_dir must be a directory inside            |
+      | {"check_dir": "public", "url": "http://x"} | url must be the site's https:// address         |
+      | {"pr_build": "make sample"}                | site block needs check_dir                      |
+      | ["public"]                                 | site block must be an object                    |
+
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'
     When I run pubkit "sync"

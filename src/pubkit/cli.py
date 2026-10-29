@@ -162,6 +162,9 @@ def sync(root: Path, check: bool) -> int:
     config = read_config(root)
     from .hosting import settings  # noqa: PLC0415
     settings(config)
+    if "site" in config:
+        from .ci import site  # noqa: PLC0415
+        site(config, root)
     kind = config["kind"]
     every = templates(kind)
     stale = []

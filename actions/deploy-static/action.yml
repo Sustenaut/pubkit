@@ -18,6 +18,11 @@
 # language and an Open Graph card, and robots.txt must let link-preview bots
 # in. A failing check deploys nothing. Set check: false for a site that is
 # not public.
+#
+# check-only: 'true' runs that check and nothing else: no deploy, so no
+# secret or target is needed. The CI `pubkit sync` writes runs it this way
+# on every pull request (ci / site), so a site that would fail to deploy
+# fails the pull request instead.
 name: deploy-static
 description: Deploy a directory of static files to a web server over rsync, to Cloudflare Pages, or to both.
 
@@ -61,6 +66,9 @@ inputs:
   check:
     description: "Run `pubkit site check` on dir first, and deploy nothing if it fails: 'true' or 'false'."
     default: 'true'
+  check-only:
+    description: "'true' runs `pubkit site check` on dir and deploys nothing, so it needs no secret or target; 'false' deploys."
+    default: 'false'
 
 runs:
   using: composite
@@ -77,10 +85,11 @@ runs:
         CLOUDFLARE_SET: ${{ inputs.cloudflare-api-token != '' }}
         ACCOUNT: ${{ inputs.cloudflare-account-id }}
         PROJECT: ${{ inputs.cloudflare-project }}
+        CHECK_ONLY: ${{ inputs.check-only }}
       run: '"$GITHUB_ACTION_PATH/check-inputs.sh"'
 
     - name: Check the site
-      if: inputs.check != 'false'
+      if: inputs.check != 'false' || inputs.check-only == 'true'
       shell: bash
       env:
         DIR: ${{ inputs.dir }}
@@ -88,7 +97,7 @@ runs:
       run: '"$GITHUB_ACTION_PATH/check-site.sh"'
 
     - name: Deploy to the server
-      if: inputs.deploy-key != ''
+      if: inputs.check-only != 'true' && inputs.deploy-key != ''
       shell: bash
       env:
         DIR: ${{ inputs.dir }}
@@ -98,7 +107,7 @@ runs:
       run: '"$GITHUB_ACTION_PATH/deploy-server.sh"'
 
     - name: Deploy to Cloudflare Pages
-      if: inputs.cloudflare-api-token != ''
+      if: inputs.check-only != 'true' && inputs.cloudflare-api-token != ''
       shell: bash
       env:
         DIR: ${{ inputs.dir }}

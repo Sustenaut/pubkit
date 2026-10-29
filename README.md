@@ -1033,6 +1033,19 @@ A Rust repository runs the jobs the Rust crate standard asks for here, worked ou
 
 A service runs `checks` (the sync check and shellcheck), and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`.
 
+A repository that deploys a static site with pubkit's `deploy-static` also gets a `site` job in `pr.yml` (`ci / site`, part of `ci / passed`), so a site that would fail to deploy fails the pull request instead of the deploy after merge. It checks the repository out, builds the site, and runs `deploy-static` at the pubkit the lock pins with `check-only: 'true'`, which runs `pubkit site check` and deploys nothing, so it needs no secret. The job comes when any workflow of the repository's own uses `deploy-static`, or pubkit.json has a `site` block:
+
+```json
+"site": {"check_dir": "public", "pr_build": "npm run build:sample", "build": "npm run build",
+         "url": "https://example.eu/"}
+```
+
+- **`check_dir`:** the directory to check, inside the repository. Without it, the `dir` the deploy workflow gives `deploy-static`.
+- **`pr_build`:** the command that builds the site for the check, such as a build from a small sample of its data where the full build is slow. Without it, `build`; without either, the directory is checked as it is in the repository.
+- **`url`:** the site's https:// address, so the check finds its og:image files.
+
+Each is one line of text, and sync refuses any other key.
+
 The checks keep the names a ruleset requires: each job is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on. Every workflow ends in `ci / passed`, which passes only when every job succeeded. The generated workflows are managed files, so `pubkit sync --check` fails when one is edited, and also while a hand-written `ci.yml` is still beside them. A repository without a ci block keeps its own `ci.yml`, which can still call `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` or `service-ci.yml`.
 
 ### SonarQube Cloud
