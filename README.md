@@ -439,7 +439,12 @@ only, never the network, and `deploy-static` runs it before every deploy.
 | WEB-ROBOTS-01 | robots.txt lets LinkedInBot, facebookexternalhit, Twitterbot and Slackbot read every page and its og:image: they obey it, so a `Disallow: /` meant for search engines hides the card too (keep a preview out of search with `<meta name="robots" content="noindex">` instead) |
 
 Every `*.html` file is a page, except `404.html` and redirects (`<meta
-http-equiv="refresh">`). A rule that a site cannot meet yet takes an
+http-equiv="refresh">`). A page that asks not to be indexed (`<meta
+name="robots" content="noindex">`, in any case and alongside other values
+such as `noindex, nofollow`, or `none`) is taken as not meant for search or
+sharing, such as a service's bare landing page: it still needs its language
+and title (WEB-PAGE-01, and WEB-PAGE-02's title), but not a description, a
+card or an image, and robots.txt may keep the preview bots from it. A rule that a site cannot meet yet takes an
 exception in `pubkit.json`, as the Rust crate standard's do (a rule, a
 reason, an until date); `pubkit conform` reads only its own rules'.
 The rules live in `src/pubkit/site.py` as `RULES`, one function per

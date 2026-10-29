@@ -1,7 +1,7 @@
 Feature: pubkit site check reads a built site as robots and other sites do
   A public site's pages name their language, title and description, and
   carry an Open Graph card whose image is large enough for LinkedIn's large
-  preview. robots.txt lets the link-preview bots in, even where it keeps
+  preview, unless they ask not to be indexed. robots.txt lets the link-preview bots in, even where it keeps
   search engines out. deploy-static runs the check before every deploy.
   Each rule has an ID, and pubkit.json can declare an exception to it.
 
@@ -66,6 +66,37 @@ Feature: pubkit site check reads a built site as robots and other sites do
     When I run pubkit "site" "check" "_site" "--url" "https://example.eu"
     Then it succeeds
     And it prints "1 page(s) meet"
+
+  Scenario Outline: A page that asks not to be indexed needs no description or card
+    Given the page "_site/status/index.html" has a language, a title and robots "<robots>"
+    When I run pubkit "site" "check" "_site" "--url" "https://example.eu"
+    Then it succeeds
+    And it prints "2 page(s) meet"
+
+    Examples:
+      | robots            |
+      | noindex           |
+      | NOINDEX, NOFOLLOW |
+      | nofollow,noindex  |
+      | none              |
+
+  Scenario: A page that asks not to be indexed still names its language and title
+    Given the page "_site/status/index.html" has only a title and robots "noindex"
+    And the site file "_site/robots.txt" holds "User-agent: *\nDisallow: /status/"
+    When I run pubkit "site" "check" "_site" "--url" "https://example.eu"
+    Then it fails
+    And stderr mentions "WEB-PAGE-01 status/index.html: no <html lang>"
+    And stderr does not mention "WEB-PAGE-02 status/index.html"
+    And stderr does not mention "WEB-OG-01 status/index.html"
+    And stderr does not mention "WEB-OG-03 status/index.html"
+    And stderr does not mention "WEB-ROBOTS-01"
+
+  Scenario: nofollow alone still asks for the card
+    Given the page "_site/status/index.html" has a language, a title and robots "nofollow"
+    When I run pubkit "site" "check" "_site" "--url" "https://example.eu"
+    Then it fails
+    And stderr mentions "WEB-PAGE-02 status/index.html: no <meta name="
+    And stderr mentions "WEB-OG-01 status/index.html"
 
   Scenario: A declared exception waives its rule and is listed as open
     Given the page "_site/about/index.html" has only a title
