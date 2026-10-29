@@ -1,0 +1,67 @@
+# Keeps what a build fetched or made between runs, by the rules in the
+# repository's pubkit.json `cache` block (README, "Caching a build"):
+# inputs, such as downloaded open data, for a period; outputs, such as one
+# map pack per area, under a fingerprint of what made them. Call it twice:
+#
+#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#     with: { step: restore, fresh: "${{ inputs.fresh || false }}" }
+#   - run: bin/build            # uses `pubkit cache run` for each unit
+#   - run: .venv/bin/pubkit cache prune
+#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#     with: { step: save }
+#
+# restore restores this period's inputs (none when fresh) and the latest
+# outputs; save keeps the inputs under this period's key, unless a run
+# already did, and the outputs under this run's key.
+name: cache
+description: Restore or save a build's inputs and outputs by the cache rules in pubkit.json.
+
+inputs:
+  step:
+    description: "'restore' before the build, 'save' after it."
+    required: true
+  fresh:
+    description: "With step restore: 'true' restores no inputs, so they are fetched anew."
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Plan the cache keys
+      id: plan
+      shell: bash
+      env:
+        STEP: ${{ inputs.step }}
+      run: '"$GITHUB_ACTION_PATH/plan.sh"'
+
+    - name: Restore the inputs
+      if: inputs.step == 'restore' && inputs.fresh != 'true' && steps.plan.outputs.inputs-key != ''
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.inputs-paths }}
+        key: ${{ steps.plan.outputs.inputs-key }}
+
+    - name: Restore the outputs
+      if: inputs.step == 'restore' && steps.plan.outputs.outputs-prefix != ''
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.outputs-paths }}
+        key: ${{ steps.plan.outputs.outputs-key }}
+        restore-keys: ${{ steps.plan.outputs.outputs-prefix }}
+
+    # A key that exists is kept as it is: this period's inputs are saved
+    # once, by the first run that fetched them.
+    - name: Save the inputs
+      if: inputs.step == 'save' && steps.plan.outputs.inputs-key != ''
+      continue-on-error: true
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.inputs-paths }}
+        key: ${{ steps.plan.outputs.inputs-key }}
+
+    - name: Save the outputs
+      if: inputs.step == 'save' && steps.plan.outputs.outputs-key != ''
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.plan.outputs.outputs-paths }}
+        key: ${{ steps.plan.outputs.outputs-key }}

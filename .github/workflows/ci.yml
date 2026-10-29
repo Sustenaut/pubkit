@@ -99,14 +99,22 @@ jobs:
       - run: shellcheck actions/deploy-static/*.sh
       - run: actions/deploy-static/test.sh
 
+  cache-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: shellcheck actions/cache/*.sh
+      - run: actions/cache/test.sh
+
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a
   # push to main skips the release (and the wheel), so nothing is tagged.
   release:
-    needs: [passed, terraform, deploy-static]
+    needs: [passed, terraform, deploy-static, cache-action]
     if: >-
       !cancelled() && needs.passed.result == 'success'
       && needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
+      && needs.cache-action.result == 'success'
     uses: Sustenaut/pubrel/.github/workflows/release.yml@6f0ba2573107ace5ea4bb92e5bdc1709c9ef9b02 # v0.5.0
     with: { pubrel-version: v0.5.0 }
     permissions:
