@@ -368,7 +368,10 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   `pubkit bump` and the nightly move it with the lock, under the old owner
   (`schryer/`) too, and `pubkit sync --check` (so `ci / passed`) and
   `pubkit conform` fail while it pins another pubkit or another commit. A
-  pin with no version, such as `@main`, is left as it is and reported.
+  pin with no version, such as `@main`, is left as it is and reported. The
+  same holds for every use of pubkit at a release in a repository's
+  workflows, generated or written by hand: its actions, and its reusable
+  workflows such as `service-ci.yml` or `rust-ci.yml`.
 
 - **`actions/deploy-ssh`:** deploys what is not a directory of files (a
   service the server rebuilds, a unit of a deploy script) by running one

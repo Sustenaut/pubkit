@@ -361,9 +361,37 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | owner     | pin            | message                                           |
-      | Sustenaut | another pubkit | deploy-static is at pubkit 0.0.1                  |
-      | schryer   | another pubkit | deploy-static is at pubkit 0.0.1                  |
+      | Sustenaut | another pubkit | deploy-static@v0.0.1 is not pubkit                |
+      | schryer   | another pubkit | deploy-static@v0.0.1 is not pubkit                |
       | Sustenaut | another commit | deploy-static@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
+
+  Scenario Outline: sync --check fails on a hand-written call of a pubkit workflow at another pubkit
+    Given a service repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    Then it succeeds
+    Given the workflow "ci-extra.yml" calls "<owner>"'s pubkit workflow "service-ci.yml" at "<pin>"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | owner     | pin            | message                                                 |
+      | Sustenaut | another pubkit | ci-extra.yml: service-ci.yml@v0.0.1 is not pubkit       |
+      | schryer   | another pubkit | ci-extra.yml: service-ci.yml@v0.0.1 is not pubkit       |
+      | Sustenaut | another commit | service-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
+
+  Scenario: A stale hand-written service-ci.yml pin fails sync --check until it is moved, then passes
+    Given a service repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "ci-extra.yml" calls "Sustenaut"'s pubkit workflow "service-ci.yml" at "another pubkit"
+    When I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+    And ".github/workflows/ci-extra.yml" calls "Sustenaut"'s pubkit workflow "service-ci.yml" at "this pubkit's commit"
 
   Scenario: A stale deploy-static pin fails sync --check until it is moved, then passes
     Given a Node repository whose ci block is '{}'

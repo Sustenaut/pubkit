@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import __version__
 from .paths import confined
-from .refs import (ACTION_PIN, ANY_OWNER, AT, RELEASE_PIN, VERSION, owner_of, pubrel_commit,
+from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit,
                    release_commit, repin)
 
 # The crates the pub* repositories publish, which `pins` moves rather than
@@ -198,8 +198,7 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         if is_generated(text):  # pubkit sync writes these, from pubkit.json
             continue
         new = text
-        for pattern, version, what in ((CI_PIN, __version__, "pubkit workflow"),
-                                       (ACTION_PIN, __version__, "pubkit action"),
+        for pattern, version, what in ((PUBKIT_PIN, __version__, "pubkit"),
                                        (RELEASE_PIN, pubrel, "pubrel release workflow"),
                                        (PUBREL_VERSION, pubrel, "pubrel-version"),
                                        (PUB_VERSION, pub, "pub-version")):
@@ -215,7 +214,7 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
                 moved = repin(pattern, new, calls, version, commit)
             for m in pattern.finditer(new):
                 # "pubkit A -> B" already says that pubkit's own pins moved.
-                if m["version"] != version and pattern not in (CI_PIN, ACTION_PIN):
+                if m["version"] != version and pattern is not PUBKIT_PIN:
                     changes.append(f"{path.name}: {what} {m['version']} -> {version}")
                 elif m["version"] == version and commit and m["commit"] != commit:
                     changes.append(f"{path.name}: {what} {version} pinned to {commit}")

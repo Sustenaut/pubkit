@@ -47,32 +47,37 @@ VERSION = r"(?P<version>[0-9][^\s'\"]*)"
 
 RELEASE_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrel/\.github/workflows/release\.yml@)"
                          + AT + VERSION)
-# A step's use of one of pubkit's actions (actions/<name>, such as
-# deploy-static), by commit with the version in a comment, or by tag. It
-# runs that pubkit's code, so it moves with the pubkit the lock pins.
-ACTION_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/actions/[\w.-]+@)" + AT + VERSION)
-# Any use of one of pubkit's actions, versioned or not.
-ACTION_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/actions/[\w.-]+@[^\s'\"]+")
+# Any use of pubkit at a release: one of its actions (actions/<name>, such
+# as deploy-static) or of its reusable workflows (.github/workflows/<name>,
+# such as service-ci.yml or job-sonar.yml), by commit with the version in a
+# comment, or by tag. It runs that pubkit's code, so it moves with the
+# pubkit the lock pins, written by sync or by hand.
+PUBKIT_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/(?P<name>actions/[\w.-]+|"
+                        r"\.github/workflows/[\w.-]+\.ya?ml)@)" + AT + VERSION)
+# Any use of pubkit's actions or reusable workflows, versioned or not.
+PUBKIT_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/(?:actions/[\w.-]+|"
+                        r"\.github/workflows/[\w.-]+\.ya?ml)@[^\s'\"]+")
 
 
-def stale_actions(root: Path, version: str, commit: str | None) -> tuple[list[str], list[str]]:
-    """(the uses of pubkit's actions in the repository's workflows that pin
-    another pubkit than `version`, or another commit than `commit`; those
-    that name no version, which nothing here moves)."""
+def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str], list[str]]:
+    """(the uses of pubkit's actions and reusable workflows in the
+    repository's workflows that pin another pubkit than `version`, or
+    another commit than `commit`; those that name no version, which nothing
+    here moves)."""
     stale, unversioned = [], []
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text, rel = path.read_text(encoding="utf-8"), path.relative_to(root).as_posix()
-        pinned = {m.start() for m in ACTION_PIN.finditer(text)}
-        for m in ACTION_PIN.finditer(text):
-            name = m["path"].removeprefix("pubkit/").removesuffix("@")
+        pinned = {m.start() for m in PUBKIT_PIN.finditer(text)}
+        for m in PUBKIT_PIN.finditer(text):
+            name = m["name"].rsplit("/", 1)[-1]
             if m["version"] != version:
-                stale.append(f"{rel}: {name} is at pubkit {m['version']}, not {version}, which "
+                stale.append(f"{rel}: {name}@v{m['version']} is not pubkit {version}, which "
                              f"tests/requirements.lock pins; run `pubkit bump`, or pin it "
                              f"@{ref(version, commit)}")
             elif commit and m["commit"] and m["commit"] != commit:
                 stale.append(f"{rel}: {name}@{m['commit']} is not the commit of pubkit "
                              f"{version}'s tag; pin it @{ref(version, commit)}")
-        unversioned += [f"{rel}: {m[0]}" for m in ACTION_USE.finditer(text)
+        unversioned += [f"{rel}: {m[0]}" for m in PUBKIT_USE.finditer(text)
                         if m.start() not in pinned]
     return stale, unversioned
 

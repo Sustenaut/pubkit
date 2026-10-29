@@ -200,8 +200,8 @@ def sync(root: Path, check: bool) -> int:
         if lock_stale:
             print(f"pubkit: {LOCK} does not pin pubkit {__version__}; run `pubkit lock`",
                   file=sys.stderr)
-        from .refs import release_commit, stale_actions  # noqa: PLC0415
-        actions, unversioned = stale_actions(root, __version__, release_commit())
+        from .refs import release_commit, stale_pins  # noqa: PLC0415
+        actions, unversioned = stale_pins(root, __version__, release_commit())
         for problem in actions:
             print(f"pubkit: {problem}", file=sys.stderr)
         for use in unversioned:
