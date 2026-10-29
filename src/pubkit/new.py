@@ -46,7 +46,7 @@ MIN_PUB = (0, 2, 1)
 # The pubrel release workflow a new package's CI calls, and the commit its
 # tag names, which the workflow pins (refs.py).
 PUBREL_PIN = "0.6.0"
-PUBREL_COMMIT = "TODO-pubrel-v0.6.0-commit"
+PUBREL_COMMIT = "986872816b1bd11e177e3f664318c35d41dd08f2"
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")
