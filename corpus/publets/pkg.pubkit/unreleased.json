@@ -7,6 +7,14 @@
     {
       "category": "changed",
       "change": "The owner of the pubkit and pubrel workflows a repository calls is set in one place, OWNER in src/pubkit/refs.py (schryer for now), and pubkit.json can override it with workflows_owner. pubkit sync, pubkit pins, pubkit bump and the pubrel tag lookup pin to that owner; conform, freshness, the nightly, the board and audit prepare read a pin under any owner, so workflows still pinned to schryer keep working after the transfer"
+    },
+    {
+      "category": "changed",
+      "change": "pubkit.mk rebuilds .venv whenever tests/requirements.lock changes (a .venv/.installed stamp), and every target running .venv/bin/pubkit, pytest or the vector generator depends on it"
+    },
+    {
+      "category": "added",
+      "change": "pubkit refuses sync --check, lock, supply-chain, doc-coverage, required, conform and audit when it is not the release tests/requirements-pubkit.txt pins, saying to run make venv or ./pubkit (exit 2; PUBKIT_IGNORE_VERSION=1 skips this)"
     }
   ],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."

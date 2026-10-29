@@ -34,6 +34,16 @@ pubkit sync --check                 # CI: fail if a managed file drifted
 pubkit sync                         # after bumping pubkit: rewrite them
 ```
 
+**The pinned release, and only it.** `sync --check`, `lock`,
+`supply-chain`, `doc-coverage`, `required`, `conform` and `audit` judge or
+write by the release `tests/requirements-pubkit.txt` pins. Run by any
+other release, they stop with exit 2: "this repository pins pubkit X; this
+is pubkit Y. Run `make venv` … or run it as ./pubkit." `PUBKIT_IGNORE_VERSION=1`
+runs them anyway. The commands that move a repository to another release
+(`init`, `sync`, `pins`, `nightly`) are never refused. In a Rust package,
+pubkit.mk rebuilds `.venv` whenever `tests/requirements.lock` changes, so
+`make` always runs the pinned release.
+
 A repository is one of three kinds, named in `pubkit.json`:
 
 | Kind | What it is |

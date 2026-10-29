@@ -3,6 +3,8 @@ repository, through the plugin's own `run` fixture."""
 
 from __future__ import annotations
 
+import re
+
 import hashlib
 import json
 import shutil
@@ -101,3 +103,32 @@ def vetted_crate(repo, name, a, b):
     (chain / "config.toml").write_text('[cargo-vet]\nversion = "0.10"\n' + imports)
     (chain / "audits.toml").write_text("[audits]\n")
     (chain / "imports.lock").write_text("")
+
+
+@given(parsers.parse('the repository pins pubkit "{release}"'))
+def pins_release(repo, release):
+    """tests/requirements-pubkit.txt as `pubkit sync` from another release would write it."""
+    path = repo / "tests" / "requirements-pubkit.txt"
+    path.write_text(re.sub(r"/download/v[^/\s]+/pubkit-[^-]+-", f"/download/v{release}/pubkit-{release}-",
+                           path.read_text()))
+
+
+@given("PUBKIT_IGNORE_VERSION is set")
+def ignore_version(env):
+    env["PUBKIT_IGNORE_VERSION"] = "1"
+
+
+@then("pubkit.mk rebuilds .venv when tests/requirements.lock changes, before running .venv/bin/pubkit")
+def venv_rebuilt(repo):
+    text = (repo / "pubkit.mk").read_text()
+    assert "$(VENV): tests/requirements.lock" in text, text
+    recipes, target = {}, None
+    for line in text.splitlines():
+        if line.startswith("\t") and target:
+            recipes[target][1].append(line)
+        elif ":" in line and not line.startswith(("#", " ", "\t", "export", ".")) and "=" not in line.split(":")[0]:
+            target = line.split(":")[0]
+            recipes[target] = (line, [])
+    for name, (head, body) in recipes.items():
+        if any(".venv/bin/pubkit" in b for b in body) and name not in ("$(VENV)",):
+            assert "$(VENV)" in head, f"{name} runs .venv/bin/pubkit without depending on $(VENV)"

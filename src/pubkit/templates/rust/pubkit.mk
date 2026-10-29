@@ -30,14 +30,23 @@ help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk -F':.*?## ' '{printf "  %-14s %s\n", $$1, $$2}'
 
-venv:: ## Python environment for the functional suite, hash-locked
+# .venv is rebuilt whenever tests/requirements.lock changes, so the pubkit
+# in it is always the release the repository pins: every target below that
+# runs .venv/bin/pubkit depends on it.
+VENV := .venv/.installed
+
+venv:: $(VENV) ## Python environment for the functional suite, hash-locked
+
+$(VENV): tests/requirements.lock
+	rm -rf .venv
 	python3 -m venv .venv
 	.venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+	touch $@
 
-lock: ## Pin tests/requirements.txt, with hashes, in tests/requirements.lock
+lock: $(VENV) ## Pin tests/requirements.txt, with hashes, in tests/requirements.lock
 	.venv/bin/pubkit lock
 
-sync-check: ## Fail if pubkit's managed files differ from the pinned version's
+sync-check: $(VENV) ## Fail if pubkit's managed files differ from the pinned version's
 	.venv/bin/pubkit sync --check
 
 fmt: ## Format Rust sources
@@ -58,13 +67,13 @@ doc: ## Documentation, warnings are errors
 build: ## Debug build
 	$(CARGO) build $(CARGO_SCOPE)
 
-functional: build ## The Gherkin suite against the built binaries
+functional: build $(VENV) ## The Gherkin suite against the built binaries
 	cd tests && pytest -q $(PYTEST_ARGS)
 
 # Everything `functional` runs, and the Rust tests, on a build instrumented
 # by cargo-llvm-cov, so the suite's runs of the binaries count too. Paths in
 # the report are relative to the repository, for SonarQube Cloud.
-coverage: ## The Rust tests and the Gherkin suite on an instrumented build; LCOV in coverage/lcov.info (needs cargo-llvm-cov)
+coverage: $(VENV) ## The Rust tests and the Gherkin suite on an instrumented build; LCOV in coverage/lcov.info (needs cargo-llvm-cov)
 	rm -rf coverage && mkdir coverage
 	source <($(CARGO) llvm-cov show-env --sh) \
 	  && $(CARGO) llvm-cov clean --workspace \
@@ -74,22 +83,22 @@ coverage: ## The Rust tests and the Gherkin suite on an instrumented build; LCOV
 	  && $(CARGO) llvm-cov report --lcov --output-path coverage/lcov.info
 	sed -i.bak 's|^SF:$(CURDIR)/|SF:|' coverage/lcov.info && rm coverage/lcov.info.bak
 
-supply-chain: ## Regenerate SUPPLY-CHAIN.md for each of SUPPLY_CHAIN_CRATES from supply-chain/
+supply-chain: $(VENV) ## Regenerate SUPPLY-CHAIN.md for each of SUPPLY_CHAIN_CRATES from supply-chain/
 	.venv/bin/pubkit supply-chain $(SUPPLY_CHAIN_CRATES)
 
-supply-chain-check: ## Fail if a committed SUPPLY-CHAIN.md is stale
+supply-chain-check: $(VENV) ## Fail if a committed SUPPLY-CHAIN.md is stale
 	.venv/bin/pubkit supply-chain --check $(SUPPLY_CHAIN_CRATES)
 
 # The targets below enforce the Rust crate standard's checked rules; `pubkit
 # required` lists which each CI job runs here.
 
-doc-coverage: ## Regenerate each published library's TESTING.md
+doc-coverage: $(VENV) ## Regenerate each published library's TESTING.md
 	.venv/bin/pubkit doc-coverage $(PUBLISHED_CRATES)
 
-doc-coverage-check: ## Fail if a public function has no example, a test covers no real item, or TESTING.md is stale
+doc-coverage-check: $(VENV) ## Fail if a public function has no example, a test covers no real item, or TESTING.md is stale
 	.venv/bin/pubkit doc-coverage --check $(PUBLISHED_CRATES)
 
-vectors: ## Regenerate the test vectors from their independent sources
+vectors: $(VENV) ## Regenerate the test vectors from their independent sources
 	$(VECTORS_GENERATE)
 
 vectors-check: vectors ## Fail if the committed test vectors differ from what the sources give
@@ -122,5 +131,5 @@ deny: ## Licence, advisory, ban and source audit
 vet: ## Every dependency is audited, trusted, or exempt with its evidence
 	cargo vet --locked
 
-required: ## The targets each CI job runs here, from the standard
+required: $(VENV) ## The targets each CI job runs here, from the standard
 	.venv/bin/pubkit required

@@ -329,6 +329,48 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
     return 0
 
 
+# The managed file naming the pubkit release a repository uses; `pubkit
+# sync` writes it, so it names the release whose standard the repository's
+# other managed files follow.
+PINS = Path("tests/requirements-pubkit.txt")
+
+# Commands that act by the repository's pinned standard. Run by any other
+# release, they would judge or write by the wrong one: an older pubkit left
+# in .venv after the pin moved says files "differ" and suggests the wrong
+# fix, or lacks a command the repository's tools name. The others (init,
+# sync, pins, nightly, ...) are how a repository moves to another release,
+# or do not depend on the pin.
+PINNED_COMMANDS = {"lock", "supply-chain", "doc-coverage", "required", "conform", "audit"}
+
+
+def pinned_release(root: Path) -> str | None:
+    """The pubkit release the repository pins, from tests/requirements-pubkit.txt."""
+    import re  # noqa: PLC0415
+
+    path = root / PINS
+    if not path.is_file():
+        return None
+    found = re.search(r"/download/v([^/\s]+)/pubkit-", path.read_text(encoding="utf-8"))
+    return found.group(1) if found else None
+
+
+def check_release(root: Path, command: str, checking: bool) -> str | None:
+    """Why this pubkit should not run `command` in `root`, or None.
+
+    `sync --check` and the commands in PINNED_COMMANDS need the release the
+    repository pins; PUBKIT_IGNORE_VERSION=1 skips this."""
+    if os.environ.get("PUBKIT_IGNORE_VERSION") == "1":
+        return None
+    if command not in PINNED_COMMANDS and not (command == "sync" and checking):
+        return None
+    pinned = pinned_release(root)
+    if pinned is None or pinned == __version__:
+        return None
+    return (f"pubkit: this repository pins pubkit {pinned} ({PINS}); this is pubkit {__version__}.\n"
+            "Run `make venv` to install the pinned release into .venv, or run it as ./pubkit. "
+            "PUBKIT_IGNORE_VERSION=1 runs this one anyway.")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
@@ -456,6 +498,10 @@ def main(argv: list[str] | None = None) -> int:
                    help="a file listing the paths the pull request changes, one per line")
     args = parser.parse_args(argv)
     root = Path.cwd()
+    refused = check_release(root, args.command, bool(getattr(args, "check", False)))
+    if refused:
+        print(refused, file=sys.stderr)
+        return 2
     if args.command == "init":
         return init(root, args.kind, args.bin, args.project)
     if args.command == "new":

@@ -84,6 +84,29 @@ Feature: Keeping a repository's shared files in step
     Then it fails
     And stderr mentions "does not pin pubkit"
 
+  Scenario: A pubkit other than the pinned release refuses to judge by the pin
+    Given a repository initialised as "utility"
+    And the repository pins pubkit "0.0.1"
+    When I run pubkit "sync" "--check"
+    Then the exit code is 2
+    And stderr mentions "this repository pins pubkit 0.0.1 (tests/requirements-pubkit.txt)"
+    And stderr mentions "Run `make venv`"
+    When I run pubkit "audit" "--standard"
+    Then the exit code is 2
+
+  Scenario: The release check can be skipped, and moving to another release is never refused
+    Given a repository initialised as "utility"
+    And the repository pins pubkit "0.0.1"
+    And PUBKIT_IGNORE_VERSION is set
+    When I run pubkit "audit" "--standard"
+    Then it succeeds
+    When I run pubkit "sync"
+    Then it succeeds
+
+  Scenario: A Rust package's .venv is rebuilt whenever its lock changes
+    Given a repository initialised as "rust"
+    Then pubkit.mk rebuilds .venv when tests/requirements.lock changes, before running .venv/bin/pubkit
+
   Scenario: sync outside an initialised repository says what to do
     Given an empty repository
     When I run pubkit "sync" "--check"
