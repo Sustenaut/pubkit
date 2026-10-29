@@ -347,6 +347,19 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | schryer   | another pubkit | deploy-static is at pubkit 0.0.1                  |
       | Sustenaut | another commit | deploy-static@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
 
+  Scenario: A stale deploy-static pin fails sync --check until it is moved, then passes
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    Then it succeeds
+    Given the workflow "deploy.yml" uses "schryer"'s pubkit action "deploy-static" at "another pubkit"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
+
   Scenario Outline: sync --check takes this pubkit's pin of an action, and reports one with no version
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
