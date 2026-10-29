@@ -42,6 +42,40 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And in "pr.yml" the "browser" job is given "browser-test" "npm run test:browser"
     And in "pr.yml" the "test" job is given "coverage-report" "coverage/"
 
+  Scenario Outline: The scan reads the code and the tests from where the repository keeps them
+    Given a <language> repository whose ci block is '{}'
+    And the repository has the directories "<directories>"
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "sonar" job is given "layout" "<layout>"
+
+    Examples:
+      | language | directories             | layout                                                                  |
+      | Python   | src, tests              | -Dsonar.sources=src -Dsonar.tests=tests                                 |
+      | Python   | tests                   | -Dsonar.sources=. -Dsonar.tests=tests -Dsonar.exclusions=tests/**       |
+      | Rust     | src, tests, fuzz        | -Dsonar.sources=src -Dsonar.tests=tests,fuzz                            |
+      | Rust     | crates, tests, benches  | -Dsonar.sources=src,crates -Dsonar.tests=tests,benches                  |
+
+  Scenario Outline: Without tests to name, or for Node, the scan keeps SonarQube Cloud's defaults
+    Given a <language> repository whose ci block is '{}'
+    And the repository has the directories "<directories>"
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "sonar" job is given no "layout"
+
+    Examples:
+      | language | directories |
+      | Python   | src         |
+      | Node     | src, tests  |
+
+  Scenario: A repository's own sonar-args still go to the scan, after the layout
+    Given a Python repository whose ci block is '{"with": {"sonar-args": "-Dsonar.tests=test"}}'
+    And the repository has the directories "src, tests"
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "sonar" job is given "sonar-args" "-Dsonar.tests=test"
+    And in "pr.yml" the "sonar" job is given "layout" "-Dsonar.sources=src -Dsonar.tests=tests"
+
   Scenario: The nightly event writes a scheduled workflow, without the release
     Given a Node repository whose ci block is '{"events": ["pr", "main", "nightly"], "cron": "5 4 * * *"}'
     When I run pubkit "sync"

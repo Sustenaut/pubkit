@@ -60,6 +60,10 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "rust-ci.yml"
     Then the plan job compares a pull request with its base and passes it to pubkit required
 
+  Scenario: The sonar job's layout comes before sonar-args, so a repository's own properties win
+    When I parse the workflow "job-sonar.yml"
+    Then the scan's layout comes before sonar-args and pubkit.json's sonar args
+
   Scenario Outline: A package's reusable workflow sends its code to SonarQube Cloud when given a token
     When I parse the workflow "<workflow>"
     Then it takes an optional SONAR_TOKEN secret

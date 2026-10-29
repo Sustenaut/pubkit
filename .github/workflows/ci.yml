@@ -47,6 +47,7 @@ jobs:
     uses: ./.github/workflows/job-sonar.yml
     with:
       reports: sonar.python.coverage.reportPaths=*.xml
+      layout: -Dsonar.sources=src -Dsonar.tests=tests
       sonar-args: >-
         -Dsonar.coverage.exclusions=tests/**
         -Dsonar.issue.ignore.multicriteria=pylock,cargolock
