@@ -41,6 +41,9 @@ jobs:
     name: ci
     uses: ./.github/workflows/job-review.yml
 
+  # cachecmd: `pubkit cache run ... -- COMMAND` exists to run the command
+  # its caller typed, as make runs a recipe; S8705 reads that as injection.
+  # The ignore names the rule and cache.py only.
   sonar:
     name: ci
     needs: functional
@@ -50,11 +53,13 @@ jobs:
       layout: -Dsonar.sources=src -Dsonar.tests=tests
       sonar-args: >-
         -Dsonar.coverage.exclusions=tests/**
-        -Dsonar.issue.ignore.multicriteria=pylock,cargolock
+        -Dsonar.issue.ignore.multicriteria=pylock,cargolock,cachecmd
         -Dsonar.issue.ignore.multicriteria.pylock.ruleKey=text:S8565
         -Dsonar.issue.ignore.multicriteria.pylock.resourceKey=pyproject.toml
         -Dsonar.issue.ignore.multicriteria.cargolock.ruleKey=text:S8570
         -Dsonar.issue.ignore.multicriteria.cargolock.resourceKey=src/pubkit/templates/**/Cargo.toml
+        -Dsonar.issue.ignore.multicriteria.cachecmd.ruleKey=pythonsecurity:S8705
+        -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubkit/cache.py
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push.
