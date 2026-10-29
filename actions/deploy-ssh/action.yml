@@ -1,0 +1,96 @@
+# Deploys by running one command on a server over SSH, for what is not a
+# directory of files: a service the server rebuilds or restarts, a unit of a
+# deploy script. The key should be one the server pins to a single program
+# (a forced command, below), which reads the command as its argument and
+# the bundle, if any, on its standard input.
+#
+#   - uses: Sustenaut/pubkit/actions/deploy-ssh@vX.Y.Z
+#     with:
+#       command: share-edge
+#       bundle: scripts/photos/share
+#       deploy-key: ${{ secrets.DEPLOY_KEY }}
+#       target: deploy@example.eu
+#       known-hosts: example.eu ssh-ed25519 AAAA...
+#
+# On the server, the key's line in authorized_keys runs one program
+# whatever the client asks, with the command in SSH_ORIGINAL_COMMAND:
+#
+#   command="/usr/local/bin/example-deploy",restrict ssh-ed25519 AAAA...
+#
+# The program must check the command against the units it knows. Give
+# tailscale-oauth-client-id and tailscale-oauth-secret when the server's SSH
+# is reachable over a tailnet only: the runner joins it first, with
+# tailscale-tags, and leaves when the job ends.
+name: deploy-ssh
+description: Deploy by running one command on a server over SSH with a restricted key, sending a bundle of files on its standard input.
+
+inputs:
+  command:
+    description: >
+      What to run: the words the server's forced command reads as
+      SSH_ORIGINAL_COMMAND, such as a unit's name. Letters, digits, spaces
+      and . _ - only.
+    required: true
+  bundle:
+    description: >
+      Paths in the workspace, space-separated, sent to the command as a
+      gzipped tar on its standard input. Leave empty to send nothing.
+    default: ''
+  deploy-key:
+    description: An SSH private key the server restricts to one program (a forced command).
+    required: true
+  target:
+    description: The server, as user@host.
+    required: true
+  port:
+    description: The server's SSH port.
+    default: '22'
+  known-hosts:
+    description: >
+      The server's host key, as a known_hosts line. Required: a command run
+      on a server is never sent to whatever host answers.
+    required: true
+  tailscale-oauth-client-id:
+    description: A Tailscale OAuth client, when the server is reachable over a tailnet only. Leave empty otherwise.
+    default: ''
+  tailscale-oauth-secret:
+    description: 'With tailscale-oauth-client-id: its secret.'
+    default: ''
+  tailscale-tags:
+    description: 'With tailscale-oauth-client-id: the tags the runner joins with, which the tailnet''s policy lets reach the server''s SSH.'
+    default: tag:ci
+
+runs:
+  using: composite
+  steps:
+    - name: Check the inputs
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        BUNDLE: ${{ inputs.bundle }}
+        DEPLOY_KEY_SET: ${{ inputs.deploy-key != '' }}
+        TARGET: ${{ inputs.target }}
+        PORT: ${{ inputs.port }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+        TAILSCALE_ID_SET: ${{ inputs.tailscale-oauth-client-id != '' }}
+        TAILSCALE_SECRET_SET: ${{ inputs.tailscale-oauth-secret != '' }}
+      run: '"$GITHUB_ACTION_PATH/check-inputs.sh"'
+
+    - name: Join the tailnet
+      if: inputs.tailscale-oauth-client-id != ''
+      uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+      with:
+        oauth-client-id: ${{ inputs.tailscale-oauth-client-id }}
+        oauth-secret: ${{ inputs.tailscale-oauth-secret }}
+        tags: ${{ inputs.tailscale-tags }}
+
+    - name: Run the command on the server
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        BUNDLE: ${{ inputs.bundle }}
+        DEPLOY_KEY: ${{ inputs.deploy-key }}
+        TARGET: ${{ inputs.target }}
+        PORT: ${{ inputs.port }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: '"$GITHUB_ACTION_PATH/deploy.sh"'
