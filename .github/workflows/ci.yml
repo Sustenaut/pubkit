@@ -75,8 +75,8 @@ jobs:
             .value.result == "success" or (.key == "review" and .value.result == "skipped"))' > /dev/null
         env: { RESULTS: '${{ toJSON(needs) }}' }
 
-  # The hosting modules (terraform/) and the deploy-static action
-  # (actions/), which consumers take by tag from this repository. Each
+  # The hosting modules (terraform/) and the deploy actions
+  # (actions/: deploy-static and deploy-ssh, which share one job), which consumers take by tag from this repository. Each
   # module's tests mock its providers, so nothing here needs credentials.
   # Terraform is the oldest version the modules allow, 1.11.
   terraform:
@@ -103,6 +103,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: shellcheck actions/deploy-static/*.sh
       - run: actions/deploy-static/test.sh
+      - run: shellcheck actions/deploy-ssh/*.sh
+      - run: actions/deploy-ssh/test.sh
 
   cache-action:
     runs-on: ubuntu-latest
@@ -120,8 +122,8 @@ jobs:
       !cancelled() && needs.passed.result == 'success'
       && needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
       && needs.cache-action.result == 'success'
-    uses: Sustenaut/pubrel/.github/workflows/release.yml@6f0ba2573107ace5ea4bb92e5bdc1709c9ef9b02 # v0.5.0
-    with: { pubrel-version: v0.5.0 }
+    uses: Sustenaut/pubrel/.github/workflows/release.yml@986872816b1bd11e177e3f664318c35d41dd08f2 # v0.6.0
+    with: { pubrel-version: v0.6.0 }
     permissions:
       contents: write
 

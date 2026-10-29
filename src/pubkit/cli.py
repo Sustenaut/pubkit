@@ -197,7 +197,14 @@ def sync(root: Path, check: bool) -> int:
         if lock_stale:
             print(f"pubkit: {LOCK} does not pin pubkit {__version__}; run `pubkit lock`",
                   file=sys.stderr)
-        if stale or lock_stale or replaced:
+        from .refs import release_commit, stale_actions  # noqa: PLC0415
+        actions, unversioned = stale_actions(root, __version__, release_commit())
+        for problem in actions:
+            print(f"pubkit: {problem}", file=sys.stderr)
+        for use in unversioned:
+            print(f"pubkit: {use} names no pubkit version, so `pubkit bump` leaves it as it is",
+                  file=sys.stderr)
+        if stale or lock_stale or replaced or actions:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":
