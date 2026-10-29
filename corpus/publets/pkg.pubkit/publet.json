@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.17.0 is released as v0.17.0 from commit 6983de1ed5ced679d225ddaa8ea92dda6f0698c7.",
+      "content": "pubkit 0.17.1 is released as v0.17.1 from commit 559a04013a22e46ccf2e9c7150d352a406a95a0c.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.17.0",
+            "0.17.1",
             "pubkit --version",
-            "pubkit 0.17.0",
-            "v0.17.0",
-            "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
+            "pubkit 0.17.1",
+            "v0.17.1",
+            "559a04013a22e46ccf2e9c7150d352a406a95a0c"
           ]
         ]
       },
-      "scope": "the published release v0.17.0 of pubkit",
+      "scope": "the published release v0.17.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
+          "revision": "559a04013a22e46ccf2e9c7150d352a406a95a0c"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.17.0 was released on 2026-10-29 from commit 6983de1ed5ced679d225ddaa8ea92dda6f0698c7 with these changes.",
+      "content": "pubkit 0.17.1 was released on 2026-10-29 from commit 559a04013a22e46ccf2e9c7150d352a406a95a0c with these changes.",
       "data": {
         "columns": [
           {
@@ -57,31 +57,23 @@
         ],
         "rows": [
           [
-            "changed",
-            "pubkit and pubrel moved to the Sustenaut organization, so OWNER in src/pubkit/refs.py is now Sustenaut: pubkit sync, pubkit pins and pubkit bump write Sustenaut/pubkit and Sustenaut/pubrel workflow pins, and pubrel's tags are read from Sustenaut/pubrel. GitHub does not follow a transferred repository's redirect for a reusable workflow, so a pin to schryer/pubrel stopped working with the move; the next sync fixes it. Readers still take a pin under schryer, and pubkit.json's workflows_owner still overrides the owner. The managed files' links and the pubkit wheel URL name Sustenaut/pubkit too"
-          ],
-          [
-            "changed",
-            "pubkit refuses to run sync, lock, supply-chain, doc-coverage, required, conform, audit or record in a repository whose tests/requirements.lock pins another pubkit, and says to run make venv, use ./pubkit, or, when it is the newer release, pubkit bump; PUBKIT_ANY_VERSION=1 runs it anyway. A stale .venv had run pubkit 0.9.x in repositories pinning 0.14.6"
+            "fixed",
+            "When the ci block names no pubrel, pubkit sync writes pubrel's release workflow at pubrel 0.5.5, the latest release, pinned to the commit its tag names (16c6c9731b3f), instead of 0.5.2"
           ],
           [
             "fixed",
-            "pubkit.mk rebuilds .venv before any target that runs a tool from it when tests/requirements.lock has changed since make venv last ran, so a moved pin no longer leaves the old pubkit in .venv"
-          ],
-          [
-            "changed",
-            "The sonar job in the CI pubkit sync writes tells SonarQube Cloud where the code and its tests are, through job-sonar.yml's new layout input: sonar.sources (src for Python; src or crates for Rust) and sonar.tests (tests for Python; tests, fuzz and benches for Rust), each only where the directory exists, so a Python or Rust repository no longer gets the warning that files look like test code while sonar.tests is unset. A repository's sonar-args come after the layout and win"
+            "pubkit site check, which deploy-static runs, no longer asks a page that asks not to be indexed (<meta name=\"robots\" content=\"noindex\">, in any case and alongside other values, or \"none\") for a meta description, an Open Graph card, a large twitter:card or an og:image, nor checks robots.txt for it, so a service's bare landing page (storage, maps) deploys again. Its language and title are still checked"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.17.0 of pubkit",
+      "scope": "the published release v0.17.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
+          "revision": "559a04013a22e46ccf2e9c7150d352a406a95a0c"
         }
       ]
     }

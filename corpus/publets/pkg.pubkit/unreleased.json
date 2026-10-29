@@ -1,13 +1,4 @@
 {
-  "changes": [
-    {
-      "category": "fixed",
-      "change": "When the ci block names no pubrel, pubkit sync writes pubrel's release workflow at pubrel 0.5.5, the latest release, pinned to the commit its tag names (16c6c9731b3f), instead of 0.5.2"
-    },
-    {
-      "category": "fixed",
-      "change": "pubkit site check, which deploy-static runs, no longer asks a page that asks not to be indexed (<meta name=\"robots\" content=\"noindex\">, in any case and alongside other values, or \"none\") for a meta description, an Open Graph card, a large twitter:card or an og:image, nor checks robots.txt for it, so a service's bare landing page (storage, maps) deploys again. Its language and title are still checked"
-    }
-  ],
+  "changes": [],
   "comment": "Changes not yet released. One row per change: category changed or removed (a published interface changed: major), added (a feature: minor), or fixed or security (patch). `pubrel add` appends one; `pubrel summary` sets the release's summary; `pubrel prepare` moves them into the package publet."
 }
