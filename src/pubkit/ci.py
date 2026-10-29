@@ -9,7 +9,7 @@ version in a comment (refs.py).
 
     "ci": {
       "language": "node",
-      "events": ["pr", "main", "nightly"],
+      "events": ["pr", "queue", "main", "nightly"],
       "cron": "17 3 * * *",
       "with": {"browser-test": "npm run test:browser", "coverage-report": "coverage/"},
       "jobs": {"review": false, "sonar": {"events": ["pr", "main"]}},
@@ -19,9 +19,16 @@ version in a comment (refs.py).
 `language` is a utility's, node or python; without it, a package.json
 with no pyproject.toml beside it makes it node. A rust or service
 repository's CI is its kind's. `events` are the workflows written: pr.yml
-(pull requests, and the merge queue's runs of them, `merge_group`, so the
-checks a ruleset requires report on the queue's merge too), main.yml (pushes to main) and nightly.yml (the schedule
-`cron`, and by hand); pr and main by default, and all three for Rust. `with` gives the
+(pull requests), queue.yml (the merge queue's runs of them, `merge_group`,
+so the checks a ruleset requires report on the queue's merge too),
+main.yml (pushes to main) and nightly.yml (the schedule `cron`, and by
+hand); pr, queue and main by default, and all four for Rust. The queue
+runs every job a pull request does, and the heavy ones (Rust's msrv, fuzz
+and cross) besides, so a pull request gets its answer sooner and nothing
+merges untested. Where the queue would run nothing a pull request does
+not, it has no workflow of its own: pr.yml runs on `merge_group` too. A
+repository without a merge queue (a user's, or a private one) leaves
+`queue` out, and its pull requests run the heavy jobs. `with` gives the
 jobs' inputs: each goes to every job that takes it, and an input no job
 takes stops sync. A job runs on the events JOBS gives it unless `jobs`
 narrows them, and `false` drops it, as a private repository drops review.
@@ -30,8 +37,8 @@ service's terraform and tests jobs only when it gives a terraform-dir and
 a test. Rust's jobs are the ones the Rust crate standard asks for here,
 from the rules and pubkit.json's exceptions, and sync writes each job's
 required make targets into its workflow, so a change to either shows as a
-change there. `release` adds pubrel's release workflow to pr.yml and
-main.yml, at this pubkit's pubrel unless it names one, passing it the
+change there. `release` adds pubrel's release workflow to pr.yml,
+queue.yml and main.yml, at this pubkit's pubrel unless it names one, passing it the
 release app's RELEASE_APP_ID and RELEASE_APP_KEY from pubrel 0.6.1, the
 first to take them, so `pubrel tag` tags with the app the tag ruleset lets
 through; `false` leaves it
@@ -41,7 +48,7 @@ a change to its release workflow is tested before it ships.
 
 A repository that deploys a static site with pubkit's deploy-static (a
 workflow of its own uses it, or pubkit.json has a `site` block) gets a
-`site` job in pr.yml: it builds the site (`site.pr_build`, else
+`site` job in pr.yml (and queue.yml): it builds the site (`site.pr_build`, else
 `site.build`, else nothing) and runs deploy-static, at this pubkit, with
 check-only, on `site.check_dir` (else the `dir` its deploy workflow gives
 deploy-static). A site that would fail to deploy fails the pull request.
@@ -52,11 +59,11 @@ deploy-static). A site that would fail to deploy fails the pull request.
 Each workflow ends in `passed` (the check a ruleset requires, `ci /
 passed`), which passes only when every job it needs succeeded.
 
-The merge queue runs pr.yml on the pull request merged into main, and
-merging moves main to that very commit, so main.yml would test it again.
-It starts instead with `tested` (job-tested.yml), which looks for a
-successful merge_group run of pr.yml on the commit: found, main skips the
-jobs that only test, and runs the scan (with the queue run's coverage,
+The merge queue runs queue.yml (or pr.yml) on the pull request merged
+into main, and merging moves main to that very commit, so main.yml would
+test it again. It starts instead with `tested` (job-tested.yml), which
+looks for a successful merge_group run of that workflow on the commit:
+found, main skips the jobs the queue ran, and runs the scan (with the queue run's coverage,
 since SonarQube Cloud measures main from a push to it) and the release;
 not found, as without a queue, every job runs as before. Every job
 is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
@@ -74,19 +81,25 @@ from typing import Any
 from . import __version__
 from .refs import owner, ref, release_commit
 
-EVENTS = ("pr", "main", "nightly")
-DEFAULT_EVENTS = ("pr", "main")
+EVENTS = ("pr", "queue", "main", "nightly")
+DEFAULT_EVENTS = ("pr", "queue", "main")
+# The jobs too slow to hold up every push to a pull request: they run in
+# the merge queue, before anything merges, and on main and the nightly.
+HEAVY = ("queue", "main", "nightly")
 CRON = "17 3 * * *"
 TRIGGERS = {
-    "pr": "  pull_request:\n  merge_group:\n",
+    "pr": "  pull_request:\n",
+    "queue": "  merge_group:\n",
     "main": "  push: { branches: [main] }\n",
     "nightly": "  schedule: [{ cron: 'CRON' }]\n  workflow_dispatch:\n",
 }
 # The events the release workflow runs on: a pull request records and
 # checks its release; a push to main tags and releases it. The merge
-# queue's run of a pull request (merge_group, in pr.yml) only reports the
-# check: pubrel tags from a push to main alone.
-RELEASE_EVENTS = ("pr", "main")
+# queue's run of a pull request (merge_group) only reports the check:
+# pubrel tags from a push to main alone.
+RELEASE_EVENTS = ("pr", "queue", "main")
+# The events the site is checked on, before anything deploys it.
+SITE_EVENTS = ("pr", "queue")
 SETTINGS = ("language", "events", "cron", "with", "jobs", "release")
 HEADER = ("# Written by `pubkit sync` from the ci block of pubkit.json. Do not edit:\n"
           "# change pubkit.json and run `pubkit sync`.\n")
@@ -152,12 +165,12 @@ JOBS: dict[str, dict[str, Job]] = {
                           ("python-version", "apt-packages", "pub-version", "functional",
                            "cargo-llvm-cov-version"), needs=("gates",), secrets=True,
                           internal=RUST_REQUIRED, standard="functional"),
-        "msrv": Job("job-rust-msrv.yml", needs=("gates",), standard="msrv"),
+        "msrv": Job("job-rust-msrv.yml", needs=("gates",), events=HEAVY, standard="msrv"),
         "fuzz": Job("job-rust-fuzz.yml",
                     ("python-version", "fuzz-seconds", "fuzz-seconds-scheduled", "cargo-fuzz-version"),
-                    needs=("gates",), standard="fuzz"),
+                    needs=("gates",), events=HEAVY, standard="fuzz"),
         "cross": Job("job-rust-cross.yml", ("python-version", "cross-targets", "cross-test-args"),
-                     needs=("gates",), standard="cross"),
+                     needs=("gates",), events=HEAVY, standard="cross"),
         "audit": Job("job-rust-audit.yml", ("cargo-deny-version", "cargo-vet-version"),
                      internal=RUST_REQUIRED, standard="audit"),
         "osv": Job("job-osv.yml"),
@@ -272,6 +285,8 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     events = given.get("events", list(LANGUAGE_EVENTS.get(language, DEFAULT_EVENTS)))
     if not isinstance(events, list) or not events or not set(events) <= set(EVENTS):
         stop(f"events must list some of {', '.join(EVENTS)}")
+    if "queue" in events and "pr" not in events:
+        stop("events lists queue without pr: the merge queue runs pull requests")
     cron = given.get("cron", CRON)
     if not isinstance(cron, str) or len(cron.split()) != 5:
         stop(f"cron must be a schedule of five fields, such as {CRON!r}")
@@ -302,10 +317,18 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             continue
         if not planned(job, rules) or (name == "cross" and inputs.get("cross-targets") == "[]"):
             continue
-        jobs[name] = tuple(e for e in EVENTS if e in on and e in events)
+        jobs[name] = tuple(e for e in EVENTS if e in on and (e in events or e == "queue"))
     unknown = sorted(set(overrides) - set(table))
     if unknown:
         stop(f"jobs names {', '.join(unknown)}, which {language} has not; it has {', '.join(table)}")
+    # The queue has a workflow of its own only when it runs a job pull
+    # requests do not; else pr.yml runs in the queue too, with the queue's
+    # jobs. Without a queue, its jobs run on pull requests instead.
+    separate = "queue" in events and any("queue" in on and "pr" not in on for on in jobs.values())
+    if not separate:
+        events = [e for e in events if e != "queue"]
+        jobs = {name: tuple(e for e in EVENTS if e in events and (
+                    e in on or (e == "pr" and "queue" in on))) for name, on in jobs.items()}
     from .new import PUBREL_PIN  # noqa: PLC0415
     release = given.get("release", language != "service")
     if language == "service" and release is not False:
@@ -405,14 +428,28 @@ def flow(values: dict[str, Any]) -> str:
 UNTESTED = "needs.tested.outputs.tested != 'true'"
 
 
+def queued(ci: dict[str, Any]) -> str:
+    """The event whose workflow the merge queue runs."""
+    return "queue" if "queue" in ci["events"] else "pr"
+
+
 def tested_job(ci: dict[str, Any]) -> str:
     return ("  # Whether the merge queue already passed this commit: then the jobs\n"
-            "  # that only test it are skipped, and nothing here tests less than the\n"
-            "  # queue did.\n"
+            "  # it ran are skipped, and nothing here tests less than the queue did.\n"
             "  tested:\n    name: ci\n"
             f"    uses: {ci['owner']}/pubkit/.github/workflows/job-tested.yml"
             f"@{ref(__version__, ci['commit'])}\n"
+            f"    with: {flow({'workflow': path(queued(ci))})}\n"
             "    permissions:\n      actions: read\n      contents: read\n")
+
+
+def trigger(ci: dict[str, Any], event: str) -> str:
+    """What starts one event's workflow: pr.yml's runs in the merge queue
+    too when the queue has none of its own."""
+    out = TRIGGERS[event].replace("CRON", ci["cron"])
+    if event == "pr" and queued(ci) == "pr":
+        out += TRIGGERS["queue"]
+    return out
 
 
 def workflow(ci: dict[str, Any], event: str) -> str:
@@ -421,7 +458,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     names = [name for name, on in ci["jobs"].items() if event in on]
     # Main takes the merge queue's run of pr.yml where there is one.
     shortcut = event == "main" and "pr" in ci["events"]
-    out = [HEADER, f"name: {event}\n\non:\n", TRIGGERS[event].replace("CRON", ci["cron"]),
+    out = [HEADER, f"name: {event}\n\non:\n", trigger(ci, event),
            "\npermissions:\n  contents: read\n\njobs:\n"]
     if shortcut:
         out.append(tested_job(ci))
@@ -433,7 +470,9 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         if "layout" in job.internal and ci["layout"]:
             given["layout"] = ci["layout"]
         needs = [n for n in job.needs if n in names]
-        if shortcut:
+        # On main, a job the queue ran waits to hear whether it passed.
+        skips = shortcut and queued(ci) in ci["jobs"][name]
+        if skips or (shortcut and name == "sonar"):
             needs = ["tested", *needs]
         first = name == names[0] and not shortcut
         out.append(f"{'' if first else chr(10)}  {name}:\n    name: ci\n")
@@ -444,7 +483,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             # The scan runs either way, after the tests or in their place.
             out.append("    if: ${{ !failure() && !cancelled() }}\n")
             given["coverage-run"] = "${{ needs.tested.outputs.run-id }}"
-        elif shortcut:
+        elif skips:
             out.append(f"    if: ${{{{ {UNTESTED} }}}}\n")
         out.append(f"    uses: {ci['owner']}/pubkit/.github/workflows/{job.workflow}"
                    f"@{ref(__version__, ci['commit'])}\n")
@@ -457,7 +496,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         # them without a word for pubkit's, once the two owners differ.
         if job.secrets:
             out.append("    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }\n")
-    if ci["site"] and event == "pr":
+    if ci["site"] and event in SITE_EVENTS:
         names = [*names, "site"]
         out.append(site_job(ci))
     if shortcut:

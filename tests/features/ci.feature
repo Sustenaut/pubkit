@@ -13,23 +13,30 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And "pr.yml" runs the jobs "test, audit, osv, review, sonar, passed, release"
     And "main.yml" runs the jobs "tested, test, audit, osv, sonar, passed, release"
     And no workflow is written for "nightly"
+    And no workflow is written for "queue"
     And no job in "pr.yml" has a condition but passed
 
   Scenario Outline: Main skips the tests the merge queue already passed on its commit
     Given a <language> repository whose ci block is '{}'
     When I run pubkit "sync"
-    Then "main.yml" first asks whether the merge queue passed its commit in "pr.yml"
+    Then "main.yml" first asks whether the merge queue passed its commit in "<queued>"
     And in "main.yml" every job but tested, the scan, passed and release runs only when it did not
     And in "main.yml" the scan runs either way, reading the coverage of the queue's run when it skipped the tests
     And in "main.yml" passed takes a job skipped for the queue's run as passed
     And in "main.yml" the release runs whenever passed succeeded
 
     Examples:
-      | language |
-      | Node     |
-      | Python   |
-      | Rust     |
-      | service  |
+      | language | queued    |
+      | Node     | pr.yml    |
+      | Python   | pr.yml    |
+      | Rust     | queue.yml |
+      | service  | pr.yml    |
+
+  Scenario: Main runs a job the merge queue does not, whatever the queue passed
+    Given a Node repository whose ci block is '{"jobs": {"osv": {"events": ["main"]}}}'
+    When I run pubkit "sync"
+    Then "pr.yml" runs the jobs "test, audit, review, sonar, passed, release"
+    And in "main.yml" the "osv" job runs whatever the queue passed
 
   Scenario: Without a pull request workflow there is no queue run, and main tests everything
     Given a Node repository whose ci block is '{"events": ["main"]}'
@@ -52,8 +59,33 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | language |
       | Node     |
       | Python   |
-      | Rust     |
       | service  |
+
+  Scenario: A Rust crate's pull requests skip the heavy jobs, which the merge queue runs before anything merges
+    Given a Rust repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "pr.yml" runs on pull requests alone
+    And "queue.yml" runs in the merge queue alone
+    And "pr.yml" runs the jobs "gates, test, functional, audit, osv, review, sonar, passed, release"
+    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
+    And no job in "queue.yml" has a condition but passed
+
+  Scenario: Without the queue event, a Rust crate's pull requests run the heavy jobs, in the queue too
+    Given a Rust repository whose ci block is '{"events": ["pr", "main", "nightly"]}'
+    When I run pubkit "sync"
+    Then "pr.yml" runs on pull requests and in the merge queue
+    And "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, review, sonar, passed, release"
+    And no workflow is written for "queue"
+    And "main.yml" first asks whether the merge queue passed its commit in "pr.yml"
+
+  Scenario: The merge queue checks the site a pull request checks
+    Given a Rust repository whose ci block is '{}'
+    And pubkit.json's site block is '{"check_dir": "public"}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" checks the site in "public" after running "nothing", deploying nothing
+    And "queue.yml" checks the site in "public" after running "nothing", deploying nothing
+    And "main.yml" has no site job
 
   Scenario: pubkit's own CI runs in the merge queue, and builds the wheel from a push to main alone
     When I read pubkit's own ci.yml
@@ -132,7 +164,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Rust repository whose ci block is '{}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, review, sonar, passed, release"
+    And "pr.yml" runs the jobs "gates, test, functional, audit, osv, review, sonar, passed, release"
+    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
     And "main.yml" runs the jobs "tested, gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
     And "nightly.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, toolchains, sonar, passed"
     And no job in "pr.yml" has a condition but passed
@@ -150,12 +183,12 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Rust repository whose ci block is '{}'
     And pubkit.json excepts "RS-VER-02"
     When I run pubkit "sync"
-    Then "pr.yml" runs the jobs "gates, test, functional, fuzz, cross, audit, osv, review, sonar, passed, release"
+    Then "queue.yml" runs the jobs "gates, test, functional, fuzz, cross, audit, osv, sonar, passed, release"
 
   Scenario: No cross-targets drops the cross job
     Given a Rust repository whose ci block is '{"with": {"cross-targets": "[]"}}'
     When I run pubkit "sync"
-    Then "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, review, sonar, passed, release"
+    Then "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, sonar, passed, release"
 
   Scenario: pubrel's own CI calls its release workflow from the checkout
     Given a Rust repository whose ci block is '{"release": {"uses": "local"}}'
@@ -246,7 +279,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Examples:
       | ci                                         | message                                         |
       | {"with": {"tests": "npm test"}}            | with gives tests, which no node job takes       |
-      | {"events": ["weekly"]}                     | events must list some of pr, main, nightly      |
+      | {"events": ["weekly"]}                     | events must list some of pr, queue, main, nightly |
+      | {"events": ["queue", "main"]}              | events lists queue without pr                   |
       | {"jobs": {"lint": false}}                  | jobs names lint, which node has not             |
       | {"jobs": {"sonar": {"when": "always"}}}    | jobs.sonar must be false or                     |
       | {"language": "go"}                         | language must be one of node, python            |
