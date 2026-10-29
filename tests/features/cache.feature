@@ -97,3 +97,68 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's en
     When I run pubkit "cache" "plan"
     Then the exit code is 2
     And stderr mentions "cache entry loose needs refresh or inputs (or both)"
+
+  Scenario Outline: A cache block that does not fit is refused, naming what is wrong
+    Given the cache block is <block>
+    When I run pubkit "cache" "plan"
+    Then the exit code is 2
+    And stderr mentions "<reason>"
+
+    Examples:
+      | block | reason |
+      | [] | cache is a map of named entries |
+      | {"a": 1} | cache entry a is a map of |
+      | {"a": {"refresh": "week"}} | cache entry a needs a path |
+      | {"a": {"path": "a", "refresh": "hourly"}} | refresh is one of run, day, week, month, never |
+      | {"a": {"path": "a", "refresh": "week", "version": 1}} | version is a string |
+      | {"a": {"path": "a", "inputs": "b"}} | inputs is a list of strings |
+      | {"a": {"path": "a", "inputs": ["b"], "unit": "data/"}} | unit is one pattern with {unit} in it |
+      | {"a": {"path": "a", "refresh": "week"}, "b": {"path": "b", "refresh": "week"}, "c": {"path": "c", "refresh": "week"}, "d": {"path": "d", "refresh": "week"}, "e": {"path": "e", "refresh": "week"}, "f": {"path": "f", "refresh": "week"}, "g": {"path": "g", "refresh": "week"}, "h": {"path": "h", "refresh": "week"}, "i": {"path": "i", "refresh": "week"}} | it takes at most 8 |
+
+  Scenario Outline: A run that does not fit the entries is refused
+    Given the cache entry "data" keeps "data" with refresh "week"
+    And the cache entry "notes" is made from the input "notes.txt"
+    When I run pubkit <args>
+    Then the exit code is 2
+    And stderr mentions "<reason>"
+
+    Examples:
+      | args | reason |
+      | "cache" "run" "nonesuch" "--output" "x" "--" "true" | cache has no entry nonesuch |
+      | "cache" "run" "data" "--output" "x" "--" "true" | data is fetched for a period, not made |
+      | "cache" "run" "packs" "--unit" "north" "--" "true" | give each file the command writes as --output |
+      | "cache" "run" "notes" "--unit" "x" "--output" "x" "--" "true" | has no unit pattern, so it takes no --unit |
+      | "cache" "run" "notes" "--output" "x" | no notes kept for this unit, and no command to make it |
+
+  Scenario: An input glob counts every file it matches, and a missing input counts as missing
+    Given the cache entry "notes" is made from the inputs "*.md" and "later/"
+    And the file "a.md" reads "one"
+    When I make "notes" into "out/notes.txt"
+    Then it prints "built notes"
+    When I make "notes" into "out/notes.txt"
+    Then it prints "reused notes"
+    When the file "b.md" reads "two"
+    And I make "notes" into "out/notes.txt"
+    Then it prints "built notes"
+    When the file "later/x.txt" reads "now here"
+    And I make "notes" into "out/notes.txt"
+    Then it prints "built notes"
+
+  Scenario: Day and month periods give keys that change daily and monthly
+    Given the cache entry "daily" keeps "daily" with refresh "day"
+    And the cache entry "monthly" keeps "monthly" with refresh "month"
+    And today is "2026-10-29"
+    When I run pubkit "cache" "plan"
+    Then it prints "-2026-10-29-"
+    And it prints "-2026-10-"
+
+  Scenario: plan writes a restore and a save slot for each entry to GitHub's step output
+    Given the cache entry "data" keeps "data" with refresh "week"
+    And GitHub's step output goes to "gh-output"
+    When I run pubkit "cache" "plan" "--github-output" "--fresh"
+    Then it succeeds
+    And "gh-output" has the line "path-1=data"
+    And "gh-output" has the line "restore-1=false"
+    And "gh-output" has the line "path-2=.packcache"
+    And "gh-output" has the line "restore-2=true"
+    And "gh-output" has the line "key-8="

@@ -123,3 +123,36 @@ def key_same(result, noted, name):
 @then(parsers.parse('the key of "{name}" is not as noted'))
 def key_changed(result, noted, name):
     assert _key(result, name) != noted
+
+
+@given(parsers.parse("the cache block is {block}"))
+def cache_block(repo, run, block):
+    assert run(pubkit(), "init", "--kind=utility", cwd=repo).code == 0
+    _config(repo, lambda c: c.update(cache=json.loads(block)))
+
+
+@given(parsers.parse('the cache entry "{name}" is made from the input "{input}"'))
+def made_entry(repo, name, input):
+    _config(repo, lambda c: c["cache"].update({name: {"path": f".{name}cache", "inputs": [input]}}))
+
+
+@given(parsers.parse('the cache entry "{name}" is made from the inputs "{a}" and "{b}"'))
+def made_entry_two(repo, name, a, b):
+    _config(repo, lambda c: c["cache"].update({name: {"path": f".{name}cache", "inputs": [a, b]}}))
+
+
+@when(parsers.parse('I make "{name}" into "{output}"'), target_fixture="result")
+def make_entry(repo, run, env, name, output):
+    write = f"import pathlib; p = pathlib.Path({output!r}); p.parent.mkdir(exist_ok=True); p.write_text('made')"
+    return run(pubkit(), "cache", "run", name, "--output", output, "--", sys.executable, "-c", write,
+               cwd=repo, env=env)
+
+
+@given(parsers.parse('GitHub\'s step output goes to "{path}"'))
+def github_output(repo, env, path):
+    env["GITHUB_OUTPUT"] = str(repo / path)
+
+
+@then(parsers.parse('"{path}" has the line "{line}"'))
+def has_line(repo, path, line):
+    assert line in (repo / path).read_text().splitlines(), (repo / path).read_text()
