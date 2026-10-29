@@ -3,4 +3,4 @@ on:
   pull_request:
 jobs:
   audit:
-    uses: schryer/pubkit/.github/workflows/job-rust-audit.yml@v0.14.6
+    uses: schryer/pubkit/.github/workflows/job-rust-audit.yml@9c202da5a93588f19366d3fab4efbabdd8f15846 # v0.14.6
