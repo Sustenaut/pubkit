@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pubkit bump and the nightly's pubkit pins move every hand-written use of one of pubkit's actions (<owner>/pubkit/actions/<name>@<commit> # vX.Y.Z or @vX.Y.Z, under Sustenaut or the old schryer), such as deploy-static, to this pubkit's commit and version, so a repository bumped to 0.17.1 no longer runs 0.17.0's site check. pubkit sync --check, and so ci / passed, and pubkit conform fail while such a pin names another pubkit or another commit; one that names no version, such as @main, is left as it is and reported"
-}
