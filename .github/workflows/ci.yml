@@ -3,6 +3,9 @@ name: ci
 on:
   push: { branches: [main] }
   pull_request:
+  # The merge queue's run of a pull request merged into main: the required
+  # checks must report on it too, or nothing leaves the queue.
+  merge_group:
 
 jobs:
   # pubkit is its own first consumer: its suite runs through the workflow it
@@ -34,8 +37,9 @@ jobs:
     name: ci
     uses: ./.github/workflows/job-osv.yml
 
-  # A generated workflow has it only for pull requests; this one runs on
-  # pushes too, so it says so here.
+  # A generated workflow has it only for pull requests and the merge
+  # queue; this one runs on pushes too, so it says so here. The queue's run
+  # adds no dependency its pull request's run did not review.
   review:
     if: github.event_name == 'pull_request'
     name: ci
@@ -62,7 +66,8 @@ jobs:
         -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubkit/cache.py
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
-  # The one check pubkit's ruleset requires. review is skipped on a push.
+  # The one check pubkit's ruleset requires. review is skipped on a push
+  # and in the merge queue.
   passed:
     name: ci / passed
     if: always()
@@ -116,6 +121,8 @@ jobs:
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a
   # push to main skips the release (and the wheel), so nothing is tagged.
+  # On a pull request or in the merge queue it only reports the check:
+  # pubrel tags from a push to main alone, as the wheel is built.
   release:
     needs: [passed, terraform, deploy-static, cache-action]
     if: >-

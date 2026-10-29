@@ -249,7 +249,8 @@ class Gatherer:
                             sources)
             return Fact(None, sources, found.note)
         differences = []
-        targets = [("branch", protect.ruleset(wanted["checks"]), "its default branch")]
+        targets = [("branch", protect.ruleset(wanted["checks"], wanted.get("queue", True)),
+                    "its default branch")]
         if wanted.get("tags", True):
             targets.append(("tag", protect.tag_ruleset(), "its release tags"))
         for target, want, where in targets:

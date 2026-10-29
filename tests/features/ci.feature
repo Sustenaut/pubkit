@@ -15,6 +15,24 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And no workflow is written for "nightly"
     And no job in "pr.yml" or "main.yml" has a condition but passed
 
+  Scenario Outline: The merge queue's runs report the checks a pull request's do
+    Given a <language> repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "pr.yml" runs on pull requests and in the merge queue
+    And "main.yml" runs on pushes to main alone
+
+    Examples:
+      | language |
+      | Node     |
+      | Python   |
+      | Rust     |
+      | service  |
+
+  Scenario: pubkit's own CI runs in the merge queue, and builds the wheel from a push to main alone
+    When I read pubkit's own ci.yml
+    Then it runs on pull requests, in the merge queue and on pushes to main
+    And its wheel job runs only on a push to main
+
   Scenario Outline: The token reaches pubkit's jobs by name, which works across owners
     Given a <language> repository whose ci block is '{}'
     When I run pubkit "sync"

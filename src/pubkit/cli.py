@@ -461,6 +461,10 @@ def main(argv: list[str] | None = None) -> int:
                    help="a check the named repositories require, instead of any list; repeat it")
     p.add_argument("--no-tags", dest="tags", action="store_false",
                    help="leave out the release tag ruleset, for repositories that release no tags")
+    p.add_argument("--no-queue", dest="queue", action="store_false",
+                   help="merge from a branch up to date with main instead of through the merge "
+                        "queue, for repositories GitHub offers no merge queue (a user's, or a "
+                        "private one)")
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME; by default every repository the config lists, or this "
                         "repository from ./pubkit.json; one not listed is read from its own "
@@ -552,7 +556,8 @@ def main(argv: list[str] | None = None) -> int:
         from .paths import confined
         from .protect import run as protect
         config = confined(args.config, "the --config file") if args.config else None
-        return protect(config, args.repos, args.check, args.require, tags=args.tags)
+        return protect(config, args.repos, args.check, args.require, tags=args.tags,
+                       queue=args.queue)
     if args.command == "board":
         from .board import run as board
         from .paths import confined
