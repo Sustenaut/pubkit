@@ -1,4 +1,0 @@
-{
-  "category": "internal",
-  "change": "pubkit's own CI runs pubrel 0.6.0's release workflow, and its unreleased changes are files under corpus/publets/pkg.pubkit/unreleased/; the empty unreleased.json is gone"
-}
