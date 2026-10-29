@@ -1,0 +1,44 @@
+# Whether the merge queue already tested this commit. The queue runs a
+# pull request's workflow (`workflow`) on the pull request merged into
+# main, and merging moves main to that same commit, so a push to main whose
+# commit has a successful merge_group run of it has nothing left to test.
+# `tested` is "true" then, and `run-id` names that run, whose coverage
+# artifacts the sonar job reads; otherwise (no queue, a commit pushed some
+# other way, a queue run that failed or never ran) `tested` is "false", and
+# every job runs as it would without this.
+#
+# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
+# (src/pubkit/ci.py). The caller grants it actions: read.
+name: job-tested
+
+on:
+  workflow_call:
+    inputs:
+      workflow: { type: string, default: .github/workflows/pr.yml, description: "The workflow the merge queue runs, by its path." }
+    outputs:
+      tested: { value: '${{ jobs.tested.outputs.tested }}', description: '"true" when the merge queue already passed this commit.' }
+      run-id: { value: '${{ jobs.tested.outputs.run-id }}', description: "The merge queue's run of this commit, when tested." }
+
+jobs:
+  tested:
+    runs-on: ubuntu-latest
+    outputs:
+      tested: ${{ steps.queue.outputs.tested }}
+      run-id: ${{ steps.queue.outputs.run-id }}
+    steps:
+      - id: queue
+        run: |
+          run=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=merge_group&status=success" \
+            --jq "[.workflow_runs[] | select(.path == \"$WORKFLOW\")][0].id // empty")
+          if [ -n "$run" ]; then
+            echo "::notice::The merge queue passed this commit in run $run, so main runs only what it adds: the scan, and the release."
+            { echo tested=true; echo "run-id=$run"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "No successful merge queue run of $WORKFLOW for $SHA: every job runs."
+            echo tested=false >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          WORKFLOW: ${{ inputs.workflow }}

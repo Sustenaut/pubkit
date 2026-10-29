@@ -22,7 +22,24 @@ jobs:
   #
   # The jobs are the ones `pubkit sync` puts in a utility's generated
   # workflows (src/pubkit/ci.py), from this checkout.
+  #
+  # On a push to main, tested asks whether the merge queue already passed
+  # this commit (merging moves main to the very commit the queue tested);
+  # then the jobs that only test it are skipped, and the scan reads the
+  # queue run's coverage. On a pull request or in the queue it is skipped,
+  # and everything runs.
+  tested:
+    if: github.event_name == 'push'
+    name: ci
+    uses: ./.github/workflows/job-tested.yml
+    with: { workflow: .github/workflows/ci.yml }
+    permissions:
+      actions: read
+      contents: read
+
   functional:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     name: ci
     uses: ./.github/workflows/job-python-functional.yml
     with:
@@ -30,10 +47,14 @@ jobs:
       test: make check
 
   audit:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     name: ci
     uses: ./.github/workflows/job-python-audit.yml
 
   osv:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     name: ci
     uses: ./.github/workflows/job-osv.yml
 
@@ -50,9 +71,14 @@ jobs:
   # The ignore names the rule and cache.py only.
   sonar:
     name: ci
-    needs: functional
+    needs: [tested, functional]
+    if: ${{ !failure() && !cancelled() }}
     uses: ./.github/workflows/job-sonar.yml
+    permissions:
+      actions: read
+      contents: read
     with:
+      coverage-run: ${{ needs.tested.outputs.run-id }}
       reports: sonar.python.coverage.reportPaths=*.xml
       layout: -Dsonar.sources=src -Dsonar.tests=tests
       sonar-args: >-
@@ -67,24 +93,28 @@ jobs:
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push
-  # and in the merge queue.
+  # and in the merge queue, tested off a push, and every testing job on a
+  # push the queue already passed.
   passed:
     name: ci / passed
     if: always()
-    needs: [functional, audit, osv, review, sonar]
+    needs: [tested, functional, audit, osv, review, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "$RESULTS"
-          echo "$RESULTS" | jq -e 'all(to_entries[];
-            .value.result == "success" or (.key == "review" and .value.result == "skipped"))' > /dev/null
-        env: { RESULTS: '${{ toJSON(needs) }}' }
+          echo "$RESULTS" | jq -e --arg tested "$TESTED" 'all(to_entries[];
+            .value.result == "success" or (.value.result == "skipped"
+              and (.key == "review" or .key == "tested" or $tested == "true")))' > /dev/null
+        env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}' }
 
   # The hosting modules (terraform/) and the deploy actions
   # (actions/: deploy-static and deploy-ssh, which share one job), which consumers take by tag from this repository. Each
   # module's tests mock its providers, so nothing here needs credentials.
   # Terraform is the oldest version the modules allow, 1.11.
   terraform:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -103,6 +133,8 @@ jobs:
         env: { MODULE: '${{ matrix.module }}' }
 
   deploy-static:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -112,6 +144,8 @@ jobs:
       - run: actions/deploy-ssh/test.sh
 
   cache-action:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -122,13 +156,15 @@ jobs:
   # job before it, however far back, succeeded: without the condition, a
   # push to main skips the release (and the wheel), so nothing is tagged.
   # On a pull request or in the merge queue it only reports the check:
-  # pubrel tags from a push to main alone, as the wheel is built.
+  # pubrel tags from a push to main alone, as the wheel is built. Where
+  # the queue already passed the commit, its run of these jobs counts.
   release:
-    needs: [passed, terraform, deploy-static, cache-action]
+    needs: [passed, tested, terraform, deploy-static, cache-action]
     if: >-
       !cancelled() && needs.passed.result == 'success'
-      && needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
-      && needs.cache-action.result == 'success'
+      && (needs.tested.outputs.tested == 'true'
+          || (needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
+              && needs.cache-action.result == 'success'))
     uses: Sustenaut/pubrel/.github/workflows/release.yml@986872816b1bd11e177e3f664318c35d41dd08f2 # v0.6.0
     with: { pubrel-version: v0.6.0 }
     permissions:

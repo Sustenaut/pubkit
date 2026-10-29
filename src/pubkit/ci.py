@@ -47,7 +47,15 @@ deploy-static). A site that would fail to deploy fails the pull request.
              "url": "https://example.eu/"}
 
 Each workflow ends in `passed` (the check a ruleset requires, `ci /
-passed`), which passes only when every job it needs succeeded. Every job
+passed`), which passes only when every job it needs succeeded.
+
+The merge queue runs pr.yml on the pull request merged into main, and
+merging moves main to that very commit, so main.yml would test it again.
+It starts instead with `tested` (job-tested.yml), which looks for a
+successful merge_group run of pr.yml on the commit: found, main skips the
+jobs that only test, and runs the scan (with the queue run's coverage,
+since SonarQube Cloud measures main from a push to it) and the release;
+not found, as without a queue, every job runs as before. Every job
 is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
 """
 
@@ -105,7 +113,7 @@ NODE_TEST = ("node-version", "python-version", "apt-packages", "setup", "test", 
              "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
 PYTHON_TEST = ("python-version", "apt-packages", "setup", "test", "sync-check",
                "coverage-report", "fuzz-runs", "fuzz-runs-scheduled")
-SONAR_INTERNAL = ("reports", "layout")
+SONAR_INTERNAL = ("reports", "layout", "coverage-run")
 RUST_REQUIRED = ("required",)
 JOBS: dict[str, dict[str, Job]] = {
     "node": {
@@ -372,12 +380,31 @@ def flow(values: dict[str, Any]) -> str:
     return json.dumps(values, ensure_ascii=False)
 
 
+# The condition each testing job on main runs under: the merge queue did
+# not already pass the commit.
+UNTESTED = "needs.tested.outputs.tested != 'true'"
+
+
+def tested_job(ci: dict[str, Any]) -> str:
+    return ("  # Whether the merge queue already passed this commit: then the jobs\n"
+            "  # that only test it are skipped, and nothing here tests less than the\n"
+            "  # queue did.\n"
+            "  tested:\n    name: ci\n"
+            f"    uses: {ci['owner']}/pubkit/.github/workflows/job-tested.yml"
+            f"@{ref(__version__, ci['commit'])}\n"
+            "    permissions:\n      actions: read\n      contents: read\n")
+
+
 def workflow(ci: dict[str, Any], event: str) -> str:
     """The text of one event's workflow."""
     table = JOBS[ci["language"]]
     names = [name for name, on in ci["jobs"].items() if event in on]
+    # Main takes the merge queue's run of pr.yml where there is one.
+    shortcut = event == "main" and "pr" in ci["events"]
     out = [HEADER, f"name: {event}\n\non:\n", TRIGGERS[event].replace("CRON", ci["cron"]),
            "\npermissions:\n  contents: read\n\njobs:\n"]
+    if shortcut:
+        out.append(tested_job(ci))
     for name in names:
         job = table[name]
         given = {**{i: ci["with"][i] for i in job.inputs if i in ci["with"]}, **job.fixed}
@@ -386,11 +413,23 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         if "layout" in job.internal and ci["layout"]:
             given["layout"] = ci["layout"]
         needs = [n for n in job.needs if n in names]
-        out.append(f"{'' if name == names[0] else chr(10)}  {name}:\n    name: ci\n")
+        if shortcut:
+            needs = ["tested", *needs]
+        first = name == names[0] and not shortcut
+        out.append(f"{'' if first else chr(10)}  {name}:\n    name: ci\n")
         if needs:
             out.append(f"    needs: [{', '.join(needs)}]\n")
+        scan = shortcut and name == "sonar"
+        if scan:
+            # The scan runs either way, after the tests or in their place.
+            out.append("    if: ${{ !failure() && !cancelled() }}\n")
+            given["coverage-run"] = "${{ needs.tested.outputs.run-id }}"
+        elif shortcut:
+            out.append(f"    if: ${{{{ {UNTESTED} }}}}\n")
         out.append(f"    uses: {ci['owner']}/pubkit/.github/workflows/{job.workflow}"
                    f"@{ref(__version__, ci['commit'])}\n")
+        if scan:
+            out.append("    permissions:\n      actions: read\n      contents: read\n")
         if given:
             out.append(f"    with: {flow(given)}\n")
         # By name, not `secrets: inherit`: GitHub hands inherited secrets
@@ -401,21 +440,38 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     if ci["site"] and event == "pr":
         names = [*names, "site"]
         out.append(site_job(ci))
-    out.append(
-        "\n  # The one check a ruleset requires: it passes only when every job\n"
-        "  # above succeeded. None of them is ever skipped for not being asked for.\n"
-        "  passed:\n    name: ci / passed\n    if: always()\n"
-        f"    needs: [{', '.join(names)}]\n    runs-on: ubuntu-latest\n    steps:\n"
-        "      - run: |\n          echo \"$RESULTS\"\n"
-        "          echo \"$RESULTS\" | jq -e 'all(.[]; .result == \"success\")' > /dev/null\n"
-        "        env: { RESULTS: '${{ toJSON(needs) }}' }\n")
+    if shortcut:
+        out.append(
+            "\n  # The one check a ruleset requires: it passes only when every job\n"
+            "  # above succeeded or, where the merge queue already passed the\n"
+            "  # commit, was skipped for it. None is skipped for not being asked for.\n"
+            "  passed:\n    name: ci / passed\n    if: always()\n"
+            f"    needs: [{', '.join(['tested', *names])}]\n    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: |\n          echo \"$RESULTS\"\n"
+            "          echo \"$RESULTS\" | jq -e --arg tested \"$TESTED\" '.tested.result == \"success\"\n"
+            "            and all(.[]; .result == \"success\" or (.result == \"skipped\" and $tested == \"true\"))'"
+            " > /dev/null\n"
+            "        env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}' }\n")
+    else:
+        out.append(
+            "\n  # The one check a ruleset requires: it passes only when every job\n"
+            "  # above succeeded. None of them is ever skipped for not being asked for.\n"
+            "  passed:\n    name: ci / passed\n    if: always()\n"
+            f"    needs: [{', '.join(names)}]\n    runs-on: ubuntu-latest\n    steps:\n"
+            "      - run: |\n          echo \"$RESULTS\"\n"
+            "          echo \"$RESULTS\" | jq -e 'all(.[]; .result == \"success\")' > /dev/null\n"
+            "        env: { RESULTS: '${{ toJSON(needs) }}' }\n")
+    # A job skipped upstream skips the release too, unless it says otherwise.
+    after = ("    if: ${{ !cancelled() && needs.passed.result == 'success' }}\n"
+             if shortcut else "")
     release = ci["release"]
     if release and event in RELEASE_EVENTS and release.get("local"):
         out.append(
             "\n  # The repository's own release workflow, built from this checkout,\n"
             "  # so a change to it is tested here before a release carries it to\n"
             "  # anyone else.\n"
-            "  release:\n    needs: passed\n    uses: ./.github/workflows/release.yml\n"
+            "  release:\n    needs: passed\n" + after + "    uses: ./.github/workflows/release.yml\n"
             + (f"    with: {flow(release['with'])}\n" if release["with"] else "")
             + "    permissions:\n      contents: write\n")
     elif release and event in RELEASE_EVENTS:
@@ -424,7 +480,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "\n  # pubrel's release workflow: on a pull request, a code change records\n"
             "  # what it changes and a release is the bump its changes require; on\n"
             "  # main, a published version is tagged and released.\n"
-            "  release:\n    needs: passed\n"
+            "  release:\n    needs: passed\n" + after +
             f"    uses: {ci['owner']}/pubrel/.github/workflows/release.yml"
             f"@{ref(pubrel, release['commit'])}\n"
             f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with']})}\n"

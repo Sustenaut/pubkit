@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The main.yml pubkit sync writes skips the tests the merge queue already passed: a first job, tested (job-tested.yml), looks for a successful merge_group run of pr.yml on the pushed commit, which merging moves main to. Found, every job that only tests is skipped and sonar reads the queue run's coverage (job-sonar.yml's new coverage-run input), so main runs only the scan and the release; not found, as in a repository without the queue, every job runs as before. passed counts a job skipped for the queue's run, and the release runs whenever passed succeeds"
+}

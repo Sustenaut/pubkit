@@ -4,7 +4,8 @@
 # in a private repository or a pull request from a fork, it says so and
 # passes. The full history lets it tell new code from old, and every
 # coverage* artifact of the run, each in coverage-download/<artifact>/,
-# gives the coverage SonarQube Cloud's quality gate asks of new code. Each
+# gives the coverage SonarQube Cloud's quality gate asks of new code: from
+# coverage-run instead, when the tests ran there and not here. Each
 # `property=pattern` in reports sends the files whose names match the
 # pattern (find -name) to that property. layout, where the code and its
 # tests are, which `pubkit sync` works out, comes first: sonar-args, then
@@ -21,6 +22,7 @@ on:
     inputs:
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
       layout: { type: string, default: '', description: "Where the code and its tests are, as SonarQube Cloud properties, such as -Dsonar.sources=src -Dsonar.tests=tests; pubkit sync gives it from the directories the repository has. sonar-args comes after it, so the repository's own wins." }
+      coverage-run: { type: string, default: '', description: "Another run of this commit whose coverage artifacts to read, such as the merge queue's that a push to main skipped its tests for; the caller grants actions: read. Empty reads this run's." }
       reports: { type: string, required: true, description: "Where the coverage reports go: space-separated property=pattern pairs, such as sonar.rust.lcov.reportPaths=lcov.info sonar.python.coverage.reportPaths=*.xml." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
@@ -51,6 +53,9 @@ jobs:
         with:
           pattern: coverage*
           path: coverage-download
+          run-id: ${{ inputs.coverage-run }}
+          repository: ${{ github.repository }}
+          github-token: ${{ inputs.coverage-run != '' && github.token || '' }}
       # The reports keep the file names the test commands gave them.
       - if: env.SONAR_TOKEN != ''
         id: report

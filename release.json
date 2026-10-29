@@ -22,6 +22,7 @@
     ".github/workflows/job-osv.yml",
     ".github/workflows/job-review.yml",
     ".github/workflows/job-sonar.yml",
+    ".github/workflows/job-tested.yml",
     ".github/workflows/job-rust-gates.yml",
     ".github/workflows/job-rust-test.yml",
     ".github/workflows/job-rust-functional.yml",
