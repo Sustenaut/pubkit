@@ -70,8 +70,8 @@ jobs:
             .value.result == "success" or (.key == "review" and .value.result == "skipped"))' > /dev/null
         env: { RESULTS: '${{ toJSON(needs) }}' }
 
-  # The hosting modules (terraform/) and the deploy-static action
-  # (actions/), which consumers take by tag from this repository. Each
+  # The hosting modules (terraform/) and the deploy actions
+  # (actions/: deploy-static and deploy-ssh, which share one job), which consumers take by tag from this repository. Each
   # module's tests mock its providers, so nothing here needs credentials.
   # Terraform is the oldest version the modules allow, 1.11.
   terraform:
@@ -98,6 +98,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - run: shellcheck actions/deploy-static/*.sh
       - run: actions/deploy-static/test.sh
+      - run: shellcheck actions/deploy-ssh/*.sh
+      - run: actions/deploy-ssh/test.sh
 
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a

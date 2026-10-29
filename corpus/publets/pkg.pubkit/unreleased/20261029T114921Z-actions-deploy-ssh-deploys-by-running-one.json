@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "actions/deploy-ssh deploys by running one command on a server over SSH, with a key the server pins to one program (a forced command reading SSH_ORIGINAL_COMMAND), a required pinned host key, an optional bundle of workspace paths sent as a gzipped tar on the command's standard input, and an optional tailnet to join first (tailscale/github-action, as tag:ci), for what is not a directory of static files: a service the server rebuilds, a unit of a deploy script"
+}
