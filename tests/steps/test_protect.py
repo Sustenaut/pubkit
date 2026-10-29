@@ -157,10 +157,22 @@ def blocks_tags(built):
     assert {r["type"] for r in built["rules"]} == {"creation", "update", "deletion"}
 
 
+@when(parsers.parse('I build the tag ruleset for "{slug}"'), target_fixture="built")
+def build_tags_for(slug):
+    return protect.tag_ruleset(slug)
+
+
 @then("only GitHub Actions may bypass it")
 def actions_bypass(built):
     assert built["bypass_actors"] == [
         {"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}]
+
+
+@then("only the release app may bypass it")
+def app_bypass(built):
+    assert built["bypass_actors"] == [
+        {"actor_id": protect.RELEASE_APP, "actor_type": "Integration", "bypass_mode": "always"}]
+    assert protect.RELEASE_APP == 5529889
 
 
 @when("I read pubkit's protected.json", target_fixture="entries")
@@ -326,7 +338,7 @@ def sent_ruleset(github, slug, checks, old, queue):
 def sent_tags(github, slug):
     (call,) = [c for c in _sent(github) if c["body"]["target"] == "tag"]
     assert (call["method"], call["url"], call["body"]) == (
-        "POST", f"repos/{slug}/rulesets", protect.tag_ruleset())
+        "POST", f"repos/{slug}/rulesets", protect.tag_ruleset(slug))
 
 
 @then("GitHub was sent no tag ruleset")

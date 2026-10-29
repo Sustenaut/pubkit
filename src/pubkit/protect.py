@@ -18,7 +18,10 @@ line. pubkit's own list is the protected.json in its checkout.
 
 `tag-ruleset.json`, also in the wheel, keeps the release tags (`v*`) to
 CI: nobody may create, move or delete one, and only GitHub Actions, where
-`pubrel tag` runs once a release pull request merges, may bypass it. A
+`pubrel tag` runs once a release pull request merges, may bypass it. In
+an organization's repository GitHub refuses the GitHub Actions app as a
+bypass actor, so a Sustenaut repository's tags let through the Sustenaut
+release app (RELEASE_APP) instead, whose token `pubrel tag` uses there. A
 hand-pushed tag cannot release code that CI did not pass. A repository
 that releases no tags goes without it: `"tags": false` in its entry, or
 `--no-tags`.
@@ -53,6 +56,10 @@ from typing import Any
 
 # The app that reports a check. Every other check is a GitHub Actions job.
 GITHUB_ACTIONS = 15368
+# The Sustenaut release app, the one actor that may create a release tag
+# in a repository of its organization, where GitHub Actions may not.
+RELEASE_APP = 5529889
+RELEASE_APP_OWNER = "sustenaut"
 APPS = {"SonarCloud Code Analysis": 12526}
 
 Api = Callable[[str, str, Any], Any]
@@ -67,9 +74,14 @@ def base(name: str = "ruleset.json") -> dict:
     return json.loads(resources.files("pubkit").joinpath(name).read_text(encoding="utf-8"))
 
 
-def tag_ruleset() -> dict:
-    """The ruleset every repository's release tags carry."""
-    return base("tag-ruleset.json")
+def tag_ruleset(repo: str = "") -> dict:
+    """The ruleset `repo`'s release tags carry: GitHub Actions bypasses it,
+    or in the release app's organization, the release app."""
+    out = base("tag-ruleset.json")
+    if repo.split("/", 1)[0].lower() == RELEASE_APP_OWNER:
+        out["bypass_actors"] = [{"actor_id": RELEASE_APP, "actor_type": "Integration",
+                                 "bypass_mode": "always"}]
+    return out
 
 
 def ruleset(checks: list[str], queue: bool = True) -> dict:
@@ -180,7 +192,7 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
                                        "its default branch", check), repo, check)
     if not tags:
         return lines, bad
-    tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(), current(api, repo, "tag"),
+    tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo), current(api, repo, "tag"),
                                                "its release tags", check), repo, check)
     return lines + tag_lines, bad or tag_bad
 

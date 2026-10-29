@@ -183,6 +183,23 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then "pr.yml" runs the jobs "test, audit, osv, passed, release"
     And "main.yml" runs the jobs "tested, test, audit, osv, sonar, passed, release"
 
+  Scenario Outline: The release workflow gets the release app's secrets from pubrel 0.6.1
+    Given a Node repository whose ci block is '{"release": {"pubrel": "<pubrel>"}}'
+    When I run pubkit "sync"
+    Then in "pr.yml" and "main.yml" the release is <given> the release app's secrets
+
+    Examples:
+      | pubrel | given     |
+      | 0.6.0  | not given |
+      | 0.6.1  | given     |
+      | 0.7.0  | given     |
+      | 1.0.0  | given     |
+
+  Scenario: The repository's own release workflow gets the release app's secrets
+    Given a Rust repository whose ci block is '{"release": {"uses": "local"}}'
+    When I run pubkit "sync"
+    Then in "pr.yml" and "main.yml" the release is given the release app's secrets
+
   Scenario: The release workflow comes at the pubrel the ci block names
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.4", "with": {"semver-checks-version": "0.51.0"}}}'
     When I run pubkit "sync"
