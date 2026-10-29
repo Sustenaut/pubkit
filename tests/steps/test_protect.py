@@ -34,6 +34,19 @@ if f:
         sys.exit(1)
     print(json.dumps({{"content": state["files"][f.group(1)]}}))
     sys.exit(0)
+r = re.match(r"repos/([^/]+/[^/]+)$", url)
+if r:
+    print(json.dumps(state.get("repos", {{}}).get(
+        r.group(1), {{"visibility": "public", "owner": {{"type": "Organization"}}}})))
+    sys.exit(0)
+o = re.match(r"orgs/([^/]+)$", url)
+if o:
+    if o.group(1) not in state.get("orgs", {{}}):
+        print(json.dumps({{"message": "Not Found"}}))
+        sys.stderr.write("gh: Not Found (HTTP 404)\\n")
+        sys.exit(1)
+    print(json.dumps(state["orgs"][o.group(1)]))
+    sys.exit(0)
 m = re.match(r"repos/([^/]+/[^/]+)/rulesets(?:/(\\d+))?", url)
 repo, rid = m.group(1), m.group(2)
 rulesets = state["rulesets"].setdefault(repo, [])
@@ -43,6 +56,8 @@ if method != "GET":
         sys.exit(1)
     body = json.load(sys.stdin)
     reasons = state["reject"].get(repo) or state["reject"].get(repo + " " + body["target"])
+    if repo in state.get("no_queue", []) and any(r["type"] == "merge_queue" for r in body["rules"]):
+        reasons = ["Invalid rule 'merge_queue': "]
     if reasons:
         print(json.dumps({{"message": "Validation Failed", "errors": reasons}}))
         sys.stderr.write("gh: Validation Failed (HTTP 422)\\n")
@@ -314,6 +329,25 @@ def rejects_tags(github, slug, reason):
     _edit(github, lambda s: s["reject"].__setitem__(f"{slug} tag", [reason]))
 
 
+@given(parsers.parse('"{slug}" is a {visibility} repository of an organization on the "{plan}" plan'))
+def org_repo(github, slug, visibility, plan):
+    def change(s):
+        s.setdefault("repos", {})[slug] = {"visibility": visibility, "owner": {"type": "Organization"}}
+        s.setdefault("orgs", {})[slug.split("/")[0]] = {"plan": {"name": plan}}
+    _edit(github, change)
+
+
+@given(parsers.parse('"{slug}" is a public repository of a personal account'))
+def user_repo(github, slug):
+    _edit(github, lambda s: s.setdefault("repos", {}).__setitem__(
+        slug, {"visibility": "public", "owner": {"type": "User"}}))
+
+
+@given(parsers.parse('GitHub refuses the merge queue in "{slug}"'))
+def refuses_queue(github, slug):
+    _edit(github, lambda s: s.setdefault("no_queue", []).append(slug))
+
+
 @given(parsers.parse('GitHub refuses to change rulesets in "{slug}"'))
 def refuses(github, slug):
     _edit(github, lambda s: s["refuse"].append(slug))
@@ -356,3 +390,9 @@ def sent_nothing(github):
 def no_admin_hint(result):
     out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
     assert "repository admin" not in out, out
+
+
+@then("it prints nothing about a merge queue")
+def no_queue_note(result):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert "merge queue" not in out and "merge_queue" not in out, out

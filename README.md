@@ -832,7 +832,13 @@ pull requests stacked behind one another merge one at a time. GitHub
 offers a merge queue only to an organization's public repositories (and to
 private ones on Enterprise Cloud); a repository without one, `"queue":
 false` in its entry or `--no-queue`, instead merges only after the checks
-pass on a branch that is up to date with main. Which repositories carry it, and the checks each
+pass on a branch that is up to date with main. `pubkit protect` works this
+out itself: it reads each repository's owner and visibility (and a private
+one's organization plan) and leaves the queue out, with a note, for a
+personal account's repository or a private one off Enterprise Cloud, and
+should GitHub still refuse the `merge_queue` rule, it warns and tries once
+more without it. The generated `pr.yml`'s `merge_group` trigger then never
+fires, and does no harm. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
     pubkit protect [--check] [--no-tags] [--no-queue] [--config FILE | --require CHECK...] [REPO...]

@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubkit protect no longer fails on a private repository with \"Invalid rule 'merge_queue'\" (HTTP 422): GitHub offers a merge queue only to an organization's public repositories and Enterprise Cloud's private ones, so protect reads each repository's owner and visibility, and a private one's organization plan, and gives main's ruleset without the queue (strict up-to-date checks instead) where there is none, saying so; should GitHub still refuse the merge_queue rule, it warns and tries once more without it"
+}
