@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "A repository that deploys a static site with deploy-static gets a ci / site job in its generated pr.yml, part of ci / passed: it builds the site (pubkit.json's new site.pr_build, else site.build) and runs deploy-static at the locked pubkit with its new check-only input, which runs pubkit site check and deploys nothing, so a site that would fail to deploy fails the pull request. site.check_dir names the directory (else the dir the deploy workflow gives deploy-static) and site.url the address; sync refuses any other site setting"
-}
