@@ -347,7 +347,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   a site that is not public.
 
   ```yaml
-  - uses: Sustenaut/pubkit/actions/deploy-static@vX.Y.Z
+  - uses: Sustenaut/pubkit/actions/deploy-static@<commit> # vX.Y.Z
     with:
       dir: site
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
@@ -357,6 +357,36 @@ own modules, which only a repository on Google Cloud or deSEC takes.
       deploy-target: deploy@example.eu:./
       known-hosts: example.eu ssh-ed25519 AAAA...
       site-url: https://example.eu/
+  ```
+
+  Pin it as above, to the commit of the pubkit release your lock pins, with
+  the version in a comment, so the check it runs is that release's.
+  `pubkit bump` and the nightly move it with the lock, under the old owner
+  (`schryer/`) too, and `pubkit sync --check` (so `ci / passed`) and
+  `pubkit conform` fail while it pins another pubkit or another commit. A
+  pin with no version, such as `@main`, is left as it is and reported.
+
+- **`actions/deploy-ssh`:** deploys what is not a directory of files (a
+  service the server rebuilds, a unit of a deploy script) by running one
+  `command` on a server over SSH, with `bundle`'s paths as a gzipped tar
+  on its standard input. The `deploy-key` should be one the server pins
+  to a single program, `command="/usr/local/bin/example-deploy",restrict`
+  in authorized_keys, which reads the command from `SSH_ORIGINAL_COMMAND`
+  and checks it against the units it knows. `known-hosts` is required: a
+  command is never sent to whatever host answers. With
+  `tailscale-oauth-client-id` and `tailscale-oauth-secret` the runner
+  first joins a tailnet (tailscale/github-action, as `tailscale-tags`,
+  `tag:ci` by default), for a server whose SSH is reachable there only.
+  The command's exit status is the step's.
+
+  ```yaml
+  - uses: Sustenaut/pubkit/actions/deploy-ssh@<commit> # vX.Y.Z
+    with:
+      command: share-edge
+      bundle: scripts/photos/share
+      deploy-key: ${{ secrets.DEPLOY_KEY }}
+      target: deploy@example.eu
+      known-hosts: example.eu ssh-ed25519 AAAA...
   ```
 
 **Moving a zone that is already in use.** Hetzner made the apex NS rrset

@@ -152,6 +152,34 @@ def calls_owner(repo, path, owner):
     assert {o for o, _ in calls} == {owner}, calls
 
 
+# A pubkit action's pin, by what it is to the pubkit under test.
+ACTION_PINS = {
+    "this pubkit's commit": lambda v: "0f3574a72707a46bae149d3ed7a4644b4837795a # v" + v,
+    "this pubkit's tag": lambda v: "v" + v,
+    "another commit": lambda v: "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v" + v,
+    "another pubkit": lambda v: "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1",
+    "main": lambda v: "main",
+}
+
+
+@given(parsers.parse('the workflow "{name}" uses "{owner}"\'s pubkit action "{action}" at "{pin}"'))
+def uses_action(repo, name, owner, action, pin):
+    from pubkit import __version__  # noqa: PLC0415
+
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("on: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n"
+                    f"      - uses: {owner}/pubkit/actions/{action}@{ACTION_PINS[pin](__version__)}\n")
+
+
+@then(parsers.parse('"{path}" uses "{owner}"\'s pubkit action "{action}" at "{pin}"'))
+def action_at(repo, path, owner, action, pin):
+    from pubkit import __version__  # noqa: PLC0415
+
+    want = f"uses: {owner}/pubkit/actions/{action}@{ACTION_PINS[pin](__version__)}\n"
+    assert want in (repo / path).read_text(), (repo / path).read_text()
+
+
 @then(parsers.parse('"{path}" contains "{text}"'))
 def contains(repo, path, text):
     assert text in (repo / path).read_text()

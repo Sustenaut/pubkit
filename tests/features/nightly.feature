@@ -52,6 +52,27 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And ".github/workflows/ci.yml" contains "uses: sustenaut/pubkit/.github/workflows/node-ci.yml@v"
     And ".github/workflows/ci.yml" does not contain "schryer"
 
+  Scenario Outline: pins moves a pubkit action to this pubkit's commit, under the current owner
+    Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
+
+    Examples:
+      | owner     | pin               |
+      | Sustenaut | another pubkit    |
+      | schryer   | another pubkit    |
+      | Sustenaut | this pubkit's tag |
+      | Sustenaut | another commit    |
+
+  Scenario: pins leaves a pubkit action that names no version
+    Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
+
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
