@@ -66,6 +66,22 @@ def bare_page(repo, path):
     target.write_text("<!doctype html><html><head><title>About</title></head><body></body></html>\n")
 
 
+@given(parsers.parse('the page "{path}" has a language, a title and robots "{robots}"'))
+def unlisted_page(repo, path, robots):
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('<!doctype html><html lang="en"><head><title>Storage</title>'
+                      f'<meta name="robots" content="{robots}"></head><body></body></html>\n')
+
+
+@given(parsers.parse('the page "{path}" has only a title and robots "{robots}"'))
+def bare_unlisted_page(repo, path, robots):
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('<!doctype html><html><head><title>Storage</title>'
+                      f'<meta name="robots" content="{robots}"></head><body></body></html>\n')
+
+
 @given("the site's card is a 640×480 JPEG")
 def small_card(repo):
     # Named .png still: the check reads the bytes, not the name.

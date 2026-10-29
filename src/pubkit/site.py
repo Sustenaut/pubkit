@@ -12,7 +12,11 @@ CHECKS.
 It reads the built directory only, never the network: an og:image under the
 site's own address (--url) is looked up in DIR; one elsewhere is only
 checked to be an https address. Pages that are not for sharing are left
-out: 404.html, and redirects (`<meta http-equiv="refresh">`).
+out: 404.html, and redirects (`<meta http-equiv="refresh">`). A page that
+asks not to be indexed (`<meta name="robots" content="noindex">`, or
+"none") is not for sharing or search either, so only the rules that hold
+for any page apply to it: its language and title, not its description,
+card or image, nor what robots.txt lets in.
 
 It uses only the standard library, so deploy-static runs it from pubkit's
 source without installing pubkit.
@@ -59,6 +63,7 @@ class Page(HTMLParser):
         self.title = ""
         self.meta: dict[str, str] = {}
         self.redirect = False
+        self.noindex = False
         self._in_title = False
         self.feed(text)
 
@@ -71,6 +76,9 @@ class Page(HTMLParser):
         elif tag == "meta":
             if a.get("http-equiv", "").lower() == "refresh":
                 self.redirect = True
+            if a.get("name", "").lower() == "robots":
+                words = a.get("content", "").lower().replace(",", " ").split()
+                self.noindex = self.noindex or "noindex" in words or "none" in words
             key = a.get("property") or a.get("name")
             if key:
                 self.meta.setdefault(key.lower(), a.get("content", "").strip())
@@ -135,7 +143,8 @@ def local(root: Path, url: str, base: str | None) -> Path | None:
 
 
 def check_page(rel: str, page: Page) -> dict[str, list[str]]:
-    """The WEB-PAGE and WEB-OG-01/03 problems of one page."""
+    """The WEB-PAGE and WEB-OG-01/03 problems of one page; for a page that
+    asks not to be indexed, only those of WEB-PAGE-01 and its title."""
     out: dict[str, list[str]] = {}
 
     def problem(rule: str, text: str) -> None:
@@ -146,6 +155,8 @@ def check_page(rel: str, page: Page) -> dict[str, list[str]]:
                                "so screen readers and translators read it right")
     if not page.title.strip():
         problem("WEB-PAGE-02", "no <title>; give the page a title, which search results and tabs show")
+    if page.noindex:
+        return out
     if not page.meta.get("description"):
         problem("WEB-PAGE-02", 'no <meta name="description">; add one or two sentences on what the page is')
     missing = [k for k in ("og:title", "og:description", "og:type", "og:url", "og:image")
@@ -233,6 +244,8 @@ def checks(root: Path, base: str | None) -> tuple[int, dict[str, list[str]]]:
         rel = path.relative_to(root).as_posix()
         for rule, texts in check_page(rel, page).items():
             out.setdefault(rule, []).extend(texts)
+        if page.noindex:
+            continue
         if image := check_image(root, rel, page, base, seen):
             out.setdefault("WEB-OG-02", []).extend(image)
         urls.append(address(root, path, base or PLACEHOLDER))
