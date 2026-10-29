@@ -44,6 +44,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And it prints "ci.yml: pubrel release workflow 0.5.3 pinned to"
     And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
 
+  Scenario: pins moves a workflow pinned under the old owner to workflows_owner's
+    Given pubkit.json names the workflows owner "sustenaut"
+    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubkit/.github/workflows/node-ci.yml@v0.0.1"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And ".github/workflows/ci.yml" contains "uses: sustenaut/pubkit/.github/workflows/node-ci.yml@v"
+    And ".github/workflows/ci.yml" does not contain "schryer"
+
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"

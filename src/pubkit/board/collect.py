@@ -17,7 +17,7 @@ from typing import Any
 from .. import protect
 from ..freshness import PIN
 from ..nightly import PUBREL_VERSION
-from ..refs import AT, RELEASE_PIN, VERSION
+from ..refs import ANY_OWNER, AT, RELEASE_PIN, VERSION
 from .connectors.actions import Actions
 from .connectors.base import Fact
 from .connectors.github import GitHub
@@ -27,8 +27,8 @@ from .connectors.scorecard import Scorecard
 from .connectors.sonarcloud import SonarCloud
 
 # Any pubkit reusable workflow, the generated job-*.yml included, by
-# commit or by tag.
-PUBKIT_PIN = re.compile(r"schryer/pubkit/\.github/workflows/[\w.-]+\.ya?ml@" + AT + VERSION)
+# commit or by tag, under any owner.
+PUBKIT_PIN = re.compile(ANY_OWNER + r"pubkit/\.github/workflows/[\w.-]+\.ya?ml@" + AT + VERSION)
 LIVE_KEYS = {"health", "test", "deploy"}
 WORKFLOW_NAME = re.compile(r"[\w.-]+\.ya?ml")
 

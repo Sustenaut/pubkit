@@ -39,7 +39,7 @@ import tomllib
 from pathlib import Path
 
 from . import __version__, standard
-from .refs import AT, VERSION, ref, release_commit
+from .refs import ANY_OWNER, AT, VERSION, owner, ref, release_commit
 
 # The audit sets every repository imports (cargo vet).
 SHARED_IMPORTS = {
@@ -61,7 +61,7 @@ DENY_BASELINE = {
 }
 # By commit, with the version in a comment, or by tag (refs.py).
 WORKFLOW_PIN = re.compile(
-    r"schryer/pubkit/\.github/workflows/(rust-ci|job-rust-[a-z]+)\.yml@" + AT + VERSION)
+    ANY_OWNER + r"pubkit/\.github/workflows/(?P<name>rust-ci|job-rust-[a-z]+)\.yml@" + AT + VERSION)
 
 
 def today() -> datetime.date:
@@ -261,24 +261,25 @@ def audit_declared(root: Path) -> list[str]:
             "and whose version is `.venv/bin/pubkit --version`"]
 
 
-def workflow_pins(root: Path) -> list[str]:
+def workflow_pins(root: Path, calls: str) -> list[str]:
     """Problems with the pins of rust-ci.yml, or of the job-rust-*.yml jobs
-    the ci block's workflows call, in this repository's workflows."""
+    the ci block's workflows call, in this repository's workflows, under
+    any owner; `calls` is the owner whose rust-ci.yml it should call."""
     problems, uses = [], 0
     commit = release_commit()
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         for m in WORKFLOW_PIN.finditer(path.read_text(encoding="utf-8")):
             uses += 1
             if m["version"] != __version__:
-                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@v{m['version']} is "
+                problems.append(f"{path.relative_to(root)}: {m['name']}.yml@v{m['version']} is "
                                 f"not pubkit {__version__}, which tests/requirements.lock pins; "
                                 f"use @{ref(__version__, commit)}")
             elif commit and m["commit"] and m["commit"] != commit:
-                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@{m['commit']} is "
+                problems.append(f"{path.relative_to(root)}: {m['name']}.yml@{m['commit']} is "
                                 f"not the commit of pubkit {__version__}'s tag; use "
                                 f"@{ref(__version__, commit)}")
     if not uses:
-        problems.append("no workflow calls schryer/pubkit/.github/workflows/rust-ci.yml; "
+        problems.append(f"no workflow calls {calls}/pubkit/.github/workflows/rust-ci.yml; "
                         "give pubkit.json a ci block, and `pubkit sync` writes them")
     return problems
 
@@ -293,7 +294,7 @@ def run(root: Path, config: dict) -> tuple[list[str], list[str]]:
         if rule in waived:
             continue
         problems += [f"{rule}: {t}" for t in texts]
-    problems += workflow_pins(root)
+    problems += workflow_pins(root, owner(config))
     conformed = sum(1 for r in rules if any(c["kind"] == "conform" for c in r["checks"]))
     lines = [f"conforms to the Rust crate standard ({conformed} rules checked here)"]
     lines += [f"open exception: {e}" for e in open_]

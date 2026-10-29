@@ -977,6 +977,8 @@ Sync pins each one, and pubrel's release workflow, to the full commit of the rel
 
 Usually neither needs the network. pubkit's commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubkit has none, and pins by tag. pubrel's commit is the one pubkit records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
+Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/refs.py` (`schryer` for now), so the release after the repositories' transfer moves every repository to the new owner on its next `pubkit sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubkit pins` (`pubkit bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubkit.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, `freshness`, the nightly, the board and the audit read a pin under any owner, so one still under the old owner keeps working.
+
 ```json
 "ci": {
   "events": ["pr", "main", "nightly"],

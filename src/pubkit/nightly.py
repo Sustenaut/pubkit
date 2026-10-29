@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import __version__
 from .paths import confined
-from .refs import AT, RELEASE_PIN, VERSION, pubrel_commit, release_commit, repin
+from .refs import ANY_OWNER, AT, RELEASE_PIN, VERSION, owner_of, pubrel_commit, release_commit, repin
 
 # The crates the pub* repositories publish, which `pins` moves rather than
 # `crates`.
@@ -52,8 +52,8 @@ CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
 PUB_VERSION = re.compile(r"(pub-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
 # Every pubkit reusable workflow a repository can call, not only rust-ci.
-CI_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/(?:rust|python|node|service)-ci\.yml@)"
-                    + AT + VERSION)
+CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/"
+                    r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
 
 # The languages pubkit's settings name, each by the ecosystem pubkit works
 # with: crates, npm packages, and the hash-locked Python requirements.
@@ -191,6 +191,7 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         from .cli import sync  # noqa: PLC0415
         sync(root, check=False)
     from .ci import is_generated  # noqa: PLC0415
+    calls = owner_of(root)
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
         if is_generated(text):  # pubkit sync writes these, from pubkit.json
@@ -207,8 +208,9 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
                 moved = pattern.sub(rf"\g<1>{version}", new)
             else:
                 # A workflow's pin: the commit moves with the version.
-                commit = release_commit() if pattern is CI_PIN else pubrel_commit(version, new)
-                moved = repin(pattern, new, version, commit)
+                commit = (release_commit() if pattern is CI_PIN
+                          else pubrel_commit(version, new, calls))
+                moved = repin(pattern, new, calls, version, commit)
             for m in pattern.finditer(new):
                 if m["version"] != version and pattern is not CI_PIN:  # "pubkit A -> B" says it
                     changes.append(f"{path.name}: {what} {m['version']} -> {version}")

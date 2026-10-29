@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .refs import ref, release_commit
+from .refs import owner, ref, release_commit
 
 EVENTS = ("pr", "main", "nightly")
 DEFAULT_EVENTS = ("pr", "main")
@@ -297,7 +297,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         out.append(f"{'' if name == names[0] else chr(10)}  {name}:\n    name: ci\n")
         if needs:
             out.append(f"    needs: [{', '.join(needs)}]\n")
-        out.append(f"    uses: schryer/pubkit/.github/workflows/{job.workflow}"
+        out.append(f"    uses: {ci['owner']}/pubkit/.github/workflows/{job.workflow}"
                    f"@{ref(__version__, ci['commit'])}\n")
         if given:
             out.append(f"    with: {flow(given)}\n")
@@ -330,7 +330,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "  # what it changes and a release is the bump its changes require; on\n"
             "  # main, a published version is tagged and released.\n"
             "  release:\n    needs: passed\n"
-            f"    uses: schryer/pubrel/.github/workflows/release.yml@{ref(pubrel, release['commit'])}\n"
+            f"    uses: {ci['owner']}/pubrel/.github/workflows/release.yml"
+            f"@{ref(pubrel, release['commit'])}\n"
             f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with']})}\n"
             "    permissions:\n      contents: write\n")
     return "".join(out)
@@ -345,12 +346,13 @@ def generated(config: dict[str, Any], root: Path) -> list[tuple[str, str]]:
     ci = settings(config, root)
     if ci is None:
         return []
+    ci["owner"] = owner(config)
     ci["commit"] = release_commit()
     if ci["release"] and not ci["release"].get("local"):
         from .refs import pubrel_commit  # noqa: PLC0415
         written = "".join((root / path(e)).read_text(encoding="utf-8") for e in EVENTS
                           if (root / path(e)).is_file())
-        ci["release"]["commit"] = pubrel_commit(ci["release"]["pubrel"], written)
+        ci["release"]["commit"] = pubrel_commit(ci["release"]["pubrel"], written, ci["owner"])
     return [(path(event), workflow(ci, event)) for event in ci["events"]]
 
 

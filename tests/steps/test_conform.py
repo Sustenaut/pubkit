@@ -56,9 +56,9 @@ def key_object(label: str) -> bytes:
     return b"\xa2" + text("body") + body + text("type") + text("key")
 
 
-def workflow(version: str) -> str:
+def workflow(version: str, owner: str = "schryer") -> str:
     return ("jobs:\n  ci:\n    uses: "
-            f"schryer/pubkit/.github/workflows/rust-ci.yml@{version}\n")
+            f"{owner}/pubkit/.github/workflows/rust-ci.yml@{version}\n")
 
 
 @given("a Rust crate that meets the standard")
@@ -132,6 +132,12 @@ def no_import(repo, name):
 @given(parsers.parse('the workflow calls rust-ci.yml at "{version}"'))
 def pinned(repo, version):
     (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(version))
+
+
+@given(parsers.parse('the workflow calls "{owner}"\'s rust-ci.yml at "{version}"'))
+def pinned_by_owner(repo, owner, version):
+    version = f"v{__version__}" if version == "this pubkit" else version
+    (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(version, owner))
 
 
 @given(parsers.parse('the workflow calls rust-ci.yml at commit "{commit}" of "{version}"'))

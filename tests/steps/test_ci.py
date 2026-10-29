@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__, ci
+from pubkit import __version__, ci, refs
 
 scenarios("ci.feature")
 
@@ -114,9 +114,8 @@ def scheduled(repo, name, cron):
 def release(repo, name, version, key, value):
     job = jobs(repo, name)["release"]
     # By tag only when pubrel's tags could not be read; by commit otherwise.
-    assert re.fullmatch(r"schryer/pubrel/\.github/workflows/release\.yml@[0-9a-f]{40}|"
-                        rf"schryer/pubrel/\.github/workflows/release\.yml@v{re.escape(version)}",
-                        job["uses"]), job["uses"]
+    pubrel = re.escape(f"{refs.OWNER}/pubrel/.github/workflows/release.yml@")
+    assert re.fullmatch(rf"{pubrel}([0-9a-f]{{40}}|v{re.escape(version)})", job["uses"]), job["uses"]
     text = (repo / ".github" / "workflows" / name).read_text()
     assert re.search(rf"release\.yml@(v|[0-9a-f]{{40}} # v){re.escape(version)}\n", text)
     assert job["with"]["pubrel-version"] == f"v{version}"
@@ -134,20 +133,21 @@ def recorded_pubrel(repo, name):
 
 @when(parsers.parse('every pin reader reads "{line}"'), target_fixture="read")
 def read_pin(line):
-    from pubkit import conform, freshness, nightly, refs  # noqa: PLC0415
+    from pubkit import conform, freshness, nightly  # noqa: PLC0415
     from pubkit.board import collect  # noqa: PLC0415
 
     patterns = {"conform": conform.WORKFLOW_PIN, "bump": freshness.WORKFLOW_PIN,
                 "nightly": nightly.CI_PIN, "board": collect.PUBKIT_PIN,
                 "release": refs.RELEASE_PIN}
-    return {name: (m["version"], m["commit"]) for name, p in patterns.items()
+    return {name: (m["owner"], m["version"], m["commit"]) for name, p in patterns.items()
             if (m := p.search(line))}
 
 
-@then(parsers.parse('{readers} read version "{version}" and commit "{commit}"'))
-def read_as(read, readers, version, commit):
+@then(parsers.parse('{readers} read owner "{owner}", version "{version}" and commit "{commit}"'))
+def read_as(read, readers, owner, version, commit):
     for reader in readers.split(", "):
-        assert read.get(reader) == (version, None if commit == "none" else commit), (reader, read)
+        want = (owner, version, None if commit == "none" else commit)
+        assert read.get(reader) == want, (reader, read)
 
 
 @then(parsers.parse('every job in "{name}" but release is named "ci", and passed "ci / passed"'))

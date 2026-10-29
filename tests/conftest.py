@@ -109,19 +109,42 @@ def pubrel_gone(tmp_path, env):
 
 @then(parsers.parse('"{path}" pins pubrel\'s release workflow to the commit of "{tag}"'))
 def pins_pubrel(repo, pubrel_tags, path, tag):
+    from pubkit.refs import OWNER  # noqa: PLC0415
+
     text = (repo / path).read_text()
-    assert f"schryer/pubrel/.github/workflows/release.yml@{pubrel_tags[tag]} # {tag}\n" in text, text
+    assert f"{OWNER}/pubrel/.github/workflows/release.yml@{pubrel_tags[tag]} # {tag}\n" in text, text
 
 
 @then(parsers.parse('"{path}" pins pubkit\'s workflows to "{commit}"'))
 def pins_pubkit(repo, path, commit):
     from pubkit import __version__  # noqa: PLC0415
+    from pubkit.refs import OWNER  # noqa: PLC0415
 
     lines = [line for line in (repo / path).read_text().splitlines()
-             if "schryer/pubkit/.github/workflows/" in line]
+             if f"{OWNER}/pubkit/.github/workflows/" in line]
     assert lines, f"{path} calls no pubkit workflow"
     for line in lines:
         assert line.endswith(f".yml@{commit} # v{__version__}"), line
+
+
+@given(parsers.parse('pubkit.json names the workflows owner "{owner}"'))
+@when(parsers.parse('pubkit.json names the workflows owner "{owner}"'))
+def workflows_owner(repo, owner):
+    import json  # noqa: PLC0415
+
+    path = repo / "pubkit.json"
+    config = json.loads(path.read_text()) if path.exists() else {"kind": "utility"}
+    config["workflows_owner"] = json.loads(owner) if owner.startswith("[") else owner
+    path.write_text(json.dumps(config))
+
+
+@then(parsers.parse('every pubkit and pubrel workflow "{path}" calls is "{owner}"\'s'))
+def calls_owner(repo, path, owner):
+    import re  # noqa: PLC0415
+
+    calls = re.findall(r"uses: ([^/\s]+)/(pubkit|pubrel)/", (repo / path).read_text())
+    assert calls, f"{path} calls no pubkit or pubrel workflow"
+    assert {o for o, _ in calls} == {owner}, calls
 
 
 @then(parsers.parse('"{path}" contains "{text}"'))

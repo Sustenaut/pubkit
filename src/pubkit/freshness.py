@@ -21,10 +21,11 @@ import re
 from pathlib import Path
 
 from . import __version__
-from .refs import AT, VERSION, ref, release_commit, repin
+from .refs import ANY_OWNER, AT, VERSION, owner_of, ref, release_commit, repin
 
 PIN = re.compile(r"/download/v([0-9][^/]*)/pubkit-")
-WORKFLOW_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/rust-ci\.yml@)" + AT + VERSION)
+WORKFLOW_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/rust-ci\.yml@)"
+                          + AT + VERSION)
 
 
 def pinned(repo: Path) -> str | None:
@@ -87,10 +88,10 @@ def bump(root: Path) -> int:
 
     sync(root, check=False)
     lock(root)
-    commit = release_commit()
+    commit, calls = release_commit(), owner_of(root)
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
-        new = repin(WORKFLOW_PIN, text, __version__, commit)
+        new = repin(WORKFLOW_PIN, text, calls, __version__, commit)
         if new != text:
             path.write_text(new, encoding="utf-8")
             print(f"updated  {path.relative_to(root)} (rust-ci.yml@{ref(__version__, commit)})")
