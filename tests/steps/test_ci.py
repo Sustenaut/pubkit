@@ -100,10 +100,17 @@ def asks_tested(repo, name, queued):
     assert first == "tested"
     assert job["uses"].startswith(f"{refs.OWNER}/pubkit/.github/workflows/job-tested.yml@")
     assert job["permissions"] == {"actions": "read", "contents": "read"}
-    # job-tested.yml's default is the pull request workflow sync writes.
+    assert job["with"] == {"workflow": f".github/workflows/{queued}"}
     data, _ = declared("job-tested.yml")
-    assert triggers(data)["workflow_call"]["inputs"]["workflow"]["default"] == \
-        f".github/workflows/{queued}"
+    assert "workflow" in triggers(data)["workflow_call"]["inputs"]
+
+
+@then(parsers.parse('in "{name}" the "{job}" job runs whatever the queue passed'))
+def runs_anyway(repo, name, job):
+    spec = jobs(repo, name)[job]
+    assert "if" not in spec, spec
+    assert "tested" not in spec.get("needs", []), spec
+    assert job in jobs(repo, name)["passed"]["needs"]
 
 
 @then(parsers.parse('in "{name}" every job but tested, the scan, passed and release runs only when it did not'))
@@ -179,6 +186,16 @@ def scheduled(repo, name, cron):
 @then(parsers.parse('"{name}" runs on pull requests and in the merge queue'))
 def queued(repo, name):
     assert set(triggers(generated(repo, name))) == {"pull_request", "merge_group"}
+
+
+@then(parsers.parse('"{name}" runs on pull requests alone'))
+def pull_requests_alone(repo, name):
+    assert set(triggers(generated(repo, name))) == {"pull_request"}
+
+
+@then(parsers.parse('"{name}" runs in the merge queue alone'))
+def queue_alone(repo, name):
+    assert set(triggers(generated(repo, name))) == {"merge_group"}
 
 
 @then(parsers.parse('"{name}" runs on pushes to main alone'))

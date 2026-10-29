@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "A Rust repository's pull requests no longer run msrv, fuzz and cross on every push: pubkit sync writes queue.yml, which the merge queue runs (merge_group) with every pull request job and those three besides, so nothing merges before they pass, and pr.yml runs on pull_request alone. The ci block's events gain queue, on by default; where the queue would run nothing a pull request does not (Node, Python and service repositories by default) there is no queue.yml and pr.yml runs on merge_group as before, and a repository without a merge queue leaves queue out so its pull requests run the heavy jobs. main.yml's tested asks for the queue's workflow by name and skips only the jobs the queue ran; queue.yml carries the release and site checks too"
+}
