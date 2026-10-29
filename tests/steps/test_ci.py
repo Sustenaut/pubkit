@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -83,13 +84,77 @@ def not_written(repo, event):
     assert not (repo / ".github" / "workflows" / f"{event}.yml").exists()
 
 
-@then('no job in "pr.yml" or "main.yml" has a condition but passed')
-def unconditional(repo):
-    for name in ("pr.yml", "main.yml", "nightly.yml"):
-        if not (repo / ".github" / "workflows" / name).exists():
+@then(parsers.parse('no job in "{name}" has a condition but passed'))
+def unconditional(repo, name):
+    for job, spec in jobs(repo, name).items():
+        assert "if" not in spec or job == "passed", f"{name}: {job} has if: {spec.get('if')}"
+
+
+UNTESTED = "${{ needs.tested.outputs.tested != 'true' }}"
+
+
+@then(parsers.parse('"{name}" first asks whether the merge queue passed its commit in "{queued}"'))
+def asks_tested(repo, name, queued):
+    first, job = next(iter(jobs(repo, name).items()))
+    assert first == "tested"
+    assert job["uses"].startswith(f"{refs.OWNER}/pubkit/.github/workflows/job-tested.yml@")
+    assert job["permissions"] == {"actions": "read", "contents": "read"}
+    # job-tested.yml's default is the pull request workflow sync writes.
+    data, _ = declared("job-tested.yml")
+    assert triggers(data)["workflow_call"]["inputs"]["workflow"]["default"] == \
+        f".github/workflows/{queued}"
+
+
+@then(parsers.parse('in "{name}" every job but tested, the scan, passed and release runs only when it did not'))
+def skips_tested(repo, name):
+    for job, spec in jobs(repo, name).items():
+        if job in ("tested", "sonar", "passed", "release"):
             continue
-        for job, spec in jobs(repo, name).items():
-            assert "if" not in spec or job == "passed", f"{name}: {job} has if: {spec.get('if')}"
+        assert spec["if"] == UNTESTED, (job, spec.get("if"))
+        assert spec["needs"][0] == "tested", (job, spec["needs"])
+
+
+@then(parsers.parse('in "{name}" the scan runs either way, reading the coverage of the queue\'s run '
+                    'when it skipped the tests'))
+def scan_either_way(repo, name):
+    spec = jobs(repo, name).get("sonar")
+    if spec is None:  # a service has no scan
+        return
+    assert spec["if"] == "${{ !failure() && !cancelled() }}"
+    assert spec["needs"][0] == "tested"
+    assert spec["with"]["coverage-run"] == "${{ needs.tested.outputs.run-id }}"
+    assert spec["permissions"] == {"actions": "read", "contents": "read"}
+
+
+@then(parsers.parse('in "{name}" passed takes a job skipped for the queue\'s run as passed'))
+def passed_takes_skipped(repo, name):
+    spec = jobs(repo, name)["passed"]
+    assert spec["needs"] == list(jobs(repo, name))[:len(spec["needs"])]
+    run = spec["steps"][0]["run"]
+    check = re.search(r"jq -e --arg tested \"\$TESTED\" '(.*)'", run, re.S).group(1)
+
+    def verdict(results, tested):
+        proc = subprocess.run(["jq", "-e", "--arg", "tested", tested, check],
+                              input=json.dumps(results), capture_output=True, text=True)
+        return proc.returncode == 0
+
+    names = spec["needs"]
+    every = {n: {"result": "success"} for n in names}
+    skipped = {**every, **{n: {"result": "skipped"} for n in names[1:]}}
+    failed = {**every, names[-1]: {"result": "failure"}}
+    assert verdict(every, "false") and verdict(every, "true")
+    assert verdict(skipped, "true") and not verdict(skipped, "false")
+    assert not verdict(failed, "true")
+    assert not verdict({**every, "tested": {"result": "failure"}}, "false")
+    assert spec["steps"][0]["env"]["TESTED"] == "${{ needs.tested.outputs.tested }}"
+
+
+@then(parsers.parse('in "{name}" the release runs whenever passed succeeded'))
+def release_after_passed(repo, name):
+    spec = jobs(repo, name).get("release")
+    if spec is None:  # a service has no release
+        return
+    assert spec["if"] == "${{ !cancelled() && needs.passed.result == 'success' }}"
 
 
 @then(parsers.parse('in "{name}" the "{job}" job needs "{needs}"'))
@@ -130,6 +195,20 @@ def own_triggers(own):
     on = triggers(own)
     assert set(on) == {"pull_request", "merge_group", "push"}
     assert on["push"] == {"branches": ["main"]}
+
+
+@then("on a push to main it skips the tests the merge queue already passed on its commit")
+def own_shortcut(own):
+    jobs_ = own["jobs"]
+    tested = jobs_["tested"]
+    assert tested["uses"] == "./.github/workflows/job-tested.yml"
+    assert tested["if"] == "github.event_name == 'push'"
+    assert tested["with"] == {"workflow": ".github/workflows/ci.yml"}
+    for job in ("functional", "audit", "osv", "terraform", "deploy-static", "cache-action"):
+        assert jobs_[job]["needs"] == "tested", job
+        assert jobs_[job]["if"] == "${{ !cancelled() && needs.tested.outputs.tested != 'true' }}", job
+    assert jobs_["sonar"]["with"]["coverage-run"] == "${{ needs.tested.outputs.run-id }}"
+    assert "needs.tested.outputs.tested == 'true'" in jobs_["release"]["if"]
 
 
 @then("its wheel job runs only on a push to main")
