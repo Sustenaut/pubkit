@@ -1,4 +1,0 @@
-{
-  "category": "internal",
-  "change": "pubkit's own CI runs on merge_group too, so its required checks report in the merge queue; the release tags and the wheel is built from a push to main alone, as before"
-}

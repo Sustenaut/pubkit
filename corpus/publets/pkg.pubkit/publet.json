@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.18.0 is released as v0.18.0 from commit dac919c76205061c55c28ab0038897b8305e29c3.",
+      "content": "pubkit 0.19.0 is released as v0.19.0 from commit a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.18.0",
+            "0.19.0",
             "pubkit --version",
-            "pubkit 0.18.0",
-            "v0.18.0",
-            "dac919c76205061c55c28ab0038897b8305e29c3"
+            "pubkit 0.19.0",
+            "v0.19.0",
+            "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
           ]
         ]
       },
-      "scope": "the published release v0.18.0 of pubkit",
+      "scope": "the published release v0.19.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "dac919c76205061c55c28ab0038897b8305e29c3"
+          "revision": "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.18.0 was released on 2026-10-29 from commit dac919c76205061c55c28ab0038897b8305e29c3 with these changes.",
+      "content": "pubkit 0.19.0 was released on 2026-10-29 from commit a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe with these changes.",
       "data": {
         "columns": [
           {
@@ -58,46 +58,38 @@
         "rows": [
           [
             "changed",
-            "pubkit's main ruleset requires a branch to be up to date with main before it merges (strict_required_status_checks_policy true), so the tree a pull request tested is the tree main holds after the merge, the CI run on main repeats the pull request's, and tagging a release needs no tests of its own; `pubkit protect --check` reports a repository whose ruleset does not"
-          ],
-          [
-            "internal",
-            "The nightly pushes and opens its pull requests as the Sustenaut nightly GitHub App (NIGHTLY_APP_ID, NIGHTLY_APP_KEY): one token per governed repository, for it alone, with contents, pull-requests and workflows write and actions read, from actions/create-github-app-token. A fine-grained token covers one owner only, and the governed repositories moved to the Sustenaut organization. Without the app it falls back to PUBKIT_BUMP_TOKEN with a warning"
-          ],
-          [
-            "fixed",
-            "pubkit bump and the nightly's pubkit pins move every hand-written use of one of pubkit's actions (<owner>/pubkit/actions/<name>@<commit> # vX.Y.Z or @vX.Y.Z, under Sustenaut or the old schryer), such as deploy-static, to this pubkit's commit and version, so a repository bumped to 0.17.1 no longer runs 0.17.0's site check. pubkit sync --check, and so ci / passed, and pubkit conform fail while such a pin names another pubkit or another commit; one that names no version, such as @main, is left as it is and reported"
+            "pubkit's main ruleset merges through GitHub's merge queue (merge commits, one group of up to five at a time) instead of requiring a branch to be up to date with main: the queue runs the required checks on the pull request merged into main as main will hold it, so the tree the checks passed is still the tree main holds after the merge and tagging a release needs no tests of its own, and pull requests stacked behind one another merge one at a time without anyone updating a branch. GitHub offers a merge queue only to an organization's public repositories, so a repository without one says \"queue\": false in its protected.json entry or pubkit.json protect block, or `pubkit protect --no-queue`, and keeps requiring an up-to-date branch. `pubkit protect --check` and the board report a repository whose ruleset does not match"
           ],
           [
             "changed",
-            "`pubkit new` no longer writes an empty corpus/publets/pkg.<name>/unreleased.json: pubrel 0.6 records each unreleased change in a file of its own under unreleased/, and a new package needs pubrel 0.6.0 on this machine; new packages' CI calls pubrel 0.6.0's release workflow"
+            "The pull request workflow pubkit sync writes (pr.yml) also runs on merge_group, the merge queue's run of a pull request, so ci / passed and release / release report on the queue's merge and a queued pull request can merge. pubrel's release workflow only reports the check there: it tags from a push to main alone"
           ],
           [
             "internal",
-            "pubkit's own CI runs pubrel 0.6.0's release workflow, and its unreleased changes are files under corpus/publets/pkg.pubkit/unreleased/; the empty unreleased.json is gone"
+            "pubkit's own CI runs on merge_group too, so its required checks report in the merge queue; the release tags and the wheel is built from a push to main alone, as before"
           ],
           [
-            "added",
-            "A repository that deploys a static site with deploy-static gets a ci / site job in its generated pr.yml, part of ci / passed: it builds the site (pubkit.json's new site.pr_build, else site.build) and runs deploy-static at the locked pubkit with its new check-only input, which runs pubkit site check and deploys nothing, so a site that would fail to deploy fails the pull request. site.check_dir names the directory (else the dir the deploy workflow gives deploy-static) and site.url the address; sync refuses any other site setting"
+            "fixed",
+            "pubkit cache run no longer fails when a rule entry, or a unit value filling one, names files outside the repository: each file is named relative to its entry"
           ],
           [
-            "added",
-            "actions/deploy-ssh deploys by running one command on a server over SSH, with a key the server pins to one program (a forced command reading SSH_ORIGINAL_COMMAND), a required pinned host key, an optional bundle of workspace paths sent as a gzipped tar on the command's standard input, and an optional tailnet to join first (tailscale/github-action, as tag:ci), for what is not a directory of static files: a service the server rebuilds, a unit of a deploy script"
+            "fixed",
+            "pubkit bump, the nightly's pubkit pins, pubkit sync --check and pubkit conform cover every use of pubkit at a release in a repository's workflows, generated or hand-written: its reusable workflows (such as a hand-written ci.yml calling service-ci.yml or rust-ci.yml) as well as its actions. 0.18.0 moved and checked only the actions, so a hand-written service-ci.yml pin stayed at the old pubkit unnoticed"
           ],
           [
-            "added",
-            "pubkit cache and actions/cache: keep a build's slow-changing inputs for a period and its per-unit outputs under a fingerprint of what made them, by rules in pubkit.json's cache block (pubkit cache plan, run, prune)"
+            "changed",
+            "The cache block is one map of named entries, each taking path (was dir), refresh (run, day, week, month or never), version, inputs (were unit and shared file entries), tools (were tool: entries) and unit (one pattern with {unit}; pubkit cache run takes --unit VALUE); an entry needs refresh or inputs, an unknown key fails pubkit sync naming it, each entry gets its own cache key, and actions/cache's save prunes, so pubkit cache prune is no longer a workflow step"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.18.0 of pubkit",
+      "scope": "the published release v0.19.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "dac919c76205061c55c28ab0038897b8305e29c3"
+          "revision": "a216bfc1d627b964d5bebed8ab4f4b12d3d7ffbe"
         }
       ]
     }
