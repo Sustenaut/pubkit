@@ -1,7 +1,7 @@
 # Reusable CI for a Python package's functional suite:
 #
 #   ci:
-#     uses: schryer/pubkit/.github/workflows/python-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubkit/.github/workflows/python-ci.yml@vX.Y.Z
 #     with: { browser-test: ./dev test --browser }
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #

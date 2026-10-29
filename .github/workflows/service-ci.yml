@@ -2,7 +2,7 @@
 # releases, and runs its secret-needing commands through ./with-secrets.
 #
 #   ci:
-#     uses: schryer/pubkit/.github/workflows/service-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubkit/.github/workflows/service-ci.yml@vX.Y.Z
 #     with: { setup: make venv, test: .venv/bin/python -m pytest -q }
 #
 # Every job runs without secrets: tests that need one are the repository's

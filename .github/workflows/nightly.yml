@@ -93,7 +93,7 @@ jobs:
           tag=$(latest "$GITHUB_REPOSITORY")
           python -m pip install --quiet \
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
-          pubrel=$(latest schryer/pubrel); pub=$(latest schryer/publet)
+          pubrel=$(latest Sustenaut/pubrel); pub=$(latest schryer/publet)
           echo "pubrel=${pubrel#v}" >> "$GITHUB_OUTPUT"
           echo "pub=${pub#v}" >> "$GITHUB_OUTPUT"
         env: { GH_TOKEN: '${{ github.token }}' }

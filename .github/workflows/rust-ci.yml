@@ -1,7 +1,7 @@
 # Reusable CI for a Rust package whose behaviour a Gherkin suite tests:
 #
 #   ci:
-#     uses: schryer/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
 #     with: { pub-version: v0.1.1 }
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #

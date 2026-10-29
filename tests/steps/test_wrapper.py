@@ -16,7 +16,7 @@ from pubkit import __version__
 
 scenarios("wrapper.feature")
 
-WHEEL = (f"https://github.com/schryer/pubkit/releases/download/v{__version__}/"
+WHEEL = (f"https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/"
          f"pubkit-{__version__}-py3-none-any.whl")
 
 FAKE_UVX = f"""#!{sys.executable}

@@ -1,7 +1,7 @@
 # Reusable CI for a Node package:
 #
 #   ci:
-#     uses: schryer/pubkit/.github/workflows/node-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubkit/.github/workflows/node-ci.yml@vX.Y.Z
 #     with: { browser-test: npm run test:browser }
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #

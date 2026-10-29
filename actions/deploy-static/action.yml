@@ -2,7 +2,7 @@
 # or to both, so either can serve the site (terraform/static-site chooses
 # which one its name points at). Build the files in an earlier step.
 #
-#   - uses: schryer/pubkit/actions/deploy-static@vX.Y.Z
+#   - uses: Sustenaut/pubkit/actions/deploy-static@vX.Y.Z
 #     with:
 #       dir: site
 #       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
