@@ -107,7 +107,14 @@ Feature: A Rust repository conforms to the standard, or says why not
     And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "another pubkit"
     When I run pubkit "conform"
     Then it fails
-    And stderr mentions "deploy-static is at pubkit 0.0.1"
+    And stderr mentions "deploy-static@v0.0.1 is not pubkit"
+
+  Scenario: A hand-written call of another pubkit's workflow fails
+    Given a Rust crate that meets the standard
+    And the workflow "extra.yml" calls "Sustenaut"'s pubkit workflow "job-osv.yml" at "another pubkit"
+    When I run pubkit "conform"
+    Then it fails
+    And stderr mentions "extra.yml: job-osv.yml@v0.0.1 is not pubkit"
 
   Scenario: An exception skips its rule, and is listed
     Given a Rust crate that meets the standard

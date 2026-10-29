@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubkit bump, the nightly's pubkit pins, pubkit sync --check and pubkit conform cover every use of pubkit at a release in a repository's workflows, generated or hand-written: its reusable workflows (such as a hand-written ci.yml calling service-ci.yml or rust-ci.yml) as well as its actions. 0.18.0 moved and checked only the actions, so a hand-written service-ci.yml pin stayed at the old pubkit unnoticed"
+}

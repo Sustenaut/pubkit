@@ -39,7 +39,7 @@ import tomllib
 from pathlib import Path
 
 from . import __version__, standard
-from .refs import ANY_OWNER, AT, VERSION, owner, ref, release_commit, stale_actions
+from .refs import ANY_OWNER, AT, VERSION, owner, release_commit, stale_pins
 
 # The audit sets every repository imports (cargo vet).
 SHARED_IMPORTS = {
@@ -262,24 +262,16 @@ def audit_declared(root: Path) -> list[str]:
 
 
 def workflow_pins(root: Path, calls: str) -> list[str]:
-    """Problems with the pins of rust-ci.yml, or of the job-rust-*.yml jobs
-    the ci block's workflows call, and of pubkit's actions, in this
-    repository's workflows, under any owner; `calls` is the owner whose
-    rust-ci.yml it should call."""
+    """Problems with the pins of pubkit's reusable workflows and actions in
+    this repository's workflows, under any owner, and a repository that
+    calls neither rust-ci.yml nor the job-rust-*.yml jobs; `calls` is the
+    owner whose rust-ci.yml it should call."""
     problems, uses = [], 0
     commit = release_commit()
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
-        for m in WORKFLOW_PIN.finditer(path.read_text(encoding="utf-8")):
-            uses += 1
-            if m["version"] != __version__:
-                problems.append(f"{path.relative_to(root)}: {m['name']}.yml@v{m['version']} is "
-                                f"not pubkit {__version__}, which tests/requirements.lock pins; "
-                                f"use @{ref(__version__, commit)}")
-            elif commit and m["commit"] and m["commit"] != commit:
-                problems.append(f"{path.relative_to(root)}: {m['name']}.yml@{m['commit']} is "
-                                f"not the commit of pubkit {__version__}'s tag; use "
-                                f"@{ref(__version__, commit)}")
-    problems += stale_actions(root, __version__, commit)[0]
+        uses += len(WORKFLOW_PIN.findall(path.read_text(encoding="utf-8")))
+    # Every pin of pubkit, rust-ci.yml's among them, against this pubkit.
+    problems += stale_pins(root, __version__, commit)[0]
     if not uses:
         problems.append(f"no workflow calls {calls}/pubkit/.github/workflows/rust-ci.yml; "
                         "give pubkit.json a ci block, and `pubkit sync` writes them")

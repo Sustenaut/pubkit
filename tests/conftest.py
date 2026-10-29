@@ -173,6 +173,24 @@ def uses_action(repo, name, owner, action, pin):
                     "        with:\n          dir: public\n")
 
 
+@given(parsers.parse('the workflow "{name}" calls "{owner}"\'s pubkit workflow "{workflow}" at "{pin}"'))
+def calls_workflow(repo, name, owner, workflow, pin):
+    from pubkit import __version__  # noqa: PLC0415
+
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("on: pull_request\njobs:\n  ci:\n"
+                    f"    uses: {owner}/pubkit/.github/workflows/{workflow}@{ACTION_PINS[pin](__version__)}\n")
+
+
+@then(parsers.parse('"{path}" calls "{owner}"\'s pubkit workflow "{workflow}" at "{pin}"'))
+def workflow_at(repo, path, owner, workflow, pin):
+    from pubkit import __version__  # noqa: PLC0415
+
+    want = f"uses: {owner}/pubkit/.github/workflows/{workflow}@{ACTION_PINS[pin](__version__)}\n"
+    assert want in (repo / path).read_text(), (repo / path).read_text()
+
+
 @then(parsers.parse('"{path}" uses "{owner}"\'s pubkit action "{action}" at "{pin}"'))
 def action_at(repo, path, owner, action, pin):
     from pubkit import __version__  # noqa: PLC0415

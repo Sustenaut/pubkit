@@ -66,6 +66,19 @@ Feature: The nightly keeps every pub* repository current, through a pull request
       | Sustenaut | this pubkit's tag |
       | Sustenaut | another commit    |
 
+  Scenario Outline: pins moves a hand-written call of any pubkit workflow to this pubkit's commit
+    Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "ci.yml" calls "<owner>"'s pubkit workflow "<workflow>" at "another pubkit"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And ".github/workflows/ci.yml" calls "Sustenaut"'s pubkit workflow "<workflow>" at "this pubkit's commit"
+
+    Examples:
+      | owner     | workflow       |
+      | Sustenaut | service-ci.yml |
+      | schryer   | service-ci.yml |
+      | Sustenaut | job-sonar.yml  |
+
   Scenario: pins leaves a pubkit action that names no version
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
