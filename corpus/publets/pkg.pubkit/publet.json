@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.16.0 is released as v0.16.0 from commit 1b72c6df9a5e88df2503b4a1ba05470f5aaf5f8b.",
+      "content": "pubkit 0.17.0 is released as v0.17.0 from commit 6983de1ed5ced679d225ddaa8ea92dda6f0698c7.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.16.0",
+            "0.17.0",
             "pubkit --version",
-            "pubkit 0.16.0",
-            "v0.16.0",
-            "1b72c6df9a5e88df2503b4a1ba05470f5aaf5f8b"
+            "pubkit 0.17.0",
+            "v0.17.0",
+            "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
           ]
         ]
       },
-      "scope": "the published release v0.16.0 of pubkit",
+      "scope": "the published release v0.17.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1b72c6df9a5e88df2503b4a1ba05470f5aaf5f8b"
+          "revision": "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.16.0 was released on 2026-10-29 from commit 1b72c6df9a5e88df2503b4a1ba05470f5aaf5f8b with these changes.",
+      "content": "pubkit 0.17.0 was released on 2026-10-29 from commit 6983de1ed5ced679d225ddaa8ea92dda6f0698c7 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,22 +58,30 @@
         "rows": [
           [
             "changed",
-            "pubkit sync pins the reusable workflows it writes, pubkit's job-*.yml and pubrel's release.yml, to the full commit of the release's tag with the version in a comment (@<commit> # vX.Y.Z) instead of the tag, so SonarQube Cloud's S7637 needs no exception. The release CI writes the tag's commit into the wheel as release-commit, so sync needs no network for pubkit's; pubrel's is recorded, reused from the workflows, or read once with git ls-remote. pubkit bump and the nightly's pubkit pins move the commit with the version. conform, freshness, the nightly and the board read both forms, so workflows pinned by tag still read and check"
+            "pubkit and pubrel moved to the Sustenaut organization, so OWNER in src/pubkit/refs.py is now Sustenaut: pubkit sync, pubkit pins and pubkit bump write Sustenaut/pubkit and Sustenaut/pubrel workflow pins, and pubrel's tags are read from Sustenaut/pubrel. GitHub does not follow a transferred repository's redirect for a reusable workflow, so a pin to schryer/pubrel stopped working with the move; the next sync fixes it. Readers still take a pin under schryer, and pubkit.json's workflows_owner still overrides the owner. The managed files' links and the pubkit wheel URL name Sustenaut/pubkit too"
           ],
           [
             "changed",
-            "The owner of the pubkit and pubrel workflows a repository calls is set in one place, OWNER in src/pubkit/refs.py (schryer for now), and pubkit.json can override it with workflows_owner. pubkit sync, pubkit pins, pubkit bump and the pubrel tag lookup pin to that owner; conform, freshness, the nightly, the board and audit prepare read a pin under any owner, so workflows still pinned to schryer keep working after the transfer"
+            "pubkit refuses to run sync, lock, supply-chain, doc-coverage, required, conform, audit or record in a repository whose tests/requirements.lock pins another pubkit, and says to run make venv, use ./pubkit, or, when it is the newer release, pubkit bump; PUBKIT_ANY_VERSION=1 runs it anyway. A stale .venv had run pubkit 0.9.x in repositories pinning 0.14.6"
+          ],
+          [
+            "fixed",
+            "pubkit.mk rebuilds .venv before any target that runs a tool from it when tests/requirements.lock has changed since make venv last ran, so a moved pin no longer leaves the old pubkit in .venv"
+          ],
+          [
+            "changed",
+            "The sonar job in the CI pubkit sync writes tells SonarQube Cloud where the code and its tests are, through job-sonar.yml's new layout input: sonar.sources (src for Python; src or crates for Rust) and sonar.tests (tests for Python; tests, fuzz and benches for Rust), each only where the directory exists, so a Python or Rust repository no longer gets the warning that files look like test code while sonar.tests is unset. A repository's sonar-args come after the layout and win"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.16.0 of pubkit",
+      "scope": "the published release v0.17.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1b72c6df9a5e88df2503b4a1ba05470f5aaf5f8b"
+          "revision": "6983de1ed5ced679d225ddaa8ea92dda6f0698c7"
         }
       ]
     }
