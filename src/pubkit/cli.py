@@ -371,9 +371,16 @@ def _release(version: str) -> tuple[int, ...]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    given = sys.argv[1:] if argv is None else argv
+    if given[:1] == ["cache"]:
+        # Its own parser: `run` passes everything after -- to the command.
+        from .cache import main as cache
+        return cache(given[1:])
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("cache", help="keep what a build fetched or made, by pubkit.json's cache rules "
+                                      "(pubkit cache --help)")
     p = commands.add_parser("init", help="write the shared files into this repository")
     p.add_argument("--kind", choices=KINDS, required=True)
     p.add_argument("--bin", help="the program under test, for <NAME>_BIN_DIR")

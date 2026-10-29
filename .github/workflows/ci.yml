@@ -41,6 +41,9 @@ jobs:
     name: ci
     uses: ./.github/workflows/job-review.yml
 
+  # cachecmd: `pubkit cache run ... -- COMMAND` exists to run the command
+  # its caller typed, as make runs a recipe; S8705 reads that as injection.
+  # The ignore names the rule and cache.py only.
   sonar:
     name: ci
     needs: functional
@@ -50,11 +53,13 @@ jobs:
       layout: -Dsonar.sources=src -Dsonar.tests=tests
       sonar-args: >-
         -Dsonar.coverage.exclusions=tests/**
-        -Dsonar.issue.ignore.multicriteria=pylock,cargolock
+        -Dsonar.issue.ignore.multicriteria=pylock,cargolock,cachecmd
         -Dsonar.issue.ignore.multicriteria.pylock.ruleKey=text:S8565
         -Dsonar.issue.ignore.multicriteria.pylock.resourceKey=pyproject.toml
         -Dsonar.issue.ignore.multicriteria.cargolock.ruleKey=text:S8570
         -Dsonar.issue.ignore.multicriteria.cargolock.resourceKey=src/pubkit/templates/**/Cargo.toml
+        -Dsonar.issue.ignore.multicriteria.cachecmd.ruleKey=pythonsecurity:S8705
+        -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubkit/cache.py
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push.
@@ -101,14 +106,22 @@ jobs:
       - run: shellcheck actions/deploy-ssh/*.sh
       - run: actions/deploy-ssh/test.sh
 
+  cache-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: shellcheck actions/cache/*.sh
+      - run: actions/cache/test.sh
+
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a
   # push to main skips the release (and the wheel), so nothing is tagged.
   release:
-    needs: [passed, terraform, deploy-static]
+    needs: [passed, terraform, deploy-static, cache-action]
     if: >-
       !cancelled() && needs.passed.result == 'success'
       && needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
+      && needs.cache-action.result == 'success'
     uses: Sustenaut/pubrel/.github/workflows/release.yml@986872816b1bd11e177e3f664318c35d41dd08f2 # v0.6.0
     with: { pubrel-version: v0.6.0 }
     permissions:

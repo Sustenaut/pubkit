@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit cache and actions/cache: keep a build's slow-changing inputs for a period and its per-unit outputs under a fingerprint of what made them, by rules in pubkit.json's cache block (pubkit cache plan, run, prune)"
+}
