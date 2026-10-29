@@ -3,9 +3,15 @@ default branch, and one on the release tags.
 
 `ruleset.json` is the ruleset every pub* repository's main carries: no
 deletion, no force push, changes only by pull request (no approval needed,
-since one person owns them), only after the required checks pass on a
-branch up to date with main, and nobody may bypass it, and it ships with the wheel. Which repositories carry
-it, and the checks each requires (all that differs between them), is local
+since one person owns them), merged by GitHub's merge queue once the
+required checks pass on the queue's merge of the pull request into main,
+and nobody may bypass it, and it ships with the wheel. The queue tests the
+tree main will hold, so a pull request need not be up to date with main.
+GitHub offers a merge queue only to an organization's public repositories
+(and Enterprise Cloud's private ones), so a repository without one, `"queue":
+false` in its entry or `--no-queue`, goes without the queue and instead
+merges only after the checks pass on a branch up to date with main. Which
+repositories carry it, and the checks each requires, is local
 configuration: a `protected.json` in the working directory, or one named
 with `--config`, or the repositories and `--require CHECK` on the command
 line. pubkit's own list is the protected.json in its checkout.
@@ -18,7 +24,8 @@ that releases no tags goes without it: `"tags": false` in its entry, or
 `--no-tags`.
 
 A repository may instead say how it is protected in its own pubkit.json:
-`"protect": {"checks": [...], "tags": false}` (`tags` defaults to true).
+`"protect": {"checks": [...], "tags": false, "queue": false}` (`tags` and
+`queue` default to true).
 `pubkit protect OWNER/NAME` reads it from GitHub for a repository the list
 does not name, and `pubkit protect` with no list and no repositories reads
 `./pubkit.json`, for the repository `origin` points at.
@@ -65,13 +72,17 @@ def tag_ruleset() -> dict:
     return base("tag-ruleset.json")
 
 
-def ruleset(checks: list[str]) -> dict:
-    """The ruleset a repository requiring `checks` carries."""
+def ruleset(checks: list[str], queue: bool = True) -> dict:
+    """The ruleset a repository requiring `checks` carries: through the
+    merge queue, or with `queue` false, from a branch up to date with main."""
     out = base()
+    if not queue:
+        out["rules"] = [r for r in out["rules"] if r["type"] != "merge_queue"]
     for rule in out["rules"]:
         if rule["type"] == "required_status_checks":
             rule["parameters"]["required_status_checks"] = [
                 {"context": c, "integration_id": APPS.get(c, GITHUB_ACTIONS)} for c in checks]
+            rule["parameters"]["strict_required_status_checks_policy"] = not queue
     return out
 
 
@@ -160,11 +171,12 @@ def differences(want: dict, have: dict) -> list[str]:
 
 
 def protect(api: Api, repo: str, checks: list[str], check: bool,
-            tags: bool = True) -> tuple[list[str], bool]:
+            tags: bool = True, queue: bool = True) -> tuple[list[str], bool]:
     """Bring one repository to both rulesets (with `tags` false, only its
-    default branch's); its report lines, and whether it differed (with
-    `check`) or could not be brought in line."""
-    lines, bad = attempt(lambda: bring(api, repo, ruleset(checks), current(api, repo),
+    default branch's; with `queue` false, main's without the merge queue);
+    its report lines, and whether it differed (with `check`) or could not
+    be brought in line."""
+    lines, bad = attempt(lambda: bring(api, repo, ruleset(checks, queue), current(api, repo),
                                        "its default branch", check), repo, check)
     if not tags:
         return lines, bad
@@ -210,7 +222,7 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
             *(f"  was: {d}" for d in diff), *lines], bool(others)
 
 
-KEYS = {"checks", "tags"}
+KEYS = {"checks", "tags", "queue"}
 
 
 def problems(block: Any) -> list[str]:
@@ -228,8 +240,9 @@ def problems(block: Any) -> list[str]:
                        'surrounding spaces')
         elif len(set(checks)) != len(checks):
             out.append('"checks" lists a check twice')
-    if not isinstance(block.get("tags", True), bool):
-        out.append(f'"tags" must be true or false, not {json.dumps(block["tags"])}')
+    for key in ("tags", "queue"):
+        if not isinstance(block.get(key, True), bool):
+            out.append(f'"{key}" must be true or false, not {json.dumps(block[key])}')
     return out
 
 
@@ -242,10 +255,11 @@ def entry(repo: str, config: Any, where: str) -> dict:
     bad = problems(block)
     if isinstance(block, dict) and block.keys() - KEYS:
         bad.append(f"{', '.join(sorted(block.keys() - KEYS))} is not a protect setting; "
-                   f"it takes checks and tags")
+                   f"it takes checks, tags and queue")
     if bad:
         raise ValueError(f"{where}'s protect block: {'; '.join(bad)}")
-    return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True)}
+    return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True),
+            "queue": block.get("queue", True)}
 
 
 def parse(text: str | bytes, where: str) -> Any:
@@ -314,10 +328,11 @@ def load(config: Path | None) -> list[dict] | None:
 
 
 def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
-        api: Api = gh, tags: bool = True) -> int:
+        api: Api = gh, tags: bool = True, queue: bool = True) -> int:
     """Protect `repos` (by default every one listed). Given `requires`, the
     named repositories require those checks, and no list is read. With
-    `tags` false, no repository gets the tag ruleset."""
+    `tags` false, no repository gets the tag ruleset; with `queue` false,
+    none gets the merge queue."""
     if requires:
         if not repos:
             sys.exit("pubkit protect: --require names a check; name the repositories too")
@@ -354,7 +369,7 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
                 failed = True
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,
-                             tags and item.get("tags", True))
+                             tags and item.get("tags", True), queue and item.get("queue", True))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

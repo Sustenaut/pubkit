@@ -806,14 +806,22 @@ that protect its main branch and add it to `protected.json` and `governed.json`.
 Every repository's default branch carries the same ruleset,
 [`src/pubkit/ruleset.json`](src/pubkit/ruleset.json), which ships in the
 wheel: it cannot be deleted or force-pushed, it changes only by pull
-request (no approval needed), only after the required checks pass on a
-branch that is up to date with it, and nobody may bypass it. Requiring
-the branch to be up to date means the tree a pull request tested is the
-tree main holds after the merge, so the run on main repeats the pull
-request's and tagging a release needs no tests of its own. Which repositories carry it, and the checks each
+request (no approval needed), merged by GitHub's merge queue, and nobody
+may bypass it. "Merge when ready" puts a pull request in the queue, which
+merges it into main as it stands then, together with the pull requests
+ahead of it, runs the required checks on that merge (the `merge_group`
+event, which the CI `pubkit sync` writes runs on), and merges only when
+they pass. So the tree the checks passed is the tree main holds after the
+merge, the run on main repeats the queue's, and tagging a release needs no
+tests of its own, yet nobody has to bring a branch up to date by hand:
+pull requests stacked behind one another merge one at a time. GitHub
+offers a merge queue only to an organization's public repositories (and to
+private ones on Enterprise Cloud); a repository without one, `"queue":
+false` in its entry or `--no-queue`, instead merges only after the checks
+pass on a branch that is up to date with main. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--no-tags] [--config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--no-tags] [--no-queue] [--config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
@@ -833,17 +841,18 @@ The repositories come from one of:
 
 - a `protected.json` in the working directory, or the file `--config`
   names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
-  `"tags": false` where the repository releases no tags.
+  `"tags": false` where the repository releases no tags, and `"queue": false`
+  where GitHub offers it no merge queue.
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.
 - the repository's own `pubkit.json`, which says how it is protected:
-  `"protect": {"checks": ["ci / passed"], "tags": false}` (`tags` defaults
-  to true). A `REPO` the list does not name is read from the `pubkit.json`
+  `"protect": {"checks": ["ci / passed"], "tags": false, "queue": false}`
+  (`tags` and `queue` default to true). A `REPO` the list does not name is read from the `pubkit.json`
   on its default branch, and `pubkit protect` with no list and no `REPO`,
   run inside a repository, reads `./pubkit.json` for the repository
   `origin` points at. The block takes only `checks`, distinct non-empty
-  names, and `tags`, true or false; anything else, or a pubkit.json that is
+  names, and `tags` and `queue`, true or false; anything else, or a pubkit.json that is
   not JSON, is refused before GitHub is asked.
 
 pubkit's own list, the pub* repositories, is

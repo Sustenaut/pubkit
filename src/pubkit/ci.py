@@ -19,7 +19,8 @@ version in a comment (refs.py).
 `language` is a utility's, node or python; without it, a package.json
 with no pyproject.toml beside it makes it node. A rust or service
 repository's CI is its kind's. `events` are the workflows written: pr.yml
-(pull requests), main.yml (pushes to main) and nightly.yml (the schedule
+(pull requests, and the merge queue's runs of them, `merge_group`, so the
+checks a ruleset requires report on the queue's merge too), main.yml (pushes to main) and nightly.yml (the schedule
 `cron`, and by hand); pr and main by default, and all three for Rust. `with` gives the
 jobs' inputs: each goes to every job that takes it, and an input no job
 takes stops sync. A job runs on the events JOBS gives it unless `jobs`
@@ -66,12 +67,14 @@ EVENTS = ("pr", "main", "nightly")
 DEFAULT_EVENTS = ("pr", "main")
 CRON = "17 3 * * *"
 TRIGGERS = {
-    "pr": "  pull_request:\n",
+    "pr": "  pull_request:\n  merge_group:\n",
     "main": "  push: { branches: [main] }\n",
     "nightly": "  schedule: [{ cron: 'CRON' }]\n  workflow_dispatch:\n",
 }
 # The events the release workflow runs on: a pull request records and
-# checks its release; a push to main tags and releases it.
+# checks its release; a push to main tags and releases it. The merge
+# queue's run of a pull request (merge_group, in pr.yml) only reports the
+# check: pubrel tags from a push to main alone.
 RELEASE_EVENTS = ("pr", "main")
 SETTINGS = ("language", "events", "cron", "with", "jobs", "release")
 HEADER = ("# Written by `pubkit sync` from the ci block of pubkit.json. Do not edit:\n"

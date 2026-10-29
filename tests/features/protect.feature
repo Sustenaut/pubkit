@@ -12,6 +12,11 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it blocks deleting and force-pushing the branch
     And it takes changes only by pull request, with no approval needed
     And it requires "ci / passed" from GitHub Actions and "SonarCloud Code Analysis" from SonarCloud
+    And it merges through the merge queue, by merge commit, without asking the branch to be up to date
+
+  Scenario: Without the merge queue, the ruleset requires a branch up to date with main
+    When I build the ruleset requiring "ci / passed", without the merge queue
+    Then it has no merge queue
     And it requires a branch to be up to date with main before it merges
 
   Scenario: The tag ruleset leaves release tags to CI alone
@@ -136,6 +141,36 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed"
     And GitHub was sent no tag ruleset
 
+  Scenario: A repository listed with "queue": false gets main's ruleset without the merge queue
+    Given protected.json lists "schryer/site" requiring "ci / passed", without the merge queue
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed", without the merge queue
+
+  Scenario: --no-queue leaves out the merge queue
+    Given GitHub has no ruleset in "schryer/baz"
+    When I run pubkit "protect" "--no-queue" "--require" "ci / passed" "schryer/baz"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/baz" requiring "ci / passed", without the merge queue
+
+  Scenario: protect --check reports a ruleset without the merge queue
+    Given protected.json lists "schryer/foo" requiring "ci / passed"
+    And GitHub has pubkit's ruleset in "schryer/foo" requiring "ci / passed", without the merge queue
+    When I run pubkit "protect" "--config" "protected.json" "--check"
+    Then it fails
+    And it prints "no merge_queue rule"
+    And it prints "required_status_checks.strict_required_status_checks_policy is true, not false"
+    And GitHub was sent nothing
+
+  Scenario: A repository's own pubkit.json can leave out the merge queue
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json's protect block is {"checks": ["ci / passed"], "queue": false}
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect"
+    Then it succeeds
+    And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed", without the merge queue
+
   Scenario: --no-tags leaves out the tag ruleset
     Given GitHub has no ruleset in "schryer/baz"
     When I run pubkit "protect" "--no-tags" "--require" "ci / passed" "schryer/baz"
@@ -193,6 +228,7 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
       | {"checks": [" ci / passed"]}              | without surrounding spaces                |
       | {"checks": ["build", "build"]}            | "checks" lists a check twice              |
       | {"checks": ["build"], "tags": "no"}       | "tags" must be true or false, not "no"    |
+      | {"checks": ["build"], "queue": 1}         | "queue" must be true or false, not 1      |
       | {"checks": ["build"], "tag": false}       | tag is not a protect setting              |
       | ["build"]                                 | it is ["build"], not an object            |
 
