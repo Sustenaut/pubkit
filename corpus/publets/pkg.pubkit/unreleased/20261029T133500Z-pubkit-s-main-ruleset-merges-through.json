@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "pubkit's main ruleset merges through GitHub's merge queue (merge commits, one group of up to five at a time) instead of requiring a branch to be up to date with main: the queue runs the required checks on the pull request merged into main as main will hold it, so the tree the checks passed is still the tree main holds after the merge and tagging a release needs no tests of its own, and pull requests stacked behind one another merge one at a time without anyone updating a branch. GitHub offers a merge queue only to an organization's public repositories, so a repository without one says \"queue\": false in its protected.json entry or pubkit.json protect block, or `pubkit protect --no-queue`, and keeps requiring an up-to-date branch. `pubkit protect --check` and the board report a repository whose ruleset does not match"
-}
