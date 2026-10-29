@@ -162,6 +162,12 @@ def sync(root: Path, check: bool) -> int:
     config = read_config(root)
     from .hosting import settings  # noqa: PLC0415
     settings(config)
+    if "cache" in config:
+        from .cache import CacheError, check as check_cache  # noqa: PLC0415
+        try:
+            check_cache(config["cache"])
+        except CacheError as e:
+            sys.exit(f"pubkit: {e}")
     if "site" in config:
         from .ci import site  # noqa: PLC0415
         site(config, root)

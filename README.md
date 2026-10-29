@@ -337,9 +337,10 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   used on its own with `hetzner`, `cloudflare`, `desec` and `dnssec` set
   as in the block (`dnssec.keys` by provider type).
 - **`actions/cache`:** keeps what a build fetched or made between runs,
-  by the rules in pubkit.json's `cache` block (see "Caching a build"
+  by the entries of pubkit.json's `cache` block (see "Caching a build"
   below). Call it with `step: restore` before the build and `step: save`
-  after it; `fresh: true` restores no inputs.
+  after it, which also drops what no run used; `fresh: true` restores no
+  fetched entry.
 - **`actions/deploy-static`:** deploys a directory to a server over rsync
   (`deploy-key`, `deploy-target`, and `known-hosts`, the server's pinned
   host key; without it the key is scanned on every run), to Cloudflare
@@ -462,50 +463,60 @@ and need no credentials; CI runs them on Terraform 1.11, with `fmt`,
 ## Caching a build
 
 A build that downloads slow-changing data, or makes many outputs one by
-one, can keep both between runs by rules the repository states in
-pubkit.json:
+one, can keep both between runs by entries the repository states in
+pubkit.json. The cache block is one map of named entries, each with the
+same keys:
 
 ```json
 "cache": {
-  "inputs": {
-    "data": {"path": "data", "refresh": "week"}
-  },
-  "outputs": {
-    "packs": {
-      "dir": ".packcache",
-      "unit": ["data/areas/{path}/", "data/boundaries.geojsonl"],
-      "shared": ["mapbuild/*.py", "tool: tippecanoe --version"]
-    }
-  }
+  "data": { "path": "data", "refresh": "week" },
+  "packs": { "path": ".packcache", "unit": "data/areas/{unit}/",
+             "inputs": ["data/boundaries.geojsonl", "mapbuild/*.py"],
+             "tools": ["tippecanoe --version"] },
+  "overview": { "path": ".packcache/overview",
+                "inputs": ["data/national/", "data/boundaries.geojsonl", "mapbuild/*.py"],
+                "tools": ["tippecanoe --version"] }
 }
 ```
 
-- **Inputs** are kept for a period: `refresh` is `day`, `week` (ISO
-  week), `month` or `never`, and `version` adds a string of the
-  repository's own, such as a pinned release. The first run of a period
-  fetches them; later runs restore them.
-- **Outputs** are made once per unit. The build makes each unit through
+| Key | What |
+|---|---|
+| `path` | the file or directory kept between runs |
+| `refresh` | `run`, `day`, `week` (ISO week), `month` or `never` |
+| `version` | a free string; changing it fetches anew |
+| `inputs` | files, directories or globs the key depends on |
+| `tools` | commands whose output counts, such as `tippecanoe --version` |
+| `unit` | one pattern with `{unit}`, filled from `--unit`, so each unit gets its own fingerprint |
+
+An entry needs `refresh` or `inputs` (or both). An unknown key fails
+`pubkit sync`, naming it. Each entry gets its own cache key, and a block
+holds at most eight entries.
+
+- A **fetched** entry (`refresh` other than `run`, and no `inputs` or
+  `unit`) is kept for its period: the first run of a period fetches it,
+  and later runs restore it. A fresh run restores none.
+- A **made** entry (`inputs`, `unit` or `refresh: run`) is restored from
+  the latest run. The build makes it through
 
   ```sh
-  pubkit cache run packs --unit path=louna/alfa --output pack.pmtiles -- bin/maps build-area ...
+  pubkit cache run packs --unit louna/alfa --output pack.pmtiles -- bin/maps build-area ...
   ```
 
-  which fingerprints the unit (the output's name, its `--unit` values,
-  each `unit` entry with `{KEY}` filled in, and each `shared` entry: a
-  file, a directory, a glob, or `tool: COMMAND` for a tool's version),
-  copies the outputs when that fingerprint was made before, and otherwise
-  runs the command and keeps what it wrote. It prints `reused packs
-  path=…` or `built packs path=…`; the command's own output goes to
-  stderr. `pubkit cache prune` then drops what no run used since the last
-  prune.
+  which fingerprints the unit (the entry's name, the unit, the `unit`
+  pattern filled in, each `inputs` entry, each `tools` command's output,
+  and the version), copies the outputs when that fingerprint was made
+  before, and otherwise runs the command and keeps what it wrote. It
+  prints `reused packs louna/alfa` or `built packs louna/alfa`; the
+  command's own output goes to stderr.
 
-In a workflow:
+In a workflow, `actions/cache` restores before the build and saves after
+it. Saving first drops what no run used, so a made entry keeps one
+build's worth (`pubkit cache prune` does the same by hand).
 
 ```yaml
 - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
   with: { step: restore, fresh: "${{ inputs.fresh || false }}" }
 - run: bin/build
-- run: .venv/bin/pubkit cache prune
 - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
   with: { step: save }
 ```

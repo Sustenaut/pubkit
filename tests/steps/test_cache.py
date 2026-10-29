@@ -1,5 +1,6 @@
-"""Steps for pubkit cache: a repository's rules, and a build command that
-counts its runs, so a scenario sees which units were made and which reused."""
+"""Steps for pubkit cache: a repository's cache entries, and a build
+command that counts its runs, so a scenario sees which units were made and
+which reused."""
 
 from __future__ import annotations
 
@@ -14,44 +15,53 @@ from conftest import pubkit
 scenarios("../features/cache.feature")
 
 # The build: copies a unit's data and build.py into its pack, and counts
-# its runs in runs.txt. The tool is a script whose --version reads tool.txt.
-BUILD = ("import sys, pathlib; a = sys.argv[1]; "
+# its runs in runs.txt.
+BUILD = ("import sys, pathlib; a, src = sys.argv[1], pathlib.Path(sys.argv[2]); "
          "out = pathlib.Path('out') / (a + '.pack'); out.parent.mkdir(exist_ok=True); "
-         "out.write_text(''.join(p.read_text() for p in sorted(pathlib.Path('data', a).iterdir()))"
+         "out.write_text(''.join(p.read_text() for p in sorted((src / a).iterdir()))"
          " + pathlib.Path('build.py').read_text()); "
          "runs = pathlib.Path('runs.txt'); runs.write_text(runs.read_text() + 'x' if runs.exists() else 'x')")
 
 
-def _config(repo, change=None):
+def _config(repo, change):
     path = repo / "pubkit.json"
     config = json.loads(path.read_text()) if path.exists() else {"kind": "utility"}
-    if change:
-        change(config)
+    change(config)
     path.write_text(json.dumps(config))
 
 
-@given(parsers.parse('a repository whose cache rules make one pack per area from "{unit}" with the shared "{shared}"'))
-def cache_rules(repo, unit, shared):
+@given(parsers.parse('a repository whose cache entry "{name}" is made per unit from "{unit}" '
+                     'with the input "{input}" and the tool "{tool}"'))
+def cache_entry(repo, run, name, unit, input, tool):
+    assert run(pubkit(), "init", "--kind=utility", cwd=repo).code == 0
     (repo / "tool.txt").write_text("1")
-    _config(repo, lambda c: c.update(cache={"outputs": {"packs": {
-        "dir": ".packcache", "unit": [unit], "shared": [shared, "tool: cat tool.txt"]}}}))
+    _config(repo, lambda c: c.update(cache={name: {
+        "path": ".packcache", "unit": unit, "inputs": [input], "tools": [tool]}}))
 
 
-@given(parsers.parse('the cache rules keep "{path}" for a "{refresh}"'))
-def keep_input(repo, path, refresh):
-    _config(repo, lambda c: c["cache"].update(inputs={path: {"path": path, "refresh": refresh}}))
+@given(parsers.parse('the cache entry "{name}" is made per unit from "{unit}"'))
+def unit_elsewhere(repo, name, unit):
+    _config(repo, lambda c: c["cache"][name].update(unit=unit))
 
 
-@given(parsers.parse('the cache rules have the setting "{dotted}"'))
-def odd_setting(repo, dotted):
-    *parents, last = dotted.split(".")
+@when(parsers.parse('the cache entry "{name}" has the version "{version}"'))
+def entry_version(repo, name, version):
+    _config(repo, lambda c: c["cache"][name].update(version=version))
 
-    def change(c):
-        node = c["cache"]
-        for p in parents:
-            node = node[p]
-        node[last] = True
-    _config(repo, change)
+
+@given(parsers.parse('the cache entry "{name}" keeps "{path}" with refresh "{refresh}"'))
+def fetched_entry(repo, name, path, refresh):
+    _config(repo, lambda c: c["cache"].update({name: {"path": path, "refresh": refresh}}))
+
+
+@given(parsers.parse('the cache entry "{name}" keeps "{path}" with no refresh or inputs'))
+def loose_entry(repo, name, path):
+    _config(repo, lambda c: c["cache"].update({name: {"path": path}}))
+
+
+@given(parsers.parse('the cache entry "{name}" has the setting "{key}"'))
+def odd_setting(repo, name, key):
+    _config(repo, lambda c: c["cache"][name].update({key: True}))
 
 
 @given(parsers.parse('today is "{day}"'))
@@ -59,10 +69,26 @@ def today(env, day):
     env["PUBKIT_TODAY"] = day
 
 
+def _make(repo, run, env, area, src):
+    return run(pubkit(), "cache", "run", "packs", "--unit", area, "--output", f"out/{area}.pack",
+               "--", sys.executable, "-c", BUILD, area, str(src), cwd=repo, env=env)
+
+
 @when(parsers.parse('I make the pack of "{area}"'), target_fixture="result")
 def make_pack(repo, run, env, area):
-    return run(pubkit(), "cache", "run", "packs", "--unit", f"area={area}", "--output", f"out/{area}.pack",
-               "--", sys.executable, "-c", BUILD, area, cwd=repo, env=env)
+    return _make(repo, run, env, area, repo / "data")
+
+
+@when(parsers.parse('I make the pack of "{area}" from "{where}"'), target_fixture="result")
+def make_pack_elsewhere(repo, run, env, area, where):
+    return _make(repo, run, env, area, repo.parent / where)
+
+
+@given(parsers.parse('the file "{path}" outside the repository reads "{text}"'))
+def file_outside(repo, path, text):
+    target = repo.parent / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text + "\n")
 
 
 @when(parsers.parse('the tool reports version "{version}"'))
@@ -80,43 +106,53 @@ def ran(repo, count):
     assert len((repo / "runs.txt").read_text()) == count
 
 
-def _inputs_key(result) -> str:
-    return re.search(r"^inputs-key=(\S+)$", result.stdout, re.M).group(1)
+def _key(result, name) -> str:
+    return re.search(rf"^{name}: path=\S+ key=(\S+)", result.stdout, re.M).group(1)
 
 
-@then("I note the inputs key", target_fixture="noted")
-def note_key(result):
-    return _inputs_key(result)
+@then(parsers.parse('I note the key of "{name}"'), target_fixture="noted")
+def note_key(result, name):
+    return _key(result, name)
 
 
-@then("the inputs key is as noted")
-def key_same(result, noted):
-    assert _inputs_key(result) == noted
+@then(parsers.parse('the key of "{name}" is as noted'))
+def key_same(result, noted, name):
+    assert _key(result, name) == noted
 
 
-@then("the inputs key is not as noted")
-def key_changed(result, noted):
-    assert _inputs_key(result) != noted
+@then(parsers.parse('the key of "{name}" is not as noted'))
+def key_changed(result, noted, name):
+    assert _key(result, name) != noted
 
 
-@given(parsers.parse('the cache rules make one pack per area from "{unit}" instead'))
-def unit_elsewhere(repo, unit):
-    _config(repo, lambda c: c["cache"]["outputs"]["packs"].update(unit=[unit]))
+@given(parsers.parse("the cache block is {block}"))
+def cache_block(repo, run, block):
+    assert run(pubkit(), "init", "--kind=utility", cwd=repo).code == 0
+    _config(repo, lambda c: c.update(cache=json.loads(block)))
 
 
-@given(parsers.parse('the file "{path}" outside the repository reads "{text}"'))
-def file_outside(repo, path, text):
-    target = repo.parent / path
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text + "\n")
+@given(parsers.parse('the cache entry "{name}" is made from the input "{input}"'))
+def made_entry(repo, name, input):
+    _config(repo, lambda c: c["cache"].update({name: {"path": f".{name}cache", "inputs": [input]}}))
 
 
-@when(parsers.parse('I make the pack of "{area}" from "{where}"'), target_fixture="result")
-def make_pack_elsewhere(repo, run, env, area, where):
-    root = repo.parent / where
-    build = ("import sys, pathlib; a, r = sys.argv[1], pathlib.Path(sys.argv[2]); "
-             "out = pathlib.Path('out') / (a + '.pack'); out.parent.mkdir(exist_ok=True); "
-             "out.write_text(''.join(p.read_text() for p in sorted((r / a).iterdir())))")
-    return run(pubkit(), "cache", "run", "packs", "--unit", f"area={area}", "--unit", f"root={root}",
-               "--output", f"out/{area}.pack", "--", sys.executable, "-c", build, area, str(root),
+@given(parsers.parse('the cache entry "{name}" is made from the inputs "{a}" and "{b}"'))
+def made_entry_two(repo, name, a, b):
+    _config(repo, lambda c: c["cache"].update({name: {"path": f".{name}cache", "inputs": [a, b]}}))
+
+
+@when(parsers.parse('I make "{name}" into "{output}"'), target_fixture="result")
+def make_entry(repo, run, env, name, output):
+    write = f"import pathlib; p = pathlib.Path({output!r}); p.parent.mkdir(exist_ok=True); p.write_text('made')"
+    return run(pubkit(), "cache", "run", name, "--output", output, "--", sys.executable, "-c", write,
                cwd=repo, env=env)
+
+
+@given(parsers.parse('GitHub\'s step output goes to "{path}"'))
+def github_output(repo, env, path):
+    env["GITHUB_OUTPUT"] = str(repo / path)
+
+
+@then(parsers.parse('"{path}" has the line "{line}"'))
+def has_line(repo, path, line):
+    assert line in (repo / path).read_text().splitlines(), (repo / path).read_text()
