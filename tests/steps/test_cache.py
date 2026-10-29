@@ -97,3 +97,26 @@ def key_same(result, noted):
 @then("the inputs key is not as noted")
 def key_changed(result, noted):
     assert _inputs_key(result) != noted
+
+
+@given(parsers.parse('the cache rules make one pack per area from "{unit}" instead'))
+def unit_elsewhere(repo, unit):
+    _config(repo, lambda c: c["cache"]["outputs"]["packs"].update(unit=[unit]))
+
+
+@given(parsers.parse('the file "{path}" outside the repository reads "{text}"'))
+def file_outside(repo, path, text):
+    target = repo.parent / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text + "\n")
+
+
+@when(parsers.parse('I make the pack of "{area}" from "{where}"'), target_fixture="result")
+def make_pack_elsewhere(repo, run, env, area, where):
+    root = repo.parent / where
+    build = ("import sys, pathlib; a, r = sys.argv[1], pathlib.Path(sys.argv[2]); "
+             "out = pathlib.Path('out') / (a + '.pack'); out.parent.mkdir(exist_ok=True); "
+             "out.write_text(''.join(p.read_text() for p in sorted((r / a).iterdir())))")
+    return run(pubkit(), "cache", "run", "packs", "--unit", f"area={area}", "--unit", f"root={root}",
+               "--output", f"out/{area}.pack", "--", sys.executable, "-c", build, area, str(root),
+               cwd=repo, env=env)
