@@ -35,6 +35,7 @@ from pathlib import Path
 
 from . import __version__
 from .paths import confined
+from .refs import AT, RELEASE_PIN, VERSION, pubrel_commit, release_commit, repin
 
 # The crates the pub* repositories publish, which `pins` moves rather than
 # `crates`.
@@ -47,12 +48,12 @@ ROW = re.compile(r"[^-\s].*", re.S)
 # The categories `pubrel add` takes.
 CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 
-RELEASE_PIN = re.compile(r"(schryer/pubrel/\.github/workflows/release\.yml@v)([0-9][^\s'\"]*)")
-PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)([0-9][^\s,}'\"]*)")
-PUB_VERSION = re.compile(r"(pub-version:\s*v)([0-9][^\s,}'\"]*)")
+# RELEASE_PIN (refs.py) is pubrel's release workflow, by commit or by tag.
+PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
+PUB_VERSION = re.compile(r"(pub-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
 # Every pubkit reusable workflow a repository can call, not only rust-ci.
-CI_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/(?:rust|python|node|service)-ci\.yml@v)"
-                    r"[0-9][^\s'\"]*")
+CI_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/(?:rust|python|node|service)-ci\.yml@)"
+                    + AT + VERSION)
 
 # The languages pubkit's settings name, each by the ecosystem pubkit works
 # with: crates, npm packages, and the hash-locked Python requirements.
@@ -194,16 +195,26 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         text = path.read_text(encoding="utf-8")
         if is_generated(text):  # pubkit sync writes these, from pubkit.json
             continue
-        new = CI_PIN.sub(rf"\g<1>{__version__}", text)
-        for pattern, version, what in ((RELEASE_PIN, pubrel, "pubrel release workflow"),
+        new = text
+        for pattern, version, what in ((CI_PIN, __version__, "pubkit workflow"),
+                                       (RELEASE_PIN, pubrel, "pubrel release workflow"),
                                        (PUBREL_VERSION, pubrel, "pubrel-version"),
                                        (PUB_VERSION, pub, "pub-version")):
-            if not version:
+            if not version or not pattern.search(new):
                 continue
+            if pattern is PUBREL_VERSION or pattern is PUB_VERSION:
+                commit = None
+                moved = pattern.sub(rf"\g<1>{version}", new)
+            else:
+                # A workflow's pin: the commit moves with the version.
+                commit = release_commit() if pattern is CI_PIN else pubrel_commit(version, new)
+                moved = repin(pattern, new, version, commit)
             for m in pattern.finditer(new):
-                if m.group(2) != version:
-                    changes.append(f"{path.name}: {what} {m.group(2)} -> {version}")
-            new = pattern.sub(rf"\g<1>{version}", new)
+                if m["version"] != version and pattern is not CI_PIN:  # "pubkit A -> B" says it
+                    changes.append(f"{path.name}: {what} {m['version']} -> {version}")
+                elif m["version"] == version and commit and m["commit"] != commit:
+                    changes.append(f"{path.name}: {what} {version} pinned to {commit}")
+            new = moved
         if new != text:
             path.write_text(new, encoding="utf-8")
     old = locked(root)

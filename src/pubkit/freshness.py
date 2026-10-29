@@ -9,8 +9,8 @@ nothing.
 
 `pubkit bump`, run in a repository, moves it to this pubkit: the managed
 files (`pubkit sync`), the lock (`pubkit lock`), and every workflow's pin of
-`rust-ci.yml`. The nightly workflow does this, and more, through `pubkit
-nightly` (nightly.py).
+`rust-ci.yml`, to the commit of this pubkit's tag (refs.py). The nightly
+workflow does this, and more, through `pubkit nightly` (nightly.py).
 """
 
 from __future__ import annotations
@@ -21,9 +21,10 @@ import re
 from pathlib import Path
 
 from . import __version__
+from .refs import AT, VERSION, ref, release_commit, repin
 
 PIN = re.compile(r"/download/v([0-9][^/]*)/pubkit-")
-WORKFLOW_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/rust-ci\.yml@v)[0-9][^\s'\"]*")
+WORKFLOW_PIN = re.compile(r"(schryer/pubkit/\.github/workflows/rust-ci\.yml@)" + AT + VERSION)
 
 
 def pinned(repo: Path) -> str | None:
@@ -53,7 +54,7 @@ def row(repo: Path) -> dict:
                   if line.startswith("open exception: ")]
     # The workflow pin is checked against the pinned pubkit by `sync --check`
     # in the repository itself; here every rule is judged by the latest.
-    problems = [p for p in problems if "rust-ci.yml@v" not in p]
+    problems = [p for p in problems if not p.startswith(".github/workflows/")]
     verdict = "yes" if not problems else f"no: {len(problems)} problem(s): " + "; ".join(problems)
     return {**out, "conforms": verdict, "exceptions": exceptions}
 
@@ -86,12 +87,13 @@ def bump(root: Path) -> int:
 
     sync(root, check=False)
     lock(root)
+    commit = release_commit()
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
-        new = WORKFLOW_PIN.sub(rf"\g<1>{__version__}", text)
+        new = repin(WORKFLOW_PIN, text, __version__, commit)
         if new != text:
             path.write_text(new, encoding="utf-8")
-            print(f"updated  {path.relative_to(root)} (rust-ci.yml@v{__version__})")
+            print(f"updated  {path.relative_to(root)} (rust-ci.yml@{ref(__version__, commit)})")
     print(f"bumped to pubkit {__version__}; run `make check`, record nothing (no code "
           f"changed), and open the pull request")
     return 0

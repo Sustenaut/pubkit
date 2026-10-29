@@ -40,8 +40,10 @@ from . import __version__, cbor
 # it), and pub 0.2.1 rotates keys.
 MIN_PUBREL = (0, 5, 3)
 MIN_PUB = (0, 2, 1)
-# The pubrel release workflow a new package's CI calls.
+# The pubrel release workflow a new package's CI calls, and the commit its
+# tag names, which the workflow pins (refs.py).
 PUBREL_PIN = "0.5.2"
+PUBREL_COMMIT = "af08363463d87d39e6c16fe3b394fed52c326b33"
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")

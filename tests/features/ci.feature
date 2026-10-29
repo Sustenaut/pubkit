@@ -3,7 +3,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   not use, and GitHub shows each as skipped. With a ci block, pubkit.json
   says which jobs run on which events, and `pubkit sync` writes one
   workflow per event that calls only those, each job its own reusable
-  workflow at this pubkit's tag.
+  workflow, pinned to the commit of this pubkit's tag with the version in
+  a comment, as SonarQube Cloud's S7637 asks.
 
   Scenario: A Node package's pull requests and pushes each run only their jobs
     Given a Node repository whose ci block is '{}'
@@ -200,6 +201,53 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | job-service-checks.yml    | checks     | service-ci.yml |
       | job-service-terraform.yml | terraform  | service-ci.yml |
       | job-service-tests.yml     | tests      | service-ci.yml |
+
+  Scenario: A released pubkit pins every job to its tag's commit, with the version in a comment
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    When I run pubkit "sync"
+    Then it succeeds
+    And ".github/workflows/pr.yml" pins pubkit's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And ".github/workflows/main.yml" pins pubkit's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And "pr.yml" pins pubrel's release workflow to the commit pubkit records
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: A source tree, with no release commit, pins pubkit's jobs by tag
+    Given a Node repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And ".github/workflows/pr.yml" contains "job-osv.yml@v"
+
+  Scenario: pubrel's release workflow is pinned to the commit its tag names, and checked offline
+    Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.4"}}'
+    And pubrel's repository tags "v0.5.4"
+    When I run pubkit "sync"
+    Then it succeeds
+    And ".github/workflows/pr.yml" pins pubrel's release workflow to the commit of "v0.5.4"
+    And ".github/workflows/main.yml" pins pubrel's release workflow to the commit of "v0.5.4"
+    When pubrel's repository cannot be reached
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: Without pubrel's tags, its release workflow is pinned by tag, with a warning
+    Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.4"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And stderr mentions "could not read the commit of v0.5.4"
+    And ".github/workflows/pr.yml" contains "release.yml@v0.5.4"
+
+  Scenario Outline: Every reader takes a pin by commit, and the older pin by tag
+    When every pin reader reads "<line>"
+    Then <readers> read version "<version>" and commit "<commit>"
+
+    Examples:
+      | line                                                                          | readers                       | version | commit |
+      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.15.1                    | conform, bump, nightly, board | 0.15.1  | none   |
+      | uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
+      | uses: schryer/pubrel/.github/workflows/release.yml@v0.5.4                     | release                       | 0.5.4   | none   |
 
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'

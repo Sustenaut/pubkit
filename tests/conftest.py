@@ -9,11 +9,22 @@ registers a step only in the module that defines it, or in a conftest.
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from pytest_bdd import given, parsers, then, when
+
+@pytest.fixture(autouse=True)
+def offline_pubrel(tmp_path, monkeypatch):
+    """No scenario reads pubrel's tags from GitHub: its repository is one
+    that is not there, unless a scenario makes one (refs.py). A source tree
+    has no release commit, so pubkit pins its own workflows by tag unless a
+    scenario gives it one."""
+    monkeypatch.setenv("PUBKIT_PUBREL_REMOTE", str(tmp_path / "no-pubrel"))
+    monkeypatch.delenv("PUBKIT_RELEASE_COMMIT", raising=False)
+
 
 @pytest.fixture
 def repo(tmp_path):
@@ -62,6 +73,55 @@ def run_pubkit(repo, run, env, args):
 def has(repo, paths):
     for path in paths.split(", "):
         assert (repo / path.strip('"')).is_file(), path
+
+
+@given(parsers.parse('pubkit is a release whose tag names "{commit}"'))
+def released(env, commit):
+    env["PUBKIT_RELEASE_COMMIT"] = commit
+
+
+@pytest.fixture
+def pubrel_tags():
+    return {}
+
+
+@given(parsers.parse('pubrel\'s repository tags "{tag}"'))
+def pubrel_tagged(tmp_path, env, pubrel_tags, tag):
+    """A stand-in for pubrel's repository, with an annotated tag, as
+    pubrel's are: the pin is to the commit it names, not to the tag."""
+    remote = tmp_path / "pubrel"
+    if not remote.exists():
+        remote.mkdir()
+        subprocess.run(["git", "init", "-q", str(remote)], check=True)
+    who = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    git = ["git", "-C", str(remote), *who]
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", tag], check=True)
+    subprocess.run([*git, "tag", "-a", tag, "-m", tag], check=True)
+    pubrel_tags[tag] = subprocess.run([*git, "rev-parse", "HEAD"], check=True,
+                                      capture_output=True, text=True).stdout.strip()
+    env["PUBKIT_PUBREL_REMOTE"] = str(remote)
+
+
+@when("pubrel's repository cannot be reached")
+def pubrel_gone(tmp_path, env):
+    env["PUBKIT_PUBREL_REMOTE"] = str(tmp_path / "gone")
+
+
+@then(parsers.parse('"{path}" pins pubrel\'s release workflow to the commit of "{tag}"'))
+def pins_pubrel(repo, pubrel_tags, path, tag):
+    text = (repo / path).read_text()
+    assert f"schryer/pubrel/.github/workflows/release.yml@{pubrel_tags[tag]} # {tag}\n" in text, text
+
+
+@then(parsers.parse('"{path}" pins pubkit\'s workflows to "{commit}"'))
+def pins_pubkit(repo, path, commit):
+    from pubkit import __version__  # noqa: PLC0415
+
+    lines = [line for line in (repo / path).read_text().splitlines()
+             if "schryer/pubkit/.github/workflows/" in line]
+    assert lines, f"{path} calls no pubkit workflow"
+    for line in lines:
+        assert line.endswith(f".yml@{commit} # v{__version__}"), line
 
 
 @then(parsers.parse('"{path}" contains "{text}"'))

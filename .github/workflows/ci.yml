@@ -106,13 +106,16 @@ jobs:
     if: >-
       !cancelled() && needs.passed.result == 'success'
       && needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
-    uses: schryer/pubrel/.github/workflows/release.yml@v0.5.0
+    uses: schryer/pubrel/.github/workflows/release.yml@6f0ba2573107ace5ea4bb92e5bdc1709c9ef9b02 # v0.5.0
     with: { pubrel-version: v0.5.0 }
     permissions:
       contents: write
 
   # Consumers lock the wheel by URL and sha256, so each release carries it.
-  # Built once, when the release appears, and never replaced.
+  # Built once, when the release appears, and never replaced, from the
+  # release's tag, with the commit the tag names in it as release-commit:
+  # `pubkit sync` pins pubkit's workflows to that commit (src/pubkit/refs.py)
+  # without asking the network.
   wheel:
     needs: release
     if: >-
@@ -130,7 +133,11 @@ jobs:
           wheel="pubkit-$version-py3-none-any.whl"
           gh release view "v$version" >/dev/null 2>&1 || { echo "v$version is not released"; exit 0; }
           gh release view "v$version" --json assets --jq '.assets[].name' | grep -qx "$wheel" && { echo "$wheel already attached"; exit 0; }
+          git fetch --quiet --depth 1 origin tag "v$version"
+          git checkout --quiet "v$version"
+          git rev-parse "v$version^{commit}" > src/pubkit/release-commit
           python -m pip wheel --no-deps . -w dist
+          unzip -p "dist/$wheel" pubkit/release-commit | grep -qxE '[0-9a-f]{40}'
           gh release upload "v$version" "dist/$wheel"
         env:
           GH_TOKEN: ${{ github.token }}

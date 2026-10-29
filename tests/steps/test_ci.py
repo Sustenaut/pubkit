@@ -113,10 +113,41 @@ def scheduled(repo, name, cron):
 @then(parsers.parse('"{name}" calls pubrel\'s release workflow at "{version}" with "{key}" "{value}"'))
 def release(repo, name, version, key, value):
     job = jobs(repo, name)["release"]
-    assert job["uses"] == f"schryer/pubrel/.github/workflows/release.yml@v{version}"
+    # By tag only when pubrel's tags could not be read; by commit otherwise.
+    assert re.fullmatch(r"schryer/pubrel/\.github/workflows/release\.yml@[0-9a-f]{40}|"
+                        rf"schryer/pubrel/\.github/workflows/release\.yml@v{re.escape(version)}",
+                        job["uses"]), job["uses"]
+    text = (repo / ".github" / "workflows" / name).read_text()
+    assert re.search(rf"release\.yml@(v|[0-9a-f]{{40}} # v){re.escape(version)}\n", text)
     assert job["with"]["pubrel-version"] == f"v{version}"
     assert job["with"][key] == value
     assert job["needs"] == "passed"
+
+
+@then(parsers.parse('"{name}" pins pubrel\'s release workflow to the commit pubkit records'))
+def recorded_pubrel(repo, name):
+    from pubkit.new import PUBREL_COMMIT, PUBREL_PIN  # noqa: PLC0415
+
+    text = (repo / ".github" / "workflows" / name).read_text()
+    assert f"release.yml@{PUBREL_COMMIT} # v{PUBREL_PIN}\n" in text, text
+
+
+@when(parsers.parse('every pin reader reads "{line}"'), target_fixture="read")
+def read_pin(line):
+    from pubkit import conform, freshness, nightly, refs  # noqa: PLC0415
+    from pubkit.board import collect  # noqa: PLC0415
+
+    patterns = {"conform": conform.WORKFLOW_PIN, "bump": freshness.WORKFLOW_PIN,
+                "nightly": nightly.CI_PIN, "board": collect.PUBKIT_PIN,
+                "release": refs.RELEASE_PIN}
+    return {name: (m["version"], m["commit"]) for name, p in patterns.items()
+            if (m := p.search(line))}
+
+
+@then(parsers.parse('{readers} read version "{version}" and commit "{commit}"'))
+def read_as(read, readers, version, commit):
+    for reader in readers.split(", "):
+        assert read.get(reader) == (version, None if commit == "none" else commit), (reader, read)
 
 
 @then(parsers.parse('every job in "{name}" but release is named "ci", and passed "ci / passed"'))

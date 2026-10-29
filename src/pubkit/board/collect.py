@@ -16,7 +16,8 @@ from typing import Any
 
 from .. import protect
 from ..freshness import PIN
-from ..nightly import PUBREL_VERSION, RELEASE_PIN
+from ..nightly import PUBREL_VERSION
+from ..refs import AT, RELEASE_PIN, VERSION
 from .connectors.actions import Actions
 from .connectors.base import Fact
 from .connectors.github import GitHub
@@ -25,8 +26,9 @@ from .connectors.live import Live
 from .connectors.scorecard import Scorecard
 from .connectors.sonarcloud import SonarCloud
 
-# Any pubkit reusable workflow, the generated job-*.yml included.
-PUBKIT_PIN = re.compile(r"schryer/pubkit/\.github/workflows/[\w.-]+\.ya?ml@v([0-9][^\s'\"]*)")
+# Any pubkit reusable workflow, the generated job-*.yml included, by
+# commit or by tag.
+PUBKIT_PIN = re.compile(r"schryer/pubkit/\.github/workflows/[\w.-]+\.ya?ml@" + AT + VERSION)
 LIVE_KEYS = {"health", "test", "deploy"}
 WORKFLOW_NAME = re.compile(r"[\w.-]+\.ya?ml")
 
@@ -143,9 +145,10 @@ class Gatherer:
         """The pubkit and pubrel versions the repository pins, and whether
         it is integrated with each."""
         workflows = "\n".join(t.value for t in texts if t.value)
-        pubkit = sorted(set(PIN.findall(lock.value or "")) | set(PUBKIT_PIN.findall(workflows)))
-        pubrel = set(m.group(2) for m in RELEASE_PIN.finditer(workflows))
-        pubrel |= set(m.group(2) for m in PUBREL_VERSION.finditer(workflows))
+        pubkit = sorted(set(PIN.findall(lock.value or ""))
+                        | {m["version"] for m in PUBKIT_PIN.finditer(workflows)})
+        pubrel = {m["version"] for m in RELEASE_PIN.finditer(workflows)}
+        pubrel |= {m["version"] for m in PUBREL_VERSION.finditer(workflows)}
         declared = ((config or {}).get("ci") or {}).get("release") if config else None
         if isinstance(declared, dict) and isinstance(declared.get("pubrel"), str):
             pubrel.add(declared["pubrel"].removeprefix("v"))

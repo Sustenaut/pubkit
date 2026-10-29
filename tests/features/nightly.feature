@@ -21,6 +21,29 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then it succeeds
     And ".github/workflows/ci.yml" does not contain "node-ci.yml@v0.0.1"
 
+  Scenario: pins moves pubrel's commit together with its version
+    Given pubrel's repository tags "v0.5.3"
+    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
+    And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
+
+  Scenario: pins moves pubkit's commit together with its version
+    Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubkit/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And ".github/workflows/ci.yml" pins pubkit's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+
+  Scenario: pins moves a current pin by tag to the tag's commit
+    Given pubrel's repository tags "v0.5.3"
+    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And it prints "ci.yml: pubrel release workflow 0.5.3 pinned to"
+    And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
+
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"

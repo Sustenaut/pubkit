@@ -39,6 +39,7 @@ import tomllib
 from pathlib import Path
 
 from . import __version__, standard
+from .refs import AT, VERSION, ref, release_commit
 
 # The audit sets every repository imports (cargo vet).
 SHARED_IMPORTS = {
@@ -58,8 +59,9 @@ DENY_BASELINE = {
     ("sources", "unknown-registry"): "deny",
     ("sources", "unknown-git"): "deny",
 }
+# By commit, with the version in a comment, or by tag (refs.py).
 WORKFLOW_PIN = re.compile(
-    r"schryer/pubkit/\.github/workflows/(rust-ci|job-rust-[a-z]+)\.yml@v([0-9][^\s'\"]*)")
+    r"schryer/pubkit/\.github/workflows/(rust-ci|job-rust-[a-z]+)\.yml@" + AT + VERSION)
 
 
 def today() -> datetime.date:
@@ -263,13 +265,18 @@ def workflow_pins(root: Path) -> list[str]:
     """Problems with the pins of rust-ci.yml, or of the job-rust-*.yml jobs
     the ci block's workflows call, in this repository's workflows."""
     problems, uses = [], 0
+    commit = release_commit()
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         for m in WORKFLOW_PIN.finditer(path.read_text(encoding="utf-8")):
             uses += 1
-            if m.group(2) != __version__:
-                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@v{m.group(2)} is not "
-                                f"pubkit {__version__}, which tests/requirements.lock pins; "
-                                f"use @v{__version__}")
+            if m["version"] != __version__:
+                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@v{m['version']} is "
+                                f"not pubkit {__version__}, which tests/requirements.lock pins; "
+                                f"use @{ref(__version__, commit)}")
+            elif commit and m["commit"] and m["commit"] != commit:
+                problems.append(f"{path.relative_to(root)}: {m.group(1)}.yml@{m['commit']} is "
+                                f"not the commit of pubkit {__version__}'s tag; use "
+                                f"@{ref(__version__, commit)}")
     if not uses:
         problems.append("no workflow calls schryer/pubkit/.github/workflows/rust-ci.yml; "
                         "give pubkit.json a ci block, and `pubkit sync` writes them")

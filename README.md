@@ -840,7 +840,9 @@ whether it conforms to the latest standard, and its open exceptions
 
 1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
    `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
-   `pub-version`, and the pub* crates in `Cargo.lock`;
+   `pub-version`, and the pub* crates in `Cargo.lock`. A workflow pin moves
+   to the commit of the new release's tag, with its version in a comment,
+   and one still pinned by tag moves to its commit;
 2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
    with an audit, adding no exemption, and that `cargo deny` passes. The
    body lists each update skipped with what `cargo vet suggest` says it
@@ -935,15 +937,17 @@ sha256: a release carries the wheel as an asset, and `pip install
 ```yaml
 jobs:
   ci:
-    uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.1.0      # or python-ci.yml, node-ci.yml
+    uses: schryer/pubkit/.github/workflows/rust-ci.yml@<commit> # v0.1.0   (or python-ci.yml, node-ci.yml)
     with: { pub-version: v0.1.1 }
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }          # by name, not inherit
   release:
     needs: ci
-    uses: schryer/pubrel/.github/workflows/release.yml@v0.1.0
+    uses: schryer/pubrel/.github/workflows/release.yml@<commit> # v0.1.0
     with: { pub-version: v0.1.1, pubrel-version: v0.1.0 }
     permissions: { contents: write }
 ```
+
+Pin each one to the full commit its release's tag names, with the version in a comment, as above, rather than to the tag (`@v0.1.0`), which can be moved: SonarQube Cloud flags a tag pin (S7637). `pubkit bump` and the nightly write pubkit's pins this way, and every reader still takes a pin by tag.
 
 - **`rust-ci.yml`:** runs every check the standard requires. A `plan` job builds the hash-locked venv, runs `make sync-check`, and asks `pubkit required` which make targets each job runs. Then:
   - `gates` runs the required gate targets, then any the `gates` input adds;
@@ -963,7 +967,15 @@ jobs:
 
 ### Generated CI: only the jobs a repository runs
 
-A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubkit.json`. `pubkit sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubkit's tag, so the Actions pins still live in pubkit. `pubkit init` and `pubkit new` write `"ci": {}`.
+A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubkit.json`. `pubkit sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubkit's release, so the Actions pins still live in pubkit. `pubkit init` and `pubkit new` write `"ci": {}`.
+
+Sync pins each one, and pubrel's release workflow, to the full commit of the release's tag, with the version in a comment, so SonarQube Cloud's S7637 (a reusable workflow pinned to a tag, which can move) needs no exception:
+
+```yaml
+    uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2
+```
+
+Usually neither needs the network. pubkit's commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubkit has none, and pins by tag. pubrel's commit is the one pubkit records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
 ```json
 "ci": {
@@ -1007,7 +1019,7 @@ The default quality gate asks for 80% coverage on new code, and a scan without a
 
 A test command that writes no report leaves the scan as it was.
 
-Every action these workflows use is pinned to a commit, with its version in a comment, and a test fails on one that is not.
+Every action these workflows use, pubrel's release workflow included, is pinned to a commit, with its version in a comment, and a test fails on one that is not.
 
 ## Developing
 

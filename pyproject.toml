@@ -31,6 +31,9 @@ pubkit = [
     "ruleset.json",
     "tag-ruleset.json",
     "board/rules.json",
+    # The commit of the release's tag, which the release CI writes before
+    # it builds the wheel; a source tree has none (refs.py).
+    "release-commit",
     "templates/**/*",
     "templates/**/.github/workflows/*",
 ]
