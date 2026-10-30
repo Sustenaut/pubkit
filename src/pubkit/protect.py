@@ -31,8 +31,12 @@ that releases no tags goes without it: `"tags": false` in its entry, or
 `--no-tags`.
 
 A repository may instead say how it is protected in its own pubkit.json:
-`"protect": {"checks": [...], "tags": false, "queue": false}` (`tags` and
-`queue` default to true).
+`"protect": {"checks": [...], "tags": false, "queue": false, "auto_merge": true}`
+(`tags` and `queue` default to true). `auto_merge` is the repository's
+"Allow auto-merge" setting, which lets a pull request merge by itself once
+the ruleset's checks pass: true turns it on, false off, and without it
+protect leaves the setting as it is. It loosens nothing, since the ruleset
+still decides what may merge. A protected.json entry takes it too.
 `pubkit protect OWNER/NAME` reads it from GitHub for a repository the list
 does not name, and `pubkit protect` with no list and no repositories reads
 `./pubkit.json`, for the repository `origin` points at.
@@ -214,11 +218,13 @@ def no_queue(api: Api, repo: str) -> str | None:
 
 
 def protect(api: Api, repo: str, checks: list[str], check: bool,
-            tags: bool = True, queue: bool = True) -> tuple[list[str], bool]:
+            tags: bool = True, queue: bool = True,
+            auto_merge: bool | None = None) -> tuple[list[str], bool]:
     """Bring one repository to both rulesets (with `tags` false, only its
     default branch's; with `queue` false, or where GitHub offers none,
-    main's without the merge queue); its report lines, and whether it
-    differed (with `check`) or could not be brought in line."""
+    main's without the merge queue), and, unless `auto_merge` is None, its
+    "Allow auto-merge" setting to `auto_merge`; its report lines, and
+    whether it differed (with `check`) or could not be brought in line."""
     notes = []
     if queue and (why := no_queue(api, repo)):
         queue = False
@@ -238,11 +244,31 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
 
     lines, bad = attempt(branch, repo, check)
     lines = notes + lines
-    if not tags:
-        return lines, bad
-    tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo), current(api, repo, "tag"),
-                                               "its release tags", check), repo, check)
-    return lines + tag_lines, bad or tag_bad
+    if tags:
+        tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo),
+                                                   current(api, repo, "tag"),
+                                                   "its release tags", check), repo, check)
+        lines, bad = lines + tag_lines, bad or tag_bad
+    if auto_merge is not None:
+        merge_lines, merge_bad = attempt(lambda: allow_auto_merge(api, repo, auto_merge, check),
+                                         repo, check)
+        lines, bad = lines + merge_lines, bad or merge_bad
+    return lines, bad
+
+
+def allow_auto_merge(api: Api, repo: str, want: bool, check: bool) -> tuple[list[str], bool]:
+    """Bring the repository's "Allow auto-merge" setting to `want`."""
+    def said(on: bool) -> str:
+        return "allowed" if on else "not allowed"
+    have = (api("GET", f"repos/{repo}", None) or {}).get("allow_auto_merge")
+    if have is None and check:
+        return [f"{repo}: auto-merge not readable; reading it needs push access"], True
+    if have == want:
+        return [f"{repo}: auto-merge {said(want)}, up to date"], False
+    if check:
+        return [f"{repo}: auto-merge is {said(bool(have))}; pubkit wants it {said(want)}"], True
+    api("PATCH", f"repos/{repo}", {"allow_auto_merge": want})
+    return [f"{repo}: auto-merge now {said(want)}"], False
 
 
 def attempt(step, repo: str, check: bool) -> tuple[list[str], bool]:
@@ -282,7 +308,7 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
             *(f"  was: {d}" for d in diff), *lines], bool(others)
 
 
-KEYS = {"checks", "tags", "queue"}
+KEYS = {"checks", "tags", "queue", "auto_merge"}
 
 
 def problems(block: Any) -> list[str]:
@@ -300,7 +326,7 @@ def problems(block: Any) -> list[str]:
                        'surrounding spaces')
         elif len(set(checks)) != len(checks):
             out.append('"checks" lists a check twice')
-    for key in ("tags", "queue"):
+    for key in ("tags", "queue", "auto_merge"):
         if not isinstance(block.get(key, True), bool):
             out.append(f'"{key}" must be true or false, not {json.dumps(block[key])}')
     return out
@@ -315,11 +341,11 @@ def entry(repo: str, config: Any, where: str) -> dict:
     bad = problems(block)
     if isinstance(block, dict) and block.keys() - KEYS:
         bad.append(f"{', '.join(sorted(block.keys() - KEYS))} is not a protect setting; "
-                   f"it takes checks, tags and queue")
+                   f"it takes checks, tags, queue and auto_merge")
     if bad:
         raise ValueError(f"{where}'s protect block: {'; '.join(bad)}")
     return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True),
-            "queue": block.get("queue", True)}
+            "queue": block.get("queue", True), "auto_merge": block.get("auto_merge")}
 
 
 def parse(text: str | bytes, where: str) -> Any:
@@ -429,7 +455,8 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
                 failed = True
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,
-                             tags and item.get("tags", True), queue and item.get("queue", True))
+                             tags and item.get("tags", True), queue and item.get("queue", True),
+                             item.get("auto_merge"))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

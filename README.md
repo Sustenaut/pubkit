@@ -869,8 +869,9 @@ The repositories come from one of:
 
 - a `protected.json` in the working directory, or the file `--config`
   names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
-  `"tags": false` where the repository releases no tags, and `"queue": false`
-  where GitHub offers it no merge queue.
+  `"tags": false` where the repository releases no tags, `"queue": false`
+  where GitHub offers it no merge queue, and `"auto_merge": true` to turn on
+  the repository's "Allow auto-merge" setting.
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.
@@ -880,8 +881,15 @@ The repositories come from one of:
   on its default branch, and `pubkit protect` with no list and no `REPO`,
   run inside a repository, reads `./pubkit.json` for the repository
   `origin` points at. The block takes only `checks`, distinct non-empty
-  names, and `tags` and `queue`, true or false; anything else, or a pubkit.json that is
+  names, and `tags`, `queue` and `auto_merge`, true or false; anything else, or a pubkit.json that is
   not JSON, is refused before GitHub is asked.
+
+`auto_merge` is the repository's "Allow auto-merge" setting, which lets a
+pull request be set to merge by itself once the ruleset's required checks
+pass (`gh pr merge --auto`). It loosens nothing: the ruleset still decides
+what may merge, and without the merge queue the branch must still be up to
+date with main. `true` turns it on, `false` off, and without it protect
+leaves the setting as it is; `--check` reports a setting that differs.
 
 pubkit's own list, the pub* repositories, is
 [`protected.json`](protected.json) at the root of this checkout: `ci /

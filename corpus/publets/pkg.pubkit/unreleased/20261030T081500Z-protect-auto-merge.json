@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit protect manages a repository's \"Allow auto-merge\" setting: \"auto_merge\": true in its pubkit.json protect block or its protected.json entry turns it on (false turns it off, and without it the setting is left alone), so a pull request can be set to merge by itself once the ruleset's checks pass; --check reports a setting that differs. schryer/visit-ee's entry turns it on"
+}
