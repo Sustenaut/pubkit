@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "New packages' CI, and pubkit's own, call pubrel 0.6.1's release workflow, pinned by its tag's commit, and so pass it the release app's RELEASE_APP_ID and RELEASE_APP_KEY, which pubrel 0.6.1 is the first to take: pubrel tag then tags with the app the Sustenaut tag ruleset lets through"
-}
