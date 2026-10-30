@@ -242,6 +242,15 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And stderr mentions "--owner=OWNER"
     And the repository has no "Cargo.toml"
 
+  Scenario: pubkit new uses no key whose identifier pub prints wrongly
+    Given pub stands in, printing the key "--root=elsewhere"
+    When I start the package "pubfoo" with a key, owned by "example-org"
+    Then it stops, saying "is not an object's identifier"
+    And pub was not asked to set the policy
+
+  Scenario: The identifier pubkit new takes is the one pubkit makes
+    Then an object's identifier passes as a key
+
   Scenario: pubkit new refuses an owner GitHub could not have
     When I run pubkit "new" "--name=pubfoo" "--tag=PKG-PUBFOO-10-2026" "--owner=a/b" "--no-key" "--no-lock"
     Then it fails

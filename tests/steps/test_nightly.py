@@ -14,7 +14,7 @@ import yaml
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import conform, new, nightly
+from pubkit import cbor, conform, new, nightly
 
 scenarios("nightly.feature")
 
@@ -326,6 +326,42 @@ def dry_run_here(repo, monkeypatch, a, b):
 def origin_remote(repo, url):
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", url], check=True)
+
+
+@given(parsers.parse('pub stands in, printing the key "{cid}"'))
+def fake_pub(tmp_path, monkeypatch, cid):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    pub = bin_dir / "pub"
+    asked = tmp_path / "pub-asked"
+    pub.write_text(f'#!/bin/sh\necho "$*" >> "{asked}"\necho "key {cid}"\n')
+    pub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+@when(parsers.parse('I start the package "{name}" with a key, owned by "{owner}"'),
+      target_fixture="stopped")
+def start_with_key(repo, monkeypatch, name, owner):
+    monkeypatch.setattr(new, "check_tools", lambda: [])
+    with pytest.raises(SystemExit) as stop:
+        new.run(repo, name, f"PKG-{name.upper():<6.6}-10-2026".replace(" ", "X"), "",
+                owner=owner, lock=False)
+    return str(stop.value)
+
+
+@then(parsers.parse('it stops, saying "{text}"'))
+def stops_saying(stopped, text):
+    assert text in stopped, stopped
+
+
+@then("pub was not asked to set the policy")
+def no_policy(tmp_path):
+    assert "policy" not in (tmp_path / "pub-asked").read_text()
+
+
+@then("an object's identifier passes as a key")
+def identifier_passes():
+    assert new.CID.fullmatch(cbor.cid(b"an object"))
 
 
 @when(parsers.parse('I start the package "{name}" owned by "{owner}"'), target_fixture="printed")

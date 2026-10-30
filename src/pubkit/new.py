@@ -54,6 +54,8 @@ PUBREL_COMMIT = "5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc"
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")
+# An object's identifier, as cbor.cid makes it: its sha-256, in base32.
+CID = re.compile(r"pub:sha2-256:[a-z2-7]{52}")
 KEPT = {"README.md", "LICENSE"}
 RENAMED = {"gitignore": ".gitignore", "fuzz/gitignore": "fuzz/.gitignore"}
 
@@ -157,8 +159,10 @@ def run(root: Path, name: str, tag: str, description: str, *, owner: str | None 
     from .cli import CONFIG, init_files  # noqa: PLC0415 - avoids an import cycle
 
     root = root.resolve()
-    if not NAME.fullmatch(name):
+    named = NAME.fullmatch(name)
+    if not named:
         sys.exit(f"pubkit: --name must be lower-case letters, digits and hyphens: {name}")
+    name = named.group(0)
     if not TAG.fullmatch(tag):
         sys.exit(f"pubkit: --tag must be a Section 9.1 tag, PKG-XXXXXX-MM-YYYY: {tag}")
     owner = owner or remote_owner(root)
@@ -194,7 +198,12 @@ def run(root: Path, name: str, tag: str, description: str, *, owner: str | None 
         run_in(corpus, "pub", "init")
         out = run_in(corpus, "pub", "sign", "--generate-key", "--principal=human",
                      f"--label={name} release key")
-        key_cid = next(line.split()[1] for line in out.splitlines() if line.startswith("key"))
+        printed = next(line.split()[1] for line in out.splitlines() if line.startswith("key"))
+        cid = CID.fullmatch(printed)
+        if not cid:
+            sys.exit(f"pubkit: `pub sign` printed {printed!r} for the key, which is not an "
+                     f"object's identifier; not using it")
+        key_cid = cid.group(0)
         run_in(corpus, "pub", "policy", f"--root={key_cid}")
         export_object(corpus, key_cid)
         release["key"] = key_cid
