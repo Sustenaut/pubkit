@@ -172,7 +172,87 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And the token may write only contents, pull requests and workflows, and read actions
     And without the app it falls back to PUBKIT_BUMP_TOKEN with a warning
 
+  Scenario: pins moves the crates pubkit.json names, and no others
+    Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
+    And Cargo.lock locks "my-core, publet-core"
+    And cargo stands in, recording what it is asked
+    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And cargo was asked to update "my-core" alone
+    And stderr does not mention "nightly.pins.crates"
+
+  Scenario: pins moves no crates when pubkit.json names none
+    Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": []}}}"
+    And Cargo.lock locks "publet-core"
+    And cargo stands in, recording what it is asked
+    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And cargo was asked to update nothing
+
+  Scenario: Without nightly.pins.crates, pins moves the old crates and warns
+    Given Cargo.lock locks "publet-core, serde"
+    And cargo stands in, recording what it is asked
+    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And cargo was asked to update "publet-core" alone
+    And stderr mentions "pubkit.json names no nightly.pins.crates, so publet-core move as pins"
+
+  Scenario: A repository with none of the old crates hears no warning
+    Given Cargo.lock locks "serde"
+    And cargo stands in, recording what it is asked
+    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    Then it succeeds
+    And stderr does not mention "nightly.pins.crates"
+
+  Scenario: The upgrades tried leave out the crates pubkit.json pins, and only those
+    Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
+    When cargo update --dry-run here says "Updating my-core v1.0.0 -> v1.0.1" and "Updating publet-core v1.0.0 -> v1.0.1"
+    Then the upgrades tried are "publet-core 1.0.0 -> 1.0.1"
+
+  Scenario Outline: sync --check refuses a nightly block pubkit cannot use, naming the key
+    Given the file "pubkit.json" reads "{"kind": "utility", "nightly": <block>}"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | block                                | message                                |
+      | {"pin": {}}                          | nightly has no setting pin             |
+      | {"pins": {"crate": ["a"]}}           | nightly.pins has no setting crate      |
+      | {"pins": {"crates": "a"}}            | nightly.pins.crates must list crate names |
+      | {"pins": {"crates": ["a b"]}}        | nightly.pins.crates must list crate names |
+      | {"pins": []}                         | nightly.pins must be an object         |
+      | []                                   | nightly must be an object              |
+
+  Scenario: pubkit new names the owner it is given, and the protect block the repository needs
+    When I start the package "pubfoo" owned by "example-org"
+    Then "Cargo.toml" contains "https://github.com/example-org/pubfoo"
+    And "SECURITY.md" contains "https://github.com/example-org/pubfoo/security"
+    And what it printed says "add a protect block" and "switch the repository on in the release app"
+    And what it printed does not say "protected.json" or "governed.json"
+
+  Scenario: pubkit new takes the owner from the origin remote
+    Given the origin remote is "git@github.com:example-org/pubfoo.git"
+    When I start the package "pubfoo" without a key
+    Then "Cargo.toml" contains "https://github.com/example-org/pubfoo"
+
+  Scenario: pubkit new without an owner or a GitHub origin stops, asking for one
+    When I run pubkit "new" "--name=pubfoo" "--tag=PKG-PUBFOO-10-2026" "--no-key" "--no-lock"
+    Then it fails
+    And stderr mentions "--owner=OWNER"
+    And the repository has no "Cargo.toml"
+
+  Scenario: pubkit new refuses an owner GitHub could not have
+    When I run pubkit "new" "--name=pubfoo" "--tag=PKG-PUBFOO-10-2026" "--owner=a/b" "--no-key" "--no-lock"
+    Then it fails
+    And stderr mentions "--owner must be a GitHub owner"
+
+  Scenario: The pub pubkit new asks for comes from the one place that says where
+    When the tools are checked with no pub installed
+    Then the install line names "https://github.com/Sustenaut/publet"
+
   Scenario: pubkit new writes a package that conforms but for its release key
+    Given the origin remote is "https://github.com/example-org/pubfoo"
     When I start the package "pubfoo" without a key
     Then the repository has "Cargo.toml", "src/lib.rs", "release.json", "SECURITY.md", "TESTING.md", "SUPPLY-CHAIN.md", "fuzz/fuzz_targets/greet.rs", ".gitignore"
     And it conforms to the standard but for "RS-SUP-05"

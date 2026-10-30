@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -274,6 +275,93 @@ def body_lists(ran, first, second):
 @then(parsers.parse('its body says "{text}" and lists no "{other}"'))
 def ran_body_says(ran, text, other):
     assert text in ran["body"] and other not in ran["body"]
+
+
+@given(parsers.parse('Cargo.lock locks "{names}"'))
+def cargo_lock(repo, names):
+    (repo / "Cargo.lock").write_text("".join(
+        f'[[package]]\nname = "{name}"\nversion = "1.0.0"\n\n' for name in names.split(", ")))
+
+
+@given("cargo stands in, recording what it is asked")
+def fake_cargo(tmp_path, env):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    cargo = bin_dir / "cargo"
+    cargo.write_text('#!/bin/sh\necho "$*" >> "$CARGO_ASKED"\n')
+    cargo.chmod(0o755)
+    env["CARGO_ASKED"] = str(tmp_path / "cargo-asked")
+    env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+def _updated(tmp_path):
+    asked = tmp_path / "cargo-asked"
+    return re.findall(r"-p (\S+)", asked.read_text()) if asked.exists() else []
+
+
+@then(parsers.parse('cargo was asked to update "{crate}" alone'))
+def updated_alone(tmp_path, crate):
+    assert _updated(tmp_path) == [crate]
+
+
+@then("cargo was asked to update nothing")
+def updated_nothing(tmp_path):
+    assert _updated(tmp_path) == []
+
+
+@then(parsers.parse('stderr does not mention "{text}"'))
+def no_mention(result, text):
+    err = result.stderr.decode() if isinstance(result.stderr, bytes) else result.stderr
+    assert text not in err, err
+
+
+@when(parsers.parse('cargo update --dry-run here says "{a}" and "{b}"'), target_fixture="tried")
+def dry_run_here(repo, monkeypatch, a, b):
+    said = subprocess.CompletedProcess([], 0, "", f"    {a}\n    {b}\n")
+    monkeypatch.setattr(nightly, "cargo", lambda *_: said)
+    return nightly.candidates(repo)
+
+
+@given(parsers.parse('the origin remote is "{url}"'))
+def origin_remote(repo, url):
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", url], check=True)
+
+
+@when(parsers.parse('I start the package "{name}" owned by "{owner}"'), target_fixture="printed")
+def start_owned(repo, monkeypatch, capsys, name, owner):
+    monkeypatch.setattr(new, "check_tools", lambda: [])
+    assert new.run(repo, name, f"PKG-{name.upper():<6.6}-10-2026".replace(" ", "X"), "",
+                   owner=owner, key=False, lock=False) == 0
+    return capsys.readouterr().out
+
+
+@then(parsers.parse('what it printed says "{first}" and "{second}"'))
+def printed_says(printed, first, second):
+    flat = " ".join(printed.split())
+    assert first in flat and second in flat, printed
+
+
+@then(parsers.parse('what it printed does not say "{first}" or "{second}"'))
+def printed_lacks(printed, first, second):
+    assert first not in printed and second not in printed, printed
+
+
+@then(parsers.parse('the repository has no "{path}"'))
+def has_no(repo, path):
+    assert not (repo / path).exists()
+
+
+@when("the tools are checked with no pub installed", target_fixture="problems")
+def tools_checked(monkeypatch):
+    monkeypatch.setattr(new, "version_of", lambda tool: None)
+    return new.check_tools()
+
+
+@then(parsers.parse('the install line names "{url}"'))
+def install_line(problems, url):
+    assert any(p.startswith("pub is not installed") and f"--git {url} " in p for p in problems)
+    assert new.PUB_GIT == url
 
 
 @when(parsers.parse('I start the package "{name}" without a key'))

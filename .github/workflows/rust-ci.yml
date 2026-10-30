@@ -2,7 +2,8 @@
 #
 #   ci:
 #     uses: Sustenaut/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
-#     with: { pub-version: v0.1.1 }
+#     with:
+#       tools: '[{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]'
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
 # Every check the Rust crate standard tags `[checked: ..., make TARGET]` runs
@@ -45,7 +46,8 @@ on:
     inputs:
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages for the functional job. }
-      pub-version: { type: string, default: '', description: A publet tag whose pub the functional suite drives; empty installs none. }
+      pub-version: { type: string, default: '', description: 'Deprecated: use tools. A publet tag whose pub the functional suite drives; empty installs none.' }
+      tools: { type: string, default: '', description: 'JSON list of the tools the functional suite drives, each {"crate", "git", "tag"}, which pubkit sync gives from ci.tools; empty installs none.' }
       os-matrix: { type: string, default: '["ubuntu-latest", "macos-latest", "windows-latest"]' }
       gates: { type: string, default: '', description: "Extra make targets the gates job runs after the required ones." }
       test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
@@ -148,8 +150,26 @@ jobs:
       - if: inputs.pub-version != ''
         run: |
           command -v pub >/dev/null && pub --version | grep -q "^pub ${PUB#v}$" \
-            || cargo install --locked --git https://github.com/schryer/publet --tag "$PUB" publet-cli
+            || cargo install --locked --git https://github.com/Sustenaut/publet --tag "$PUB" publet-cli
         env: { PUB: '${{ inputs.pub-version }}' }
+      - if: inputs.tools != ''
+        id: tools
+        run: |
+          echo "key=$(printf %s "$TOOLS" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "$HOME/.cargo-tools/bin" >> "$GITHUB_PATH"
+        env: { TOOLS: '${{ inputs.tools }}' }
+      - if: inputs.tools != ''
+        id: tools-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cargo-tools
+          key: tools-${{ steps.tools.outputs.key }}-${{ runner.os }}
+      - if: inputs.tools != '' && steps.tools-cache.outputs.cache-hit != 'true'
+        run: |
+          jq -r '.[] | [.crate, .git, .tag] | @tsv' <<<"$TOOLS" | while IFS=$'\t' read -r crate git tag; do
+            cargo install --locked --root "$HOME/.cargo-tools" --git "$git" --tag "$tag" "$crate"
+          done
+        env: { TOOLS: '${{ inputs.tools }}' }
       - if: env.COVERAGE == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:

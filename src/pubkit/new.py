@@ -1,9 +1,11 @@
 """`pubkit new`: a new Rust package that meets the standard from its first
 commit.
 
-    pubkit new --name=pubfoo --tag=PKG-PUBFOO-10-2026 [--description=TEXT]
+    pubkit new --name=pubfoo --tag=PKG-PUBFOO-10-2026 [--owner=OWNER] [--description=TEXT]
 
-Run in an empty repository (a README or LICENSE already there is kept). It:
+Run in an empty repository (a README or LICENSE already there is kept). The
+package's repository is OWNER's, by default the owner the `origin` remote
+names; without either it stops. It:
 
 1. checks the toolchain first, refusing a `pubrel` or `pub` older than the
    releases the pipeline needs;
@@ -21,9 +23,8 @@ Run in an empty repository (a README or LICENSE already there is kept). It:
    to `corpus/objects`, checked against its identifier;
 5. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
    the test requirements;
-6. prints the lines that, in schryer/pubkit, protect its main branch
-   (`pubkit protect --require ...`, and a line for protected.json) and register it for pubkit's
-   nightly workflow (governed.json).
+6. prints the protect block its pubkit.json needs, and that the repository
+   is then switched on in the release app.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, cbor
+from .refs import OWNER_NAME
 
 # The releases a new package's pipeline needs on this machine: pubrel 0.6.0
 # records each unreleased change in a file of its own (0.5.3 gave security
@@ -43,6 +45,8 @@ from . import __version__, cbor
 # 0.2.1 rotates keys.
 MIN_PUBREL = (0, 6, 0)
 MIN_PUB = (0, 2, 1)
+# Where pub comes from: publet-cli, at a tag of this repository.
+PUB_GIT = "https://github.com/Sustenaut/publet"
 # The pubrel release workflow a new package's CI calls, and the commit its
 # tag names, which the workflow pins (refs.py).
 PUBREL_PIN = "0.6.1"
@@ -78,8 +82,7 @@ def check_tools() -> list[str]:
     problems = []
     for tool, least, install in (
         ("pubrel", MIN_PUBREL, "cargo install --locked pubrel"),
-        ("pub", MIN_PUB, "cargo install --locked --git https://github.com/schryer/publet "
-                         "--tag v{v} publet-cli"),
+        ("pub", MIN_PUB, f"cargo install --locked --git {PUB_GIT} --tag v{{v}} publet-cli"),
         ("cargo", None, "https://rustup.rs"),
     ):
         found = version_of(tool)
@@ -141,8 +144,16 @@ def release_json(name: str, tag: str) -> dict:
     }
 
 
-def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
-        lock: bool = True) -> int:
+def remote_owner(root: Path) -> str | None:
+    """The owner of the GitHub repository `origin` points at, if it does."""
+    out = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"],
+                         capture_output=True, text=True, check=False).stdout
+    m = re.search(r"github\.com[:/]([A-Za-z0-9-]+)/", out)
+    return m.group(1) if m else None
+
+
+def run(root: Path, name: str, tag: str, description: str, *, owner: str | None = None,
+        key: bool = True, lock: bool = True) -> int:
     from .cli import CONFIG, init_files  # noqa: PLC0415 - avoids an import cycle
 
     root = root.resolve()
@@ -150,6 +161,12 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
         sys.exit(f"pubkit: --name must be lower-case letters, digits and hyphens: {name}")
     if not TAG.fullmatch(tag):
         sys.exit(f"pubkit: --tag must be a Section 9.1 tag, PKG-XXXXXX-MM-YYYY: {tag}")
+    owner = owner or remote_owner(root)
+    if not owner:
+        sys.exit("pubkit: origin is not a GitHub repository; name the package's owner with "
+                 "--owner=OWNER")
+    if not OWNER_NAME.fullmatch(owner):
+        sys.exit(f"pubkit: --owner must be a GitHub owner: {owner}")
     for there in (CONFIG, "Cargo.toml", "release.json"):
         if (root / there).exists():
             sys.exit(f"pubkit: {there} already exists; `pubkit new` starts a package, "
@@ -161,7 +178,7 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
         return 1
 
     config = {"kind": "rust", "bin": name, "ci": {}}
-    extra = {"name": name, "crate": name.replace("-", "_"), "tag": tag,
+    extra = {"name": name, "owner": owner, "crate": name.replace("-", "_"), "tag": tag,
              "description": description or f"{name}: a pub* package."}
     init_files(root, config, layers=("common", "rust", "new-rust"), extra=extra,
                keep=KEPT)
@@ -194,8 +211,7 @@ def run(root: Path, name: str, tag: str, description: str, *, key: bool = True,
         from .cli import lock as lock_requirements  # noqa: PLC0415
         lock_requirements(root)
 
-    entry = json.dumps({"repo": f"schryer/{name}", "checks": CHECKS})
-    requires = " ".join(f'--require "{c}"' for c in CHECKS)
+    block = json.dumps({"checks": CHECKS})
     print(f"""
 {name} is ready: every file the standard asks for, a release key, and a
 crate that passes every check. Next:
@@ -204,16 +220,11 @@ crate that passes every check. Next:
   cargo vet                        # fetch the shared audits into supply-chain/
   git add -A && git commit -m "{name}: a new pub* package" && git push
 
-Then protect main as every pub* repository is (pull requests only, after
-CI):
+Then add a protect block to pubkit.json, which says how {owner}/{name} is
+protected (in an organization, add its release app's id too, as
+"release_app"):
 
-  pubkit protect {requires} schryer/{name}
+  "protect": {block}
 
-and, in schryer/pubkit, add
-
-  {entry}
-
-to protected.json, so `pubkit protect --check` there covers it. And register
-it for pubkit's nightly workflow: add {{"repo": "schryer/{name}"}} to
-governed.json.""")
+and switch the repository on in the release app.""")
     return 0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -33,6 +34,93 @@ def triggers(data):
 
 
 KINDS = {"Node": "utility", "Python": "utility", "Rust": "rust", "service": "service"}
+
+
+@then(parsers.parse('"{name}"\'s job "{job}" is given the tools "{text}"'))
+def given_tools(repo, name, job, text):
+    assert jobs(repo, name)[job]["with"]["tools"] == text
+
+
+@then(parsers.parse('"{name}"\'s job "{job}" is given no tools'))
+def given_no_tools(repo, name, job):
+    assert "tools" not in jobs(repo, name)[job].get("with", {})
+
+
+@then(parsers.parse('"{name}"\'s job "{job}" passes "{key}" as "{value}"'))
+def passes(repo, name, job, key, value):
+    assert jobs(repo, name)[job]["with"][key] == value
+
+
+def _install_step(workflow):
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    (step,) = [s for job in data["jobs"].values() for s in job.get("steps", [])
+               if "--root" in s.get("run", "")]
+    return step["run"]
+
+
+TWO_TOOLS = json.dumps([{"crate": "one-cli", "git": "https://example.eu/one", "tag": "v1"},
+                        {"crate": "two-cli", "git": "https://example.eu/two.git", "tag": "v2.0"}])
+
+
+@when(parsers.parse('the "{workflow}" step that installs tools runs on two tools'),
+      target_fixture="install")
+def install_tools(tmp_path, workflow):
+    return _run_install(tmp_path, workflow, 'echo "$*" >> "$ASKED"\n')
+
+
+@when(parsers.parse('the "{workflow}" step that installs tools runs with cargo failing'),
+      target_fixture="install")
+def install_tools_failing(tmp_path, workflow):
+    return _run_install(tmp_path, workflow, "exit 101\n")
+
+
+def _run_install(tmp_path, workflow, cargo):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake = bin_dir / "cargo"
+    fake.write_text("#!/bin/sh\n" + cargo)
+    fake.chmod(0o755)
+    asked = tmp_path / "asked"
+    done = subprocess.run(  # GitHub's default for `run`: bash -e.
+        ["bash", "-e", "-c", _install_step(workflow)], capture_output=True, text=True, check=False,
+        env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+             "HOME": str(tmp_path), "TOOLS": TWO_TOOLS, "ASKED": str(asked)})
+    return {"code": done.returncode, "asked": asked, "home": tmp_path}
+
+
+@then("it installed both with cargo at their tags, into the tools directory")
+def installed(install):
+    root = f"--root {install['home']}/.cargo-tools"
+    assert install["code"] == 0
+    assert install["asked"].read_text().splitlines() == [
+        f"install --locked {root} --git https://example.eu/one --tag v1 one-cli",
+        f"install --locked {root} --git https://example.eu/two.git --tag v2.0 two-cli"]
+
+
+@then("the step fails")
+def step_fails(install):
+    assert install["code"] != 0
+
+
+@then(parsers.parse('no pubkit workflow names "{text}"'))
+def no_workflow_names(text):
+    assert not [p.name for p in WORKFLOWS.glob("*.yml") if text in p.read_text()]
+
+
+@given(parsers.parse('the latest release of "{slug}" is "{tag}"'))
+def latest_release(tmp_path, env, slug, tag):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake = bin_dir / "gh"
+    fake.write_text(f'#!/bin/sh\n[ "$4" = "{slug}" ] || exit 1\nprintf "%s\\n" "{tag}"\n')
+    fake.chmod(0o755)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+@then(parsers.parse('"{command}" reported no tool moving'))
+def no_tool_moved(result, command):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert "ci.tools" not in out, out
 
 
 @given(parsers.parse("a {language} repository whose ci block is '{text}'"))

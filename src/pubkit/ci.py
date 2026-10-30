@@ -13,7 +13,9 @@ version in a comment (refs.py).
       "cron": "17 3 * * *",
       "with": {"browser-test": "npm run test:browser", "coverage-report": "coverage/"},
       "jobs": {"review": false, "sonar": {"events": ["pr", "main"]}},
-      "release": {"pubrel": "0.5.4", "with": {}}
+      "release": {"pubrel": "0.5.4", "with": {}},
+      "tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli",
+                 "tag": "v1.2.3"}]
     }
 
 `language` is a utility's, node or python; without it, a package.json
@@ -45,6 +47,11 @@ through; `false` leaves it
 out, and a service, which deploys, has none. `{"uses": "local"}` calls the
 repository's own .github/workflows/release.yml instead, as pubrel does, so
 a change to its release workflow is tested before it ships.
+
+`tools` lists what a Rust repository's functional suite drives: each crate
+is installed from its git repository at its tag, by `cargo install --locked`,
+and the nightly moves each tag to the latest release of that repository. It
+replaces the `pub-version` input, which still works and warns.
 
 A repository that deploys a static site with pubkit's deploy-static (a
 workflow of its own uses it, or pubkit.json has a `site` block) gets a
@@ -100,7 +107,7 @@ TRIGGERS = {
 RELEASE_EVENTS = ("pr", "queue", "main")
 # The events the site is checked on, before anything deploys it.
 SITE_EVENTS = ("pr", "queue")
-SETTINGS = ("language", "events", "cron", "with", "jobs", "release")
+SETTINGS = ("language", "events", "cron", "with", "jobs", "release", "tools")
 HEADER = ("# Written by `pubkit sync` from the ci block of pubkit.json. Do not edit:\n"
           "# change pubkit.json and run `pubkit sync`.\n")
 
@@ -164,7 +171,7 @@ JOBS: dict[str, dict[str, Job]] = {
         "functional": Job("job-rust-functional.yml",
                           ("python-version", "apt-packages", "pub-version", "functional",
                            "cargo-llvm-cov-version"), needs=("gates",), secrets=True,
-                          internal=RUST_REQUIRED, standard="functional"),
+                          internal=(*RUST_REQUIRED, "tools"), standard="functional"),
         "msrv": Job("job-rust-msrv.yml", needs=("gates",), events=HEAVY, standard="msrv"),
         "fuzz": Job("job-rust-fuzz.yml",
                     ("python-version", "fuzz-seconds", "fuzz-seconds-scheduled", "cargo-fuzz-version"),
@@ -199,6 +206,15 @@ UTILITY = ("node", "python")
 # it, since the scan fails on a directory that is not there.
 LAYOUT = {"python": (("src",), ("tests",)),
           "rust": (("src", "crates"), ("tests", "fuzz", "benches"))}
+
+# What a tool in the ci block's `tools` is: what cargo installs, and from where.
+TOOL = ("crate", "git", "tag")
+CRATE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
+TOOL_GIT = re.compile(r"https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:/[A-Za-z0-9_.-]+)+/?")
+TOOL_TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
+# The git repositories whose latest release the nightly can read.
+GITHUB_REPO = re.compile(r"https://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)"
+                         r"(?:\.git)?/?")
 
 # The checkout the site job runs, pinned as pubkit's own workflows pin it.
 CHECKOUT = "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0"
@@ -302,6 +318,11 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     overrides = given.get("jobs", {})
     if not isinstance(overrides, dict):
         stop('jobs must be an object, such as {"review": false}')
+    listed = tools(given)
+    if listed and language != "rust":
+        stop(f"tools is for a Rust repository's functional job; {language} has none")
+    if listed and "pub-version" in inputs:
+        stop("with gives pub-version, the deprecated form of tools; give tools alone")
     rules = plan(config, root) if language == "rust" else None
     jobs: dict[str, tuple[str, ...]] = {}
     for name, job in table.items():
@@ -354,8 +375,30 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
             "with": inputs, "jobs": jobs, "release": release, "layout": layout(language, root),
-            "site": site(config, root),
+            "site": site(config, root), "tools": listed,
             "targets": rules["targets"] if rules else {}}
+
+
+def tools(given: dict[str, Any]) -> list[dict[str, str]]:
+    """The ci block's `tools`, checked; each is a crate, a git and a tag."""
+    listed = given.get("tools", [])
+    if not isinstance(listed, list):
+        stop('tools must be a list of objects, each with a crate, a git and a tag')
+    for tool in listed:
+        if not isinstance(tool, dict):
+            stop(f"tools must list objects, not {json.dumps(tool)}")
+        unknown = sorted(set(tool) - set(TOOL))
+        if unknown:
+            stop(f"tools has no setting {', '.join(unknown)}; each tool takes {', '.join(TOOL)}")
+        for key, pattern, what in (("crate", CRATE, "a crate's name"),
+                                   ("git", TOOL_GIT, "the git repository's https:// address"),
+                                   ("tag", TOOL_TAG, "a tag of that repository")):
+            if not isinstance(tool.get(key), str) or not pattern.fullmatch(tool[key]):
+                stop(f"tools: {key} must be {what}, not {json.dumps(tool.get(key))}")
+    crates = [tool["crate"] for tool in listed]
+    if len(set(crates)) != len(crates):
+        stop("tools lists a crate twice")
+    return listed
 
 
 def layout(language: str, root: Path) -> str:
@@ -467,6 +510,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         given = {**{i: ci["with"][i] for i in job.inputs if i in ci["with"]}, **job.fixed}
         if "required" in job.internal:
             given["required"] = " ".join(ci["targets"][job.standard])
+        if "tools" in job.internal and ci["tools"]:
+            given["tools"] = json.dumps(ci["tools"])
         if "layout" in job.internal and ci["layout"]:
             given["layout"] = ci["layout"]
         needs = [n for n in job.needs if n in names]
@@ -573,6 +618,9 @@ def generated(config: dict[str, Any], root: Path) -> list[tuple[str, str]]:
     ci = settings(config, root)
     if ci is None:
         return []
+    if "pub-version" in ci["with"]:
+        print("pubkit: warning: pubkit.json's ci.with.pub-version is deprecated; list the tool "
+              "in ci.tools, with its crate, git and tag", file=sys.stderr)
     ci["owner"] = owner(config)
     ci["commit"] = release_commit()
     if ci["release"] and not ci["release"].get("local"):

@@ -35,7 +35,49 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Given GitHub has no ruleset in "Sustenaut/foo"
     When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/foo"
     Then it succeeds
+    And it prints "Sustenaut/foo: warning: no release_app in its protect block"
     And GitHub was sent the tag ruleset for "Sustenaut/foo"
+
+  Scenario: A repository's protect block names the release app its tags let through
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json's protect block is {"checks": ["ci / passed"], "release_app": 12345}
+    And GitHub has no ruleset in "schryer/site"
+    When I run pubkit "protect"
+    Then it succeeds
+    And it prints nothing about a release app
+    And GitHub was sent a tag ruleset only app 12345 may bypass
+
+  Scenario: A release app in a protected.json entry is the one its tags let through
+    Given protected.json lists "Sustenaut/foo" requiring "ci / passed", with the release app 12345
+    And GitHub has no ruleset in "Sustenaut/foo"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it succeeds
+    And it prints nothing about a release app
+    And GitHub was sent a tag ruleset only app 12345 may bypass
+
+  Scenario: A repository of no known owner, naming no release app, gets no app and no warning
+    Given GitHub has no ruleset in "example-org/foo"
+    When I run pubkit "protect" "--require" "ci / passed" "example-org/foo"
+    Then it succeeds
+    And it prints nothing about a release app
+    And GitHub was sent the tag ruleset for "example-org/foo"
+
+  Scenario: A release tag ruleset the block leaves out gives no warning about its app
+    Given GitHub has no ruleset in "Sustenaut/foo"
+    When I run pubkit "protect" "--require" "ci / passed" "--no-tags" "Sustenaut/foo"
+    Then it succeeds
+    And it prints nothing about a release app
+
+  Scenario Outline: sync --check refuses an unsound protect block
+    Given its pubkit.json's protect block is <block>
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "<reason>"
+
+    Examples:
+      | block                                        | reason                                  |
+      | {"checks": ["build"], "release_app": "1"}    | "release_app" must be a GitHub App's id |
+      | {"checks": ["build"], "bypass": 1}           | bypass is not a protect setting         |
 
   Scenario: protected.json covers every governed repository
     When I read pubkit's protected.json
@@ -326,6 +368,10 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
       | {"checks": ["build"], "tags": "no"}       | "tags" must be true or false, not "no"    |
       | {"checks": ["build"], "queue": 1}         | "queue" must be true or false, not 1      |
       | {"checks": ["build"], "tag": false}       | tag is not a protect setting              |
+      | {"checks": ["build"], "release_app": "1"} | "release_app" must be a GitHub App's id   |
+      | {"checks": ["build"], "release_app": true} | "release_app" must be a GitHub App's id  |
+      | {"checks": ["build"], "release_app": 0}   | "release_app" must be a GitHub App's id   |
+      | {"checks": ["build"], "release_app": 1.5} | "release_app" must be a GitHub App's id   |
       | ["build"]                                 | it is ["build"], not an object            |
 
   Scenario: A ./pubkit.json that is not JSON is refused

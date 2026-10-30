@@ -9,7 +9,8 @@
 #
 # 1. every outdated pub* pin: the latest pubkit (in any of its *-ci.yml
 #    workflows), pubrel's release workflow and pubrel-version, pub-version,
-#    and the pub* crates in Cargo.lock;
+#    each tool ci.tools pins by tag, and the crates nightly.pins.crates names
+#    in Cargo.lock;
 # 2. the other crates' updates that cargo vet covers with an audit (no new
 #    exemption) and cargo deny passes; the body lists each one skipped,
 #    with what `cargo vet suggest` says it needs;
@@ -124,7 +125,7 @@ jobs:
           tag=$(latest "$GITHUB_REPOSITORY")
           python -m pip install --quiet \
             "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
-          pubrel=$(latest Sustenaut/pubrel); pub=$(latest schryer/publet)
+          pubrel=$(latest Sustenaut/pubrel); pub=$(latest Sustenaut/publet)
           echo "pubrel=${pubrel#v}" >> "$GITHUB_OUTPUT"
           echo "pub=${pub#v}" >> "$GITHUB_OUTPUT"
         env: { GH_TOKEN: '${{ github.token }}' }

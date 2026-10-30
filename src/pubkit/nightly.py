@@ -2,8 +2,10 @@
 
 `pubkit pins --pubrel V --pub V` moves every outdated pub* pin to its latest
 release: this pubkit (managed files, lock, `rust-ci.yml`), pubrel's release
-workflow and `pubrel-version`, the `pub-version` a workflow installs, and
-the pub* crates in `Cargo.lock`, within their requirements.
+workflow and `pubrel-version`, the `pub-version` a workflow installs, each
+tool `ci.tools` pins by tag, to the latest release of its git repository,
+and the crates `nightly.pins.crates` names in `Cargo.lock`, within their
+requirements.
 
 `pubkit crates --report FILE` then tries each upgrade `cargo update` would
 make to the other crates, one at a time on top of those it kept, and keeps
@@ -38,8 +40,8 @@ from .paths import confined
 from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit,
                    release_commit, repin)
 
-# The crates the pub* repositories publish, which `pins` moves rather than
-# `crates`.
+# The crates `pins` moves rather than `crates` where a repository's pubkit.json
+# names none in `nightly.pins.crates`, with a warning, until each one does.
 PUB_CRATES = ("publet-core", "publet-algorithms", "pubunit")
 
 # A row's text, which must not start with '-' (pubrel has no `--`, so it
@@ -89,6 +91,44 @@ def by_language(name: str, given: object, defaults: dict[str, bool]) -> dict[str
     return {**defaults, **given}
 
 
+def named_crates(config: dict) -> tuple[str, ...] | None:
+    """The crates pubkit.json's `nightly.pins.crates` names, or None when it
+    names none. Anything else in the nightly block stops the command."""
+    from .ci import CRATE  # noqa: PLC0415
+    block = config.get("nightly", {})
+    if not isinstance(block, dict):
+        sys.exit('pubkit: pubkit.json\'s nightly must be an object, such as '
+                 '{"pins": {"crates": ["some-crate"]}}')
+    unknown = sorted(set(block) - {"pins"})
+    if unknown:
+        sys.exit(f"pubkit: pubkit.json's nightly has no setting {', '.join(unknown)}; "
+                 "it takes pins")
+    pinned = block.get("pins", {})
+    if not isinstance(pinned, dict):
+        sys.exit('pubkit: pubkit.json\'s nightly.pins must be an object, such as '
+                 '{"crates": ["some-crate"]}')
+    unknown = sorted(set(pinned) - {"crates"})
+    if unknown:
+        sys.exit(f"pubkit: pubkit.json's nightly.pins has no setting {', '.join(unknown)}; "
+                 "it takes crates")
+    if "crates" not in pinned:
+        return None
+    names = pinned["crates"]
+    if not isinstance(names, list) or not all(isinstance(n, str) and CRATE.fullmatch(n)
+                                              for n in names):
+        sys.exit("pubkit: pubkit.json's nightly.pins.crates must list crate names, "
+                 f"not {names!r}")
+    return tuple(names)
+
+
+def pin_crates(root: Path) -> tuple[str, ...]:
+    """The crates `pins` moves here rather than `crates`."""
+    path = root / "pubkit.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    named = named_crates(config)
+    return PUB_CRATES if named is None else named
+
+
 def settings(root: Path) -> dict[str, dict[str, bool]]:
     """The repository's `update` and `security.fuzz`, per language, from
     pubkit.json over the defaults. Anything else stops the nightly."""
@@ -106,6 +146,7 @@ def settings(root: Path) -> dict[str, dict[str, bool]]:
     from .security import dependabot_settings, sonar_settings  # noqa: PLC0415
     dependabot_settings(config)
     sonar_settings(config)
+    named_crates(config)
     return {"update": by_language("update", config.get("update", {}), UPDATES), "fuzz": fuzz}
 
 
@@ -177,6 +218,44 @@ def released_by_config(root: Path, pubrel: str, changes: list[str]) -> bool:
     return True
 
 
+def latest_release(repo: str) -> str | None:
+    """The tag of `repo`'s latest release, or None when GitHub does not say."""
+    try:
+        out = subprocess.run(["gh", "release", "view", "--repo", repo, "--json", "tagName",
+                              "--jq", ".tagName"], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def tools_by_config(root: Path, changes: list[str]) -> bool:
+    """Move each tool pubkit.json's ci.tools pins by tag to the latest release
+    of its git repository; True when one moved. One whose latest release
+    cannot be read stays as it is, with a warning."""
+    from .ci import GITHUB_REPO, TOOL_TAG, tools  # noqa: PLC0415
+
+    path = root / "pubkit.json"
+    if not path.is_file():
+        return False
+    config = json.loads(path.read_text(encoding="utf-8"))
+    listed = tools(config["ci"]) if isinstance(config.get("ci"), dict) else []
+    moved = False
+    for tool in listed:
+        m = GITHUB_REPO.fullmatch(tool["git"])
+        latest = latest_release(m["repo"]) if m else None
+        if not latest or not TOOL_TAG.fullmatch(latest):
+            print(f"pubkit: warning: no latest release of {tool['git']} to read, "
+                  f"so {tool['crate']} stays at {tool['tag']}", file=sys.stderr)
+        elif latest != tool["tag"]:
+            changes.append(f"pubkit.json: ci.tools {tool['crate']} {tool['tag']} -> {latest}")
+            tool["tag"] = latest
+            moved = True
+    if moved:
+        config["ci"]["tools"] = listed
+        path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return moved
+
+
 def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
@@ -188,7 +267,8 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         if lock:
             lock_requirements(root)
         changes.append(f"pubkit {before} -> {__version__}")
-    if pubrel and released_by_config(root, pubrel, changes):
+    released = bool(pubrel) and released_by_config(root, pubrel, changes)
+    if tools_by_config(root, changes) or released:
         from .cli import sync  # noqa: PLC0415
         sync(root, check=False)
     from .ci import is_generated  # noqa: PLC0415
@@ -222,11 +302,16 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         if new != text:
             path.write_text(new, encoding="utf-8")
     old = locked(root)
-    for crate in PUB_CRATES:
+    moving = pin_crates(root)
+    if moving is PUB_CRATES and (used := [c for c in PUB_CRATES if c in old]):
+        print(f"pubkit: warning: pubkit.json names no nightly.pins.crates, so {', '.join(used)} "
+              f"move as pins; add \"nightly\": {{\"pins\": {{\"crates\": {json.dumps(used)}}}}} "
+              f"to it", file=sys.stderr)
+    for crate in moving:
         if crate in old:
             cargo(root, "update", "--quiet", "-p", crate)
     new_lock = locked(root)
-    changes += [f"{c} {old[c]} -> {new_lock[c]}" for c in PUB_CRATES
+    changes += [f"{c} {old[c]} -> {new_lock[c]}" for c in moving
                 if c in old and new_lock.get(c) != old[c]]
     if new_lock != old:
         refresh_reports(root)
@@ -291,15 +376,15 @@ def python(root: Path) -> list[str]:
 
 def candidates(root: Path) -> list[tuple[str, str, str]]:
     """(crate, from, to) for every upgrade `cargo update` would make, the
-    pub* crates aside. Downgrades (which the MSRV-aware resolver proposes
-    when a locked version needs a newer Rust) are not taken."""
-    return upgrades(cargo(root, "update", "--dry-run").stderr)
+    crates `pins` moves aside. Downgrades (which the MSRV-aware resolver
+    proposes when a locked version needs a newer Rust) are not taken."""
+    return upgrades(cargo(root, "update", "--dry-run").stderr, pin_crates(root))
 
 
-def upgrades(dry_run: str) -> list[tuple[str, str, str]]:
-    """The upgrades in `cargo update --dry-run`'s output."""
+def upgrades(dry_run: str, pinned: tuple[str, ...] = PUB_CRATES) -> list[tuple[str, str, str]]:
+    """The upgrades in `cargo update --dry-run`'s output, `pinned` aside."""
     return [(m.group(1), m.group(2), m.group(3)) for m in UPDATE.finditer(dry_run)
-            if m.group(1) not in PUB_CRATES]
+            if m.group(1) not in pinned]
 
 
 def recommended(vet_output: str) -> str:

@@ -270,6 +270,98 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And no workflow is written for "pr"
     And ".github/workflows/ci.yml" contains "name: ci"
 
+  Scenario: The tools a Rust repository lists reach its functional job
+    Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml"'s job "functional" is given the tools "[{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]"
+    And "pr.yml"'s job "gates" is given no tools
+
+  Scenario: Without tools the functional job is given none
+    Given a Rust repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "pr.yml"'s job "functional" is given no tools
+
+  Scenario Outline: Each workflow that runs the functional suite installs every tool, and fails when one fails
+    When the "<workflow>" step that installs tools runs on two tools
+    Then it installed both with cargo at their tags, into the tools directory
+    When the "<workflow>" step that installs tools runs with cargo failing
+    Then the step fails
+
+    Examples:
+      | workflow                |
+      | job-rust-functional.yml |
+      | rust-ci.yml             |
+
+  Scenario: pub-version still works, with a warning
+    Given a Rust repository whose ci block is '{"with": {"pub-version": "v0.2.1"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And stderr mentions "ci.with.pub-version is deprecated"
+    And "pr.yml"'s job "functional" passes "pub-version" as "v0.2.1"
+
+  Scenario: The workflows install pub-version's pub from where publet is
+    Then no pubkit workflow names "schryer/publet"
+
+  Scenario: pins moves a tool to the latest release of its git repository
+    Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli.git", "tag": "v1.2.3"}]}'
+    And the latest release of "example-org/some-cli" is "v1.3.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "pubkit.json: ci.tools some-cli v1.2.3 -> v1.3.0"
+    And "pubkit.json" contains "v1.3.0"
+    And ".github/workflows/pr.yml" contains "v1.3.0"
+    And ".github/workflows/pr.yml" does not contain "v1.2.3"
+
+  Scenario: pins leaves a tool already at its latest release
+    Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.3.0"}]}'
+    And the latest release of "example-org/some-cli" is "v1.3.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And "pubkit.json" contains "v1.3.0"
+    And "pins" reported no tool moving
+
+  Scenario Outline: pins leaves a tool whose latest release it cannot trust, and warns
+    Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "<git>", "tag": "v1.2.3"}]}'
+    And the latest release of "example-org/some-cli" is "<latest>"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And stderr mentions "so some-cli stays at v1.2.3"
+    And "pubkit.json" contains "v1.2.3"
+
+    Examples:
+      | git                                         | latest      |
+      | https://github.com/example-org/missing      | v1.3.0      |
+      | https://github.com/example-org/some-cli     | v1; rm -rf  |
+      | https://git.example.eu/example-org/some-cli | v1.3.0      |
+
+  Scenario Outline: A tool pubkit cannot install stops sync with a message
+    Given a Rust repository whose ci block is '<ci>'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "<message>"
+
+    Examples:
+      | ci | message |
+      | {"tools": "publet-cli"} | tools must be a list |
+      | {"tools": ["publet-cli"]} | tools must list objects |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1", "rev": "b"}]} | tools has no setting rev |
+      | {"tools": [{"git": "https://example.eu/a", "tag": "v1"}]} | tools: crate must be a crate's name |
+      | {"tools": [{"crate": "a b", "git": "https://example.eu/a", "tag": "v1"}]} | tools: crate must be a crate's name |
+      | {"tools": [{"crate": "a", "tag": "v1"}]} | tools: git must be the git repository's https:// address |
+      | {"tools": [{"crate": "a", "git": "http://example.eu/a", "tag": "v1"}]} | tools: git must be the git repository's https:// address |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a; rm", "tag": "v1"}]} | tools: git must be the git repository's https:// address |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a"}]} | tools: tag must be a tag of that repository |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "-v1"}]} | tools: tag must be a tag of that repository |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}, {"crate": "a", "git": "https://example.eu/b", "tag": "v1"}]} | tools lists a crate twice |
+      | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}], "with": {"pub-version": "v1"}} | with gives pub-version, the deprecated form of tools |
+
+  Scenario: tools is for a Rust repository
+    Given a Node repository whose ci block is '{"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}]}'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "tools is for a Rust repository's functional job"
+
   Scenario Outline: A ci setting pubkit cannot use stops sync with a message
     Given a Node repository whose ci block is '<ci>'
     When I run pubkit "sync"
