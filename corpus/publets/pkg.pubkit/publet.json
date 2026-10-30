@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.23.1 is released as v0.23.1 from commit 5dd7f8852f9335ada2998e230a6ac8b41a9f2e23.",
+      "content": "pubkit 0.23.2 is released as v0.23.2 from commit 2f3fda595f374be729bdb8f33fccbb60b74661d3.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.23.1",
+            "0.23.2",
             "pubkit --version",
-            "pubkit 0.23.1",
-            "v0.23.1",
-            "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
+            "pubkit 0.23.2",
+            "v0.23.2",
+            "2f3fda595f374be729bdb8f33fccbb60b74661d3"
           ]
         ]
       },
-      "scope": "the published release v0.23.1 of pubkit",
+      "scope": "the published release v0.23.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
+          "revision": "2f3fda595f374be729bdb8f33fccbb60b74661d3"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.23.1 was released on 2026-10-30 from commit 5dd7f8852f9335ada2998e230a6ac8b41a9f2e23 with these changes.",
+      "content": "pubkit 0.23.2 was released on 2026-10-30 from commit 2f3fda595f374be729bdb8f33fccbb60b74661d3 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,18 +58,18 @@
         "rows": [
           [
             "added",
-            "pubkit app-secrets sends one GitHub App's id, installation id and key, named by the repository's own github_app block in pubkit.json, to that repository, through ./with-secrets, and checks all three before writing any. pubkit sync --check checks the block."
+            "pubkit app-secrets takes several apps in github_app, and any other values in a secrets list in pubkit.json, each with a kind of secret or variable."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.23.1 of pubkit",
+      "scope": "the published release v0.23.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
+          "revision": "2f3fda595f374be729bdb8f33fccbb60b74661d3"
         }
       ]
     }
