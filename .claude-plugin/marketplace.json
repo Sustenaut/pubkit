@@ -1,6 +1,6 @@
 {
   "name": "pubkit",
-  "description": "Claude Code plugins from pubkit, the shared testing and quality setup for schryer's packages.",
+  "description": "Claude Code plugins from pubkit, the shared testing and quality setup for Rust, Python and Node packages.",
   "owner": {
     "name": "David Schryer"
   },

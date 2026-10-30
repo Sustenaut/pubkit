@@ -300,9 +300,6 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And stderr mentions "ci.with.pub-version is deprecated"
     And "pr.yml"'s job "functional" passes "pub-version" as "v0.2.1"
 
-  Scenario: The workflows install pub-version's pub from where publet is
-    Then no pubkit workflow names "schryer/publet"
-
   Scenario: pins moves a tool to the latest release of its git repository
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli.git", "tag": "v1.2.3"}]}'
     And the latest release of "example-org/some-cli" is "v1.3.0"
@@ -467,11 +464,11 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | line                                                                                                        | readers                       | owner     | version | commit                                   |
-      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | schryer   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: schryer/pubkit/.github/workflows/rust-ci.yml@v0.15.1                                                  | conform, bump, nightly, board | schryer   | 0.15.1  | none                                     |
-      | uses: schryer/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | schryer   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | schryer   | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
-      | uses: schryer/pubrel/.github/workflows/release.yml@v0.5.4                                                   | release                       | schryer   | 0.5.4   | none                                     |
+      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@v0.15.1                                                  | conform, bump, nightly, board | example-org   | 0.15.1  | none                                     |
+      | uses: example-org/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | example-org   | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
+      | uses: example-org/pubrel/.github/workflows/release.yml@v0.5.4                                                   | release                       | example-org   | 0.5.4   | none                                     |
       | uses: sustenaut/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.16.0     | conform, bump, nightly, board | sustenaut | 0.16.0  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
       | uses: Sustenaut/pubkit/.github/workflows/job-rust-test.yml@v0.16.0                                          | conform, board                | Sustenaut | 0.16.0  | none                                     |
       | uses: sustenaut/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.5      | release                       | sustenaut | 0.5.5   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
@@ -499,9 +496,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
   Scenario: sync moves workflows written for the old owner to Sustenaut's
     Given a Node repository whose ci block is '{}'
-    And pubkit.json names the workflows owner "schryer"
+    And pubkit.json names the workflows owner "example-org"
     When I run pubkit "sync"
-    Then every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "schryer"'s
+    Then every pubkit and pubrel workflow ".github/workflows/pr.yml" calls is "example-org"'s
     When pubkit.json names the workflows owner "Sustenaut"
     And I run pubkit "sync" "--check"
     Then it fails
@@ -517,9 +514,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | owner         |
-      | sustenaut/x   |
-      | -sustenaut    |
-      | ["sustenaut"] |
+      | example-org/x  |
+      | -example-org   |
+      | ["example-org"] |
 
   Scenario Outline: sync --check fails on a pubkit action pinned to another pubkit or commit
     Given a Node repository whose ci block is '{}'
@@ -534,7 +531,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Examples:
       | owner     | pin            | message                                           |
       | Sustenaut | another pubkit | deploy-static@v0.0.1 is not pubkit                |
-      | schryer   | another pubkit | deploy-static@v0.0.1 is not pubkit                |
+      | example-org   | another pubkit | deploy-static@v0.0.1 is not pubkit                |
       | Sustenaut | another commit | deploy-static@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
 
   Scenario Outline: sync --check fails on a hand-written call of a pubkit workflow at another pubkit
@@ -550,7 +547,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Examples:
       | owner     | pin            | message                                                 |
       | Sustenaut | another pubkit | ci-extra.yml: service-ci.yml@v0.0.1 is not pubkit       |
-      | schryer   | another pubkit | ci-extra.yml: service-ci.yml@v0.0.1 is not pubkit       |
+      | example-org   | another pubkit | ci-extra.yml: service-ci.yml@v0.0.1 is not pubkit       |
       | Sustenaut | another commit | service-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
 
   Scenario: A stale hand-written service-ci.yml pin fails sync --check until it is moved, then passes
@@ -568,7 +565,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario: A stale deploy-static pin fails sync --check until it is moved, then passes
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "schryer"'s pubkit action "deploy-static" at "another pubkit"
+    And the workflow "deploy.yml" uses "example-org"'s pubkit action "deploy-static" at "another pubkit"
     When I run pubkit "sync"
     Then it succeeds
     When I run pubkit "sync" "--check"

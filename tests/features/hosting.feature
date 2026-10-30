@@ -14,7 +14,7 @@ Feature: pubkit.json's hosting block holds the providers and the zones
     Then pubkit accepts its hosting block
 
   Scenario: Any name can be a provider of a type pubkit knows
-    Given the hosting settings '{"hosting": {"providers": {"sustenaut-hetzner": {"type": "hetzner"}, "family-hetzner": {"type": "hetzner"}}, "zones": {"example.eu": {"dns": ["family-hetzner"]}}}}'
+    Given the hosting settings '{"hosting": {"providers": {"main-hetzner": {"type": "hetzner"}, "other-hetzner": {"type": "hetzner"}}, "zones": {"example.eu": {"dns": ["other-hetzner"]}}}}'
     Then pubkit accepts its hosting block
 
   Scenario Outline: A provider pubkit cannot use stops it with a message

@@ -7,7 +7,7 @@
 #   - uses: Sustenaut/pubkit/actions/deploy-ssh@vX.Y.Z
 #     with:
 #       command: share-edge
-#       bundle: scripts/photos/share
+#       bundle: scripts/site
 #       deploy-key: ${{ secrets.DEPLOY_KEY }}
 #       target: deploy@example.eu
 #       known-hosts: example.eu ssh-ed25519 AAAA...

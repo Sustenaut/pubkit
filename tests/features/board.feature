@@ -130,13 +130,13 @@ Feature: The board grades every listed repository A to E
   Scenario: The lists connector reads protected.json and governed.json
     Given recorded responses from the build recording
     When the lists connector reads "protected.json" and "governed.json"
-    Then it lists "schryer/pubthing, schryer/visit-thing, schryer/private-thing"
-    And "schryer/pubthing" is governed
+    Then it lists "example-org/pubthing, example-org/site-thing, example-org/private-thing"
+    And "example-org/pubthing" is governed
     And every call is recorded with its connector, method, endpoint and time
 
   Scenario: The github connector reads a repository's files, issues and alerts
     Given recorded responses from the build recording
-    When the github connector reads "schryer/pubthing"
+    When the github connector reads "example-org/pubthing"
     Then its visibility is "public"
     And its pubkit.json has the kind "rust"
     And it has 1 open issue, the pull request it lists not counted
@@ -146,21 +146,21 @@ Feature: The board grades every listed repository A to E
 
   Scenario: The actions connector reads main's runs and their jobs
     Given recorded responses from the build recording
-    When the actions connector reads main's runs of "schryer/pubthing"
+    When the actions connector reads main's runs of "example-org/pubthing"
     Then the newest run is "ci.yml", "success"
     And its jobs include "ci / gates" "success"
 
   Scenario: The sonarcloud connector reads ratings as letters, and no project as none
     Given recorded responses from the build recording
-    When the sonarcloud connector reads "schryer/pubthing" and "schryer/visit-thing"
-    Then "schryer/pubthing" rates reliability "A", maintainability "B" and security "A"
-    And "schryer/visit-thing" has no ratings, noted "no SonarQube Cloud project schryer_visit-thing"
+    When the sonarcloud connector reads "example-org/pubthing" and "example-org/site-thing"
+    Then "example-org/pubthing" rates reliability "A", maintainability "B" and security "A"
+    And "example-org/site-thing" has no ratings, noted "no SonarQube Cloud project example-org_site-thing"
 
   Scenario: The scorecard connector reads a score, and an unscored repository as none
     Given recorded responses from the build recording
-    When the scorecard connector reads "schryer/pubthing" and "schryer/visit-thing"
-    Then "schryer/pubthing" scores 6.1
-    And "schryer/visit-thing" is not scored
+    When the scorecard connector reads "example-org/pubthing" and "example-org/site-thing"
+    Then "example-org/pubthing" scores 6.1
+    And "example-org/site-thing" is not scored
 
   Scenario: The live connector says whether a health URL answers
     Given recorded responses from the build recording
@@ -174,7 +174,7 @@ Feature: The board grades every listed repository A to E
     And it prints "3 repos:"
     And "site/board.json" lists the repositories worst first
     And every fact and notch in "site/board.json" names calls that board.json records
-    And "site/index.html" shows "schryer/private-thing" as private, with its grades
+    And "site/index.html" shows "example-org/private-thing" as private, with its grades
     And "site/index.html" has a breakdown naming "github · open_issues"
     And "site/index.html" loads no script
 

@@ -26,7 +26,7 @@ Everything provider-specific is here, in the repository, not in pubkit:
                               "desec": ["257 3 13 quFX..."]}},
           "sites": {
             "@": {"provider": "hetzner", "kind": "server", "server": "web"},
-            "recipes": {"provider": "cloudflare", "kind": "pages", "project": "example-recipes",
+            "blog": {"provider": "cloudflare", "kind": "pages", "project": "example-blog",
                         "served_by": "pages", "standby": "web"},
             "pub": {"provider": "gcp", "kind": "cloud-run", "service": "pub-site"}
           }

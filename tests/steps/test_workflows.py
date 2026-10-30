@@ -152,7 +152,7 @@ def layout_first(workflow):
 @then("the scan waits for the quality gate, so a failing gate fails the job")
 def sonar_gate(workflow):
     """Without the wait the scan only uploads, so `ci / passed` stays green
-    while SonarQube Cloud's quality gate fails (publet#56). The timeout
+    while SonarQube Cloud's quality gate fails. The timeout
     keeps a stuck analysis from holding the job for the default 5 minutes
     longer than it needs."""
     steps = workflow["data"]["jobs"]["sonar"]["steps"]

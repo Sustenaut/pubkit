@@ -231,7 +231,7 @@ def release_key_label(root: Path) -> list[str]:
         return ["release.json names no key"]
     names = [release.get("name")] + [p.get("name") for p in release.get("packages", [])]
     names = [n for n in names if n]
-    # A workspace's crates share a family name: publet-core, publet-cli.
+    # A workspace's crates share a family name: example-core, example-cli.
     names += [n.split("-")[0] for n in names]
     obj = root / release.get("corpus", "corpus") / "objects" / (key.replace(":", "_") + ".cbor")
     if not obj.is_file():

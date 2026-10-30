@@ -4,7 +4,7 @@ The rust-crate-quality agent writes its report on a package's release to
 `audit/<package>-<version>.md`, starting with a header:
 
     ---
-    package: pubunit
+    package: example-crate
     version: 0.1.1
     standard: <sha256 of the Rust crate standard it audited against>
     blocking: 0

@@ -102,11 +102,6 @@ def step_fails(install):
     assert install["code"] != 0
 
 
-@then(parsers.parse('no pubkit workflow names "{text}"'))
-def no_workflow_names(text):
-    assert not [p.name for p in WORKFLOWS.glob("*.yml") if text in p.read_text()]
-
-
 @given(parsers.parse('the latest release of "{slug}" is "{tag}"'))
 def latest_release(tmp_path, env, slug, tag):
     bin_dir = tmp_path / "bin"

@@ -1,5 +1,5 @@
 Feature: pubkit is also a Claude Code plugin marketplace
-  `/plugin marketplace add schryer/pubkit` reads .claude-plugin/marketplace.json
+  `/plugin marketplace add Sustenaut/pubkit` reads .claude-plugin/marketplace.json
   at the repository root, and each plugin it lists is installed from its own
   directory. A malformed manifest, or an agent pointing at a file its plugin
   does not ship, fails only when someone installs it, so the layout is

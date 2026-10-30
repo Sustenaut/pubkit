@@ -30,12 +30,12 @@ mock_provider "cloudflare" {
   }
   mock_resource "cloudflare_pages_project" {
     defaults = {
-      subdomain = "example-recipes-2ab.pages.dev"
+      subdomain = "example-blog-2ab.pages.dev"
     }
   }
 }
 
-# testdata/pubkit.json gives recipes.example.eu the subdomain above, the
+# testdata/pubkit.json gives blog.example.eu the subdomain above, the
 # name Cloudflare picks when the project's own is taken; docs.example.org
 # has its project's own name.
 override_resource {
@@ -56,7 +56,7 @@ run "zones" {
 
   assert {
     condition = toset(keys(output.records["example.eu"])) == toset(concat(
-      ["email_mx", "email_dmarc", "apex_txt", "apex_a", "apex_aaaa", "recipes", "pub"],
+      ["email_mx", "email_dmarc", "apex_txt", "apex_a", "apex_aaaa", "blog", "pub"],
       [for selector in keys(var.config.providers.mailbox.dkim) : "email_dkim_${selector}"],
       [for name in keys(var.config.zones["example.eu"].email.verification) : "email_verification_${name}"],
     ))
@@ -89,8 +89,8 @@ run "zones" {
     condition = (
       output.records["example.eu"]["apex_a"].name == "@" &&
       tolist(output.records["example.eu"]["apex_aaaa"].values) == tolist(["2001:db8::1"]) &&
-      output.records["example.eu"]["recipes"].type == "CNAME" &&
-      tolist(output.records["example.eu"]["recipes"].values) == tolist(["example-recipes-2ab.pages.dev."]) &&
+      output.records["example.eu"]["blog"].type == "CNAME" &&
+      tolist(output.records["example.eu"]["blog"].values) == tolist(["example-blog-2ab.pages.dev."]) &&
       tolist(output.records["example.eu"]["pub"].values) == tolist([var.config.providers.gcp.cloud_run.domain_target])
     )
     error_message = "A server site gets its addresses, a Pages site the subdomain Cloudflare reports, a Cloud Run site the provider's domain_target."
@@ -144,8 +144,8 @@ run "zones" {
 
   assert {
     condition = (
-      cloudflare_pages_project.site["recipes.example.eu"].account_id == var.config.providers.cloudflare.account_id &&
-      cloudflare_pages_project.site["recipes.example.eu"].production_branch == "main" &&
+      cloudflare_pages_project.site["blog.example.eu"].account_id == var.config.providers.cloudflare.account_id &&
+      cloudflare_pages_project.site["blog.example.eu"].production_branch == "main" &&
       cloudflare_pages_domain.site["docs.example.org"].project_name == "example-docs"
     )
     error_message = "Each Pages site has its project, in the provider's account, and its domain."
@@ -153,7 +153,7 @@ run "zones" {
 
   assert {
     condition = (
-      output.sites["recipes.example.eu"].project == "example-recipes" &&
+      output.sites["blog.example.eu"].project == "example-blog" &&
       output.sites["example.eu"].url == "https://example.eu/" &&
       output.sites["pub.example.eu"].project == null
     )
