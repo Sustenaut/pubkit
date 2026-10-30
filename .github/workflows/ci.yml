@@ -165,8 +165,11 @@ jobs:
       && (needs.tested.outputs.tested == 'true'
           || (needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
               && needs.cache-action.result == 'success'))
-    uses: Sustenaut/pubrel/.github/workflows/release.yml@986872816b1bd11e177e3f664318c35d41dd08f2 # v0.6.0
-    with: { pubrel-version: v0.6.0 }
+    uses: Sustenaut/pubrel/.github/workflows/release.yml@5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc # v0.6.1
+    with: { pubrel-version: v0.6.1 }
+    # The release app's token tags the release: the tag ruleset lets only
+    # it through.
+    secrets: { RELEASE_APP_ID: '${{ secrets.RELEASE_APP_ID }}', RELEASE_APP_KEY: '${{ secrets.RELEASE_APP_KEY }}' }
     permissions:
       contents: write
 
