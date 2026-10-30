@@ -19,6 +19,7 @@
     pubkit freshness [--json] (DIR... | --repos FILE [DIR])
     pubkit protect [--check] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
     pubkit state --check [FILE]
+    pubkit app-secrets [--check]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR [--repos FILE | --config FILE --governed FILE] [--rules FILE]
@@ -180,6 +181,10 @@ def sync(root: Path, check: bool) -> int:
             entry("", config, CONFIG)
         except ValueError as e:
             sys.exit(f"pubkit: {e}")
+    if "github_app" in config:
+        from .app_secrets import problems  # noqa: PLC0415
+        if bad := problems(config["github_app"]):
+            sys.exit(f"pubkit: {CONFIG}'s github_app block: {'; '.join(bad)}")
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -510,6 +515,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true", required=True,
                    help="check its shape, that each repository exists, and each protected one's block")
     p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
+    p = commands.add_parser("app-secrets", help="send the GitHub App this repository's github_app "
+                                                "block names to it, through ./with-secrets")
+    p.add_argument("--check", action="store_true", help="check the three values, and send nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -592,6 +600,9 @@ def main(argv: list[str] | None = None) -> int:
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return protect(config, args.repos, args.check, args.require, tags=args.tags,
                        queue=args.queue, repos_file=repos_file)
+    if args.command == "app-secrets":
+        from .app_secrets import run as app_secrets
+        return app_secrets(read_config(root), args.check)
     if args.command == "state":
         from .paths import confined
         from .state import check
