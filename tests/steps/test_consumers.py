@@ -32,7 +32,9 @@ DEPENDENCIES = {"actions", "bitwarden", "docker", "google", "hashicorp", "pypa",
                 "tailscale"}
 
 # pub is a pubkit tool, like pubrel, so `pubkit new` names where it comes from.
-TOOLS = {("src/pubkit/new.py", "Sustenaut/publet")}
+# pubkit's own CI, which it does not ship to anyone, runs the integrations scan.
+TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
+         (".github/workflows/integrations.yml", "Sustenaut/integrations")}
 # TODO: shrink this list. Each goes with the deprecated pub-version input, in
 # the breaking release that removes it, or with the release control plane
 # work that moves the nightly and its lists out of pubkit.
