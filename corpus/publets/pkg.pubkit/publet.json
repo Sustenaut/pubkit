@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.21.0 is released as v0.21.0 from commit ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723.",
+      "content": "pubkit 0.21.1 is released as v0.21.1 from commit 54f757071eed3b664928ddc09554b7e82ed461c2.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.21.0",
+            "0.21.1",
             "pubkit --version",
-            "pubkit 0.21.0",
-            "v0.21.0",
-            "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
+            "pubkit 0.21.1",
+            "v0.21.1",
+            "54f757071eed3b664928ddc09554b7e82ed461c2"
           ]
         ]
       },
-      "scope": "the published release v0.21.0 of pubkit",
+      "scope": "the published release v0.21.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
+          "revision": "54f757071eed3b664928ddc09554b7e82ed461c2"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.21.0 was released on 2026-10-30 from commit ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723 with these changes.",
+      "content": "pubkit 0.21.1 was released on 2026-10-30 from commit 54f757071eed3b664928ddc09554b7e82ed461c2 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "changed",
-            "A Rust repository's pull requests no longer run msrv, fuzz and cross on every push: pubkit sync writes queue.yml, which the merge queue runs (merge_group) with every pull request job and those three besides, so nothing merges before they pass, and pr.yml runs on pull_request alone. The ci block's events gain queue, on by default; where the queue would run nothing a pull request does not (Node, Python and service repositories by default) there is no queue.yml and pr.yml runs on merge_group as before, and a repository without a merge queue leaves queue out so its pull requests run the heavy jobs. main.yml's tested asks for the queue's workflow by name and skips only the jobs the queue ran; queue.yml carries the release and site checks too"
-          ],
-          [
-            "changed",
-            "New packages' CI, and pubkit's own, call pubrel 0.6.1's release workflow, pinned by its tag's commit, and so pass it the release app's RELEASE_APP_ID and RELEASE_APP_KEY, which pubrel 0.6.1 is the first to take: pubrel tag then tags with the app the Sustenaut tag ruleset lets through"
+            "added",
+            "actions/pr-label says whether the pull request a run is for (the event's own, a merge queue group's, or on a push the ones merged into the pushed commit) carries a label, \"refresh cache\" by default, and actions/cache's restore takes refresh: 'true' (pubkit cache plan --refresh) to restore no entry, fetched or made, so a pull request labelled refresh cache rebuilds everything once it merges"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.21.0 of pubkit",
+      "scope": "the published release v0.21.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
+          "revision": "54f757071eed3b664928ddc09554b7e82ed461c2"
         }
       ]
     }
