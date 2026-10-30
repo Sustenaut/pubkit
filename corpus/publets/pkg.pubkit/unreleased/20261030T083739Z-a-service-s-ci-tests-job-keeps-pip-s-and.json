@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "A service's CI tests job keeps pip's and uv's download caches between runs, keyed on the repository's lock files, so its setup installs from the runner instead of PyPI"
-}
