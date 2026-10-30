@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "The board judged a repository's tag ruleset by the default release app, not the release_app its protect block names."
+}

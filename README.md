@@ -867,7 +867,7 @@ more without it. The generated `pr.yml`'s `merge_group` trigger then never
 fires, and does no harm. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--no-tags] [--no-queue] [--config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--no-tags] [--no-queue] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
@@ -895,6 +895,9 @@ one does. When GitHub rejects a ruleset, it prints GitHub's reasons.
 
 The repositories come from one of:
 
+- a repos file, with `--repos FILE` ([The repos file](#the-repos-file)): the
+  repositories it marks to protect, each with the checks its own `pubkit.json`
+  says;
 - a `protected.json` in the working directory, or the file `--config`
   names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
   `"tags": false` where the repository releases no tags, `"queue": false`
@@ -939,9 +942,9 @@ carries this rule into every repository, where coding agents read it.
 
 ## The release board
 
-    pubkit board --out DIR [--config protected.json] [--governed governed.json] [--rules FILE]
+    pubkit board --out DIR [--repos FILE | --config protected.json --governed governed.json] [--rules FILE]
 
-grades every repository the lists name, public and private, A to E for
+grades every repository the repos file (or the two lists) names, public and private, A to E for
 quality, security and delivery, and writes `DIR/board.json` and a static
 `DIR/index.html`: no scripts, rows worst first, each grade a dot in
 SonarQube's colours whose breakdown opens on hover or keyboard focus. It
@@ -970,7 +973,7 @@ with every notch listed; the overall grade is the worst of the three.
   answer) and no continuous live testing (its live-test workflow not green
   in the last 24 hours); no release (a package's tag, a service's
   production deploy) in two months; any open issue (pull requests aside);
-  no nightly (not in governed.json, and no `nightly.yml` run in two days);
+  no nightly (not governed, and no `nightly.yml` run in two days);
   protection that differs from what `pubkit protect --check` wants, or no
   ruleset at all on a private repository GitHub's plan gives none; and a
   red last CI run on main. A fact the board could not read takes its
@@ -1002,14 +1005,59 @@ such a file instead of the network.
 [`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
 checks out the caller, installs what its `tests/requirements.lock` pins
 (wheels only, by hash: the caller's own pubkit),
-runs `pubkit board` with the caller's read-only `token` and its lists, and
-uploads board.json and index.html as the `board` artifact, kept 90 days. It
+runs `pubkit board` with the caller's read-only `token` and its `repos` input
+(the repos file itself, as JSON) or its two lists, and uploads board.json and index.html as the `board` artifact, kept 90 days. It
 deploys nothing.
+
+## The repos file
+
+Which repositories pubkit acts on comes from outside it, in one file:
+
+```json
+{ "repositories": [
+    { "repo": "example-org/some-tool", "protect": true, "govern": true, "project": "tools" },
+    { "repo": "example-org/some-site", "protect": true, "govern": false }
+] }
+```
+
+`protect` says it should carry pubkit's rulesets, and `govern` that a nightly
+keeps it current; each is false when left out. `project`, optional, labels it on
+the board. How a repository is protected stays in its own `pubkit.json`'s
+protect block. `pubkit board --repos FILE`, `pubkit protect [--check] --repos
+FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
+governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
+and `nightly.yml` take its contents as a `repos` input.
+
+`protected.json`, `governed.json`, `--config`, `--governed` and the nightly's
+own schedule still work for one more release, and warn that they are going.
+
+### State files
+
+    pubkit state --check [FILE]
+
+checks a state repository's `state.json` (by default in the working directory),
+which a control plane keeps for one GitHub owner and writes repos files from:
+
+```json
+{ "owner": "example-org",
+  "repos": {
+    "some-tool": { "project": "tools", "board": true, "protect": true, "govern": true }
+} }
+```
+
+It checks the file's shape, then through `gh` that each repository exists under
+the owner, and that each with `protect` has a sound protect block. `gh` needs a
+token that can read every repository named, which a workflow's own
+`GITHUB_TOKEN` can't. It builds nothing, so it suits being a state repository's
+one required check.
 
 ## The nightly
 
-`.github/workflows/nightly.yml` runs every night over the repositories
-`governed.json` lists. It reports, in its summary, the pubkit each pins,
+`.github/workflows/nightly.yml` runs over the repositories its `repos` input
+marks to govern, called from a control plane's own schedule, or every night
+over those `governed.json` lists. A caller passes the secrets `app-id`,
+`app-key`, `notify-token` and `notify-user`, and the `pubkit` input names the
+repository whose latest release supplies the wheel and the update script. It reports, in its summary, the pubkit each pins,
 whether it conforms to the latest standard, and its open exceptions
 (`pubkit freshness`). Then it keeps one pull request per repository, on its
 `pubkit-nightly` branch, with up to four commits (`pubkit nightly`):
@@ -1039,12 +1087,11 @@ the dependency commits are dropped. Nothing merges it: the Sustenaut bot
 sends a Slack DM when it is green or fails.
 
 It pushes and opens the pull requests as the **Sustenaut nightly** GitHub
-App, which is installed on each owner whose repositories `governed.json`
-lists. For each repository it mints a token for that repository alone,
+App, which is installed on each owner whose repositories it governs. For each repository it mints a token for that repository alone,
 with contents, pull-requests and workflows write and actions read, which
 expires within the hour (`actions/create-github-app-token`). pubkit's
 repository variable `NIGHTLY_APP_ID` and secret `NIGHTLY_APP_KEY` (the
-app's private key) set it up. Without them it falls back, with a warning,
+app's private key) set it up on its own schedule, and `app-id` and `app-key` when called. Without them it falls back, with a warning,
 to a `PUBKIT_BUMP_TOKEN` secret, and with neither it only reports.
 
 ### Update and security settings

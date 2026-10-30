@@ -1,12 +1,12 @@
-# Reusable: grade every repository the caller's lists name, A to E, with
+# Reusable: grade every repository the caller names, A to E, with
 # `pubkit board`, and keep board.json and index.html as the run's "board"
 # artifact for 90 days, which is the board's history. It deploys nothing
 # and writes nowhere: the caller's workflow publishes the page.
 #
 # The caller checks nothing out first: this workflow checks out the
-# caller's repository, where the lists are, installs the pubkit its
+# caller's repository, where its lock is, installs the pubkit its
 # tests/requirements.lock pins (by hash, wheels only), and reads every repository
-# they name with `token`, a fine-grained token that can only read
+# named, by `repos` or by the caller's lists, with `token`, a fine-grained token that can only read
 # (Metadata, Contents, Actions, Issues, Pull requests, Dependabot alerts,
 # Code scanning alerts, Secret scanning alerts and Administration, all
 # read). `sonar-token` reads private SonarQube Cloud projects; public ones
@@ -20,14 +20,18 @@ on:
         type: string
         default: tests/requirements.lock
         description: The hash-locked requirements, pubkit's wheel among them, in the caller's repository
+      repos:
+        type: string
+        default: ''
+        description: 'The repos file itself, as JSON: {"repositories": [{"repo", "protect", "govern", "project"}]}. In place of the two lists below.'
       protected:
         type: string
         default: protected.json
-        description: The repositories and the checks each requires, in the caller's repository
+        description: The repositories and the checks each requires, in the caller's repository; goes in a later release, use repos
       governed:
         type: string
         default: governed.json
-        description: The repositories a nightly updates; none when the file is absent
+        description: The repositories a nightly updates; none when the file is absent; goes in a later release, use repos
       rules:
         type: string
         default: ''
@@ -55,13 +59,20 @@ jobs:
         env: { LOCK: '${{ inputs.lock }}' }
       - shell: bash  # pipefail: a failed board fails the step, though tee succeeds
         run: |
-          args=(--out site --config "$PROTECTED")
-          if [ -f "$GOVERNED" ]; then args+=(--governed "$GOVERNED"); fi
+          args=(--out site)
+          if [ -n "$REPOS" ]; then
+            printf '%s' "$REPOS" > .pubkit-repos.json
+            args+=(--repos .pubkit-repos.json)
+          else
+            args+=(--config "$PROTECTED")
+            if [ -f "$GOVERNED" ]; then args+=(--governed "$GOVERNED"); fi
+          fi
           if [ -n "$RULES" ]; then args+=(--rules "$RULES"); fi
           pubkit board "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
         env:
           GITHUB_TOKEN: '${{ secrets.token }}'
           SONAR_TOKEN: '${{ secrets.sonar-token }}'
+          REPOS: '${{ inputs.repos }}'
           PROTECTED: '${{ inputs.protected }}'
           GOVERNED: '${{ inputs.governed }}'
           RULES: '${{ inputs.rules }}'

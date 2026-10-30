@@ -265,3 +265,10 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When I start the package "pubfoo" without a key
     Then the repository has "Cargo.toml", "src/lib.rs", "release.json", "SECURITY.md", "TESTING.md", "SUPPLY-CHAIN.md", "fuzz/fuzz_targets/greet.rs", ".gitignore"
     And it conforms to the standard but for "RS-SUP-05"
+
+  Scenario: A control plane calls the nightly with a repos input and neutral secrets
+    When I parse the workflow "nightly.yml"
+    Then it can be called with the input "repos" and the secrets "app-id, app-key, notify-token, notify-user"
+    And it still runs on a schedule, warning that governed.json goes
+    And only what the repos input governs gets a pull request
+    And it takes pubkit's script and wheel from the same latest release, whichever repository calls it

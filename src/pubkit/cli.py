@@ -16,11 +16,12 @@
     pubkit crates [--report FILE]
     pubkit record TEXT
     pubkit nightly --pubrel V --pub V --body FILE
-    pubkit freshness [--json] DIR...
-    pubkit protect [--check] [--config FILE | --require CHECK...] [REPO...]
+    pubkit freshness [--json] (DIR... | --repos FILE [DIR])
+    pubkit protect [--check] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
+    pubkit state --check [FILE]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
-    pubkit board --out DIR [--config FILE] [--governed FILE] [--rules FILE]
+    pubkit board --out DIR [--repos FILE | --config FILE --governed FILE] [--rules FILE]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -464,15 +465,20 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("freshness",
                             help="report which pinned pubkit and standard each repository meets")
     p.add_argument("--json", action="store_true", help="JSON rows instead of a Markdown table")
-    p.add_argument("dirs", nargs="+", metavar="DIR", type=Path)
+    p.add_argument("--repos", type=Path, metavar="FILE",
+                   help="report the repositories this repos file governs, checked out in DIR")
+    p.add_argument("dirs", nargs="*", metavar="DIR", type=Path)
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
     p = commands.add_parser("protect",
                             help="put pubkit's ruleset on the default branch of each repository")
     p.add_argument("--check", action="store_true",
                    help="change nothing: print how each differs, and fail when one does")
+    p.add_argument("--repos", dest="repos_file", type=Path, metavar="FILE",
+                   help="the repos file: protect those it marks, each by its own pubkit.json")
     p.add_argument("--config", type=Path,
-                   help="the repositories and their checks (default: ./protected.json)")
+                   help="the repositories and their checks (default: ./protected.json); "
+                        "goes in a later release, use --repos")
     p.add_argument("--require", action="append", metavar="CHECK",
                    help="a check the named repositories require, instead of any list; repeat it")
     p.add_argument("--no-tags", dest="tags", action="store_false",
@@ -488,15 +494,22 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("board", help="grade every listed repository A to E into "
                                           "board.json and a static index.html")
     p.add_argument("--out", type=Path, required=True, help="the directory to write them to")
-    p.add_argument("--config", type=Path, default=Path("protected.json"),
-                   help="the repositories and their checks (default: ./protected.json)")
+    p.add_argument("--repos", type=Path, metavar="FILE", help="the repos file: grade what it names")
+    p.add_argument("--config", type=Path,
+                   help="the repositories and their checks (default: ./protected.json); "
+                        "goes in a later release, use --repos")
     p.add_argument("--governed", type=Path,
-                   help="the repositories a nightly updates (default: ./governed.json, if any)")
+                   help="the repositories a nightly updates (default: ./governed.json, if any); "
+                        "goes in a later release, use --repos")
     p.add_argument("--rules", type=Path, help="other rules than the ones pubkit ships")
     p.add_argument("--replay", type=Path,
                    help="read recorded responses from this file instead of the network")
     p.add_argument("--record", type=Path,
                    help="also keep every response in this file, for --replay")
+    p = commands.add_parser("state", help="check a state repository's state.json")
+    p.add_argument("--check", action="store_true", required=True,
+                   help="check its shape, that each repository exists, and each protected one's block")
+    p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -567,23 +580,39 @@ def main(argv: list[str] | None = None) -> int:
         return bump(root)
     if args.command == "freshness":
         from .freshness import freshness
-        return freshness(args.dirs, args.json)
+        from .paths import confined
+        repos_file = confined(args.repos, "the --repos file") if args.repos else None
+        return freshness(args.dirs, args.json, repos_file)
     if args.command == "protect":
         from .paths import confined
         from .protect import run as protect
+        if args.repos_file and (args.config or args.require):
+            sys.exit("pubkit protect: --repos takes the place of --config and --require")
         config = confined(args.config, "the --config file") if args.config else None
+        repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return protect(config, args.repos, args.check, args.require, tags=args.tags,
-                       queue=args.queue)
+                       queue=args.queue, repos_file=repos_file)
+    if args.command == "state":
+        from .paths import confined
+        from .state import check
+        return check(confined(args.file, "the state file"))
     if args.command == "board":
         from .board import run as board
         from .paths import confined
-        governed = args.governed or (Path("governed.json") if Path("governed.json").is_file() else None)
+        if args.repos and (args.config or args.governed):
+            sys.exit("pubkit board: --repos takes the place of --config and --governed")
+        config, governed = args.config, args.governed
+        if not args.repos:
+            from .repos import warn_lists
+            warn_lists("board", "protected.json, governed.json, --config and --governed")
+            config = config or Path("protected.json")
+            governed = governed or (Path("governed.json") if Path("governed.json").is_file() else None)
         files = {name: confined(path, f"the --{name} file") if path else None
-                 for name, path in (("config", args.config), ("governed", governed),
+                 for name, path in (("config", config), ("governed", governed),
                                     ("rules", args.rules), ("replay", args.replay),
-                                    ("record", args.record))}
+                                    ("record", args.record), ("repos", args.repos))}
         return board(files["config"], files["governed"], confined(args.out, "the --out directory"),
-                     files["rules"], files["replay"], files["record"])
+                     files["rules"], files["replay"], files["record"], files["repos"])
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

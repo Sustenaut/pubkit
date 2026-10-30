@@ -118,10 +118,12 @@ def _steps(workflow):
 def app_token(workflow):
     app = next(s for s in _steps(workflow) if s.get("id") == "app")
     assert re.fullmatch(r"actions/create-github-app-token@[0-9a-f]{40}", app["uses"])
-    assert app["if"] == "vars.NIGHTLY_APP_ID != ''"
+    assert app["if"] == "env.APP_ID != ''"
+    update_job = workflow["data"]["jobs"]["update"]
+    assert update_job["env"]["APP_ID"] == "${{ secrets.app-id || vars.NIGHTLY_APP_ID }}"
     given = app["with"]
-    assert given["app-id"] == "${{ vars.NIGHTLY_APP_ID }}"
-    assert given["private-key"] == "${{ secrets.NIGHTLY_APP_KEY }}"
+    assert given["app-id"] == "${{ env.APP_ID }}"
+    assert given["private-key"] == "${{ secrets.app-key || secrets.NIGHTLY_APP_KEY }}"
     assert given["owner"] == "${{ steps.where.outputs.owner }}"
     assert given["repositories"] == "${{ steps.where.outputs.name }}"
     update = next(s for s in _steps(workflow) if "update.sh" in s.get("run", ""))
@@ -140,7 +142,7 @@ def app_permissions(workflow):
 def fallback(workflow):
     token = next(s for s in _steps(workflow) if s.get("id") == "token")
     assert token["env"]["BUMP_TOKEN"] == "${{ secrets.PUBKIT_BUMP_TOKEN }}"
-    assert "::warning::No NIGHTLY_APP_ID" in token["run"]
+    assert "::warning::No app-id or NIGHTLY_APP_ID" in token["run"]
     assert token["run"].index("APP_TOKEN") < token["run"].index("BUMP_TOKEN")
     assert "GH_TOKEN" not in workflow["data"]["jobs"]["update"].get("env", {})
 
@@ -411,3 +413,35 @@ def start(repo, monkeypatch, name):
 def conforms_but(repo, rule):
     _, problems = conform.run(repo, json.loads((repo / "pubkit.json").read_text()))
     assert problems and all(p.startswith(f"{rule}:") for p in problems), problems
+
+
+@then(parsers.parse('it can be called with the input "{name}" and the secrets "{secrets}"'))
+def called(workflow, name, secrets):
+    call = workflow["data"][True]["workflow_call"]
+    assert call["inputs"][name]["required"] is True
+    assert set(call["secrets"]) == set(secrets.split(", "))
+    assert "NIGHTLY_APP" not in workflow["data"]["jobs"]["update"]["env"]["REPO"]
+
+
+@then("it still runs on a schedule, warning that governed.json goes")
+def still_scheduled(workflow):
+    assert workflow["data"][True]["schedule"]
+    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
+    assert "::warning::governed.json and this schedule go in a later release" in report["run"]
+
+
+@then("only what the repos input governs gets a pull request")
+def only_governed(workflow):
+    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
+    assert "select(.govern)" in report["run"]
+    assert report["env"]["REPOS"] == "${{ inputs.repos }}"
+    assert workflow["data"]["jobs"]["update"]["if"] == "needs.report.outputs.repos != '[]'"
+
+
+@then("it takes pubkit's script and wheel from the same latest release, whichever repository calls it")
+def same_release(workflow):
+    assert workflow["data"]["env"]["PUBKIT"] == "${{ inputs.pubkit || github.repository }}"
+    checkout = next(s for s in _steps(workflow) if s.get("with", {}).get("path") == "pubkit")
+    assert checkout["with"]["repository"] == "${{ env.PUBKIT }}"
+    assert checkout["with"]["ref"] == "${{ needs.report.outputs.tag }}"
+    assert '$GITHUB_REPOSITORY' not in "".join(s.get("run", "") for s in _steps(workflow))

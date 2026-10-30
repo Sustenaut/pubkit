@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The board's lists connector is now repos, in board.json's calls, and the notch for an ungoverned repository says \"Not governed\"."
+}

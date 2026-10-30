@@ -98,8 +98,9 @@ def render(board: dict) -> str:
             for key, label in (("quality", "Quality"), ("security", "Security"),
                                ("delivery", "Delivery")))
         overall = row["overall"]
+        project = f" <span class=tag>{escape(row['project'])}</span>" if row.get("project") else ""
         rows.append(
-            f"<tr><td class=mono>{escape(row['repo'])}{private} <span class=tag>{row['kind']}</span></td>"
+            f"<tr><td class=mono>{escape(row['repo'])}{private}{project} <span class=tag>{row['kind']}</span></td>"
             f"<td class=overall data-label=Overall><span class=\"dot {overall}\">{overall}</span></td>"
             f"<td class=mono data-label=Released>{escape(row['released'])}</td>"
             f"<td class=mono data-label=pubkit>{escape(row['pubkit'])}</td>"
