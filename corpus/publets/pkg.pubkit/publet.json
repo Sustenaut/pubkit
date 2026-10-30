@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.23.2 is released as v0.23.2 from commit 2f3fda595f374be729bdb8f33fccbb60b74661d3.",
+      "content": "pubkit 0.24.0 is released as v0.24.0 from commit 5b6294f0328a0d13193bec1d8117612e942313a3.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.23.2",
+            "0.24.0",
             "pubkit --version",
-            "pubkit 0.23.2",
-            "v0.23.2",
-            "2f3fda595f374be729bdb8f33fccbb60b74661d3"
+            "pubkit 0.24.0",
+            "v0.24.0",
+            "5b6294f0328a0d13193bec1d8117612e942313a3"
           ]
         ]
       },
-      "scope": "the published release v0.23.2 of pubkit",
+      "scope": "the published release v0.24.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "2f3fda595f374be729bdb8f33fccbb60b74661d3"
+          "revision": "5b6294f0328a0d13193bec1d8117612e942313a3"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.23.2 was released on 2026-10-30 from commit 2f3fda595f374be729bdb8f33fccbb60b74661d3 with these changes.",
+      "content": "pubkit 0.24.0 was released on 2026-10-30 from commit 5b6294f0328a0d13193bec1d8117612e942313a3 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit app-secrets takes several apps in github_app, and any other values in a secrets list in pubkit.json, each with a kind of secret or variable."
+            "changed",
+            "Public code integrates with SonarQube Cloud whatever its kind: a service's CI, from pubkit sync and service-ci.yml, runs the sonar job too, with the coverage its tests write to coverage-report. A private service drops it with \"jobs\": {\"sonar\": false}."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.23.2 of pubkit",
+      "scope": "the published release v0.24.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "2f3fda595f374be729bdb8f33fccbb60b74661d3"
+          "revision": "5b6294f0328a0d13193bec1d8117612e942313a3"
         }
       ]
     }
