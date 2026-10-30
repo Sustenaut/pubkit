@@ -103,6 +103,33 @@ is given, and the repository's own tests when `test` is. No job has
 secrets. Its `passed` job is the one check a ruleset would require; private
 repositories on GitHub Free have no rulesets, so there it is a summary.
 
+### Sending a GitHub App's values to a repository
+
+A repository that uses a GitHub App names its three values in its `pubkit.json`:
+
+```json
+"github_app": {
+  "id":              { "from": "some-app-id", "to": "SOME_APP_ID" },
+  "installation_id": { "from": "some-app-installation-id", "to": "SOME_APP_INSTALLATION_ID" },
+  "key":             { "from": "some-app-key", "to": "SOME_APP_KEY" }
+}
+```
+
+`from` is the secret's name in the Bitwarden project `./with-secrets` reads, and
+`to` its name on GitHub. The id and the installation id go as variables and the
+key as a secret, on the repository `origin` points at and no other:
+
+```sh
+./with-secrets ./pubkit app-secrets --check   # checks only, sends nothing
+./with-secrets ./pubkit app-secrets
+```
+
+It writes nothing until all three are there and look right (digits for the ids,
+BEGIN and END lines for the key). It prints names and lengths, never a value,
+and each value reaches `gh` on its standard input. An app installed on several
+owners has a different installation id on each, so each repository names its own
+owner's. `pubkit sync --check` checks the block.
+
 ## Hosting modules
 
 Terraform modules for a repository's domains: their DNS, their email and
