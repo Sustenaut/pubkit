@@ -341,6 +341,12 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   below). Call it with `step: restore` before the build and `step: save`
   after it, which also drops what no run used; `fresh: true` restores no
   fetched entry, and `refresh: true` restores no entry at all.
+- **`actions/docker-build`:** builds a Docker image with buildx and a
+  GitHub Actions layer cache, so an unchanged stage is restored instead of
+  built again, and loads it into the runner's Docker for the job's checks
+  and `docker push`. Give each image its own `scope`. A cached layer keeps
+  the packages it was built with until something before it changes;
+  `no-cache: true` takes the current ones.
 - **`actions/pr-label`:** says whether the pull request a run is for
   carries a label, `refresh cache` by default (`label` names another),
   as its output `present`. The pull request is the event's own, the one a

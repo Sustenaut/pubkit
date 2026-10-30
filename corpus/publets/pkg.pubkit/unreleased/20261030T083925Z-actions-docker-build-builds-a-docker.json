@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "actions/docker-build builds a Docker image with buildx and a GitHub Actions layer cache, one scope per image, and loads it into the runner's Docker"
+}
