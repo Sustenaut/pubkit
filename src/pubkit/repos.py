@@ -1,7 +1,7 @@
 """The repos file: which repositories pubkit acts on, from outside pubkit.
 
     {"repositories": [
-      {"repo": "OWNER/NAME", "protect": true, "govern": false, "project": "some-group"}
+      {"repo": "example-org/some-tool", "protect": true, "govern": false, "project": "tools"}
     ]}
 
 `protect` says it should carry pubkit's rulesets, `govern` that a nightly
