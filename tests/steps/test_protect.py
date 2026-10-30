@@ -35,6 +35,14 @@ if f:
     print(json.dumps({{"content": state["files"][f.group(1)]}}))
     sys.exit(0)
 r = re.match(r"repos/([^/]+/[^/]+)$", url)
+if r and method == "PATCH":
+    body = json.load(sys.stdin)
+    state.setdefault("repos", {{}}).setdefault(
+        r.group(1), {{"visibility": "public", "owner": {{"type": "Organization"}}}}).update(body)
+    state["sent"].append({{"method": method, "url": url, "body": body}})
+    json.dump(state, open(path, "w"))
+    print("{{}}")
+    sys.exit(0)
 if r:
     print(json.dumps(state.get("repos", {{}}).get(
         r.group(1), {{"visibility": "public", "owner": {{"type": "Organization"}}}})))
@@ -337,6 +345,27 @@ def org_repo(github, slug, visibility, plan):
     _edit(github, change)
 
 
+@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", with auto-merge'))
+def lists_with_auto_merge(repo, github, slug, checks):
+    (repo / "protected.json").write_text(json.dumps(
+        {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False,
+                           "auto_merge": True}]}))
+
+
+@given(parsers.re(r'"(?P<slug>[^"]+)" (?P<on>allows|does not allow) auto-merge$'))
+def auto_merge_setting(github, slug, on):
+    _edit(github, lambda s: s.setdefault("repos", {}).setdefault(
+        slug, {"visibility": "public", "owner": {"type": "Organization"}}).__setitem__(
+        "allow_auto_merge", on == "allows"))
+
+
+@then(parsers.parse('GitHub was asked to allow auto-merge in "{slug}"'))
+def sent_auto_merge(github, slug):
+    (call,) = [c for c in _sent(github) if "target" not in c["body"]]
+    assert (call["method"], call["url"], call["body"]) == (
+        "PATCH", f"repos/{slug}", {"allow_auto_merge": True})
+
+
 @given(parsers.parse('"{slug}" is a public repository of a personal account'))
 def user_repo(github, slug):
     _edit(github, lambda s: s.setdefault("repos", {}).__setitem__(
@@ -360,7 +389,7 @@ def _sent(github):
 @then(parsers.re(r'GitHub was sent the ruleset for "(?P<slug>[^"]+)" requiring "(?P<checks>[^"]+)"'
                  r'(?:, replacing "(?P<old>[^"]+)")?(?P<queue>, without the merge queue)?$'))
 def sent_ruleset(github, slug, checks, old, queue):
-    (call,) = [c for c in _sent(github) if c["body"]["target"] == "branch"]
+    (call,) = [c for c in _sent(github) if c["body"].get("target") == "branch"]
     assert call["body"] == protect.ruleset(_checks(checks), not queue)
     if old:
         assert (call["method"], call["url"]) == ("PUT", f"repos/{slug}/rulesets/7")
@@ -370,14 +399,14 @@ def sent_ruleset(github, slug, checks, old, queue):
 
 @then(parsers.parse('GitHub was sent the tag ruleset for "{slug}"'))
 def sent_tags(github, slug):
-    (call,) = [c for c in _sent(github) if c["body"]["target"] == "tag"]
+    (call,) = [c for c in _sent(github) if c["body"].get("target") == "tag"]
     assert (call["method"], call["url"], call["body"]) == (
         "POST", f"repos/{slug}/rulesets", protect.tag_ruleset(slug))
 
 
 @then("GitHub was sent no tag ruleset")
 def sent_no_tags(github):
-    assert [c for c in _sent(github) if c["body"]["target"] == "tag"] == []
+    assert [c for c in _sent(github) if c["body"].get("target") == "tag"] == []
 
 
 @then("GitHub was sent nothing")
@@ -396,3 +425,9 @@ def no_admin_hint(result):
 def no_queue_note(result):
     out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
     assert "merge queue" not in out and "merge_queue" not in out, out
+
+
+@then("it prints nothing about auto-merge")
+def no_auto_merge_note(result):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert "auto-merge" not in out, out

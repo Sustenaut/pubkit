@@ -224,6 +224,49 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it succeeds
     And GitHub was sent the ruleset for "schryer/site" requiring "ci / passed", without the merge queue
 
+  Scenario: A repository listed with "auto_merge": true gets auto-merge allowed
+    Given protected.json lists "schryer/site" requiring "ci / passed", with auto-merge
+    And GitHub has only main's ruleset in "schryer/site" requiring "ci / passed"
+    And "schryer/site" does not allow auto-merge
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it succeeds
+    And it prints "schryer/site: auto-merge now allowed"
+    And GitHub was asked to allow auto-merge in "schryer/site"
+
+  Scenario: protect --check reports auto-merge left off, and changes nothing
+    Given protected.json lists "schryer/site" requiring "ci / passed", with auto-merge
+    And GitHub has only main's ruleset in "schryer/site" requiring "ci / passed"
+    And "schryer/site" does not allow auto-merge
+    When I run pubkit "protect" "--config" "protected.json" "--check"
+    Then it fails
+    And it prints "schryer/site: auto-merge is not allowed; pubkit wants it allowed"
+    And GitHub was sent nothing
+
+  Scenario: Auto-merge already allowed is up to date
+    Given protected.json lists "schryer/site" requiring "ci / passed", with auto-merge
+    And GitHub has only main's ruleset in "schryer/site" requiring "ci / passed"
+    And "schryer/site" allows auto-merge
+    When I run pubkit "protect" "--config" "protected.json" "--check"
+    Then it succeeds
+    And it prints "schryer/site: auto-merge allowed, up to date"
+
+  Scenario: Without auto_merge, protect leaves the setting alone
+    Given protected.json lists "schryer/site" requiring "ci / passed", without tags
+    And GitHub has only main's ruleset in "schryer/site" requiring "ci / passed"
+    When I run pubkit "protect" "--config" "protected.json"
+    Then it succeeds
+    And it prints nothing about auto-merge
+    And GitHub was sent nothing
+
+  Scenario: A repository's own pubkit.json can allow auto-merge
+    Given the working directory is a clone of "schryer/site" whose pubkit.json requires "ci / passed"
+    And its pubkit.json's protect block is {"checks": ["ci / passed"], "tags": false, "auto_merge": true}
+    And GitHub has only main's ruleset in "schryer/site" requiring "ci / passed"
+    And "schryer/site" does not allow auto-merge
+    When I run pubkit "protect"
+    Then it succeeds
+    And GitHub was asked to allow auto-merge in "schryer/site"
+
   Scenario: --no-tags leaves out the tag ruleset
     Given GitHub has no ruleset in "schryer/baz"
     When I run pubkit "protect" "--no-tags" "--require" "ci / passed" "schryer/baz"
