@@ -48,11 +48,11 @@
         "apex_txt": ["google-site-verification=abc"],
         "sites": {
           "@": { "provider": "hetzner", "kind": "server", "server": "web" },
-          "recipes": {
+          "blog": {
             "provider": "cloudflare",
             "kind": "pages",
-            "project": "example-recipes",
-            "subdomain": "example-recipes-2ab.pages.dev",
+            "project": "example-blog",
+            "subdomain": "example-blog-2ab.pages.dev",
             "standby": "web"
           },
           "pub": { "provider": "gcp", "kind": "cloud-run", "service": "pub-site" }

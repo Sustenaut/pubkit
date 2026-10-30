@@ -157,7 +157,7 @@ which the modules are tested with (secrets never go here; tokens stay with
       "apex_txt": ["google-site-verification=abc"],
       "sites": {
         "@": { "provider": "hetzner", "kind": "server", "server": "web" },
-        "recipes": { "provider": "cloudflare", "kind": "pages", "project": "example-recipes", "standby": "web" },
+        "blog": { "provider": "cloudflare", "kind": "pages", "project": "example-blog", "standby": "web" },
         "pub": { "provider": "gcp", "kind": "cloud-run", "service": "pub-site" }
       }
     },
@@ -379,7 +379,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
       dir: site
       cloudflare-api-token: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
       cloudflare-account-id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      cloudflare-project: example-recipes
+      cloudflare-project: example-blog
       deploy-key: ${{ secrets.DEPLOY_KEY }}
       deploy-target: deploy@example.eu:./
       known-hosts: example.eu ssh-ed25519 AAAA...
@@ -413,7 +413,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   - uses: Sustenaut/pubkit/actions/deploy-ssh@<commit> # vX.Y.Z
     with:
       command: share-edge
-      bundle: scripts/photos/share
+      bundle: scripts/site
       deploy-key: ${{ secrets.DEPLOY_KEY }}
       target: deploy@example.eu
       known-hosts: example.eu ssh-ed25519 AAAA...
@@ -421,8 +421,7 @@ own modules, which only a repository on Google Cloud or deSEC takes.
 
 **Moving a zone that is already in use.** Hetzner made the apex NS rrset
 with the zone, so the first apply with Cloudflare joining it must take it
-over rather than create it, with an import block in the root module (this
-is what schryer-eu-infra needed):
+over rather than create it, with an import block in the root module:
 
 ```hcl
 import {
@@ -521,14 +520,14 @@ holds at most eight entries.
   the latest run. The build makes it through
 
   ```sh
-  pubkit cache run packs --unit louna/alfa --output pack.pmtiles -- bin/maps build-area ...
+  pubkit cache run packs --unit north/alpha --output pack.pmtiles -- bin/build-pack ...
   ```
 
   which fingerprints the unit (the entry's name, the unit, the `unit`
   pattern filled in, each `inputs` entry, each `tools` command's output,
   and the version), copies the outputs when that fingerprint was made
   before, and otherwise runs the command and keeps what it wrote. It
-  prints `reused packs louna/alfa` or `built packs louna/alfa`; the
+  prints `reused packs north/alpha` or `built packs north/alpha`; the
   command's own output goes to stderr.
 
 In a workflow, `actions/cache` restores before the build and saves after
@@ -623,7 +622,7 @@ standard names. A repository sets the variables they read in its Makefile:
 `TESTING.md`: every public item, the examples its docs run, and the tests
 whose `// covers:` comment names it. With `--check`, it fails on a public
 function with no example, a `// covers:` naming no public item, or a stale
-`TESTING.md`. It moved here from publet's `tools/`, so every repository runs
+`TESTING.md`. It lives here so every repository runs
 the same version.
 
 ## Conformance, and declared exceptions
@@ -640,7 +639,7 @@ runs it in every Rust repository:
 | RS-FUZZ-01 | `fuzz/fuzz_targets/*.rs` exists |
 | RS-SUP-01 | `deny.toml` keeps the shared baseline, and `supply-chain/config.toml` imports the shared audit sets |
 | RS-SUP-04 | `SECURITY.md` exists |
-| RS-SUP-05 | the release key `release.json` names is labelled for what it releases ("pubunit release key"), not with a person's name: its label is public in every release it signs |
+| RS-SUP-05 | the release key `release.json` names is labelled for what it releases ("example-crate release key"), not with a person's name: its label is public in every release it signs |
 | RS-REL-01 | `release.json` declares `pubkit audit --check` as a security check |
 
 It also checks that every workflow calling `rust-ci.yml` pins the pubkit
@@ -669,7 +668,7 @@ rust-crate-quality agent (RS-REL-01). For a release, the agent writes it to
 
 ```
 ---
-package: pubunit
+package: example-crate
 version: 0.1.1
 standard: <pubkit audit --standard>
 blocking: 0
@@ -698,8 +697,8 @@ needs a new audit.
 ### Preparing the report
 
 ```sh
-./pubkit audit prepare --package publet-core          # audit/publet-core-<next>.md
-with-secrets ./pubkit audit draft --package publet-core   # optional: Claude drafts the judged rules
+./pubkit audit prepare --package example-crate        # audit/example-crate-<next>.md
+with-secrets ./pubkit audit draft --package example-crate   # optional: Claude drafts the judged rules
 ```
 
 `pubkit audit prepare --package NAME` writes the report for the release
@@ -794,7 +793,7 @@ none of them needs a `.claude/` folder. In Claude Code:
 
 Then ask for it by name, in any repository:
 
-- "Use rust-crate-quality to audit publet-core." It returns a report and
+- "Use rust-crate-quality to audit example-crate." It returns a report and
   edits nothing.
 - "Use rust-crate-quality to fix the docs of pubrel." It edits
   documentation, then re-runs the checks.
@@ -903,7 +902,7 @@ The repositories come from one of:
   the repository's "Allow auto-merge" setting.
   `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
-  `pubkit protect --require "ci / passed" schryer/newrepo`.
+  `pubkit protect --require "ci / passed" example-org/newrepo`.
 - the repository's own `pubkit.json`, which says how it is protected:
   `"protect": {"checks": ["ci / passed"], "tags": false, "queue": false, "release_app": 12345}`
   (`tags` and `queue` default to true). A `REPO` the list does not name is read from the `pubkit.json`
@@ -926,7 +925,7 @@ pubkit's own list, the pub* repositories, is
 passed` from a pubkit workflow, `release / release` where pubrel releases,
 and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
 requests. Here, `make protect` (or `make protect-check`, or `make protect
-REPOS=schryer/recipes`) runs it, making the venv first if there is none.
+REPOS=example-org/example-site`) runs it, making the venv first if there is none.
 
 ### Pull requests: ready, or draft
 

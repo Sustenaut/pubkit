@@ -407,7 +407,7 @@ def _board(repo, path):
 def worst_first(repo, path):
     board = _board(repo, path)
     assert [r["repo"] for r in board["repos"]] == [
-        "schryer/private-thing", "schryer/visit-thing", "schryer/pubthing"]
+        "example-org/private-thing", "example-org/site-thing", "example-org/pubthing"]
     assert [r["overall"] for r in board["repos"]] == ["E", "C", "B"]
 
 

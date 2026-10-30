@@ -230,7 +230,7 @@ def position_keyed():
         _record("email_mx 0", "MX", "mxext1.mailbox.org", 10),
         _record("apex_txt 0", "TXT", '"v=spf1 include:mailbox.org ~all"'),
         _record("apex_a 0", "A", "192.0.2.1"),
-        _record("recipes 0", "CNAME", "example-recipes.pages.dev"),
+        _record("blog 0", "CNAME", "example-blog.pages.dev"),
     ])
 
 
@@ -254,7 +254,7 @@ def run_moves(repo, run, state):
 def moved_three(result):
     out = result.stdout
     assert out.count("moved {") == 3, out
-    assert "apex_a" not in out and "recipes" not in out and "ns2.desec.org" not in out, out
+    assert "apex_a" not in out and "blog" not in out and "ns2.desec.org" not in out, out
 
 
 @then("it moves the NS, MX and apex TXT records to keys by their values, HCL-quoted")

@@ -56,7 +56,7 @@ def key_object(label: str) -> bytes:
     return b"\xa2" + text("body") + body + text("type") + text("key")
 
 
-def workflow(version: str, owner: str = "schryer") -> str:
+def workflow(version: str, owner: str = "example-org") -> str:
     return ("jobs:\n  ci:\n    uses: "
             f"{owner}/pubkit/.github/workflows/rust-ci.yml@{version}\n")
 

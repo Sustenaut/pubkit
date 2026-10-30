@@ -27,7 +27,7 @@ Feature: pubkit dns check compares a zone's nameservers and validates each one a
     And delv was not run
 
   Scenario: Every rrset the hosting block describes is compared
-    Then the rrsets compared for "example.eu" are "@ NS, @ MX, @ TXT, _dmarc TXT, mbo0001._domainkey CNAME, mbo0002._domainkey CNAME, mbo0003._domainkey CNAME, mbo0004._domainkey CNAME, f67e29eb00a65673481c0f9731bc90e0c6f94fd3 TXT, @ A, @ AAAA, recipes CNAME, pub CNAME"
+    Then the rrsets compared for "example.eu" are "@ NS, @ MX, @ TXT, _dmarc TXT, mbo0001._domainkey CNAME, mbo0002._domainkey CNAME, mbo0003._domainkey CNAME, mbo0004._domainkey CNAME, f67e29eb00a65673481c0f9731bc90e0c6f94fd3 TXT, @ A, @ AAAA, blog CNAME, pub CNAME"
 
   Scenario: A nameserver with another answer fails the check
     Given every nameserver of "example.net" serves it alike

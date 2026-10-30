@@ -8,7 +8,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Given an empty repository
 
   Scenario: pins moves every workflow pin to the latest releases
-    Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1, pub-version: v0.2.0 }"
+    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1, pub-version: v0.2.0 }"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
@@ -16,14 +16,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And ".github/workflows/ci.yml" contains "release.yml@v0.5.3 with: { pubrel-version: v0.5.3, pub-version: v0.2.1 }"
 
   Scenario: pins moves pubkit's pin in every one of its reusable workflows
-    Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubkit/.github/workflows/node-ci.yml@v0.0.1"
+    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubkit/.github/workflows/node-ci.yml@v0.0.1"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" does not contain "node-ci.yml@v0.0.1"
 
   Scenario: pins moves pubrel's commit together with its version
     Given pubrel's repository tags "v0.5.3"
-    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
+    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
@@ -31,14 +31,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves pubkit's commit together with its version
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubkit/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
+    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubkit/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" pins pubkit's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
 
   Scenario: pins moves a current pin by tag to the tag's commit
     Given pubrel's repository tags "v0.5.3"
-    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
+    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.3 pinned to"
@@ -46,11 +46,11 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves a workflow pinned under the old owner to workflows_owner's
     Given pubkit.json names the workflows owner "sustenaut"
-    And the file ".github/workflows/ci.yml" reads "    uses: schryer/pubkit/.github/workflows/node-ci.yml@v0.0.1"
+    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubkit/.github/workflows/node-ci.yml@v0.0.1"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" contains "uses: sustenaut/pubkit/.github/workflows/node-ci.yml@v"
-    And ".github/workflows/ci.yml" does not contain "schryer"
+    And ".github/workflows/ci.yml" does not contain "example-org"
 
   Scenario Outline: pins moves a pubkit action to this pubkit's commit, under the current owner
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
@@ -62,7 +62,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Examples:
       | owner     | pin               |
       | Sustenaut | another pubkit    |
-      | schryer   | another pubkit    |
+      | example-org   | another pubkit    |
       | Sustenaut | this pubkit's tag |
       | Sustenaut | another commit    |
 
@@ -76,7 +76,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Examples:
       | owner     | workflow       |
       | Sustenaut | service-ci.yml |
-      | schryer   | service-ci.yml |
+      | example-org   | service-ci.yml |
       | Sustenaut | job-sonar.yml  |
 
   Scenario: pins leaves a pubkit action that names no version
@@ -87,7 +87,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
 
   Scenario: pins on a repository already current changes nothing
-    Given the file ".github/workflows/ci.yml" reads "uses: schryer/pubrel/.github/workflows/release.yml@v0.5.3"
+    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
     Then it succeeds
     And it prints nothing

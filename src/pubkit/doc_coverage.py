@@ -17,8 +17,7 @@ TESTING.md is a view, never edited by hand. `make doc-coverage` writes it;
 are broken. The crates are the published packages with a library target,
 from `cargo metadata`, unless named.
 
-Moved here from publet's tools/doc-coverage.py, so every repository runs the
-same version.
+It lives here so every repository runs the same version.
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ pull requests. `"dependabot": false` leaves `.github/dependabot.yml` to the
 repository.
 
 `security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**", "organization":
-"sustenaut"}`: `args` are properties every workflow's sonar job adds, after
+"example-org"}`: `args` are properties every workflow's sonar job adds, after
 its `sonar-args` input, and `organization` is the SonarQube Cloud
 organization key the scan sends the project to. By default that is the
 GitHub owner in lower case, as SonarQube Cloud's keys are; the project key
@@ -104,5 +104,5 @@ def sonar_settings(config: dict[str, Any]) -> dict[str, str]:
     organization = given.get("organization", "")
     if organization != "" and not (isinstance(organization, str) and ORGANIZATION.fullmatch(organization)):
         sys.exit("pubkit: security.sonar.organization must be a SonarQube Cloud organization key: "
-                 "lower-case letters, digits and dashes, such as sustenaut")
+                 "lower-case letters, digits and dashes, such as example-org")
     return {"args": given.get("args", ""), "organization": organization}

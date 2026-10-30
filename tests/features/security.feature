@@ -32,7 +32,7 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
       | {"security": {"sonar": {"schedule": "daily"}}}                 | security.sonar has no setting schedule    |
       | {"security": {"sonar": {"args": 1}}}                           | security.sonar.args must be a string      |
       | {"security": {"sonar": "-Dx=y"}}                               | security.sonar must be an object          |
-      | {"security": {"sonar": {"organization": "Sustenaut"}}}         | security.sonar.organization must be a     |
+      | {"security": {"sonar": {"organization": "Example-Org"}}}         | security.sonar.organization must be a     |
       | {"security": {"sonar": {"organization": 7}}}                   | security.sonar.organization must be a     |
 
   Scenario: pubkit sync writes dependabot.yml and sync --check sees it drift
