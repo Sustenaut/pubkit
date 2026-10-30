@@ -7,6 +7,9 @@
 #
 #   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
 #     with: { step: restore, fresh: "${{ inputs.fresh || false }}" }
+#
+# refresh: 'true' on restore restores nothing at all, as when the pull
+# request a run is for carries the "refresh cache" label (actions/pr-label).
 #   - run: bin/build              # uses `pubkit cache run` for what it makes
 #   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
 #     with: { step: save }
@@ -23,6 +26,9 @@ inputs:
   fresh:
     description: "With step restore: 'true' restores no fetched entry, so each is fetched anew."
     default: 'false'
+  refresh:
+    description: "With step restore: 'true' restores no entry, fetched or made, so the build fetches and makes everything anew (see actions/pr-label)."
+    default: 'false'
 
 runs:
   using: composite
@@ -33,6 +39,7 @@ runs:
       env:
         STEP: ${{ inputs.step }}
         FRESH: ${{ inputs.fresh }}
+        REFRESH: ${{ inputs.refresh }}
       run: '"$GITHUB_ACTION_PATH/plan.sh"'
 
     - name: Restore cache entry 1

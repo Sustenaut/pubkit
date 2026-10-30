@@ -30,6 +30,10 @@ export GITHUB_OUTPUT="$work/fresh"
 STEP=restore FRESH=true "$here/plan.sh" > /dev/null
 expect "fresh: the data not restored" '^restore-1=false$'
 expect "fresh: the packs still restored" '^restore-2=true$'
+export GITHUB_OUTPUT="$work/refresh"
+STEP=restore REFRESH=true "$here/plan.sh" > /dev/null
+expect "refresh: the data not restored" '^restore-1=false$'
+expect "refresh: the packs not restored" '^restore-2=false$'
 if STEP=other "$here/plan.sh" > /dev/null 2>&1; then
   echo "FAIL: a step that is neither restore nor save is taken"; failures=$((failures + 1))
 else

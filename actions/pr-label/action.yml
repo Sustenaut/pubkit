@@ -1,0 +1,40 @@
+# Tells a workflow whether the pull request it runs for carries a label,
+# "refresh cache" by default, so one label a person sets on a pull request
+# can steer what the run does with it: a deploy that rebuilds everything
+# (actions/cache's refresh), or anything else a repository wires to it.
+#
+#   - id: refresh
+#     uses: Sustenaut/pubkit/actions/pr-label@vX.Y.Z
+#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#     with: { step: restore, refresh: "${{ steps.refresh.outputs.present }}" }
+#
+# The pull request is the event's own (pull_request, pull_request_target),
+# the one a merge queue group is for (merge_group), or the ones merged into
+# a pushed commit (push: any of them carrying the label counts). Any other
+# event has none, so present is false. Reading a pushed commit's pull
+# requests needs the job's token to have pull-requests: read.
+name: pr-label
+description: Whether the pull request a run is for carries a label ("refresh cache" by default).
+
+inputs:
+  label:
+    description: The label's name, compared without regard to case.
+    default: refresh cache
+  token:
+    description: A token that can read the repository's pull requests.
+    default: ${{ github.token }}
+
+outputs:
+  present:
+    description: "'true' when the pull request carries the label, else 'false'."
+    value: ${{ steps.look.outputs.present }}
+
+runs:
+  using: composite
+  steps:
+    - id: look
+      shell: bash
+      env:
+        LABEL: ${{ inputs.label }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: '"$GITHUB_ACTION_PATH/label.sh"'
