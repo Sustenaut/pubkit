@@ -1,4 +1,0 @@
-{
-  "category": "internal",
-  "change": "Neutral examples replace the names of consumers in the docs, docstrings, error text and test fixtures, and a test fails if what pubkit ships names any repository but its own and its tools'"
-}

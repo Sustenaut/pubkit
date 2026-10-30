@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "ci.tools in pubkit.json lists what a Rust repository's functional suite drives, each a crate, a git repository and a tag: sync writes it into the functional job, which installs each with cargo install --locked, and the nightly moves each tag to the latest release of its repository. The pub-version input still works, warns at sync, and goes in a later release. pubkit now installs pub from Sustenaut/publet, where it moved"
-}
