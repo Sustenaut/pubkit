@@ -21,8 +21,8 @@ from pubkit.board import rules as grading
 from pubkit.board.connectors.actions import Actions
 from pubkit.board.connectors.base import Ledger, Recording, Replay
 from pubkit.board.connectors.github import GitHub
-from pubkit.board.connectors.lists import Lists
 from pubkit.board.connectors.live import Live
+from pubkit.board.connectors.repos import Repos
 from pubkit.board.connectors.scorecard import Scorecard
 from pubkit.board.connectors.sonarcloud import SonarCloud
 
@@ -262,12 +262,12 @@ def _connector(sources, cls):
     return cls(sources["ledger"], sources["transport"])
 
 
-@when(parsers.parse('the lists connector reads "{protected}" and "{governed}"'),
+@when(parsers.parse('the repos connector reads "{protected}" and "{governed}"'),
       target_fixture="read")
 def read_lists(sources, protected, governed):
-    lists = _connector(sources, Lists)
-    return {"protected": lists.protected(FIXTURES / protected),
-            "governed": lists.governed(FIXTURES / governed)}
+    repos = _connector(sources, Repos)
+    return {"protected": repos.protected(FIXTURES / protected),
+            "governed": repos.governed(FIXTURES / governed)}
 
 
 @then(parsers.parse('it lists "{names}"'))

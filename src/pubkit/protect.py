@@ -49,7 +49,9 @@ renaming it, so a repository never carries two. It calls the GitHub API through 
 must be signed in as someone who administers the repositories.
 `pubkit protect --check` changes nothing: it prints how each repository
 differs, and fails when one does. `--config FILE` reads another list, such
-as an edited one not yet released.
+as an edited one not yet released. `--repos FILE` reads a repos file instead
+(repos.py): the repositories it marks to protect, each with the checks its
+own pubkit.json says. protected.json and `--config` go in a later release.
 """
 
 from __future__ import annotations
@@ -64,6 +66,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from .repos import REPO, read, warn_lists
+
 # The app that reports a check. Every other check is a GitHub Actions job.
 GITHUB_ACTIONS = 15368
 # The release app a repository of this owner gets when its entry names no
@@ -76,7 +80,6 @@ Api = Callable[[str, str, Any], Any]
 
 LOCAL = "protected.json"
 OWN = "pubkit.json"
-REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 
 
 def base(name: str = "ruleset.json") -> dict:
@@ -412,6 +415,7 @@ def load(config: Path | None) -> list[dict] | None:
         config = Path(LOCAL)
     elif not config.is_file():
         sys.exit(f"pubkit protect: no {config}")
+    warn_lists("protect", f"{config} and --config")
     try:
         entries = parse(config.read_text(encoding="utf-8"), str(config))["repositories"]
     except (ValueError, KeyError, TypeError) as e:
@@ -434,12 +438,17 @@ def load(config: Path | None) -> list[dict] | None:
 
 
 def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
-        api: Api = gh, tags: bool = True, queue: bool = True) -> int:
+        api: Api = gh, tags: bool = True, queue: bool = True,
+        repos_file: Path | None = None) -> int:
     """Protect `repos` (by default every one listed). Given `requires`, the
-    named repositories require those checks, and no list is read. With
-    `tags` false, no repository gets the tag ruleset; with `queue` false,
-    none gets the merge queue."""
-    if requires:
+    named repositories require those checks, and no list is read. Given
+    `repos_file`, the repositories it marks to protect are read from their
+    own pubkit.json. With `tags` false, no repository gets the tag ruleset;
+    with `queue` false, none gets the merge queue."""
+    if repos_file:
+        repos = repos or [e["repo"] for e in read(repos_file, "protect") if e["protect"]]
+        entries = []
+    elif requires:
         if not repos:
             sys.exit("pubkit protect: --require names a check; name the repositories too")
         bad = [r for r in repos if not REPO.fullmatch(r)]
@@ -471,7 +480,7 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
             try:
                 item = remote(api, name)
             except ValueError as e:
-                print(f"{name}: not in {LOCAL}, and {e}")
+                print(f"{name}: {e}" if repos_file else f"{name}: not in {LOCAL}, and {e}")
                 failed = True
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,

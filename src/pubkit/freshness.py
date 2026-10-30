@@ -5,7 +5,8 @@ latest pubkit, so none sits on an old standard unnoticed.
 pubkit its lock pins, whether it is this one, whether it conforms to this
 pubkit's standard, and its open exceptions: one Markdown table, also
 appended to the GitHub step summary when there is one. It reads; it changes
-nothing.
+nothing. `pubkit freshness --repos FILE [DIR]` reports instead the repositories
+a repos file marks to govern, each checked out at DIR/<name>.
 
 `pubkit bump`, run in a repository, moves it to this pubkit: the managed
 files (`pubkit sync`), the lock (`pubkit lock`), and every workflow's pin of
@@ -19,11 +20,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 from . import __version__
 from .refs import (ANY_OWNER, AT, PUBKIT_PIN, VERSION, owner_of, ref, release_commit, repin,
                    stale_pins)
+from .repos import read
 
 PIN = re.compile(r"/download/v([0-9][^/]*)/pubkit-")
 WORKFLOW_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/rust-ci\.yml@)"
@@ -73,8 +76,29 @@ def table(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def freshness(dirs: list[Path], as_json: bool) -> int:
-    rows = [row(d.resolve()) for d in dirs]
+def governed_rows(repos_file: Path, where: Path) -> list[dict]:
+    """A row for each repository the repos file governs, checked out or not."""
+    rows = []
+    for entry in read(repos_file, "freshness"):
+        if not entry["govern"]:
+            continue
+        name = entry["repo"].split("/", 1)[1]
+        checkout = where / name
+        rows.append(row(checkout.resolve()) if checkout.is_dir() else
+                    {"repo": name, "pinned": "-", "latest": __version__,
+                     "conforms": "not checked out", "exceptions": []})
+    return rows
+
+
+def freshness(dirs: list[Path], as_json: bool, repos_file: Path | None = None) -> int:
+    if repos_file:
+        if len(dirs) > 1:
+            sys.exit("pubkit freshness: --repos takes one directory, where the checkouts are")
+        rows = governed_rows(repos_file, dirs[0] if dirs else Path("."))
+    elif dirs:
+        rows = [row(d.resolve()) for d in dirs]
+    else:
+        sys.exit("pubkit freshness: name the checkouts, or pass --repos FILE")
     text = json.dumps(rows, indent=2) + "\n" if as_json else table(rows)
     print(text, end="")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

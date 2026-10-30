@@ -58,7 +58,7 @@ Feature: The board grades every listed repository A to E
     And it has 3 open issues
     When I grade them
     Then Delivery is "D"
-    And Delivery lists, in order, "pubkit 0.12.0, latest 0.14.2", "3 open issues", "Not in governed.json, and no nightly run in 2 days"
+    And Delivery lists, in order, "pubkit 0.12.0, latest 0.14.2", "3 open issues", "Not governed, and no nightly run in 2 days"
 
   Scenario: A package not integrated with pubrel, unreleased for two months
     Given the facts of a package with nothing wrong
@@ -127,9 +127,9 @@ Feature: The board grades every listed repository A to E
     When I order them
     Then the order is "a/two, a/three, a/one"
 
-  Scenario: The lists connector reads protected.json and governed.json
+  Scenario: The repos connector reads protected.json and governed.json
     Given recorded responses from the build recording
-    When the lists connector reads "protected.json" and "governed.json"
+    When the repos connector reads "protected.json" and "governed.json"
     Then it lists "example-org/pubthing, example-org/site-thing, example-org/private-thing"
     And "example-org/pubthing" is governed
     And every call is recorded with its connector, method, endpoint and time

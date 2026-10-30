@@ -21,8 +21,8 @@ from ..refs import ANY_OWNER, AT, RELEASE_PIN, VERSION
 from .connectors.actions import Actions
 from .connectors.base import Fact
 from .connectors.github import GitHub
-from .connectors.lists import Lists
 from .connectors.live import Live
+from .connectors.repos import Repos
 from .connectors.scorecard import Scorecard
 from .connectors.sonarcloud import SonarCloud
 
@@ -35,7 +35,7 @@ WORKFLOW_NAME = re.compile(r"[\w.-]+\.ya?ml")
 
 @dataclass
 class Connectors:
-    lists: Lists
+    repos: Repos
     github: GitHub
     actions: Actions
     sonarcloud: SonarCloud
@@ -50,15 +50,21 @@ def merged(*facts: Fact, value: Any, note: str | None = None) -> Fact:
     return Fact(value, tuple(sources), note)
 
 
-def inventory(c: Connectors, protected: Path, governed: Path | None) -> tuple[list[dict], list[str]]:
-    """The repositories to grade, in the lists' order, each with its
-    protected.json entry and whether governed.json lists it; and any
-    problem reading the lists."""
+def inventory(c: Connectors, protected: Path | None, governed: Path | None,
+              repos: Path | None = None) -> tuple[list[dict], list[str]]:
+    """The repositories to grade, in the file's order, each with its roles
+    and, from protected.json, its entry; and any problem reading the file."""
+    if repos:
+        read = c.repos.listed(repos)
+        return [{"repo": e["repo"], "entry": None, "listed": True, "governed": e["govern"],
+                 "protect": e["protect"], "project": e.get("project"),
+                 "sources": list(read.sources)} for e in read.value or []], \
+            ([] if read.value is not None else [f"{repos}: {read.note}"])
     problems = []
-    listed = c.lists.protected(protected)
+    listed = c.repos.protected(protected)
     if listed.value is None:
         problems.append(f"{protected}: {listed.note}")
-    ruled = c.lists.governed(governed) if governed else Fact([], ())
+    ruled = c.repos.governed(governed) if governed else Fact([], ())
     if ruled.value is None:
         problems.append(f"{governed}: {ruled.note}")
     out: dict[str, dict] = {}
@@ -231,14 +237,18 @@ class Gatherer:
                     (*item["sources"], *runs.sources), runs.note)
 
     def protection(self, repo, item, config, raw, visibility) -> Fact:
-        """How the repository's rulesets differ from what pubkit wants of it."""
+        """How the repository's rulesets differ from what pubkit wants of it:
+        not at all, where its repos file entry doesn't ask for any."""
+        if not item.get("protect", True):
+            return Fact({"differences": [], "limit": False}, item["sources"])
         if item["entry"] is not None:
             wanted, why = item["entry"], item["sources"]
         else:
             try:
                 wanted = protect.entry(repo, config, "its pubkit.json")
             except ValueError as e:
-                return Fact({"differences": [f"not in protected.json, and {e}"], "limit": False},
+                said = str(e) if item.get("listed") else f"not in protected.json, and {e}"
+                return Fact({"differences": [said], "limit": False},
                             raw.sources)
             why = list(raw.sources)
         found = self.c.github.rulesets(repo)
@@ -252,7 +262,7 @@ class Gatherer:
         targets = [("branch", protect.ruleset(wanted["checks"], wanted.get("queue", True)),
                     "its default branch")]
         if wanted.get("tags", True):
-            targets.append(("tag", protect.tag_ruleset(repo), "its release tags"))
+            targets.append(("tag", protect.tag_ruleset(repo, wanted.get("release_app")), "its release tags"))
         for target, want, where in targets:
             test = protect.on_default_branch if target == "branch" else protect.on_release_tags
             have = [r for r in found.value if r.get("target") == target and test(r)]

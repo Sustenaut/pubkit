@@ -254,7 +254,7 @@ def nightly(f: Facts, entry: dict, now: datetime) -> list[dict]:
     days = entry.get("days", 2)
     if last and now - when(last["at"]) <= timedelta(days=days):
         return []
-    return [step(f"Not in governed.json, and no nightly run in {days} days", -1, f, "nightly")]
+    return [step(f"Not governed, and no nightly run in {days} days", -1, f, "nightly")]
 
 
 def protection(f: Facts, _: dict, __: datetime) -> list[dict]:

@@ -1,15 +1,26 @@
-"""The lists connector: pubkit's protected.json and governed.json, or a
-client's own, which say which repositories the board grades."""
+"""The repos connector: a repos file, or until they go, protected.json and
+governed.json, which say which repositories the board grades."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from ...repos import entries
 from .base import Connector, Fact
 
 
-class Lists(Connector):
-    name = "lists"
+class Repos(Connector):
+    name = "repos"
+
+    def listed(self, path: Path) -> Fact:
+        """A repos file's entries: each repository and its roles."""
+        response, call = self.get("listed", f"file:{path}", f"file:{path.name}")
+        if not response.ok:
+            return Fact(None, (call,), response.message())
+        try:
+            return Fact(entries(response.body or b"", path.name), (call,))
+        except ValueError as e:
+            return Fact(None, (call,), str(e))
 
     def _entries(self, method: str, path: Path) -> Fact:
         # Logged by name only: board.json does not name the runner's directories.

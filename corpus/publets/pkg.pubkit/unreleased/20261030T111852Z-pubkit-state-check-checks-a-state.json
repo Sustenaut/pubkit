@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit state --check checks a state repository's state.json: its shape, that each repository exists under the owner, and that each one to protect has a protect block."
+}

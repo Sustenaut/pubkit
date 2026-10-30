@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit board, protect and freshness take --repos FILE, a list of repositories with their roles from outside pubkit, and the reusable board.yml and nightly.yml take it as a repos input."
+}
