@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "actions/pr-label says whether the pull request a run is for (the event's own, a merge queue group's, or on a push the ones merged into the pushed commit) carries a label, \"refresh cache\" by default, and actions/cache's restore takes refresh: 'true' (pubkit cache plan --refresh) to restore no entry, fetched or made, so a pull request labelled refresh cache rebuilds everything once it merges"
-}
