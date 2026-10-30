@@ -143,6 +143,29 @@ jobs:
       - run: shellcheck actions/deploy-ssh/*.sh
       - run: actions/deploy-ssh/test.sh
 
+  # Builds one image twice under one scope: the second must come from the cache.
+  docker-build-action:
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: ./actions/docker-build
+        with:
+          tags: docker-build-test:first
+          scope: docker-build-test-${{ github.run_id }}-${{ github.run_attempt }}
+          context: actions/docker-build/test
+      - uses: ./actions/docker-build
+        with:
+          tags: docker-build-test:second
+          scope: docker-build-test-${{ github.run_id }}-${{ github.run_attempt }}
+          context: actions/docker-build/test
+      - run: |
+          first=$(docker run --rm docker-build-test:first cat /built)
+          second=$(docker run --rm docker-build-test:second cat /built)
+          echo "first $first, second $second"
+          [ -n "$first" ] && [ "$first" = "$second" ]
+
   cache-action:
     needs: tested
     if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
@@ -160,7 +183,7 @@ jobs:
   # pubrel tags from a push to main alone, as the wheel is built. Where
   # the queue already passed the commit, its run of these jobs counts.
   release:
-    needs: [passed, tested, terraform, deploy-static, cache-action]
+    needs: [passed, tested, terraform, deploy-static, cache-action, docker-build-action]
     if: >-
       !cancelled() && needs.passed.result == 'success'
       && (needs.tested.outputs.tested == 'true'
