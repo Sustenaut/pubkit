@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "A pubkit.json protect block or protected.json entry takes \"release_app\": a GitHub App id, a positive integer, which its release tag ruleset lets through; a repository of the one owner pubkit still knows gets that owner's app when it names none, with a warning. pubkit sync --check now refuses an unsound protect block too"
+}

@@ -24,15 +24,17 @@ line. pubkit's own list is the protected.json in its checkout.
 CI: nobody may create, move or delete one, and only GitHub Actions, where
 `pubrel tag` runs once a release pull request merges, may bypass it. In
 an organization's repository GitHub refuses the GitHub Actions app as a
-bypass actor, so a Sustenaut repository's tags let through the Sustenaut
-release app (RELEASE_APP) instead, whose token `pubrel tag` uses there. A
+bypass actor, so an organization's repository names its release app with
+`"release_app": ID` in its entry, and its tags let that app through instead,
+whose token `pubrel tag` uses there. A repository of RELEASE_APP_OWNER that
+names none still gets RELEASE_APP, with a warning, until it does. A
 hand-pushed tag cannot release code that CI did not pass. A repository
 that releases no tags goes without it: `"tags": false` in its entry, or
 `--no-tags`.
 
 A repository may instead say how it is protected in its own pubkit.json:
-`"protect": {"checks": [...], "tags": false, "queue": false, "auto_merge": true}`
-(`tags` and `queue` default to true). `auto_merge` is the repository's
+`"protect": {"checks": [...], "tags": false, "queue": false, "auto_merge": true,
+"release_app": 12345}` (`tags` and `queue` default to true). `auto_merge` is the repository's
 "Allow auto-merge" setting, which lets a pull request merge by itself once
 the ruleset's checks pass: true turns it on, false off, and without it
 protect leaves the setting as it is. It loosens nothing, since the ruleset
@@ -64,8 +66,8 @@ from typing import Any
 
 # The app that reports a check. Every other check is a GitHub Actions job.
 GITHUB_ACTIONS = 15368
-# The Sustenaut release app, the one actor that may create a release tag
-# in a repository of its organization, where GitHub Actions may not.
+# The release app a repository of this owner gets when its entry names no
+# `release_app`, with a warning, until every one of them does.
 RELEASE_APP = 5529889
 RELEASE_APP_OWNER = "sustenaut"
 APPS = {"SonarCloud Code Analysis": 12526}
@@ -82,12 +84,19 @@ def base(name: str = "ruleset.json") -> dict:
     return json.loads(resources.files("pubkit").joinpath(name).read_text(encoding="utf-8"))
 
 
-def tag_ruleset(repo: str = "") -> dict:
+def falls_back(repo: str, release_app: int | None) -> bool:
+    """Whether `repo` gets RELEASE_APP because its entry names no release app."""
+    return release_app is None and repo.split("/", 1)[0].lower() == RELEASE_APP_OWNER
+
+
+def tag_ruleset(repo: str = "", release_app: int | None = None) -> dict:
     """The ruleset `repo`'s release tags carry: GitHub Actions bypasses it,
-    or in the release app's organization, the release app."""
+    or the release app its entry names."""
     out = base("tag-ruleset.json")
-    if repo.split("/", 1)[0].lower() == RELEASE_APP_OWNER:
-        out["bypass_actors"] = [{"actor_id": RELEASE_APP, "actor_type": "Integration",
+    if falls_back(repo, release_app):
+        release_app = RELEASE_APP
+    if release_app is not None:
+        out["bypass_actors"] = [{"actor_id": release_app, "actor_type": "Integration",
                                  "bypass_mode": "always"}]
     return out
 
@@ -219,13 +228,19 @@ def no_queue(api: Api, repo: str) -> str | None:
 
 def protect(api: Api, repo: str, checks: list[str], check: bool,
             tags: bool = True, queue: bool = True,
-            auto_merge: bool | None = None) -> tuple[list[str], bool]:
+            auto_merge: bool | None = None,
+            release_app: int | None = None) -> tuple[list[str], bool]:
     """Bring one repository to both rulesets (with `tags` false, only its
     default branch's; with `queue` false, or where GitHub offers none,
-    main's without the merge queue), and, unless `auto_merge` is None, its
-    "Allow auto-merge" setting to `auto_merge`; its report lines, and
-    whether it differed (with `check`) or could not be brought in line."""
+    main's without the merge queue; with `release_app`, its tags' letting
+    that app through), and, unless `auto_merge` is None, its "Allow
+    auto-merge" setting to `auto_merge`; its report lines, and whether it
+    differed (with `check`) or could not be brought in line."""
     notes = []
+    if tags and falls_back(repo, release_app):
+        notes.append(f"{repo}: warning: no release_app in its protect block, so its tags let "
+                     f"through app {RELEASE_APP}; add \"release_app\": {RELEASE_APP} to its "
+                     f"pubkit.json")
     if queue and (why := no_queue(api, repo)):
         queue = False
         notes.append(f"{repo}: no merge queue: {why}; {NO_QUEUE}")
@@ -245,7 +260,7 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
     lines, bad = attempt(branch, repo, check)
     lines = notes + lines
     if tags:
-        tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo),
+        tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo, release_app),
                                                    current(api, repo, "tag"),
                                                    "its release tags", check), repo, check)
         lines, bad = lines + tag_lines, bad or tag_bad
@@ -308,7 +323,7 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
             *(f"  was: {d}" for d in diff), *lines], bool(others)
 
 
-KEYS = {"checks", "tags", "queue", "auto_merge"}
+KEYS = {"checks", "tags", "queue", "auto_merge", "release_app"}
 
 
 def problems(block: Any) -> list[str]:
@@ -329,6 +344,10 @@ def problems(block: Any) -> list[str]:
     for key in ("tags", "queue", "auto_merge"):
         if not isinstance(block.get(key, True), bool):
             out.append(f'"{key}" must be true or false, not {json.dumps(block[key])}')
+    app = block.get("release_app", 1)
+    if isinstance(app, bool) or not isinstance(app, int) or app <= 0:
+        out.append(f'"release_app" must be a GitHub App\'s id, a positive integer, '
+                   f'not {json.dumps(app)}')
     return out
 
 
@@ -341,11 +360,12 @@ def entry(repo: str, config: Any, where: str) -> dict:
     bad = problems(block)
     if isinstance(block, dict) and block.keys() - KEYS:
         bad.append(f"{', '.join(sorted(block.keys() - KEYS))} is not a protect setting; "
-                   f"it takes checks, tags, queue and auto_merge")
+                   f"it takes checks, tags, queue, auto_merge and release_app")
     if bad:
         raise ValueError(f"{where}'s protect block: {'; '.join(bad)}")
     return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True),
-            "queue": block.get("queue", True), "auto_merge": block.get("auto_merge")}
+            "queue": block.get("queue", True), "auto_merge": block.get("auto_merge"),
+            "release_app": block.get("release_app")}
 
 
 def parse(text: str | bytes, where: str) -> Any:
@@ -456,7 +476,7 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,
                              tags and item.get("tags", True), queue and item.get("queue", True),
-                             item.get("auto_merge"))
+                             item.get("auto_merge"), item.get("release_app"))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

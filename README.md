@@ -836,9 +836,11 @@ first commit: the managed and seeded files, docs, test vectors, a fuzz
 target, Gherkin scenarios, `deny.toml`, `supply-chain/`, `SECURITY.md`,
 `release.json` with its security checks (the quality audit among them), and
 a release key labelled "pubfoo release key", its secret in the gitignored
-`corpus/.publet`. It refuses a `pubrel` older than 0.5.3 or a `pub` older
-than 0.2.1, and prints the two steps it does not take itself: the lines
-that protect its main branch and add it to `protected.json` and `governed.json`.
+`corpus/.publet`. Its repository is `--owner`'s, by default the owner the
+`origin` remote names; without either it stops. It refuses a `pubrel` older
+than 0.5.3 or a `pub` older than 0.2.1, and prints the steps it does not take
+itself: the protect block to add to `pubkit.json`, and switching the repository
+on in the release app.
 
 ## Protecting main and the release tags
 
@@ -873,8 +875,10 @@ the default branch to match, renaming it. It does the same for the release
 tags' ruleset, [`src/pubkit/tag-ruleset.json`](src/pubkit/tag-ruleset.json):
 nobody may create, move or delete a `v*` tag, and only GitHub Actions may
 bypass it. GitHub refuses the GitHub Actions app as a bypass actor in an
-organization's repository, so a Sustenaut repository's tags let through the
-Sustenaut release GitHub App (app 5529889) instead: installed on the organization, with contents
+organization's repository, so such a repository names its release GitHub App
+with `"release_app": ID` in its entry, and its tags let that app through
+instead (without it, a repository of the one owner pubkit still knows gets that
+owner's app, with a warning): installed on the organization, with contents
 write only, and its id and private key as the organization secrets
 `RELEASE_APP_ID` and `RELEASE_APP_KEY`, which the CI `pubkit sync` writes
 passes to pubrel's release workflow (pubrel 0.6.1 and later), where `pubrel
@@ -901,13 +905,14 @@ The repositories come from one of:
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" schryer/newrepo`.
 - the repository's own `pubkit.json`, which says how it is protected:
-  `"protect": {"checks": ["ci / passed"], "tags": false, "queue": false}`
+  `"protect": {"checks": ["ci / passed"], "tags": false, "queue": false, "release_app": 12345}`
   (`tags` and `queue` default to true). A `REPO` the list does not name is read from the `pubkit.json`
   on its default branch, and `pubkit protect` with no list and no `REPO`,
   run inside a repository, reads `./pubkit.json` for the repository
   `origin` points at. The block takes only `checks`, distinct non-empty
-  names, and `tags`, `queue` and `auto_merge`, true or false; anything else, or a pubkit.json that is
-  not JSON, is refused before GitHub is asked.
+  names, `tags`, `queue` and `auto_merge`, true or false, and `release_app`, a positive integer;
+  anything else, or a pubkit.json that is not JSON, is refused before GitHub is asked, and `pubkit
+  sync --check` refuses it too.
 
 `auto_merge` is the repository's "Allow auto-merge" setting, which lets a
 pull request be set to merge by itself once the ruleset's required checks
@@ -1012,7 +1017,9 @@ whether it conforms to the latest standard, and its open exceptions
 
 1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
    `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
-   `pub-version`, and the pub* crates in `Cargo.lock`. A workflow pin moves
+   `pub-version`, each tool `ci.tools` pins by tag, to the latest release of
+   its git repository, and the crates `nightly.pins.crates` names in
+   `Cargo.lock`. A workflow pin moves
    to the commit of the new release's tag, with its version in a comment,
    and one still pinned by tag moves to its commit;
 2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
@@ -1051,6 +1058,7 @@ ecosystem's lock):
 {
   "kind": "utility",
   "update": { "rust": true, "node": true, "python": false },
+  "nightly": { "pins": { "crates": ["some-crate"] } },
   "security": {
     "fuzz": { "rust": true },
     "dependabot": { "schedule": "weekly", "ecosystems": ["github-actions"] },
@@ -1062,6 +1070,7 @@ ecosystem's lock):
 | Setting | Default | Off means |
 |---|---|---|
 | `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
+| `nightly.pins.crates` | three crates, with a warning | the crates the nightly moves with the pins, whatever `cargo vet` says, rather than one at a time; `[]` is none. `pubkit sync --check` refuses any other key in `nightly` or `nightly.pins` |
 | `security.fuzz.<language>` | `true` | a scheduled run fuzzes as briefly as any other: `rust-ci.yml` runs cargo-fuzz for `fuzz-seconds` instead of `fuzz-seconds-scheduled`, and `python-ci.yml` and `node-ci.yml` give each property test `fuzz-runs` inputs instead of `fuzz-runs-scheduled` (see [Property tests](#property-tests)) |
 | `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out |
 | `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input; `organization` is the SonarQube Cloud organization key, by default the GitHub owner in lower case |
@@ -1167,13 +1176,15 @@ Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/re
   "with": {"browser-test": "npm run test:browser", "coverage-report": "coverage/",
            "sonar-args": "-Dsonar.tests=test"},
   "jobs": {"review": false, "sonar": {"events": ["pr", "main"]}},
-  "release": {"pubrel": "0.5.4"}
+  "release": {"pubrel": "0.5.4"},
+  "tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]
 }
 ```
 
 - **`events`:** which workflows to write. `pr` writes `pr.yml` (pull requests), `queue` writes `queue.yml` (the merge queue's runs of them, `merge_group`), `main` writes `main.yml` (pushes to main), and `nightly` writes `nightly.yml` (`cron`, or by hand). The default is pr, queue and main, and all four for Rust. The queue runs every job a pull request runs, and the heavy ones besides (Rust's `msrv`, `fuzz` and `cross`), so each push to a pull request gets its answer sooner while nothing merges before the heavy jobs pass. Where the queue would run nothing a pull request does not (Node, Python and service repositories, by default), sync writes no `queue.yml` and `pr.yml` runs on `merge_group` too. A repository without a merge queue (a user's, or a private one) leaves `queue` out, so its pull requests run the heavy jobs themselves.
 - **`with`:** the jobs' inputs, the same ones `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
 - **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only, and Rust's `msrv`, `fuzz` and `cross`, which run everywhere but on pull requests. `browser` runs only when `with` gives a `browser-test`.
+- **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release. It replaces the `pub-version` input, which still works, warns at sync, and goes in a later release.
 - **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust or service repository's CI is its kind's.
 - **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
 

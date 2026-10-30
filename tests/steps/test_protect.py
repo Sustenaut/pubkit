@@ -404,6 +404,25 @@ def sent_tags(github, slug):
         "POST", f"repos/{slug}/rulesets", protect.tag_ruleset(slug))
 
 
+@then(parsers.parse("GitHub was sent a tag ruleset only app {app:d} may bypass"))
+def sent_app_tags(github, app):
+    (call,) = [c for c in _sent(github) if c["body"].get("target") == "tag"]
+    assert call["body"]["bypass_actors"] == [
+        {"actor_id": app, "actor_type": "Integration", "bypass_mode": "always"}]
+
+
+@then("it prints nothing about a release app")
+def no_app_note(result):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert "release_app" not in out, out
+
+
+@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", with the release app {app:d}'))
+def listed_with_app(repo, slug, checks, app):
+    (repo / "protected.json").write_text(json.dumps({"repositories": [
+        {"repo": slug, "checks": checks.split(", "), "release_app": app}]}))
+
+
 @then("GitHub was sent no tag ruleset")
 def sent_no_tags(github):
     assert [c for c in _sent(github) if c["body"].get("target") == "tag"] == []

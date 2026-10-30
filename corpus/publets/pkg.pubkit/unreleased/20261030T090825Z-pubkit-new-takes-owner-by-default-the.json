@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubkit new takes --owner, by default the owner the origin remote names, and without either it stops; a new package's Cargo.toml and SECURITY.md name that owner. It no longer prints lines to add to pubkit's own lists: it prints the protect block to add, and that the repository is then switched on in the release app"
+}

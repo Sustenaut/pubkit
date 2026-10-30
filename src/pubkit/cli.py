@@ -1,7 +1,7 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
     pubkit init --kind=rust|utility|service [--bin=NAME]
-    pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--description=TEXT]
+    pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--owner=OWNER] [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
     pubkit supply-chain [--check] CRATE...
@@ -171,6 +171,14 @@ def sync(root: Path, check: bool) -> int:
     if "site" in config:
         from .ci import site  # noqa: PLC0415
         site(config, root)
+    from .nightly import named_crates  # noqa: PLC0415
+    named_crates(config)
+    if "protect" in config:
+        from .protect import entry  # noqa: PLC0415
+        try:
+            entry("", config, CONFIG)
+        except ValueError as e:
+            sys.exit(f"pubkit: {e}")
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -394,6 +402,8 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("new", help="start a new Rust package that meets the standard")
     p.add_argument("--name", required=True, help="the package's name, which is also its binary's")
     p.add_argument("--tag", required=True, help="its Section 9.1 tag, PKG-XXXXXX-MM-YYYY")
+    p.add_argument("--owner", help="the GitHub owner of its repository; by default the owner "
+                                   "of the origin remote")
     p.add_argument("--description", default="", help="one sentence on what it is for")
     p.add_argument("--no-key", action="store_true",
                    help="do not create the corpus workspace and release key (for tests)")
@@ -521,8 +531,8 @@ def main(argv: list[str] | None = None) -> int:
         return init(root, args.kind, args.bin, args.project)
     if args.command == "new":
         from .new import run as new
-        return new(root, args.name, args.tag, args.description, key=not args.no_key,
-                   lock=not args.no_lock)
+        return new(root, args.name, args.tag, args.description, owner=args.owner,
+                   key=not args.no_key, lock=not args.no_lock)
     if args.command == "sync":
         return sync(root, args.check)
     if args.command == "supply-chain":
