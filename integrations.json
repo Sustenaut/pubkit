@@ -1,0 +1,192 @@
+{
+  "uses": [
+    {
+      "plugin": "anthropic.api",
+      "paths": [
+        "src/pubkit/audit_draft.py"
+      ]
+    },
+    {
+      "plugin": "bitwarden.secrets",
+      "paths": [
+        "src/pubkit/templates/service/with-secrets"
+      ]
+    },
+    {
+      "plugin": "cloudflare.dns",
+      "paths": [
+        "actions/deploy-static/action.yml"
+      ]
+    },
+    {
+      "plugin": "cloudflare.pages",
+      "paths": [
+        "actions/deploy-static/",
+        "src/pubkit/hosting.py",
+        "terraform/testdata/pubkit.json"
+      ]
+    },
+    {
+      "plugin": "crates-io.publish",
+      "paths": [
+        "plugins/rust-crate-quality/.claude-plugin/plugin.json",
+        "src/pubkit/audit_prepare.py",
+        "src/pubkit/nightly.py",
+        "src/pubkit/standard.json"
+      ]
+    },
+    {
+      "plugin": "desec.dns",
+      "paths": [
+        "src/pubkit/hosting.py",
+        "terraform/dns-zone/variables.tf",
+        "terraform/testdata/pubkit.json"
+      ]
+    },
+    {
+      "plugin": "github.app-token",
+      "paths": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/nightly.yml",
+        "src/pubkit/app_secrets.py",
+        "src/pubkit/ci.py"
+      ]
+    },
+    {
+      "plugin": "github.board-read",
+      "paths": [
+        "src/pubkit/board/"
+      ]
+    },
+    {
+      "plugin": "github.repo-ops",
+      "paths": [
+        ".github/nightly/update.sh",
+        ".github/workflows/ci.yml",
+        ".github/workflows/job-tested.yml",
+        ".github/workflows/nightly.yml",
+        "Makefile",
+        "actions/pr-label/",
+        "src/pubkit/app_secrets.py",
+        "src/pubkit/nightly.py",
+        "src/pubkit/protect.py"
+      ]
+    },
+    {
+      "plugin": "google.cloud",
+      "paths": [
+        "terraform/cloud-run-sites/"
+      ]
+    },
+    {
+      "plugin": "mailbox.smtp",
+      "paths": [
+        "src/pubkit/dns.py",
+        "src/pubkit/hosting.py",
+        "terraform/hosting/variables.tf",
+        "terraform/testdata/pubkit.json"
+      ]
+    },
+    {
+      "plugin": "openssf.scorecard",
+      "paths": [
+        "src/pubkit/board/connectors/scorecard.py"
+      ]
+    },
+    {
+      "plugin": "osv.audit",
+      "paths": [
+        ".github/workflows/job-osv.yml",
+        ".github/workflows/node-ci.yml",
+        ".github/workflows/python-ci.yml",
+        ".github/workflows/rust-ci.yml"
+      ]
+    },
+    {
+      "plugin": "pypi.publish",
+      "paths": [
+        "src/pubkit/cli.py"
+      ]
+    },
+    {
+      "plugin": "slack.post",
+      "paths": [
+        ".github/nightly/update.sh",
+        ".github/workflows/nightly.yml"
+      ]
+    },
+    {
+      "plugin": "sonarcloud.read",
+      "paths": [
+        "src/pubkit/board/"
+      ]
+    },
+    {
+      "plugin": "sonarcloud.scan",
+      "paths": [
+        ".github/workflows/**",
+        "src/pubkit/ci.py"
+      ]
+    },
+    {
+      "plugin": "tailscale.tailnet",
+      "paths": [
+        "actions/deploy-ssh/"
+      ]
+    }
+  ],
+  "terraform": [
+    {
+      "dir": "terraform/cloud-run-sites",
+      "plugins": [
+        "terraform.google"
+      ],
+      "runs": []
+    },
+    {
+      "dir": "terraform/desec-zones",
+      "plugins": [
+        "terraform.desec"
+      ],
+      "runs": []
+    },
+    {
+      "dir": "terraform/dns-zone",
+      "plugins": [
+        "terraform.cloudflare",
+        "terraform.hetzner"
+      ],
+      "runs": []
+    },
+    {
+      "dir": "terraform/hosting",
+      "plugins": [
+        "terraform.cloudflare",
+        "terraform.hetzner"
+      ],
+      "runs": []
+    }
+  ],
+  "other_hosts": [
+    {
+      "host": "rustup.rs",
+      "reason": "A link in an install hint"
+    }
+  ],
+  "other_secrets": [
+    {
+      "name": "PUBKIT_BUMP_TOKEN",
+      "reason": "The nightly's fallback GitHub token, for when no app is set up; it reaches only GitHub"
+    }
+  ],
+  "exclude": [
+    {
+      "path": "tests/**",
+      "reason": "Fakes of these services, which move into the plugins in phase 4"
+    },
+    {
+      "path": "corpus/**",
+      "reason": "Release records, not code"
+    }
+  ]
+}
