@@ -43,7 +43,9 @@ fingerprint made them, and otherwise runs COMMAND, which must write every
 used since the last save, so `path` holds one build's worth.
 
 `pubkit cache plan` gives the key for each entry, and `actions/cache`
-restores and saves them. Only Python's standard library is used, so the
+restores and saves them. `plan --refresh` restores no entry at all, fetched
+or made, so the run fetches and makes everything anew (`actions/pr-label`
+tells a workflow when the pull request it runs for asks for that). Only Python's standard library is used, so the
 action runs this module from its own copy of pubkit without installing
 anything.
 """
@@ -265,6 +267,7 @@ def main(argv: list[str] | None = None, root: Path | None = None) -> int:
     p = commands.add_parser("plan", help="each entry's path and actions/cache key")
     p.add_argument("--github-output", action="store_true", help="also append them to $GITHUB_OUTPUT")
     p.add_argument("--fresh", action="store_true", help="restore no fetched entry")
+    p.add_argument("--refresh", action="store_true", help="restore no entry, fetched or made")
     p = commands.add_parser("run", help="reuse a unit's outputs, or make and keep them: "
                                         "run NAME [--unit VALUE] --output FILE... -- COMMAND")
     p.add_argument("name")
@@ -287,12 +290,13 @@ def main(argv: list[str] | None = None, root: Path | None = None) -> int:
             for s in slots:
                 print(f"{s['name']}: path={s['path']} key={s['key']}"
                       + (f" restore-prefix={s['prefix']}" if s["prefix"] else "")
-                      + (" (fresh: not restored)" if args.fresh and s["fetched"] else ""))
+                      + (" (refresh: not restored)" if args.refresh
+                         else " (fresh: not restored)" if args.fresh and s["fetched"] else ""))
             if args.github_output:
                 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as gh:
                     for i in range(1, SLOTS + 1):
                         s = slots[i - 1] if i <= len(slots) else None
-                        restore = bool(s) and not (args.fresh and s["fetched"])
+                        restore = bool(s) and not args.refresh and not (args.fresh and s["fetched"])
                         gh.write(f"path-{i}={s['path'] if s else ''}\n")
                         gh.write(f"key-{i}={s['key'] if s else ''}\n")
                         gh.write(f"prefix-{i}={s['prefix'] if s else ''}\n")

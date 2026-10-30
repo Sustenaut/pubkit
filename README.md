@@ -340,7 +340,23 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   by the entries of pubkit.json's `cache` block (see "Caching a build"
   below). Call it with `step: restore` before the build and `step: save`
   after it, which also drops what no run used; `fresh: true` restores no
-  fetched entry.
+  fetched entry, and `refresh: true` restores no entry at all.
+- **`actions/pr-label`:** says whether the pull request a run is for
+  carries a label, `refresh cache` by default (`label` names another),
+  as its output `present`. The pull request is the event's own, the one a
+  merge queue group is for, or, on a push, the ones merged into the pushed
+  commit, which needs `pull-requests: read`. One label a person puts on a
+  pull request can so steer what its deploy does once it merges, such as
+  rebuilding everything:
+
+  ```yaml
+  permissions: { contents: read, pull-requests: read }
+  steps:
+    - id: refresh
+      uses: Sustenaut/pubkit/actions/pr-label@<commit> # vX.Y.Z
+    - uses: Sustenaut/pubkit/actions/cache@<commit> # vX.Y.Z
+      with: { step: restore, refresh: "${{ steps.refresh.outputs.present }}" }
+  ```
 - **`actions/deploy-static`:** deploys a directory to a server over rsync
   (`deploy-key`, `deploy-target`, and `known-hosts`, the server's pinned
   host key; without it the key is scanned on every run), to Cloudflare
@@ -511,7 +527,10 @@ holds at most eight entries.
 
 In a workflow, `actions/cache` restores before the build and saves after
 it. Saving first drops what no run used, so a made entry keeps one
-build's worth (`pubkit cache prune` does the same by hand).
+build's worth (`pubkit cache prune` does the same by hand). With
+`refresh: true` (`pubkit cache plan --refresh`) the restore step restores
+nothing, so the build fetches and makes everything anew; `actions/pr-label`
+sets it from a `refresh cache` label on the pull request.
 
 ```yaml
 - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z

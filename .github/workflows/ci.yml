@@ -149,8 +149,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - run: shellcheck actions/cache/*.sh
+      - run: shellcheck actions/cache/*.sh actions/pr-label/*.sh
       - run: actions/cache/test.sh
+      - run: actions/pr-label/test.sh
 
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a

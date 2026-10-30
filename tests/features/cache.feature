@@ -86,6 +86,13 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's en
     When I run pubkit "cache" "plan"
     Then the key of "data" is not as noted
 
+  Scenario: A refresh run restores no entry, fetched or made
+    Given the cache entry "data" keeps "data" with refresh "week"
+    When I run pubkit "cache" "plan" "--refresh"
+    Then it prints "data: path=data key=pubkit-cache-data-"
+    And it prints "(refresh: not restored)"
+    And it prints "packs: path=.packcache key=pubkit-cache-packs-"
+
   Scenario: An entry with an unknown setting fails pubkit sync, naming it
     Given the cache entry "packs" has the setting "dir"
     When I run pubkit "sync" "--check"

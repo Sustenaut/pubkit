@@ -13,6 +13,9 @@ args=(plan --github-output)
 if [[ "${STEP}" == restore && "${FRESH:-false}" == true ]]; then
   args+=(--fresh)
 fi
+if [[ "${STEP}" == restore && "${REFRESH:-false}" == true ]]; then
+  args+=(--refresh)
+fi
 src="$(cd "$(dirname "$0")/../../src" && pwd)"
 # -P keeps the workspace off the import path, so only this pubkit is run.
 PYTHONPATH="$src" python3 -P -m pubkit.cache "${args[@]}"
