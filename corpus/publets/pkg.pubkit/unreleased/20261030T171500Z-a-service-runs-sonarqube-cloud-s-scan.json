@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "Public code integrates with SonarQube Cloud whatever its kind: a service's CI, from pubkit sync and service-ci.yml, runs the sonar job too, with the coverage its tests write to coverage-report. A private service drops it with \"jobs\": {\"sonar\": false}."
+}

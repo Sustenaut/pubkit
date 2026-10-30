@@ -189,12 +189,18 @@ JOBS: dict[str, dict[str, Job]] = {
                                        "sonar.python.coverage.reportPaths=*.xml"},
                      internal=SONAR_INTERNAL),
     },
-    # A service deploys rather than releases, and is private: no release,
-    # and no scan or dependency review, which need a public repository.
+    # A service deploys rather than releases: no release. Public code is
+    # scanned, a service's too; a private service, which SonarQube Cloud
+    # does not analyse for free, drops the scan with "jobs": {"sonar": false}.
     "service": {
         "checks": Job("job-service-checks.yml", ("python-version", "shellcheck", "sync-check")),
         "terraform": Job("job-service-terraform.yml", ("terraform-dir",), when="terraform-dir"),
-        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test"), when="test"),
+        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test", "coverage-report"),
+                     when="test"),
+        "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("tests",), secrets=True,
+                     fixed={"reports": "sonar.python.coverage.reportPaths=*.xml "
+                                       "sonar.javascript.lcov.reportPaths=lcov.info"},
+                     internal=SONAR_INTERNAL),
     },
 }
 # The languages a utility can be; a rust or service repository is its kind.
