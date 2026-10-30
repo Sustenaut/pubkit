@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "The nightly can be called as a reusable workflow, with the neutral secrets app-id, app-key, notify-token and notify-user."
-}

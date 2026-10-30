@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.22.0 is released as v0.22.0 from commit 63cbf733a0d80d6f79d649cdb003059626f0d699.",
+      "content": "pubkit 0.23.0 is released as v0.23.0 from commit 9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.22.0",
+            "0.23.0",
             "pubkit --version",
-            "pubkit 0.22.0",
-            "v0.22.0",
-            "63cbf733a0d80d6f79d649cdb003059626f0d699"
+            "pubkit 0.23.0",
+            "v0.23.0",
+            "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
           ]
         ]
       },
-      "scope": "the published release v0.22.0 of pubkit",
+      "scope": "the published release v0.23.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "63cbf733a0d80d6f79d649cdb003059626f0d699"
+          "revision": "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.22.0 was released on 2026-10-30 from commit 63cbf733a0d80d6f79d649cdb003059626f0d699 with these changes.",
+      "content": "pubkit 0.23.0 was released on 2026-10-30 from commit 9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf with these changes.",
       "data": {
         "columns": [
           {
@@ -58,46 +58,38 @@
         "rows": [
           [
             "added",
-            "pubkit protect manages a repository's \"Allow auto-merge\" setting: \"auto_merge\": true in its pubkit.json protect block or its protected.json entry turns it on (false turns it off, and without it the setting is left alone), so a pull request can be set to merge by itself once the ruleset's checks pass; --check reports a setting that differs. schryer/visit-ee's entry turns it on"
+            "protected.json, governed.json, --config, --governed and the nightly's own schedule warn that they go in a later release."
+          ],
+          [
+            "added",
+            "pubkit board, protect and freshness take --repos FILE, a list of repositories with their roles from outside pubkit, and the reusable board.yml and nightly.yml take it as a repos input."
+          ],
+          [
+            "added",
+            "pubkit state --check checks a state repository's state.json: its shape, that each repository exists under the owner, and that each one to protect has a protect block."
+          ],
+          [
+            "fixed",
+            "The board judged a repository's tag ruleset by the default release app, not the release_app its protect block names."
           ],
           [
             "changed",
-            "A service's CI tests job keeps pip's and uv's download caches between runs, keyed on the repository's lock files, so its setup installs from the runner instead of PyPI"
+            "The board's lists connector is now repos, in board.json's calls, and the notch for an ungoverned repository says \"Not governed\"."
           ],
           [
             "added",
-            "actions/docker-build builds a Docker image with buildx and a GitHub Actions layer cache, one scope per image, and loads it into the runner's Docker"
-          ],
-          [
-            "added",
-            "A pubkit.json protect block or protected.json entry takes \"release_app\": a GitHub App id, a positive integer, which its release tag ruleset lets through; a repository of the one owner pubkit still knows gets that owner's app when it names none, with a warning. pubkit sync --check now refuses an unsound protect block too"
-          ],
-          [
-            "added",
-            "ci.tools in pubkit.json lists what a Rust repository's functional suite drives, each a crate, a git repository and a tag: sync writes it into the functional job, which installs each with cargo install --locked, and the nightly moves each tag to the latest release of its repository. The pub-version input still works, warns at sync, and goes in a later release. pubkit now installs pub from Sustenaut/publet, where it moved"
-          ],
-          [
-            "added",
-            "pubkit.json takes \"nightly\": {\"pins\": {\"crates\": [...]}}: the crates the nightly moves with the pins rather than one at a time. pubkit sync --check refuses any other key there, naming it. A repository that names none keeps the old three crates, and `pubkit pins` warns when that moved any of them"
-          ],
-          [
-            "changed",
-            "pubkit new takes --owner, by default the owner the origin remote names, and without either it stops; a new package's Cargo.toml and SECURITY.md name that owner. It no longer prints lines to add to pubkit's own lists: it prints the protect block to add, and that the repository is then switched on in the release app"
-          ],
-          [
-            "internal",
-            "Neutral examples replace the names of consumers in the docs, docstrings, error text and test fixtures, and a test fails if what pubkit ships names any repository but its own and its tools'"
+            "The nightly can be called as a reusable workflow, with the neutral secrets app-id, app-key, notify-token and notify-user."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.22.0 of pubkit",
+      "scope": "the published release v0.23.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "63cbf733a0d80d6f79d649cdb003059626f0d699"
+          "revision": "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
         }
       ]
     }
