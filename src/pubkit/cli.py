@@ -181,10 +181,10 @@ def sync(root: Path, check: bool) -> int:
             entry("", config, CONFIG)
         except ValueError as e:
             sys.exit(f"pubkit: {e}")
-    if "github_app" in config:
-        from .app_secrets import problems  # noqa: PLC0415
-        if bad := problems(config["github_app"]):
-            sys.exit(f"pubkit: {CONFIG}'s github_app block: {'; '.join(bad)}")
+    if "github_app" in config or "secrets" in config:
+        from .app_secrets import config_problems  # noqa: PLC0415
+        if bad := config_problems(config):
+            sys.exit(f"pubkit: {CONFIG}: {'; '.join(bad)}")
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -515,9 +515,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--check", action="store_true", required=True,
                    help="check its shape, that each repository exists, and each protected one's block")
     p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
-    p = commands.add_parser("app-secrets", help="send the GitHub App this repository's github_app "
-                                                "block names to it, through ./with-secrets")
-    p.add_argument("--check", action="store_true", help="check the three values, and send nothing")
+    p = commands.add_parser("app-secrets", help="send the secrets this repository's pubkit.json "
+                                                "names to it, through ./with-secrets")
+    p.add_argument("--check", action="store_true", help="check the values, and send nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "

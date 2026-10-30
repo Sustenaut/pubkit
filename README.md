@@ -103,20 +103,26 @@ is given, and the repository's own tests when `test` is. No job has
 secrets. Its `passed` job is the one check a ruleset would require; private
 repositories on GitHub Free have no rulesets, so there it is a summary.
 
-### Sending a GitHub App's values to a repository
+### Sending secrets to a repository
 
-A repository that uses a GitHub App names its three values in its `pubkit.json`:
+A repository names the values it needs in its `pubkit.json`. A GitHub App has
+three, in `github_app`, which may also be a list of apps. `secrets` lists any
+others, each with a `kind` of `secret` or `variable`:
 
 ```json
 "github_app": {
   "id":              { "from": "some-app-id", "to": "SOME_APP_ID" },
   "installation_id": { "from": "some-app-installation-id", "to": "SOME_APP_INSTALLATION_ID" },
   "key":             { "from": "some-app-key", "to": "SOME_APP_KEY" }
-}
+},
+"secrets": [
+  { "from": "some-token", "to": "SOME_TOKEN", "kind": "secret" },
+  { "from": "some-user", "to": "SOME_USER", "kind": "variable" }
+]
 ```
 
 `from` is the secret's name in the Bitwarden project `./with-secrets` reads, and
-`to` its name on GitHub. The id and the installation id go as variables and the
+`to` its name on GitHub. An app's id and installation id go as variables and its
 key as a secret, on the repository `origin` points at and no other:
 
 ```sh
@@ -124,11 +130,11 @@ key as a secret, on the repository `origin` points at and no other:
 ./with-secrets ./pubkit app-secrets
 ```
 
-It writes nothing until all three are there and look right (digits for the ids,
-BEGIN and END lines for the key). It prints names and lengths, never a value,
+It writes nothing until every one is there and looks right (digits for an app's
+ids, BEGIN and END lines for its key, and not empty for the others). It prints names and lengths, never a value,
 and each value reaches `gh` on its standard input. An app installed on several
 owners has a different installation id on each, so each repository names its own
-owner's. `pubkit sync --check` checks the block.
+owner's. `pubkit sync --check` checks both.
 
 ## Hosting modules
 
