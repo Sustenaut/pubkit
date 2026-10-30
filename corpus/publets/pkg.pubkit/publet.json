@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.23.0 is released as v0.23.0 from commit 9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf.",
+      "content": "pubkit 0.23.1 is released as v0.23.1 from commit 5dd7f8852f9335ada2998e230a6ac8b41a9f2e23.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.23.0",
+            "0.23.1",
             "pubkit --version",
-            "pubkit 0.23.0",
-            "v0.23.0",
-            "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
+            "pubkit 0.23.1",
+            "v0.23.1",
+            "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
           ]
         ]
       },
-      "scope": "the published release v0.23.0 of pubkit",
+      "scope": "the published release v0.23.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
+          "revision": "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.23.0 was released on 2026-10-30 from commit 9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf with these changes.",
+      "content": "pubkit 0.23.1 was released on 2026-10-30 from commit 5dd7f8852f9335ada2998e230a6ac8b41a9f2e23 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,38 +58,18 @@
         "rows": [
           [
             "added",
-            "protected.json, governed.json, --config, --governed and the nightly's own schedule warn that they go in a later release."
-          ],
-          [
-            "added",
-            "pubkit board, protect and freshness take --repos FILE, a list of repositories with their roles from outside pubkit, and the reusable board.yml and nightly.yml take it as a repos input."
-          ],
-          [
-            "added",
-            "pubkit state --check checks a state repository's state.json: its shape, that each repository exists under the owner, and that each one to protect has a protect block."
-          ],
-          [
-            "fixed",
-            "The board judged a repository's tag ruleset by the default release app, not the release_app its protect block names."
-          ],
-          [
-            "changed",
-            "The board's lists connector is now repos, in board.json's calls, and the notch for an ungoverned repository says \"Not governed\"."
-          ],
-          [
-            "added",
-            "The nightly can be called as a reusable workflow, with the neutral secrets app-id, app-key, notify-token and notify-user."
+            "pubkit app-secrets sends one GitHub App's id, installation id and key, named by the repository's own github_app block in pubkit.json, to that repository, through ./with-secrets, and checks all three before writing any. pubkit sync --check checks the block."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.23.0 of pubkit",
+      "scope": "the published release v0.23.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "9fcc7cfdf389b34185bfbe4a5184f0acbaf34faf"
+          "revision": "5dd7f8852f9335ada2998e230a6ac8b41a9f2e23"
         }
       ]
     }
