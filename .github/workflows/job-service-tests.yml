@@ -1,5 +1,6 @@
 # A service's tests, without secrets: tests that need one are the
-# repository's to skip.
+# repository's to skip. The coverage report the test command writes, if
+# any, goes to the sonar job as the `coverage` artifact.
 #
 # One job of the CI `pubkit sync` writes from the ci block of pubkit.json
 # (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
@@ -12,6 +13,7 @@ on:
       python-version: { type: string, default: '3.14' }
       setup: { type: string, default: '', description: 'Prepares the tests, for example make venv. Empty skips it.' }
       test: { type: string, required: true, description: Runs the tests. }
+      coverage-report: { type: string, default: coverage/, description: "The coverage the test command writes, if any (Cobertura XML or LCOV lcov.info), which the sonar job reads." }
 
 jobs:
   tests:
@@ -34,3 +36,10 @@ jobs:
       - if: inputs.setup != ''
         run: ${{ inputs.setup }}
       - run: ${{ inputs.test }}
+      # The sonar job runs elsewhere, so the report goes to it as an artifact.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: ${{ inputs.coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1

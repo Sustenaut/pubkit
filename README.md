@@ -40,7 +40,7 @@ A repository is one of three kinds, named in `pubkit.json`:
 |---|---|
 | `rust` | A released Rust package, held to the Rust crate standard (below) |
 | `utility` | A released tool or library in any language, or several, without the Rust package's extra checks |
-| `service` | A private repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
+| `service` | A repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
 
 The kind `python` (before 0.10.0) and `python-utility` (0.10.0) are now
 `utility`: a package's language doesn't decide its kind. `sync` says so
@@ -99,8 +99,8 @@ Every other secret goes under its name in upper case, `-` as `_`.
 
 `service-ci.yml` is a service's CI: `pubkit sync --check` and shellcheck,
 `terraform fmt`, `init -backend=false` and `validate` when `terraform-dir`
-is given, and the repository's own tests when `test` is. No job has
-secrets. Its `passed` job is the one check a ruleset would require; private
+is given, the repository's own tests when `test` is, and SonarQube Cloud's
+scan (below). No job but the scan has secrets. Its `passed` job is the one check a ruleset would require; private
 repositories on GitHub Free have no rulesets, so there it is a summary.
 
 ### Sending secrets to a repository
@@ -1271,7 +1271,7 @@ Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/re
 
 A Rust repository runs the jobs the Rust crate standard asks for here, worked out at sync time from the rules and `pubkit.json`'s exceptions: `gates`, `test`, `functional`, `msrv`, `fuzz`, `cross` and `audit` as required, beside `osv`, `review` and `sonar`, and `toolchains` (the latest stable and beta Rust) on the nightly. Sync writes each job's required make targets into the workflow (`required`), so an exception added or expired shows as a change there, and `make sync-check` in `gates` fails until `pubkit sync` writes it. An empty `cross-targets` (`"[]"`) drops `cross`. `msrv`, `fuzz` and `cross` run in the merge queue rather than on each push to a pull request (unless `events` leaves out `queue`). On a pull request that touches no Rust code, Cargo files, `fuzz/` or workflow files, `fuzz` and `cross` pass at once with a notice (from `pubkit required`, which says `slow=false`) rather than being skipped; release pull requests, pushes and the nightly run them in full.
 
-A service runs `checks` (the sync check and shellcheck), and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`.
+A service runs `checks` (the sync check and shellcheck) and `sonar`, and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`. Its tests hand `sonar` the coverage they write to `coverage-report` (by default `coverage/`, Cobertura XML or LCOV `lcov.info`). A private service drops the scan with `"jobs": {"sonar": false}`.
 
 A repository that deploys a static site with pubkit's `deploy-static` also gets a `site` job in `pr.yml` (`ci / site`, part of `ci / passed`), so a site that would fail to deploy fails the pull request instead of the deploy after merge. It checks the repository out, builds the site, and runs `deploy-static` at the pubkit the lock pins with `check-only: 'true'`, which runs `pubkit site check` and deploys nothing, so it needs no secret. The job comes when any workflow of the repository's own uses `deploy-static`, or pubkit.json has a `site` block:
 
@@ -1290,7 +1290,7 @@ The checks keep the names a ruleset requires: each job is named `ci`, so its che
 
 ### SonarQube Cloud
 
-`rust-ci.yml`, `python-ci.yml` and `node-ci.yml` each run a `sonar` job, part of `passed`. Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubkit's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+Public code integrates with SonarQube Cloud, whatever its kind: `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` and `service-ci.yml` each run a `sonar` job, part of `passed`, and so does the CI `pubkit sync` writes for every kind. Only a private repository, which SonarQube Cloud does not analyse for free, leaves it out (`"jobs": {"sonar": false}`). Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubkit's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
 
 1. In SonarQube Cloud, analyse the repository as a new project in the organization whose key is its GitHub owner in lower case (or the one `security.sonar.organization` names), keeping the key `OWNER_REPO`.
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.
@@ -1304,6 +1304,7 @@ The default quality gate asks for 80% coverage on new code, and a scan without a
 | `rust-ci.yml` | `coverage/*.xml` (Cobertura) | any of the `functional` targets, for a repository's Python, such as coverage.py's `coverage xml -o coverage/scripts.xml` (run it after `make coverage`, which empties `coverage/`) |
 | `python-ci.yml` | `coverage-report`, by default `coverage/coverage.xml` (Cobertura) | the `test` command, such as coverage.py with `patch = ["subprocess"]`, which also measures the programs the suite starts (pubkit's own `make functional` does this) |
 | `node-ci.yml` | `coverage-report`, by default `coverage/lcov.info` | the `test` command, such as `node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info` |
+| `service-ci.yml` | `coverage-report`, by default `coverage/`: Cobertura `*.xml` or LCOV `lcov.info` | the `test` command, as for Python or Node |
 
 A test command that writes no report leaves the scan as it was.
 

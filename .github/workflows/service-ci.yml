@@ -1,12 +1,15 @@
-# Reusable CI for a service: a private repository that deploys rather than
+# Reusable CI for a service: a repository that deploys rather than
 # releases, and runs its secret-needing commands through ./with-secrets.
 #
 #   ci:
 #     uses: Sustenaut/pubkit/.github/workflows/service-ci.yml@vX.Y.Z
 #     with: { setup: make venv, test: .venv/bin/python -m pytest -q }
+#     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
-# Every job runs without secrets: tests that need one are the repository's
-# to skip. Terraform is checked without a backend (fmt, init, validate), so
+# Every job but sonar runs without secrets: tests that need one are the
+# repository's to skip. Public code is scanned by SonarQube Cloud, given a
+# SONAR_TOKEN; without one, as in a private repository, sonar passes with a
+# warning. Terraform is checked without a backend (fmt, init, validate), so
 # no state or credentials are touched.
 name: service-ci
 
@@ -19,6 +22,10 @@ on:
       terraform-dir: { type: string, default: '', description: 'Where the Terraform files are. Empty skips the Terraform checks.' }
       shellcheck: { type: string, default: with-secrets, description: 'Shell scripts to check: space-separated globs.' }
       sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+      coverage-report: { type: string, default: coverage/, description: "The coverage the test command writes, if any (Cobertura XML or LCOV lcov.info), which the sonar job reads." }
+      sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
+    secrets:
+      SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
 
 jobs:
   checks:
@@ -75,6 +82,65 @@ jobs:
       - if: inputs.setup != ''
         run: ${{ inputs.setup }}
       - run: ${{ inputs.test }}
+      # The sonar job runs elsewhere, so the report goes to it as an artifact.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: ${{ inputs.coverage-report }}
+          if-no-files-found: ignore
+          retention-days: 1
+
+  sonar:
+    needs: [tests]
+    # It waits for the tests, so their coverage counts; when no test was
+    # asked for, that job is skipped.
+    if: always() && contains(fromJSON('["success", "skipped"]'), needs.tests.result)
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - if: env.SONAR_TOKEN == ''
+        # A pull request from a fork gets no secrets, by design: a notice.
+        # Anything else got none because the caller passed none: a warning
+        # naming the usual cause, since the job still passes.
+        run: |
+          if [ "$FORK" = true ]; then
+            echo "::notice::No SONAR_TOKEN was passed, so SonarQube Cloud did not analyse this commit."
+          else
+            echo "::warning::No SONAR_TOKEN reached the sonar job, so SonarQube Cloud did not analyse this commit. Either the repository (or its organization) has no SONAR_TOKEN secret, or the caller passes it with secrets: inherit to a workflow of another owner, which GitHub drops; pass SONAR_TOKEN by name under the job's secrets."
+          fi
+        env: { FORK: '${{ github.event.pull_request.head.repo.fork || false }}' }
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { fetch-depth: 0 }
+      - if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        continue-on-error: true
+        with:
+          pattern: coverage*
+          path: coverage-download
+      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      - if: env.SONAR_TOKEN != ''
+        id: settings
+        # The organization: security.sonar.organization, or the owner in
+        # lower case, since SonarQube Cloud's organization keys are.
+        run: |
+          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null || true)
+          echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
+        env: { OWNER: '${{ github.repository_owner }}' }
+      - if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        with:
+          args: >-
+            -Dsonar.organization=${{ steps.settings.outputs.organization }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+            -Dsonar.python.coverage.reportPaths=coverage-download/**/*.xml
+            -Dsonar.javascript.lcov.reportPaths=coverage-download/**/lcov.info
+            ${{ inputs.sonar-args }}
+            ${{ steps.settings.outputs.args }}
 
   # The one check a ruleset would require. Private repositories on GitHub
   # Free have no rulesets, so there it is a summary to read, not a gate.
@@ -82,7 +148,7 @@ jobs:
   # when not asked for.
   passed:
     if: always()
-    needs: [checks, terraform, tests]
+    needs: [checks, terraform, tests, sonar]
     runs-on: ubuntu-latest
     steps:
       - run: |

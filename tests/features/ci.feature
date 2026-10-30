@@ -197,18 +197,24 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And "pr.yml" calls the repository's own release workflow
     And "main.yml" calls the repository's own release workflow
 
-  Scenario: A service runs its checks, and Terraform and tests when it names them
+  Scenario: A service runs its checks and its scan, and Terraform and tests when it names them
     Given a service repository whose ci block is '{"with": {"terraform-dir": ".", "test": "make test"}}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "checks, terraform, tests, passed"
+    And "pr.yml" runs the jobs "checks, terraform, tests, sonar, passed"
     And "pr.yml" has no release
     And in "pr.yml" the "terraform" job is given "terraform-dir" "."
 
-  Scenario: A service without Terraform or tests runs only its checks
+  Scenario: A service without Terraform or tests runs only its checks and its scan
     Given a service repository whose ci block is '{}'
     When I run pubkit "sync"
-    Then "main.yml" runs the jobs "tested, checks, passed"
+    Then "main.yml" runs the jobs "tested, checks, sonar, passed"
+
+  Scenario: A private service drops the scan
+    Given a service repository whose ci block is '{"jobs": {"sonar": false}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And "pr.yml" runs the jobs "checks, passed"
 
   Scenario: The jobs block narrows a job's events or drops it
     Given a Node repository whose ci block is '{"jobs": {"review": false, "sonar": {"events": ["main"]}}}'
