@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.20.0 is released as v0.20.0 from commit 711c44e4e7d63d717af6c4f8f6fd35018a308689.",
+      "content": "pubkit 0.21.0 is released as v0.21.0 from commit ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.20.0",
+            "0.21.0",
             "pubkit --version",
-            "pubkit 0.20.0",
-            "v0.20.0",
-            "711c44e4e7d63d717af6c4f8f6fd35018a308689"
+            "pubkit 0.21.0",
+            "v0.21.0",
+            "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
           ]
         ]
       },
-      "scope": "the published release v0.20.0 of pubkit",
+      "scope": "the published release v0.21.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "711c44e4e7d63d717af6c4f8f6fd35018a308689"
+          "revision": "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.20.0 was released on 2026-10-29 from commit 711c44e4e7d63d717af6c4f8f6fd35018a308689 with these changes.",
+      "content": "pubkit 0.21.0 was released on 2026-10-30 from commit ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,39 +58,27 @@
         "rows": [
           [
             "changed",
-            "The main.yml pubkit sync writes skips the tests the merge queue already passed: a first job, tested (job-tested.yml), looks for a successful merge_group run of pr.yml on the pushed commit, which merging moves main to. Found, every job that only tests is skipped and sonar reads the queue run's coverage (job-sonar.yml's new coverage-run input), so main runs only the scan and the release; not found, as in a repository without the queue, every job runs as before. passed counts a job skipped for the queue's run, and the release runs whenever passed succeeds"
-          ],
-          [
-            "internal",
-            "pubkit's own CI skips, on a push to main, the jobs the merge queue already passed on the commit (functional, audit, osv, terraform, deploy-static, cache-action), and runs the scan on the queue run's coverage, then the release and the wheel"
-          ],
-          [
-            "fixed",
-            "A Sustenaut repository's release-tag ruleset lets through the Sustenaut release GitHub App (app 5529889) instead of GitHub Actions, which GitHub refuses as a bypass actor in an organization's repository (\"Actor GitHub Actions integration must be part of the ruleset source or owner organization\"), so pubkit protect can put the tag ruleset on the organization's repositories again; other owners' keep GitHub Actions. pubkit protect --check and the board compare against the same"
+            "A Rust repository's pull requests no longer run msrv, fuzz and cross on every push: pubkit sync writes queue.yml, which the merge queue runs (merge_group) with every pull request job and those three besides, so nothing merges before they pass, and pr.yml runs on pull_request alone. The ci block's events gain queue, on by default; where the queue would run nothing a pull request does not (Node, Python and service repositories by default) there is no queue.yml and pr.yml runs on merge_group as before, and a repository without a merge queue leaves queue out so its pull requests run the heavy jobs. main.yml's tested asks for the queue's workflow by name and skips only the jobs the queue ran; queue.yml carries the release and site checks too"
           ],
           [
             "changed",
-            "The release job pubkit sync writes passes pubrel's release workflow the release app's RELEASE_APP_ID and RELEASE_APP_KEY secrets, by name, when the ci block's pubrel is 0.6.1 or later (the first to take them, and to tag with the app's token), and always to a repository's own release workflow (\"release\": {\"uses\": \"local\"})"
-          ],
-          [
-            "fixed",
-            "pubkit protect no longer fails on a private repository with \"Invalid rule 'merge_queue'\" (HTTP 422): GitHub offers a merge queue only to an organization's public repositories and Enterprise Cloud's private ones, so protect reads each repository's owner and visibility, and a private one's organization plan, and gives main's ruleset without the queue (strict up-to-date checks instead) where there is none, saying so; should GitHub still refuse the merge_queue rule, it warns and tries once more without it"
+            "New packages' CI, and pubkit's own, call pubrel 0.6.1's release workflow, pinned by its tag's commit, and so pass it the release app's RELEASE_APP_ID and RELEASE_APP_KEY, which pubrel 0.6.1 is the first to take: pubrel tag then tags with the app the Sustenaut tag ruleset lets through"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.20.0 of pubkit",
+      "scope": "the published release v0.21.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "711c44e4e7d63d717af6c4f8f6fd35018a308689"
+          "revision": "ff9f36e08b38ee8f34c0061d11c4bc37c8cb1723"
         }
       ]
     }
   },
-  "created": "2026-10-29T00:00:00Z",
+  "created": "2026-10-30T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
