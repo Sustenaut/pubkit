@@ -4,19 +4,22 @@
       "plugin": "anthropic.api",
       "paths": [
         "src/pubkit/audit_draft.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "bitwarden.secrets",
       "paths": [
         "src/pubkit/templates/service/with-secrets"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "cloudflare.dns",
       "paths": [
         "actions/deploy-static/action.yml"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "cloudflare.pages",
@@ -24,7 +27,8 @@
         "actions/deploy-static/",
         "src/pubkit/hosting.py",
         "terraform/testdata/pubkit.json"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "crates-io.publish",
@@ -33,7 +37,8 @@
         "src/pubkit/audit_prepare.py",
         "src/pubkit/nightly.py",
         "src/pubkit/standard.json"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "desec.dns",
@@ -41,7 +46,8 @@
         "src/pubkit/hosting.py",
         "terraform/dns-zone/variables.tf",
         "terraform/testdata/pubkit.json"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "github.app-token",
@@ -50,13 +56,15 @@
         ".github/workflows/nightly.yml",
         "src/pubkit/app_secrets.py",
         "src/pubkit/ci.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "github.board-read",
       "paths": [
         "src/pubkit/board/"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "github.repo-ops",
@@ -70,13 +78,15 @@
         "src/pubkit/app_secrets.py",
         "src/pubkit/nightly.py",
         "src/pubkit/protect.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "google.cloud",
       "paths": [
         "terraform/cloud-run-sites/"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "mailbox.smtp",
@@ -85,13 +95,15 @@
         "src/pubkit/hosting.py",
         "terraform/hosting/variables.tf",
         "terraform/testdata/pubkit.json"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "openssf.scorecard",
       "paths": [
         "src/pubkit/board/connectors/scorecard.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "osv.audit",
@@ -100,39 +112,45 @@
         ".github/workflows/node-ci.yml",
         ".github/workflows/python-ci.yml",
         ".github/workflows/rust-ci.yml"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "pypi.publish",
       "paths": [
         "src/pubkit/cli.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "slack.post",
       "paths": [
         ".github/nightly/update.sh",
         ".github/workflows/nightly.yml"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "sonarcloud.read",
       "paths": [
         "src/pubkit/board/"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "sonarcloud.scan",
       "paths": [
         ".github/workflows/**",
         "src/pubkit/ci.py"
-      ]
+      ],
+      "mode": "required"
     },
     {
       "plugin": "tailscale.tailnet",
       "paths": [
         "actions/deploy-ssh/"
-      ]
+      ],
+      "mode": "required"
     }
   ],
   "terraform": [
@@ -141,14 +159,16 @@
       "plugins": [
         "terraform.google"
       ],
-      "runs": []
+      "runs": [],
+      "mode": "required"
     },
     {
       "dir": "terraform/desec-zones",
       "plugins": [
         "terraform.desec"
       ],
-      "runs": []
+      "runs": [],
+      "mode": "required"
     },
     {
       "dir": "terraform/dns-zone",
@@ -156,7 +176,8 @@
         "terraform.cloudflare",
         "terraform.hetzner"
       ],
-      "runs": []
+      "runs": [],
+      "mode": "required"
     },
     {
       "dir": "terraform/hosting",
@@ -164,7 +185,8 @@
         "terraform.cloudflare",
         "terraform.hetzner"
       ],
-      "runs": []
+      "runs": [],
+      "mode": "required"
     }
   ],
   "other_hosts": [
