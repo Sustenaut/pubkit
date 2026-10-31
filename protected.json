@@ -1,15 +1,15 @@
 {
   "comment": "The repositories whose default branch carries pubkit's ruleset (src/pubkit/ruleset.json), each with the checks a pull request must pass before it merges. `pubkit protect` applies it, as the repositories' owner; `pubkit protect --check` reports any that differ. Every check is a GitHub Actions job but SonarCloud Code Analysis, which the SonarCloud app reports: list it only for a repository whose pull requests SonarQube Cloud already analyses, or nothing there can merge. Main merges through GitHub's merge queue, which GitHub offers only to an organization's public repositories: a user's repository, or a private one, says \"queue\": false. \"auto_merge\": true turns on the repository's Allow auto-merge setting; without it the setting is left as it is.",
   "repositories": [
-    { "repo": "Sustenaut/pubkit", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
-    { "repo": "Sustenaut/pubrel", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis"] },
-    { "repo": "Sustenaut/publet", "checks": ["ci / passed", "release / release"] },
-    { "repo": "Sustenaut/pubunit", "checks": ["ci / passed", "release / release"] },
-    { "repo": "Sustenaut/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "Sustenaut/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "Sustenaut/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis"] },
-    { "repo": "schryer/recipes", "checks": ["ci / passed", "build"], "tags": false, "queue": false },
-    { "repo": "schryer/visit-ee", "checks": ["ci / passed"], "tags": false, "queue": false, "auto_merge": true },
-    { "repo": "Sustenaut/maps", "checks": ["ci / passed"], "tags": false }
+    { "repo": "Sustenaut/pubkit", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis", "integrations / scan"] },
+    { "repo": "Sustenaut/pubrel", "checks": ["ci / passed", "release / release", "SonarCloud Code Analysis", "integrations / scan"] },
+    { "repo": "Sustenaut/publet", "checks": ["ci / passed", "release / release", "integrations / scan"] },
+    { "repo": "Sustenaut/pubunit", "checks": ["ci / passed", "release / release", "integrations / scan"] },
+    { "repo": "Sustenaut/pubtheme", "checks": ["ci / passed", "SonarCloud Code Analysis", "integrations / scan"] },
+    { "repo": "Sustenaut/publet-decimal-classification", "checks": ["ci / passed", "SonarCloud Code Analysis", "integrations / scan"] },
+    { "repo": "Sustenaut/recipe-host", "checks": ["ci / passed", "SonarCloud Code Analysis", "integrations / scan"] },
+    { "repo": "schryer/recipes", "checks": ["ci / passed", "build", "integrations / scan"], "tags": false, "queue": false },
+    { "repo": "schryer/visit-ee", "checks": ["ci / passed", "integrations / scan"], "tags": false, "queue": false, "auto_merge": true },
+    { "repo": "Sustenaut/maps", "checks": ["ci / passed", "integrations / scan"], "tags": false }
   ]
 }
