@@ -10,12 +10,14 @@ is one GitHub App's three values, or a list of apps; `secrets` is any others:
     },
     "secrets": [
       {"from": "some-token", "to": "SOME_TOKEN", "kind": "secret"},
-      {"from": "some-user", "to": "SOME_USER", "kind": "variable"}
+      {"from": "some-user", "to": "SOME_USER", "kind": "variable"},
+      {"from": "some-deploy-key", "to": "SOME_DEPLOY_KEY", "kind": "secret", "environment": "some-env"}
     ]
 
 `from` is the secret's name in the Bitwarden project ./with-secrets reads, and
 `to` its name on GitHub. An app's id and installation id go as variables and its
-key as a secret; `kind` says for the others. They all go to the repository
+key as a secret; `kind` says for the others, and `environment`, if given, names the
+GitHub environment one goes in, which must exist. They all go to the repository
 `origin` points at and no other. Run it through with-secrets, which puts the
 project's secrets in its environment:
 
@@ -44,6 +46,7 @@ KINDS = {"secret", "variable"}
 SLOTS = {"id": "variable", "installation_id": "variable", "key": "secret"}
 FROM = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 TO = re.compile(r"[A-Z_][A-Z0-9_]*")
+ENVIRONMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
 
 def app_problems(block: Any) -> list[str]:
@@ -81,8 +84,8 @@ def other_problems(entries: Any) -> list[str]:
         return ["it must be a list of from, to and kind"]
     out = []
     for entry in entries:
-        if not isinstance(entry, dict) or set(entry) != {"from", "to", "kind"}:
-            out.append(f"{json.dumps(entry)} needs \"from\", \"to\" and \"kind\"")
+        if not isinstance(entry, dict) or set(entry) - {"environment"} != {"from", "to", "kind"}:
+            out.append(f"{json.dumps(entry)} needs \"from\", \"to\" and \"kind\", and may have \"environment\"")
             continue
         label = entry["to"] if isinstance(entry["to"], str) else json.dumps(entry["to"])
         if not isinstance(entry["from"], str) or not FROM.fullmatch(entry["from"]):
@@ -91,6 +94,8 @@ def other_problems(entries: Any) -> list[str]:
             out.append(f"{label}'s \"to\" must be upper case letters, digits and _, not starting GITHUB_")
         if not isinstance(entry["kind"], str) or entry["kind"] not in KINDS:
             out.append(f"{label}'s \"kind\" must be secret or variable")
+        if "environment" in entry and not (isinstance(entry["environment"], str) and ENVIRONMENT.fullmatch(entry["environment"])):
+            out.append(f"{label}'s \"environment\" is not an environment's name")
     return out
 
 
@@ -112,8 +117,8 @@ def config_problems(config: dict) -> list[str]:
         out += [f"{OTHERS}: {p}" for p in other_problems(config[OTHERS])]
     if out:
         return out
-    names = [(item["kind"], item["to"]) for item in plan(config)]
-    return [f"two of them have the same \"to\", {to}" for kind, to in sorted(set(names)) if names.count((kind, to)) > 1]
+    names = [(item["kind"], item["to"], item.get("environment", "")) for item in plan(config)]
+    return [f"two of them have the same \"to\", {to}" for kind, to, _ in sorted(set(names)) if names.count((kind, to, _)) > 1]
 
 
 def wrong_value(slot: str | None, value: str) -> str | None:
@@ -168,13 +173,16 @@ def run(config: dict, check: bool) -> int:
         return 0
     repo = origin()
     for item in items:
-        done = subprocess.run(["gh", item["kind"], "set", item["to"], "-R", repo], input=values[item["from"]],
-                              text=True, capture_output=True, check=False)
+        environment = item.get("environment")
+        where = f"{repo}, environment {environment}" if environment else repo
+        done = subprocess.run(["gh", item["kind"], "set", item["to"], "-R", repo,
+                               *(["--env", environment] if environment else [])],
+                              input=values[item["from"]], text=True, capture_output=True, check=False)
         if done.returncode != 0:
-            print(f"  FAILED   {item['kind']} {item['to']} in {repo}: {done.stderr.strip()}")
+            print(f"  FAILED   {item['kind']} {item['to']} in {where}: {done.stderr.strip()}")
             failed = True
         else:
-            print(f"  sent     {item['kind']} {item['to']} in {repo}")
+            print(f"  sent     {item['kind']} {item['to']} in {where}")
     if failed:
         print("Fix what gh said and run this again: it only overwrites.")
         return 1

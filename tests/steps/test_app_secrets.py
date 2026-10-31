@@ -73,6 +73,13 @@ def clone_many(repo, log, slug):
         {"from": "plain-user", "to": "PLAIN_USER", "kind": "variable"}]})
 
 
+@given(parsers.parse('a clone of "{slug}" whose secrets list has "{name}" in the environment "{environment}", and in the repository'))
+def clone_environment(repo, log, slug, name, environment):
+    _clone(repo, slug, {"secrets": [
+        {"from": "plain-token", "to": name, "kind": "secret", "environment": environment},
+        {"from": "plain-user", "to": name, "kind": "secret"}]})
+
+
 @given(parsers.parse('a clone of "{slug}" that names only "{name}" as a secret'))
 def clone_one(repo, log, slug, name):
     _clone(repo, slug, {"secrets": [{"from": name, "to": "PLAIN_TOKEN", "kind": "secret"}]})
@@ -108,6 +115,20 @@ def sound(repo):
     config = json.loads((repo / "pubkit.json").read_text())
     config["github_app"] = BLOCK
     (repo / "pubkit.json").write_text(json.dumps(config))
+
+
+@then(parsers.parse('gh set the {kind} "{name}" in the environment "{environment}" of "{slug}"'))
+def gh_set_environment(log, kind, name, environment, slug):
+    call = next(c for c in _calls(log) if "--env" in c["args"])
+    assert call["args"] == [kind, "set", name, "-R", slug, "--env", environment]
+    assert call["read"] == MORE["PLAIN_TOKEN"]
+
+
+@then(parsers.parse('gh set the {kind} "{name}" in "{slug}" with no environment'))
+def gh_set_repository(log, kind, name, slug):
+    call = next(c for c in _calls(log) if "--env" not in c["args"])
+    assert call["args"] == [kind, "set", name, "-R", slug]
+    assert call["read"] == MORE["PLAIN_USER"]
 
 
 @then(parsers.parse('gh set the {kind} "{name}" in "{slug}"'))
