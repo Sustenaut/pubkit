@@ -63,6 +63,23 @@ Feature: pubkit app-secrets sends what this repository names to it
     And gh was called 8 times
     And no value is printed or on a command line
 
+  Scenario: A value can go in an environment, and the same name can be in two
+    Given a clone of "example-org/thing" whose secrets list has "PLAIN_TOKEN" in the environment "server", and in the repository
+    And Bitwarden has all those values
+    When I run pubkit "app-secrets"
+    Then it succeeds
+    And gh set the secret "PLAIN_TOKEN" in the environment "server" of "example-org/thing"
+    And gh set the secret "PLAIN_TOKEN" in "example-org/thing" with no environment
+    And it prints "sent     secret PLAIN_TOKEN in example-org/thing, environment server"
+
+  Scenario: A failure says which environment
+    Given a clone of "example-org/thing" whose secrets list has "PLAIN_TOKEN" in the environment "server", and in the repository
+    And Bitwarden has all those values
+    And gh refuses "PLAIN_TOKEN"
+    When I run pubkit "app-secrets"
+    Then the exit code is 1
+    And it prints "FAILED   secret PLAIN_TOKEN in example-org/thing, environment server"
+
   Scenario: Only other values, with no app, work too
     Given a clone of "example-org/thing" that names only "plain-token" as a secret
     And Bitwarden has all those values
@@ -103,6 +120,10 @@ Feature: pubkit app-secrets sends what this repository names to it
       | [{"from": "a", "to": "low", "kind": "secret"}]          | low's "to" must be        |
       | [{"from": "a", "to": "A", "kind": "plain"}]             | A's "kind" must be        |
       | [{"from": "a", "to": "A", "kind": 1}]                   | A's "kind" must be        |
+      | [{"from": "a", "to": "A", "kind": "secret", "environment": "a b"}] | A's "environment" is not |
+      | [{"from": "a", "to": "A", "kind": "secret", "environment": 1}] | A's "environment" is not |
+      | [{"from": "a", "to": "A", "kind": "secret", "extra": 1}] | needs "from"              |
+      | [{"from": "a", "to": "A", "kind": "secret", "environment": "e"}, {"from": "b", "to": "A", "kind": "secret", "environment": "e"}] | two of them have the same |
       | [{"from": 1, "to": 2, "kind": "secret"}]                | 2's "from" is not         |
       | [{"from": "a", "to": "A", "kind": "secret"}, {"from": "b", "to": "A", "kind": "secret"}] | two of them have the same |
 

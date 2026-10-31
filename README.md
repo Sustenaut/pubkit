@@ -117,13 +117,16 @@ others, each with a `kind` of `secret` or `variable`:
 },
 "secrets": [
   { "from": "some-token", "to": "SOME_TOKEN", "kind": "secret" },
-  { "from": "some-user", "to": "SOME_USER", "kind": "variable" }
+  { "from": "some-user", "to": "SOME_USER", "kind": "variable" },
+  { "from": "some-deploy-key", "to": "SOME_DEPLOY_KEY", "kind": "secret", "environment": "some-env" }
 ]
 ```
 
 `from` is the secret's name in the Bitwarden project `./with-secrets` reads, and
 `to` its name on GitHub. An app's id and installation id go as variables and its
-key as a secret, on the repository `origin` points at and no other:
+key as a secret, on the repository `origin` points at and no other. `environment`,
+on an entry in `secrets`, puts it in that GitHub environment, which must already
+exist, instead of the repository's own:
 
 ```sh
 ./with-secrets ./pubkit app-secrets --check   # checks only, sends nothing
