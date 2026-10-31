@@ -32,6 +32,21 @@ def missing():
 if re.search(r"/rulesets", url):
     print("[]")
     sys.exit(0)
+reports = state.get("reports", {{}})
+p = re.match(r"repos/([^/]+/[^/]+)/pulls\\?", url)
+if p:
+    if p.group(1) not in reports:
+        missing()
+    print(json.dumps([{{"head": {{"sha": "pr"}}}}] if "pr" in reports[p.group(1)] else []))
+    sys.exit(0)
+c = re.match(r"repos/([^/]+/[^/]+)/commits/([^/]+)/(check-runs|status)", url)
+if c:
+    found = reports.get(c.group(1), {{}}).get("pr" if c.group(2) == "pr" else "branch", {{}})
+    if c.group(3) == "check-runs":
+        print(json.dumps({{"check_runs": [{{"name": n}} for n in found.get("runs", [])]}}))
+    else:
+        print(json.dumps({{"statuses": [{{"context": n}} for n in found.get("statuses", [])]}}))
+    sys.exit(0)
 f = re.match(r"repos/([^/]+/[^/]+)/contents/pubkit.json$", url)
 if f:
     if f.group(1) not in state["files"]:
@@ -92,6 +107,26 @@ def has_config(github, slug, text):
         _exists(state, slug)
         state["files"][slug] = base64.b64encode(text.encode()).decode()
     _edit(github, change)
+
+
+def _reported(github, slug, where, kind, name):
+    _edit(github, lambda state: state.setdefault("reports", {}).setdefault(slug, {}).setdefault(where, {})
+          .setdefault(kind, []).append(name))
+
+
+@given(parsers.parse('"{slug}" has reported "{name}" on its default branch'))
+def reported_branch(github, slug, name):
+    _reported(github, slug, "branch", "runs", name)
+
+
+@given(parsers.parse('"{slug}" has reported "{name}" on a recent pull request'))
+def reported_pull(github, slug, name):
+    _reported(github, slug, "pr", "runs", name)
+
+
+@given(parsers.parse('"{slug}" has a commit status "{name}" on its default branch'))
+def reported_status(github, slug, name):
+    _reported(github, slug, "branch", "statuses", name)
 
 
 @given(parsers.parse('"{slug}" exists'))
