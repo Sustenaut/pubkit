@@ -450,3 +450,30 @@ def no_queue_note(result):
 def no_auto_merge_note(result):
     out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
     assert "auto-merge" not in out, out
+
+
+@given("pubkit's ruleset as a read-only token sees it, with no bypass_actors", target_fixture="seen")
+def read_only_ruleset():
+    have = protect.ruleset(["ci / passed"])
+    del have["bypass_actors"]
+    return have
+
+
+@given("pubkit's ruleset, with a bypass actor added", target_fixture="seen")
+def bypassed_ruleset():
+    return {**protect.ruleset(["ci / passed"]), "bypass_actors": [{"actor_id": 1}]}
+
+
+@when("I compare it with pubkit's ruleset", target_fixture="found")
+def compare(seen):
+    return protect.differences(protect.ruleset(["ci / passed"]), seen)
+
+
+@then("it finds no difference")
+def no_difference(found):
+    assert found == []
+
+
+@then("it reports the bypass actors")
+def bypass_reported(found):
+    assert any(line.startswith("bypass_actors is") for line in found)

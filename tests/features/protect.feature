@@ -411,3 +411,13 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     When I run pubkit "protect" "--check"
     Then it fails
     And stderr mentions "lists example-org/foo more than once"
+
+  Scenario: A read-only token can't see who may bypass a ruleset, and that's no difference
+    Given pubkit's ruleset as a read-only token sees it, with no bypass_actors
+    When I compare it with pubkit's ruleset
+    Then it finds no difference
+
+  Scenario: A bypass actor that can be read still counts
+    Given pubkit's ruleset, with a bypass actor added
+    When I compare it with pubkit's ruleset
+    Then it reports the bypass actors

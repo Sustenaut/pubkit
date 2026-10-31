@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubkit protect --check and the board no longer report a difference because a read-only token can't see a ruleset's bypass_actors, which GitHub hides from it."
+}

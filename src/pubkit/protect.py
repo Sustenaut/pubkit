@@ -176,9 +176,12 @@ def _checks(params: dict) -> set[tuple[str, int | None]]:
 def differences(want: dict, have: dict) -> list[str]:
     """How `have` falls short of, or goes beyond, `want`: one line each.
     Only what `want` sets is compared, so a setting GitHub adds with its own
-    default is no difference."""
+    default is no difference. GitHub hides bypass_actors from a token that
+    can't change the ruleset, so it counts only when it can be read."""
     out = []
     for key in ("name", "target", "enforcement", "conditions", "bypass_actors"):
+        if key == "bypass_actors" and have.get(key) is None:
+            continue
         if want[key] != have.get(key):
             out.append(f"{key} is {json.dumps(have.get(key))}, not {json.dumps(want[key])}")
     wanted, had = _rules(want), _rules(have)
