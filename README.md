@@ -1023,7 +1023,7 @@ more without it. The generated `pr.yml`'s `merge_group` trigger then never
 fires, and does no harm. Which repositories carry it, and the checks each
 requires, is local configuration, not part of pubkit:
 
-    pubkit protect [--check] [--no-tags] [--no-queue] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--no-tags] [--no-queue] [--repos FILE | --require CHECK...] [REPO...]
 
 creates the ruleset in each repository, or updates the ruleset already on
 the default branch to match, renaming it. It does the same for the release
@@ -1054,17 +1054,11 @@ The repositories come from one of:
 - a repos file, with `--repos FILE` ([The repos file](#the-repos-file)): the
   repositories it marks to protect, each with the checks its own `pubkit.json`
   says;
-- a `protected.json` in the working directory, or the file `--config`
-  names: `{"repositories": [{"repo": "OWNER/NAME", "checks": [...]}]}`, with
-  `"tags": false` where the repository releases no tags, `"queue": false`
-  where GitHub offers it no merge queue, and `"auto_merge": true` to turn on
-  the repository's "Allow auto-merge" setting.
-  `REPO` arguments pick some of the repositories it lists;
 - `--require CHECK`, repeated, and the `REPO` arguments, with no file:
   `pubkit protect --require "ci / passed" example-org/newrepo`.
 - the repository's own `pubkit.json`, which says how it is protected:
   `"protect": {"checks": ["ci / passed"], "tags": false, "queue": false, "release_app": 12345}`
-  (`tags` and `queue` default to true). A `REPO` the list does not name is read from the `pubkit.json`
+  (`tags` and `queue` default to true). A `REPO` is read from the `pubkit.json`
   on its default branch, and `pubkit protect` with no list and no `REPO`,
   run inside a repository, reads `./pubkit.json` for the repository
   `origin` points at. The block takes only `checks`, distinct non-empty
@@ -1084,11 +1078,7 @@ what may merge, and without the merge queue the branch must still be up to
 date with main. `true` turns it on, `false` off, and without it protect
 leaves the setting as it is; `--check` reports a setting that differs.
 
-pubkit's own list, the pub* repositories, is
-[`protected.json`](protected.json) at the root of this checkout: `ci /
-passed` from a pubkit workflow, `release / release` where pubrel releases,
-and `SonarCloud Code Analysis` where the SonarCloud app reports on pull
-requests. Here, `make protect` (or `make protect-check`, or `make protect
+Here, `make protect` (or `make protect-check`, or `make protect
 REPOS=example-org/example-site`) runs it, making the venv first if there is none.
 
 ### Pull requests: ready, or draft
@@ -1103,7 +1093,7 @@ carries this rule into every repository, where coding agents read it.
 
 ## The release board
 
-    pubkit board --out DIR [--repos FILE | --config protected.json --governed governed.json] [--rules FILE]
+    pubkit board --out DIR --repos FILE [--rules FILE]
 
 grades every repository the repos file (or the two lists) names, public and private, A to E for
 quality, security and delivery, and writes `DIR/board.json` and a static
@@ -1189,9 +1179,6 @@ FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
 governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
 and `nightly.yml` take its contents as a `repos` input.
 
-`protected.json`, `governed.json`, `--config` and `--governed` still work for one more
-release, and warn that they are going. The nightly's own schedule has gone.
-
 ### State files
 
     pubkit state --check [FILE]
@@ -1216,7 +1203,7 @@ one required check.
 
 `.github/workflows/nightly.yml` runs over the repositories its `repos` input
 marks to govern, called from a control plane's own schedule. It has no schedule of its
-own. Run by hand, it reads `governed.json`, which goes in a later release. A caller passes the secrets `app-id`,
+own. Run by hand, it takes the same `repos` input. A caller passes the secrets `app-id`,
 `app-key`, `notify-token` and `notify-user`, and the `pubkit` input names the
 repository whose latest release supplies the wheel and the update script. It reports, in its summary, the pubkit each pins,
 whether it conforms to the latest standard, and its open exceptions
@@ -1225,7 +1212,7 @@ whether it conforms to the latest standard, and its open exceptions
 
 1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
    `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
-   `pub-version`, each tool `ci.tools` pins by tag, to the latest release of
+   each tool `ci.tools` pins by tag, to the latest release of
    its git repository, and the crates `nightly.pins.crates` names in
    `Cargo.lock`. A workflow pin moves
    to the commit of the new release's tag, with its version in a comment,
@@ -1335,12 +1322,11 @@ sha256: a release carries the wheel as an asset, and `pip install
 jobs:
   ci:
     uses: Sustenaut/pubkit/.github/workflows/rust-ci.yml@<commit> # v0.1.0   (or python-ci.yml, node-ci.yml)
-    with: { pub-version: v0.1.1 }
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }          # by name, not inherit
   release:
     needs: ci
     uses: Sustenaut/pubrel/.github/workflows/release.yml@<commit> # v0.1.0
-    with: { pub-version: v0.1.1, pubrel-version: v0.1.0 }
+    with: { pubrel-version: v0.1.0 }
     permissions: { contents: write }
 ```
 
@@ -1391,7 +1377,7 @@ Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/re
 - **`events`:** which workflows to write. `pr` writes `pr.yml` (pull requests), `queue` writes `queue.yml` (the merge queue's runs of them, `merge_group`), `main` writes `main.yml` (pushes to main), and `nightly` writes `nightly.yml` (`cron`, or by hand). The default is pr, queue and main, and all four for Rust. The queue runs every job a pull request runs, and the heavy ones besides (Rust's `msrv`, `fuzz` and `cross`), so each push to a pull request gets its answer sooner while nothing merges before the heavy jobs pass. Where the queue would run nothing a pull request does not (Node, Python and service repositories, by default), sync writes no `queue.yml` and `pr.yml` runs on `merge_group` too. A repository without a merge queue (a user's, or a private one) leaves `queue` out, so its pull requests run the heavy jobs themselves.
 - **`with`:** the jobs' inputs, the same ones `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` take. Each input goes to every job that takes it, and one that no job takes stops sync.
 - **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only, and Rust's `msrv`, `fuzz` and `cross`, which run everywhere but on pull requests. `browser` runs only when `with` gives a `browser-test`.
-- **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release. It replaces the `pub-version` input, which still works, warns at sync, and goes in a later release.
+- **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release.
 - **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust or service repository's CI is its kind's.
 - **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
 

@@ -1,8 +1,8 @@
 Feature: Every repository carries pubkit's rulesets, on main and on its release tags
   src/pubkit/ruleset.json is main's ruleset, and tag-ruleset.json the
-  release tags', both shipped in the wheel. Which
-  repositories carry it, with the checks each requires, is local: a
-  protected.json (pubkit's own sits at its root), or --require. `pubkit protect` creates or
+  release tags', both shipped in the wheel. Which repositories carry it comes from a
+  repos file or the command line, and the checks each requires from its own pubkit.json,
+  or --require. `pubkit protect` creates or
   updates the rulesets through the GitHub API, and `pubkit protect --check`
   reports how a repository differs, changing nothing.
 
@@ -25,19 +25,6 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it blocks creating, moving and deleting them
     And only GitHub Actions may bypass it
 
-  Scenario: A Sustenaut repository's release tags let the release app through instead
-    When I build the tag ruleset for "Sustenaut/pubthing"
-    Then it targets the tags "refs/tags/v*"
-    And it blocks creating, moving and deleting them
-    And only the release app may bypass it
-
-  Scenario: protect gives a Sustenaut repository the release app's tag ruleset
-    Given GitHub has no ruleset in "Sustenaut/foo"
-    When I run pubkit "protect" "--require" "ci / passed" "Sustenaut/foo"
-    Then it succeeds
-    And it prints "Sustenaut/foo: warning: no release_app in its protect block"
-    And GitHub was sent the tag ruleset for "Sustenaut/foo"
-
   Scenario: A repository's protect block names the release app its tags let through
     Given the working directory is a clone of "example-org/site" whose pubkit.json requires "ci / passed"
     And its pubkit.json's protect block is {"checks": ["ci / passed"], "release_app": 12345}
@@ -47,26 +34,12 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it prints nothing about a release app
     And GitHub was sent a tag ruleset only app 12345 may bypass
 
-  Scenario: A release app in a protected.json entry is the one its tags let through
-    Given protected.json lists "Sustenaut/foo" requiring "ci / passed", with the release app 12345
-    And GitHub has no ruleset in "Sustenaut/foo"
-    When I run pubkit "protect" "--config" "protected.json"
-    Then it succeeds
-    And it prints nothing about a release app
-    And GitHub was sent a tag ruleset only app 12345 may bypass
-
-  Scenario: A repository of no known owner, naming no release app, gets no app and no warning
+  Scenario: A repository naming no release app gets no app and no warning
     Given GitHub has no ruleset in "example-org/foo"
     When I run pubkit "protect" "--require" "ci / passed" "example-org/foo"
     Then it succeeds
     And it prints nothing about a release app
     And GitHub was sent the tag ruleset for "example-org/foo"
-
-  Scenario: A release tag ruleset the block leaves out gives no warning about its app
-    Given GitHub has no ruleset in "Sustenaut/foo"
-    When I run pubkit "protect" "--require" "ci / passed" "--no-tags" "Sustenaut/foo"
-    Then it succeeds
-    And it prints nothing about a release app
 
   Scenario Outline: sync --check refuses an unsound protect block
     Given its pubkit.json's protect block is <block>
@@ -79,15 +52,10 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
       | {"checks": ["build"], "release_app": "1"}    | "release_app" must be a GitHub App's id |
       | {"checks": ["build"], "bypass": 1}           | bypass is not a protect setting         |
 
-  Scenario: protected.json covers every governed repository
-    When I read pubkit's protected.json
-    Then every repository in it requires at least one check, and is listed once
-    And every repository in governed.json is in it
-
   Scenario: protect creates the ruleset where there is none
-    Given protected.json lists "example-org/foo" requiring "ci / passed, release / release"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed, release / release"
     And GitHub has no ruleset in "example-org/foo"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/foo"
     Then it succeeds
     And it prints "example-org/foo: created "main changes by pull request, after CI""
     And it prints "example-org/foo: created "release tags only from CI""
@@ -95,9 +63,9 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And GitHub was sent the tag ruleset for "example-org/foo"
 
   Scenario: protect --check reports a ruleset that differs, and changes nothing
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has the ruleset "main" in "example-org/foo" requiring "test"
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/foo"
     Then it fails
     And it prints "does not require ci / passed (app 15368)"
     And it prints "also requires test (app 15368)"
@@ -105,47 +73,38 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And GitHub was sent nothing
 
   Scenario: protect updates the ruleset already on main, and renames it
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has the ruleset "main" in "example-org/foo" requiring "test"
-    When I run pubkit "protect" "--config" "protected.json" "example-org/foo"
+    When I run pubkit "protect" "example-org/foo"
     Then it succeeds
     And it prints "example-org/foo: updated "main""
     And GitHub was sent the ruleset for "example-org/foo" requiring "ci / passed", replacing "main"
     And it prints "example-org/foo: "release tags only from CI" up to date"
 
   Scenario: A ruleset that matches is up to date, whatever GitHub adds to it
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has pubkit's ruleset in "example-org/foo" requiring "ci / passed"
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/foo"
     Then it succeeds
     And it prints "example-org/foo: "main changes by pull request, after CI" up to date"
     And it prints "example-org/foo: "release tags only from CI" up to date"
 
   Scenario: protect --check reports release tags without pubkit's tag ruleset
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has only main's ruleset in "example-org/foo" requiring "ci / passed"
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/foo"
     Then it fails
     And it prints "example-org/foo: no ruleset on its release tags"
     And GitHub was sent nothing
 
-  Scenario: A repository neither listed nor carrying a protect block is not protected
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
-    When I run pubkit "protect" "--config" "protected.json" "example-org/bar"
+  Scenario: A repository carrying no protect block is not protected
+    Given GitHub has no ruleset in "example-org/bar"
+    When I run pubkit "protect" "example-org/bar"
     Then it fails
-    And it prints "example-org/bar: not in protected.json, and no pubkit.json on its default branch"
+    And it prints "example-org/bar: no pubkit.json on its default branch"
     And GitHub was sent nothing
 
-  Scenario: A repository protected.json lacks is protected as its own pubkit.json says
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
-    And "example-org/site"'s pubkit.json on GitHub requires "ci / passed", without tags
-    And GitHub has no ruleset in "example-org/site"
-    When I run pubkit "protect" "example-org/site"
-    Then it succeeds
-    And GitHub was sent the ruleset for "example-org/site" requiring "ci / passed"
-    And GitHub was sent no tag ruleset
-
-  Scenario: Without any list, the named repositories' own pubkit.json are read
+  Scenario: The named repositories' own pubkit.json are read
     Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed, build"
     And GitHub has no ruleset in "example-org/site"
     When I run pubkit "protect" "example-org/site"
@@ -169,36 +128,30 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And stderr mentions "./pubkit.json has no protect block"
 
   Scenario: protect says who may change a ruleset when GitHub refuses
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub refuses to change rulesets in "example-org/foo"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/foo"
     Then it fails
     And it prints "needs a repository admin"
 
-  Scenario: protect refuses an entry that is not a repository
-    Given protected.json lists "example-org/foo/../bar" requiring "ci / passed"
-    When I run pubkit "protect" "--config" "protected.json" "--check"
-    Then it fails
-    And stderr mentions "needs a repo, OWNER/NAME"
-
-  Scenario: Without a list or --require, protect says how to give one
+  Scenario: With nothing named and no ./pubkit.json, protect says what to give it
     When I run pubkit "protect"
     Then it fails
-    And stderr mentions "pass --config FILE, or name the repositories with --require"
+    And stderr mentions "pass --repos FILE, or name the repositories with --require"
 
-  Scenario: A repository listed with "tags": false gets only main's ruleset
-    Given protected.json lists "example-org/site" requiring "ci / passed", without tags
+  Scenario: A repository whose block has "tags": false gets only main's ruleset
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", without tags
     And GitHub has no ruleset in "example-org/site"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And it prints "example-org/site: created "main changes by pull request, after CI""
     And GitHub was sent the ruleset for "example-org/site" requiring "ci / passed"
     And GitHub was sent no tag ruleset
 
-  Scenario: A repository listed with "queue": false gets main's ruleset without the merge queue
-    Given protected.json lists "example-org/site" requiring "ci / passed", without the merge queue
+  Scenario: A repository whose block has "queue": false gets main's ruleset without the merge queue
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", without the merge queue
     And GitHub has no ruleset in "example-org/site"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And GitHub was sent the ruleset for "example-org/site" requiring "ci / passed", without the merge queue
 
@@ -250,9 +203,9 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And GitHub was sent nothing
 
   Scenario: protect --check reports a ruleset without the merge queue
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has pubkit's ruleset in "example-org/foo" requiring "ci / passed", without the merge queue
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/foo"
     Then it fails
     And it prints "no merge_queue rule"
     And it prints "required_status_checks.strict_required_status_checks_policy is true, not false"
@@ -266,36 +219,36 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it succeeds
     And GitHub was sent the ruleset for "example-org/site" requiring "ci / passed", without the merge queue
 
-  Scenario: A repository listed with "auto_merge": true gets auto-merge allowed
-    Given protected.json lists "example-org/site" requiring "ci / passed", with auto-merge
+  Scenario: A repository whose block has "auto_merge": true gets auto-merge allowed
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", with auto-merge
     And GitHub has only main's ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" does not allow auto-merge
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And it prints "example-org/site: auto-merge now allowed"
     And GitHub was asked to allow auto-merge in "example-org/site"
 
   Scenario: protect --check reports auto-merge left off, and changes nothing
-    Given protected.json lists "example-org/site" requiring "ci / passed", with auto-merge
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", with auto-merge
     And GitHub has only main's ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" does not allow auto-merge
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/site"
     Then it fails
     And it prints "example-org/site: auto-merge is not allowed; pubkit wants it allowed"
     And GitHub was sent nothing
 
   Scenario: Auto-merge already allowed is up to date
-    Given protected.json lists "example-org/site" requiring "ci / passed", with auto-merge
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", with auto-merge
     And GitHub has only main's ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" allows auto-merge
-    When I run pubkit "protect" "--config" "protected.json" "--check"
+    When I run pubkit "protect" "--check" "example-org/site"
     Then it succeeds
     And it prints "example-org/site: auto-merge allowed, up to date"
 
   Scenario: Without auto_merge, protect leaves the setting alone
-    Given protected.json lists "example-org/site" requiring "ci / passed", without tags
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed", without tags
     And GitHub has only main's ruleset in "example-org/site" requiring "ci / passed"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And it prints nothing about auto-merge
     And GitHub was sent nothing
@@ -325,19 +278,12 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     And it prints "Actor GitHub Actions integration must be part of the ruleset source"
 
   Scenario: protect shows why GitHub rejected a ruleset
-    Given protected.json lists "example-org/foo" requiring "ci / passed, SonarCloud Code Analysis"
+    Given "example-org/foo"'s pubkit.json on GitHub requires "ci / passed, SonarCloud Code Analysis"
     And GitHub rejects the ruleset for "example-org/foo" because "Invalid rule 'required_status_checks': integration 12526 is not installed"
-    When I run pubkit "protect" "--config" "protected.json"
+    When I run pubkit "protect" "example-org/foo"
     Then it fails
     And it prints "Validation Failed (HTTP 422); Invalid rule 'required_status_checks': integration 12526 is not installed"
     And it prints nothing about a repository admin
-
-  Scenario: Without --config, a protected.json in the working directory is the list
-    Given protected.json lists "example-org/foo" requiring "ci / passed"
-    And GitHub has no ruleset in "example-org/foo"
-    When I run pubkit "protect"
-    Then it succeeds
-    And it prints "example-org/foo: created"
 
   Scenario: --require protects one repository with the checks it names, without a list
     Given GitHub has no ruleset in "example-org/baz"
@@ -385,7 +331,7 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Given "example-org/site"'s pubkit.json on GitHub is "{not json"
     When I run pubkit "protect" "example-org/site"
     Then it fails
-    And it prints "example-org/site: not in protected.json, and its pubkit.json is not JSON"
+    And it prints "example-org/site: its pubkit.json is not JSON"
     And GitHub was sent nothing
 
   Scenario: A repository's unsound protect block on GitHub is reported, and nothing sent
@@ -400,18 +346,6 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it fails
     And stderr mentions "example-org/foo/../bar is not OWNER/NAME"
 
-  Scenario: protect refuses a protected.json entry whose tags are not true or false
-    Given protected.json is {"repositories": [{"repo": "example-org/foo", "checks": ["build"], "tags": "no"}]}
-    When I run pubkit "protect" "--check"
-    Then it fails
-    And stderr mentions "example-org/foo: "tags" must be true or false"
-
-  Scenario: protect refuses a protected.json that lists a repository twice
-    Given protected.json is {"repositories": [{"repo": "example-org/foo", "checks": ["build"]}, {"repo": "example-org/foo", "checks": ["ci / passed"]}]}
-    When I run pubkit "protect" "--check"
-    Then it fails
-    And stderr mentions "lists example-org/foo more than once"
-
   Scenario: A read-only token can't see who may bypass a ruleset, and that's no difference
     Given pubkit's ruleset as a read-only token sees it, with no bypass_actors
     When I compare it with pubkit's ruleset
@@ -423,51 +357,51 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it reports the bypass actors
 
   Scenario: A public repository gets secret scanning and push protection turned on
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has no ruleset in "example-org/site"
     And "example-org/site" has secret scanning "disabled" and push protection "disabled"
-    When I run pubkit "protect"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And it prints "example-org/site: turned on secret scanning, push protection"
     And GitHub was asked to turn on "secret_scanning, secret_scanning_push_protection" in "example-org/site"
 
   Scenario: Only what's off is turned on
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has no ruleset in "example-org/site"
     And "example-org/site" has secret scanning "enabled" and push protection "disabled"
-    When I run pubkit "protect"
+    When I run pubkit "protect" "example-org/site"
     Then it succeeds
     And GitHub was asked to turn on "secret_scanning_push_protection" in "example-org/site"
 
   Scenario: protect --check reports them off, and changes nothing
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has pubkit's ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" has secret scanning "disabled" and push protection "disabled"
-    When I run pubkit "protect" "--check" "--no-tags"
+    When I run pubkit "protect" "--check" "--no-tags" "example-org/site"
     Then the exit code is 1
     And it prints "pubkit wants it on"
     And GitHub was asked to turn on nothing in "example-org/site"
 
   Scenario: Already on, nothing is asked
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has no ruleset in "example-org/site"
     And "example-org/site" has secret scanning "enabled" and push protection "enabled"
-    When I run pubkit "protect"
+    When I run pubkit "protect" "example-org/site"
     Then it prints "secret scanning and push protection on, up to date"
     And GitHub was asked to turn on nothing in "example-org/site"
 
   Scenario: A private repository is left alone
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has no ruleset in "example-org/site"
     And "example-org/site" is a private repository of an organization on the "team" plan
-    When I run pubkit "protect"
+    When I run pubkit "protect" "example-org/site"
     Then it prints "secret scanning left alone"
     And GitHub was asked to turn on nothing in "example-org/site"
 
   Scenario: A token that can't read them changes nothing, and fails nothing
-    Given protected.json lists "example-org/site" requiring "ci / passed"
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has pubkit's ruleset in "example-org/site" requiring "ci / passed"
-    When I run pubkit "protect" "--check" "--no-tags"
+    When I run pubkit "protect" "--check" "--no-tags" "example-org/site"
     Then it succeeds
     And it prints "secret scanning not readable"
     And GitHub was asked to turn on nothing in "example-org/site"

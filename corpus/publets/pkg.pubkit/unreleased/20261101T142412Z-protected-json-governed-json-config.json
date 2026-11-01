@@ -1,0 +1,4 @@
+{
+  "category": "removed",
+  "change": "protected.json, governed.json, --config, --governed and pubkit pins' --pub are gone: pubkit protect, pubkit board and the nightly take a repos file or their named repositories, and how each is protected stays in its own pubkit.json. A repository with release tags must name its release_app, since no owner gets one by default, and one that should move crates as pins must name them in nightly.pins.crates. The pub-version CI input is gone: list the tool in ci.tools."
+}

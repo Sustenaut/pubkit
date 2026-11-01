@@ -212,7 +212,7 @@
   },
   "https://api.github.com/repos/example-org/pubthing/contents/pubkit.json": {
    "json": {
-    "content": "eyJraW5kIjogInJ1c3QiLCAicHJvdGVjdCI6IHsiY2hlY2tzIjogWyJjaSAvIHBhc3NlZCIsICJyZWxlYXNlIC8gcmVsZWFzZSJdfX0=",
+    "content": "eyJraW5kIjogInJ1c3QiLCAicHJvdGVjdCI6IHsiY2hlY2tzIjogWyJjaSAvIHBhc3NlZCIsICJyZWxlYXNlIC8gcmVsZWFzZSJdLCAicXVldWUiOiBmYWxzZX19",
     "encoding": "base64",
     "type": "file"
    },
@@ -522,7 +522,7 @@
   },
   "https://api.github.com/repos/example-org/site-thing/contents/pubkit.json": {
    "json": {
-    "content": "eyJraW5kIjogInNlcnZpY2UiLCAiY2kiOiB7fSwgInByb3RlY3QiOiB7ImNoZWNrcyI6IFsiY2kgLyBwYXNzZWQiXSwgInRhZ3MiOiBmYWxzZX0sICJsaXZlIjogeyJoZWFsdGgiOiAiaHR0cHM6Ly92aXNpdC5leGFtcGxlLmV1L2hlYWx0aCIsICJ0ZXN0IjogImxpdmUueW1sIn19",
+    "content": "eyJraW5kIjogInNlcnZpY2UiLCAiY2kiOiB7fSwgInByb3RlY3QiOiB7ImNoZWNrcyI6IFsiY2kgLyBwYXNzZWQiXSwgInRhZ3MiOiBmYWxzZSwgInF1ZXVlIjogZmFsc2V9LCAibGl2ZSI6IHsiaGVhbHRoIjogImh0dHBzOi8vdmlzaXQuZXhhbXBsZS5ldS9oZWFsdGgiLCAidGVzdCI6ICJsaXZlLnltbCJ9fQ==",
     "encoding": "base64",
     "type": "file"
    },

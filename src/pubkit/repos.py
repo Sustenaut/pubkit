@@ -65,9 +65,3 @@ def read(path: Path, command: str) -> list[dict]:
         return entries(path.read_text(encoding="utf-8"), str(path))
     except (OSError, ValueError) as e:
         sys.exit(f"pubkit {command}: {e}")
-
-
-def warn_lists(command: str, flags: str) -> None:
-    """Say that a list pubkit read goes away in a later release."""
-    print(f"pubkit {command}: warning: {flags} go in a later release; "
-          f"use --repos FILE (see README, The repos file)", file=sys.stderr)

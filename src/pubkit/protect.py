@@ -15,46 +15,39 @@ reads each repository's owner and visibility (and, for a private one, its
 organization's plan) and leaves the queue out by itself where GitHub has
 none, saying so; should GitHub still refuse the merge_queue rule, it tries
 once more without it. Either way, what merges was tested on the latest main. Which
-repositories carry it, and the checks each requires, is local
-configuration: a `protected.json` in the working directory, or one named
-with `--config`, or the repositories and `--require CHECK` on the command
-line. pubkit's own list is the protected.json in its checkout.
+repositories carry it comes from a repos file, or from the repositories named on the
+command line, and the checks each requires from its own pubkit.json, or `--require CHECK`.
 
 `tag-ruleset.json`, also in the wheel, keeps the release tags (`v*`) to
 CI: nobody may create, move or delete one, and only GitHub Actions, where
 `pubrel tag` runs once a release pull request merges, may bypass it. In
 an organization's repository GitHub refuses the GitHub Actions app as a
 bypass actor, so an organization's repository names its release app with
-`"release_app": ID` in its entry, and its tags let that app through instead,
-whose token `pubrel tag` uses there. A repository of RELEASE_APP_OWNER that
-names none still gets RELEASE_APP, with a warning, until it does. A
-hand-pushed tag cannot release code that CI did not pass. A repository
-that releases no tags goes without it: `"tags": false` in its entry, or
-`--no-tags`.
+`"release_app": ID` in its protect block, and its tags let that app through instead,
+whose token `pubrel tag` uses there. A hand-pushed tag cannot release code that CI did
+not pass. A repository that releases no tags goes without it: `"tags": false` in its
+block, or `--no-tags`.
 
-A repository may instead say how it is protected in its own pubkit.json:
+A repository says how it is protected in its own pubkit.json:
 `"protect": {"checks": [...], "tags": false, "queue": false, "auto_merge": true,
 "release_app": 12345}` (`tags` and `queue` default to true). `auto_merge` is the repository's
 "Allow auto-merge" setting, which lets a pull request merge by itself once
 the ruleset's checks pass: true turns it on, false off, and without it
 protect leaves the setting as it is. It loosens nothing, since the ruleset
-still decides what may merge. A protected.json entry takes it too.
+still decides what may merge.
 Each public repository also gets secret scanning and push protection turned on,
 unless its block says `"secret_scanning": false`; a private one isn't touched, since
 those need GitHub Advanced Security there. Nothing here ever turns them off.
-`pubkit protect OWNER/NAME` reads it from GitHub for a repository the list
-does not name, and `pubkit protect` with no list and no repositories reads
-`./pubkit.json`, for the repository `origin` points at.
+`pubkit protect OWNER/NAME` reads it from GitHub, and `pubkit protect` with no
+repositories reads `./pubkit.json`, for the repository `origin` points at.
 
 `pubkit protect [REPO...]` creates each ruleset in each repository, or
 updates the one already on its default branch or its release tags,
 renaming it, so a repository never carries two. It calls the GitHub API through `gh`, which
 must be signed in as someone who administers the repositories.
 `pubkit protect --check` changes nothing: it prints how each repository
-differs, and fails when one does. `--config FILE` reads another list, such
-as an edited one not yet released. `--repos FILE` reads a repos file instead
-(repos.py): the repositories it marks to protect, each with the checks its
-own pubkit.json says. protected.json and `--config` go in a later release.
+differs, and fails when one does. `--repos FILE` reads a repos file (repos.py): the
+repositories it marks to protect, each with the checks its own pubkit.json says.
 """
 
 from __future__ import annotations
@@ -69,19 +62,16 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from .repos import REPO, read, warn_lists
+from .repos import REPO, read
 
 # The app that reports a check. Every other check is a GitHub Actions job.
 GITHUB_ACTIONS = 15368
 # The release app a repository of this owner gets when its entry names no
 # `release_app`, with a warning, until every one of them does.
-RELEASE_APP = 5529889
-RELEASE_APP_OWNER = "sustenaut"
 APPS = {"SonarCloud Code Analysis": 12526}
 
 Api = Callable[[str, str, Any], Any]
 
-LOCAL = "protected.json"
 OWN = "pubkit.json"
 
 
@@ -90,17 +80,10 @@ def base(name: str = "ruleset.json") -> dict:
     return json.loads(resources.files("pubkit").joinpath(name).read_text(encoding="utf-8"))
 
 
-def falls_back(repo: str, release_app: int | None) -> bool:
-    """Whether `repo` gets RELEASE_APP because its entry names no release app."""
-    return release_app is None and repo.split("/", 1)[0].lower() == RELEASE_APP_OWNER
-
-
-def tag_ruleset(repo: str = "", release_app: int | None = None) -> dict:
-    """The ruleset `repo`'s release tags carry: GitHub Actions bypasses it,
-    or the release app its entry names."""
+def tag_ruleset(release_app: int | None = None) -> dict:
+    """The ruleset a repository's release tags carry: GitHub Actions bypasses it,
+    or the release app its protect block names."""
     out = base("tag-ruleset.json")
-    if falls_back(repo, release_app):
-        release_app = RELEASE_APP
     if release_app is not None:
         out["bypass_actors"] = [{"actor_id": release_app, "actor_type": "Integration",
                                  "bypass_mode": "always"}]
@@ -250,10 +233,6 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
     auto-merge" setting to `auto_merge`; its report lines, and whether it
     differed (with `check`) or could not be brought in line."""
     notes = []
-    if tags and falls_back(repo, release_app):
-        notes.append(f"{repo}: warning: no release_app in its protect block, so its tags let "
-                     f"through app {RELEASE_APP}; add \"release_app\": {RELEASE_APP} to its "
-                     f"pubkit.json")
     if queue and (why := no_queue(api, repo)):
         queue = False
         notes.append(f"{repo}: no merge queue: {why}; {NO_QUEUE}")
@@ -273,7 +252,7 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
     lines, bad = attempt(branch, repo, check)
     lines = notes + lines
     if tags:
-        tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(repo, release_app),
+        tag_lines, tag_bad = attempt(lambda: bring(api, repo, tag_ruleset(release_app),
                                                    current(api, repo, "tag"),
                                                    "its release tags", check), repo, check)
         lines, bad = lines + tag_lines, bad or tag_bad
@@ -365,7 +344,7 @@ KEYS = {"checks", "tags", "queue", "auto_merge", "release_app", "secret_scanning
 
 
 def problems(block: Any) -> list[str]:
-    """What is wrong with a protect block or a protected.json entry's checks
+    """What is wrong with a protect block's checks
     and tags: one phrase each, none when it is sound."""
     if not isinstance(block, dict):
         return [f"it is {json.dumps(block)}, not an object"]
@@ -442,44 +421,12 @@ def origin() -> str:
     return m.group(1)
 
 
-def load(config: Path | None) -> list[dict] | None:
-    """The repositories and their checks: `config`, else the protected.json
-    in the working directory; None when there is neither."""
-    if config is None:
-        if not Path(LOCAL).is_file():
-            return None
-        config = Path(LOCAL)
-    elif not config.is_file():
-        sys.exit(f"pubkit protect: no {config}")
-    warn_lists("protect", f"{config} and --config")
-    try:
-        entries = parse(config.read_text(encoding="utf-8"), str(config))["repositories"]
-    except (ValueError, KeyError, TypeError) as e:
-        sys.exit(f"pubkit protect: {config} needs a \"repositories\" list ({e})")
-    if not isinstance(entries, list):
-        sys.exit(f"pubkit protect: {config}'s \"repositories\" is not a list")
-    for e in entries:
-        if not isinstance(e, dict) or not REPO.fullmatch(str(e.get("repo", ""))) \
-                or not e.get("checks"):
-            sys.exit(f"pubkit protect: protected.json: {json.dumps(e)} needs a repo, "
-                     f"OWNER/NAME, and the checks it requires")
-        bad = problems(e)
-        if bad:
-            sys.exit(f"pubkit protect: protected.json: {e['repo']}: {'; '.join(bad)}")
-    repos = [e["repo"] for e in entries]
-    twice = sorted({r for r in repos if repos.count(r) > 1})
-    if twice:
-        sys.exit(f"pubkit protect: protected.json lists {', '.join(twice)} more than once")
-    return entries
-
-
-def run(config: Path | None, repos: list[str], check: bool, requires: list[str] | None = None,
+def run(repos: list[str], check: bool, requires: list[str] | None = None,
         api: Api = gh, tags: bool = True, queue: bool = True,
         repos_file: Path | None = None) -> int:
-    """Protect `repos` (by default every one listed). Given `requires`, the
-    named repositories require those checks, and no list is read. Given
-    `repos_file`, the repositories it marks to protect are read from their
-    own pubkit.json. With `tags` false, no repository gets the tag ruleset;
+    """Protect `repos`, each as its own pubkit.json on GitHub says. Given `requires`,
+    they require those checks instead. Given `repos_file`, it says which to protect when
+    none is named. With neither and no `repos`, this repository, from ./pubkit.json. With `tags` false, no repository gets the tag ruleset;
     with `queue` false, none gets the merge queue."""
     if repos_file:
         repos = repos or [e["repo"] for e in read(repos_file, "protect") if e["protect"]]
@@ -495,12 +442,11 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
         bad = [r for r in repos if not REPO.fullmatch(r)]
         if bad:
             sys.exit(f"pubkit protect: {', '.join(bad)} is not OWNER/NAME")
-        entries = load(config)
-        if entries is None and not repos:
+        entries = []
+        if not repos:
             if not Path(OWN).is_file():
-                sys.exit(f"pubkit protect: no ./{LOCAL} or ./{OWN}; pass --config FILE, or "
-                         f"name the repositories with --require CHECK for each check they "
-                         f"require")
+                sys.exit(f"pubkit protect: no ./{OWN}; pass --repos FILE, or name the "
+                         f"repositories with --require CHECK for each check they require")
             own = origin()
             try:
                 entries = [entry(own, parse(Path(OWN).read_text(encoding="utf-8"), f"./{OWN}"),
@@ -516,7 +462,7 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
             try:
                 item = remote(api, name)
             except ValueError as e:
-                print(f"{name}: {e}" if repos_file else f"{name}: not in {LOCAL}, and {e}")
+                print(f"{name}: {e}")
                 failed = True
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,

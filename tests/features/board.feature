@@ -1,5 +1,5 @@
 Feature: The board grades every listed repository A to E
-  `pubkit board` reads the repositories protected.json and governed.json
+  `pubkit board` reads the repositories a repos file
   list, reads each through one connector per source, and grades them by
   src/pubkit/board/rules.json: Quality and Security start at SonarQube
   Cloud's letters and Delivery at A, each taking a letter off per notch,
@@ -83,7 +83,7 @@ Feature: The board grades every listed repository A to E
   Scenario: A package behind on pubkit, ungoverned and with open issues grades D
     Given the facts of a package with nothing wrong
     And it pins pubkit "0.12.0" where the latest is "0.14.2"
-    And it is not in governed.json and has no nightly workflow
+    And it is not governed and has no nightly workflow
     And it has 3 open issues
     When I grade them
     Then Delivery is "D"
@@ -129,7 +129,7 @@ Feature: The board grades every listed repository A to E
   Scenario: A grade never goes below E, but lists every notch
     Given the facts of a package with nothing wrong
     And it pins pubkit "0.12.0" where the latest is "0.14.2"
-    And it is not in governed.json and has no nightly workflow
+    And it is not governed and has no nightly workflow
     And it has 3 open issues
     And it has no release.json, so is not integrated with pubrel
     And its last release was "v0.3.1" on "2026-08-01T10:00:00Z"
@@ -156,9 +156,9 @@ Feature: The board grades every listed repository A to E
     When I order them
     Then the order is "a/two, a/three, a/one"
 
-  Scenario: The repos connector reads protected.json and governed.json
+  Scenario: The repos connector reads a repos file
     Given recorded responses from the build recording
-    When the repos connector reads "protected.json" and "governed.json"
+    When the repos connector reads "repos.json"
     Then it lists "example-org/pubthing, example-org/site-thing, example-org/private-thing"
     And "example-org/pubthing" is governed
     And every call is recorded with its connector, method, endpoint and time
@@ -197,8 +197,8 @@ Feature: The board grades every listed repository A to E
     Then the first answers 200 and the second does not answer
 
   Scenario: pubkit board writes board.json and index.html from a recorded build
-    Given the build recording, protected.json and governed.json in the repository
-    When I run pubkit "board" "--out" "site" "--replay" "recorded.json"
+    Given the build recording and its repos file in the repository
+    When I run pubkit "board" "--out" "site" "--replay" "recorded.json" "--repos" "repos.json"
     Then it succeeds
     And it prints "3 repos:"
     And "site/board.json" lists the repositories worst first

@@ -12,18 +12,18 @@
     pubkit audit prepare --package NAME [--version V] [--out FILE] [--quick] [--force]
     pubkit audit draft --package NAME [--report FILE] [--model ID]
     pubkit bump
-    pubkit pins --pubrel V --pub V [--no-lock]
+    pubkit pins --pubrel V [--no-lock]
     pubkit crates [--report FILE]
     pubkit record TEXT
-    pubkit nightly --pubrel V --pub V --body FILE
+    pubkit nightly --pubrel V --body FILE
     pubkit freshness [--json] (DIR... | --repos FILE [DIR])
-    pubkit protect [--check] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
+    pubkit protect [--check] [--repos FILE | --require CHECK...] [REPO...]
     pubkit state --check [FILE]
     pubkit app-secrets [--check]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
-    pubkit board --out DIR [--repos FILE | --config FILE --governed FILE] [--rules FILE]
+    pubkit board --out DIR --repos FILE [--rules FILE]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -453,7 +453,6 @@ def main(argv: list[str] | None = None) -> int:
                        help="print the sha256 of the standard this pubkit ships, for a report's header")
     p = commands.add_parser("pins", help="move every outdated pub* pin to its latest release")
     p.add_argument("--pubrel", default="", help="pubrel's latest release, for its workflow pins")
-    p.add_argument("--pub", default="", help="publet-cli's latest release, for pub-version")
     p.add_argument("--no-lock", action="store_true", help="do not relock (it needs the network)")
     p = commands.add_parser("crates",
                             help="update other crates, keeping only what cargo vet audits and cargo deny passes")
@@ -464,7 +463,6 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("nightly",
                             help="commit the pins, then the audited crate updates, and write the PR body")
     p.add_argument("--pubrel", required=True)
-    p.add_argument("--pub", required=True)
     p.add_argument("--body", required=True, type=Path)
     commands.add_parser("bump",
                         help="move this repository to this pubkit: managed files, lock, workflow pins")
@@ -482,11 +480,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="change nothing: print how each differs, and fail when one does")
     p.add_argument("--repos", dest="repos_file", type=Path, metavar="FILE",
                    help="the repos file: protect those it marks, each by its own pubkit.json")
-    p.add_argument("--config", type=Path,
-                   help="the repositories and their checks (default: ./protected.json); "
-                        "goes in a later release, use --repos")
     p.add_argument("--require", action="append", metavar="CHECK",
-                   help="a check the named repositories require, instead of any list; repeat it")
+                   help="a check the named repositories require, instead of their own "
+                        "pubkit.json; repeat it")
     p.add_argument("--no-tags", dest="tags", action="store_false",
                    help="leave out the release tag ruleset, for repositories that release no tags")
     p.add_argument("--no-queue", dest="queue", action="store_false",
@@ -494,19 +490,13 @@ def main(argv: list[str] | None = None) -> int:
                         "queue, for repositories GitHub offers no merge queue (a user's, or a "
                         "private one)")
     p.add_argument("repos", nargs="*", metavar="REPO",
-                   help="OWNER/NAME; by default every repository the config lists, or this "
-                        "repository from ./pubkit.json; one not listed is read from its own "
-                        "pubkit.json on GitHub")
+                   help="OWNER/NAME, read from its own pubkit.json on GitHub; by default "
+                        "those the repos file marks, or this repository from ./pubkit.json")
     p = commands.add_parser("board", help="grade every listed repository A to E into "
                                           "board.json and a static index.html")
     p.add_argument("--out", type=Path, required=True, help="the directory to write them to")
-    p.add_argument("--repos", type=Path, metavar="FILE", help="the repos file: grade what it names")
-    p.add_argument("--config", type=Path,
-                   help="the repositories and their checks (default: ./protected.json); "
-                        "goes in a later release, use --repos")
-    p.add_argument("--governed", type=Path,
-                   help="the repositories a nightly updates (default: ./governed.json, if any); "
-                        "goes in a later release, use --repos")
+    p.add_argument("--repos", type=Path, metavar="FILE", required=True,
+                   help="the repos file: grade what it names")
     p.add_argument("--rules", type=Path, help="other rules than the ones pubkit ships")
     p.add_argument("--replay", type=Path,
                    help="read recorded responses from this file instead of the network")
@@ -581,7 +571,7 @@ def main(argv: list[str] | None = None) -> int:
         return conform(root)
     if args.command == "pins":
         from .nightly import pins
-        for line in pins(root, args.pubrel, args.pub, lock=not args.no_lock):
+        for line in pins(root, args.pubrel, lock=not args.no_lock):
             print(line)
         return 0
     if args.command == "crates":
@@ -594,7 +584,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "nightly":
         from .nightly import nightly
-        return nightly(root, args.pubrel, args.pub, args.body)
+        return nightly(root, args.pubrel, args.body)
     if args.command == "bump":
         from .freshness import bump
         return bump(root)
@@ -606,11 +596,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "protect":
         from .paths import confined
         from .protect import run as protect
-        if args.repos_file and (args.config or args.require):
-            sys.exit("pubkit protect: --repos takes the place of --config and --require")
-        config = confined(args.config, "the --config file") if args.config else None
+        if args.repos_file and args.require:
+            sys.exit("pubkit protect: --repos takes the place of --require")
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
-        return protect(config, args.repos, args.check, args.require, tags=args.tags,
+        return protect(args.repos, args.check, args.require, tags=args.tags,
                        queue=args.queue, repos_file=repos_file)
     if args.command == "app-secrets":
         from .app_secrets import run as app_secrets
@@ -626,19 +615,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "board":
         from .board import run as board
         from .paths import confined
-        if args.repos and (args.config or args.governed):
-            sys.exit("pubkit board: --repos takes the place of --config and --governed")
-        config, governed = args.config, args.governed
-        if not args.repos:
-            from .repos import warn_lists
-            warn_lists("board", "protected.json, governed.json, --config and --governed")
-            config = config or Path("protected.json")
-            governed = governed or (Path("governed.json") if Path("governed.json").is_file() else None)
         files = {name: confined(path, f"the --{name} file") if path else None
-                 for name, path in (("config", config), ("governed", governed),
-                                    ("rules", args.rules), ("replay", args.replay),
+                 for name, path in (("rules", args.rules), ("replay", args.replay),
                                     ("record", args.record), ("repos", args.repos))}
-        return board(files["config"], files["governed"], confined(args.out, "the --out directory"),
+        return board(confined(args.out, "the --out directory"),
                      files["rules"], files["replay"], files["record"], files["repos"])
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves

@@ -256,7 +256,7 @@ def nightly_runs(repo, monkeypatch, capsys, name, version, package, new):
     monkeypatch.setattr(cli, "lock", lambda root: (root / cli.LOCK).write_text(
         LOCK_TEXT.replace("9.0.0", new)))
     monkeypatch.chdir(repo)
-    assert nightly.nightly(repo, "0.5.4", "0.2.1", Path("body.md")) == 0
+    assert nightly.nightly(repo, "0.5.4", Path("body.md")) == 0
     return {"made": capsys.readouterr().out.strip(), "body": (repo / "body.md").read_text()}
 
 
@@ -424,11 +424,12 @@ def called(workflow, name, secrets):
     assert "NIGHTLY_APP" not in workflow["data"]["jobs"]["update"]["env"]["REPO"]
 
 
-@then("run by hand it still reads governed.json, warning that it goes")
-def by_hand(workflow):
+@then("run by hand it takes the same repos input")
+def by_hand_repos(workflow):
+    dispatch = workflow["data"][True]["workflow_dispatch"]["inputs"]
+    assert dispatch["repos"]["required"] is True
     report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
-    assert "::warning::governed.json goes in a later release" in report["run"]
-    assert "pubkit/governed.json" in report["run"]
+    assert "governed.json" not in report["run"]
 
 
 @then("a repository it can't read for the report doesn't stop the others")

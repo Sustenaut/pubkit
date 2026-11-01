@@ -1,8 +1,8 @@
 """The nightly update of a pub* repository, as two commits' worth of change.
 
-`pubkit pins --pubrel V --pub V` moves every outdated pub* pin to its latest
+`pubkit pins --pubrel V` moves every outdated pub* pin to its latest
 release: this pubkit (managed files, lock, `rust-ci.yml`), pubrel's release
-workflow and `pubrel-version`, the `pub-version` a workflow installs, each
+workflow and `pubrel-version`, each
 tool `ci.tools` pins by tag, to the latest release of its git repository,
 and the crates `nightly.pins.crates` names in `Cargo.lock`, within their
 requirements.
@@ -40,10 +40,6 @@ from .paths import confined
 from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit,
                    release_commit, repin)
 
-# The crates `pins` moves rather than `crates` where a repository's pubkit.json
-# names none in `nightly.pins.crates`, with a warning, until each one does.
-PUB_CRATES = ("publet-core", "publet-algorithms", "pubunit")
-
 # A row's text, which must not start with '-' (pubrel has no `--`, so it
 # would read that as an option) or a space.
 ROW = re.compile(r"[^-\s].*", re.S)
@@ -53,7 +49,6 @@ CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
 
 # RELEASE_PIN (refs.py) is pubrel's release workflow, by commit or by tag.
 PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
-PUB_VERSION = re.compile(r"(pub-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
 # Every pubkit reusable workflow a repository can call, not only rust-ci.
 CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/"
                     r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
@@ -126,7 +121,7 @@ def pin_crates(root: Path) -> tuple[str, ...]:
     path = root / "pubkit.json"
     config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     named = named_crates(config)
-    return PUB_CRATES if named is None else named
+    return named or ()
 
 
 def settings(root: Path) -> dict[str, dict[str, bool]]:
@@ -256,7 +251,7 @@ def tools_by_config(root: Path, changes: list[str]) -> bool:
     return moved
 
 
-def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
+def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
     changes = []
@@ -280,11 +275,10 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
         new = text
         for pattern, version, what in ((PUBKIT_PIN, __version__, "pubkit"),
                                        (RELEASE_PIN, pubrel, "pubrel release workflow"),
-                                       (PUBREL_VERSION, pubrel, "pubrel-version"),
-                                       (PUB_VERSION, pub, "pub-version")):
+                                       (PUBREL_VERSION, pubrel, "pubrel-version")):
             if not version or not pattern.search(new):
                 continue
-            if pattern is PUBREL_VERSION or pattern is PUB_VERSION:
+            if pattern is PUBREL_VERSION:
                 commit = None
                 moved = pattern.sub(rf"\g<1>{version}", new)
             else:
@@ -303,10 +297,6 @@ def pins(root: Path, pubrel: str, pub: str, lock: bool = True) -> list[str]:
             path.write_text(new, encoding="utf-8")
     old = locked(root)
     moving = pin_crates(root)
-    if moving is PUB_CRATES and (used := [c for c in PUB_CRATES if c in old]):
-        print(f"pubkit: warning: pubkit.json names no nightly.pins.crates, so {', '.join(used)} "
-              f"move as pins; add \"nightly\": {{\"pins\": {{\"crates\": {json.dumps(used)}}}}} "
-              f"to it", file=sys.stderr)
     for crate in moving:
         if crate in old:
             cargo(root, "update", "--quiet", "-p", crate)
@@ -381,7 +371,7 @@ def candidates(root: Path) -> list[tuple[str, str, str]]:
     return upgrades(cargo(root, "update", "--dry-run").stderr, pin_crates(root))
 
 
-def upgrades(dry_run: str, pinned: tuple[str, ...] = PUB_CRATES) -> list[tuple[str, str, str]]:
+def upgrades(dry_run: str, pinned: tuple[str, ...] = ()) -> list[tuple[str, str, str]]:
     """The upgrades in `cargo update --dry-run`'s output, `pinned` aside."""
     return [(m.group(1), m.group(2), m.group(3)) for m in UPDATE.finditer(dry_run)
             if m.group(1) not in pinned]
@@ -578,7 +568,7 @@ def body(pinned: list[str], updated: list[str], skipped: list[dict],
     return "\n".join(out).rstrip("\n") + "\n"
 
 
-def nightly(root: Path, pubrel: str, pub: str, body_path: Path) -> int:
+def nightly(root: Path, pubrel: str, body_path: Path) -> int:
     """The nightly's commits on the current branch, and the pull request's
     body. Prints the commits it made, in order: `pins` first when it made
     that one, then any of `crates`, `npm` and `python`, or nothing."""
@@ -586,7 +576,7 @@ def nightly(root: Path, pubrel: str, pub: str, body_path: Path) -> int:
 
     body_path = confined(body_path, "the --body file")
     update = settings(root)["update"]
-    pinned = pins(root, pubrel, pub)
+    pinned = pins(root, pubrel)
     made = ["pins"] if commit(root, "Move to the latest pub* releases", pinned) else []
     result: dict = {"updated": [], "skipped": []}
     others: dict[str, list[str]] = {}

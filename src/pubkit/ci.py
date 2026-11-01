@@ -50,8 +50,7 @@ a change to its release workflow is tested before it ships.
 
 `tools` lists what a Rust repository's functional suite drives: each crate
 is installed from its git repository at its tag, by `cargo install --locked`,
-and the nightly moves each tag to the latest release of that repository. It
-replaces the `pub-version` input, which still works and warns.
+and the nightly moves each tag to the latest release of that repository.
 
 A repository that deploys a static site with pubkit's deploy-static (a
 workflow of its own uses it, or pubkit.json has a `site` block) gets a
@@ -169,7 +168,7 @@ JOBS: dict[str, dict[str, Job]] = {
         "test": Job("job-rust-test.yml", ("os-matrix", "test-args"), needs=("gates",),
                     standard="test"),
         "functional": Job("job-rust-functional.yml",
-                          ("python-version", "apt-packages", "pub-version", "functional",
+                          ("python-version", "apt-packages", "functional",
                            "cargo-llvm-cov-version"), needs=("gates",), secrets=True,
                           internal=(*RUST_REQUIRED, "tools"), standard="functional"),
         "msrv": Job("job-rust-msrv.yml", needs=("gates",), events=HEAVY, standard="msrv"),
@@ -327,8 +326,6 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     listed = tools(given)
     if listed and language != "rust":
         stop(f"tools is for a Rust repository's functional job; {language} has none")
-    if listed and "pub-version" in inputs:
-        stop("with gives pub-version, the deprecated form of tools; give tools alone")
     rules = plan(config, root) if language == "rust" else None
     jobs: dict[str, tuple[str, ...]] = {}
     for name, job in table.items():
@@ -624,9 +621,6 @@ def generated(config: dict[str, Any], root: Path) -> list[tuple[str, str]]:
     ci = settings(config, root)
     if ci is None:
         return []
-    if "pub-version" in ci["with"]:
-        print("pubkit: warning: pubkit.json's ci.with.pub-version is deprecated; list the tool "
-              "in ci.tools, with its crate, git and tag", file=sys.stderr)
     ci["owner"] = owner(config)
     ci["commit"] = release_commit()
     if ci["release"] and not ci["release"].get("local"):

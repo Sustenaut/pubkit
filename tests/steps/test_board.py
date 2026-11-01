@@ -117,7 +117,7 @@ def secret_unreadable(case):
     _set(case, "secret_protection", None)
 
 
-@given("it is not in governed.json and has no nightly workflow")
+@given("it is not governed and has no nightly workflow")
 def ungoverned(case):
     _set(case, "nightly", {"governed": False, "last": None})
 
@@ -277,24 +277,19 @@ def _connector(sources, cls):
     return cls(sources["ledger"], sources["transport"])
 
 
-@when(parsers.parse('the repos connector reads "{protected}" and "{governed}"'),
-      target_fixture="read")
-def read_lists(sources, protected, governed):
-    repos = _connector(sources, Repos)
-    return {"protected": repos.protected(FIXTURES / protected),
-            "governed": repos.governed(FIXTURES / governed)}
+@when(parsers.parse('the repos connector reads "{name}"'), target_fixture="read")
+def read_repos_file(sources, name):
+    return {"listed": _connector(sources, Repos).listed(FIXTURES / name)}
 
 
 @then(parsers.parse('it lists "{names}"'))
 def it_lists(read, names):
-    listed = [e["repo"] for e in read["protected"].value]
-    listed += [e["repo"] for e in read["governed"].value if e["repo"] not in listed]
-    assert listed == [n.strip() for n in names.split(",")]
+    assert [e["repo"] for e in read["listed"].value] == [n.strip() for n in names.split(",")]
 
 
 @then(parsers.parse('"{repo}" is governed'))
 def is_governed(read, repo):
-    assert repo in [e["repo"] for e in read["governed"].value]
+    assert repo in [e["repo"] for e in read["listed"].value if e["govern"]]
 
 
 @then("every call is recorded with its connector, method, endpoint and time")
@@ -408,9 +403,9 @@ def answers(read):
 
 # The command, replaying the recorded build.
 
-@given("the build recording, protected.json and governed.json in the repository")
+@given("the build recording and its repos file in the repository")
 def recorded_build(repo):
-    for name in ("recorded.json", "protected.json", "governed.json"):
+    for name in ("recorded.json", "repos.json"):
         shutil.copy(FIXTURES / name, repo / name)
 
 
@@ -464,11 +459,9 @@ def record_then_replay(sources, tmp_path, monkeypatch):
     monkeypatch.chdir(FIXTURES)
     when_built = sources["transport"].recorded_at
     recording = Recording(sources["transport"])
-    first = build(Path("protected.json"), Path("governed.json"), grading.load(), recording,
-                  when_built)
+    first = build(Path("repos.json"), grading.load(), recording, when_built)
     recording.save(tmp_path / "again.json", when_built)
-    second = build(Path("protected.json"), Path("governed.json"), grading.load(),
-                   Replay(tmp_path / "again.json"), when_built)
+    second = build(Path("repos.json"), grading.load(), Replay(tmp_path / "again.json"), when_built)
     return first, second
 
 

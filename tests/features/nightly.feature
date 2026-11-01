@@ -8,23 +8,22 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Given an empty repository
 
   Scenario: pins moves every workflow pin to the latest releases
-    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1, pub-version: v0.2.0 }"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1 }"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
-    And it prints "ci.yml: pub-version 0.2.0 -> 0.2.1"
-    And ".github/workflows/ci.yml" contains "release.yml@v0.5.3 with: { pubrel-version: v0.5.3, pub-version: v0.2.1 }"
+    And ".github/workflows/ci.yml" contains "release.yml@v0.5.3 with: { pubrel-version: v0.5.3 }"
 
   Scenario: pins moves pubkit's pin in every one of its reusable workflows
     Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubkit/.github/workflows/node-ci.yml@v0.0.1"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" does not contain "node-ci.yml@v0.0.1"
 
   Scenario: pins moves pubrel's commit together with its version
     Given pubrel's repository tags "v0.5.3"
     And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
     And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
@@ -32,14 +31,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario: pins moves pubkit's commit together with its version
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubkit/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" pins pubkit's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
 
   Scenario: pins moves a current pin by tag to the tag's commit
     Given pubrel's repository tags "v0.5.3"
     And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.3 pinned to"
     And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
@@ -47,7 +46,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario: pins moves a workflow pinned under the old owner to workflows_owner's
     Given pubkit.json names the workflows owner "sustenaut"
     And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubkit/.github/workflows/node-ci.yml@v0.0.1"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" contains "uses: sustenaut/pubkit/.github/workflows/node-ci.yml@v"
     And ".github/workflows/ci.yml" does not contain "example-org"
@@ -55,7 +54,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario Outline: pins moves a pubkit action to this pubkit's commit, under the current owner
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
 
@@ -69,7 +68,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario Outline: pins moves a hand-written call of any pubkit workflow to this pubkit's commit
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "ci.yml" calls "<owner>"'s pubkit workflow "<workflow>" at "another pubkit"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" calls "Sustenaut"'s pubkit workflow "<workflow>" at "this pubkit's commit"
 
@@ -82,13 +81,13 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario: pins leaves a pubkit action that names no version
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
 
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints nothing
 
@@ -96,9 +95,9 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When cargo vet reports "  zeroize:1.9.1 missing [\"safe-to-deploy\"]" and "  syn:3.0.9 missing [\"safe-to-run\"]"
     Then the crates skipped are "syn, zeroize"
 
-  Scenario: The upgrades tried are cargo's, without its downgrades or the pub* crates
+  Scenario: The upgrades tried are cargo's, without its downgrades
     When cargo update --dry-run says "Updating syn v3.0.5 -> v3.0.9", "Downgrading icu_provider v2.3.1 -> v2.1.1 (available: v2.3.1)" and "Updating publet-core v0.1.2 -> v0.1.3"
-    Then the upgrades tried are "syn 3.0.5 -> 3.0.9"
+    Then the upgrades tried are "syn 3.0.5 -> 3.0.9, publet-core 0.1.2 -> 0.1.3"
 
   Scenario: A skipped crate's reason is the audits cargo vet recommends
     When a failing cargo vet ends with "recommended audits for safe-to-deploy:" and "cargo vet diff zeroize 1.9.0 1.9.1"
@@ -176,7 +175,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
     And Cargo.lock locks "my-core, publet-core"
     And cargo stands in, recording what it is asked
-    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--no-lock"
     Then it succeeds
     And cargo was asked to update "my-core" alone
     And stderr does not mention "nightly.pins.crates"
@@ -185,25 +184,16 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": []}}}"
     And Cargo.lock locks "publet-core"
     And cargo stands in, recording what it is asked
-    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--no-lock"
     Then it succeeds
     And cargo was asked to update nothing
 
-  Scenario: Without nightly.pins.crates, pins moves the old crates and warns
+  Scenario: Without nightly.pins.crates, pins moves no crates
     Given Cargo.lock locks "publet-core, serde"
     And cargo stands in, recording what it is asked
-    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--no-lock"
     Then it succeeds
-    And cargo was asked to update "publet-core" alone
-    And stderr mentions "pubkit.json names no nightly.pins.crates, so publet-core move as pins"
-
-  Scenario: A repository with none of the old crates hears no warning
-    Given Cargo.lock locks "serde"
-    And cargo stands in, recording what it is asked
-    When I run pubkit "pins" "--pub" "0.2.1" "--no-lock"
-    Then it succeeds
-    And stderr does not mention "nightly.pins.crates"
-
+    And cargo was asked to update nothing
   Scenario: The upgrades tried leave out the crates pubkit.json pins, and only those
     Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
     When cargo update --dry-run here says "Updating my-core v1.0.0 -> v1.0.1" and "Updating publet-core v1.0.0 -> v1.0.1"
@@ -269,7 +259,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario: A control plane calls the nightly with a repos input and neutral secrets
     When I parse the workflow "nightly.yml"
     Then it can be called with the input "repos" and the secrets "app-id, app-key, notify-token, notify-user"
-    And run by hand it still reads governed.json, warning that it goes
+    And run by hand it takes the same repos input
     And a repository it can't read for the report doesn't stop the others
     And only what the repos input governs gets a pull request
     And it takes pubkit's script and wheel from the same latest release, whichever repository calls it
