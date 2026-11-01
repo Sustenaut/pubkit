@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.24.3 is released as v0.24.3 from commit 71df7061de7498f6d9b7f60a0afd628520d187c5.",
+      "content": "pubkit 0.24.4 is released as v0.24.4 from commit 40b437a0d305ae86119268ba9c5cfbea69c21144.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.24.3",
+            "0.24.4",
             "pubkit --version",
-            "pubkit 0.24.3",
-            "v0.24.3",
-            "71df7061de7498f6d9b7f60a0afd628520d187c5"
+            "pubkit 0.24.4",
+            "v0.24.4",
+            "40b437a0d305ae86119268ba9c5cfbea69c21144"
           ]
         ]
       },
-      "scope": "the published release v0.24.3 of pubkit",
+      "scope": "the published release v0.24.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "71df7061de7498f6d9b7f60a0afd628520d187c5"
+          "revision": "40b437a0d305ae86119268ba9c5cfbea69c21144"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.24.3 was released on 2026-11-01 from commit 71df7061de7498f6d9b7f60a0afd628520d187c5 with these changes.",
+      "content": "pubkit 0.24.4 was released on 2026-11-01 from commit 40b437a0d305ae86119268ba9c5cfbea69c21144 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,18 +58,22 @@
         "rows": [
           [
             "added",
-            "pubkit protect turns on secret scanning and push protection on public repositories, and the board takes a security notch when either is off. A protect block opts out with secret_scanning false; nothing ever turns them off, and private repositories are left alone."
+            "terraform/cloud-run-service, terraform/backup-bucket and terraform/cloud-run-access: what a Cloud Run site repeats (its account, registry and service, and a deploy account only its own GitHub repository can use), a backup bucket with an account that can only create objects, and who may pass IAP to each service. The README describes one stack per repository, and how to move a site without changing anything in the cloud."
+          ],
+          [
+            "fixed",
+            "terraform/hosting and terraform/dns-zone no longer show a change on every plan for Cloudflare's DNS settings the module does not set, a zone Cloudflare reports as pending DNSSEC, or a Pages project whose deployment configs its own deploys set."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.24.3 of pubkit",
+      "scope": "the published release v0.24.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "71df7061de7498f6d9b7f60a0afd628520d187c5"
+          "revision": "40b437a0d305ae86119268ba9c5cfbea69c21144"
         }
       ]
     }
