@@ -127,6 +127,12 @@ resource "cloudflare_zone_dns_settings" "zone" {
 
   zone_id        = cloudflare_zone.zone[0].id
   multi_provider = true
+
+  # The provider takes these as optional, not computed: Cloudflare reports them,
+  # this sets none, and without this every plan would show them going to null.
+  lifecycle {
+    ignore_changes = [flatten_all_cnames, foundation_dns, ns_ttl, secondary_overrides, zone_mode]
+  }
 }
 
 locals {
@@ -184,6 +190,13 @@ resource "cloudflare_zone_dnssec" "zone" {
   zone_id             = cloudflare_zone.zone[0].id
   status              = "active"
   dnssec_multi_signer = true
+
+  # Cloudflare can report a signing zone as "pending", and setting "active" does
+  # not change that, so without this every plan would show it. status is sent
+  # when the zone is created; `pubkit dns check` is what notices signing stop.
+  lifecycle {
+    ignore_changes = [status]
+  }
 }
 
 # The other providers' keys, one record each, keyed by the key as

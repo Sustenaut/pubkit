@@ -168,6 +168,10 @@ resource "cloudflare_pages_project" "site" {
   production_branch = "main"
 
   lifecycle {
+    # The project's own deploys set these, with wrangler: a binding there would
+    # otherwise show this project as changed on every plan.
+    ignore_changes = [deployment_configs]
+
     postcondition {
       condition     = self.subdomain == each.value.pages_subdomain
       error_message = "Cloudflare named the Pages project ${each.value.project}'s address ${self.subdomain}, not ${each.value.pages_subdomain}. Set \"subdomain\": \"${self.subdomain}\" on ${each.key}'s site in pubkit.json, and apply again."
