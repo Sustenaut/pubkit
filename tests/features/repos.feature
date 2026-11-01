@@ -175,3 +175,52 @@ Feature: A repos file says which repositories pubkit acts on, and a state file w
   Scenario: state takes only --check
     When I run pubkit "state"
     Then it does not succeed
+
+  Scenario: A repository that reports every check it requires passes
+    Given the state of "example-org" has "one" with protect on and "two" with protect off
+    And "example-org/one" has a protect block requiring "ci / passed"
+    And "example-org/one" has reported "ci / passed" on its default branch
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it succeeds
+
+  Scenario: A check seen only on a recent pull request still counts
+    Given the state of "example-org" has "one" with protect on and "two" with protect off
+    And "example-org/one" has a protect block requiring "ci / passed"
+    And "example-org/one" has reported "other" on its default branch
+    And "example-org/one" has reported "ci / passed" on a recent pull request
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it succeeds
+
+  Scenario: A commit status counts as a check too
+    Given the state of "example-org" has "one" with protect on and "two" with protect off
+    And "example-org/one" has a protect block requiring "ci / passed"
+    And "example-org/one" has a commit status "ci / passed" on its default branch
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it succeeds
+
+  Scenario: A required check the repository never reports is refused
+    Given the state of "example-org" has "one" with protect on and "two" with protect off
+    And "example-org/one" has a protect block requiring "SonarCloud Code Analysis"
+    And "example-org/one" has reported "ci / passed" on its default branch
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it does not succeed
+    And it prints "example-org/one requires the check "SonarCloud Code Analysis", which it hasn't reported lately"
+
+  Scenario: Protect off doesn't look at a repository's checks
+    Given the state of "example-org" has "one" with protect off and "two" with protect off
+    And "example-org/one" has a protect block requiring "SonarCloud Code Analysis"
+    And "example-org/one" has reported "ci / passed" on its default branch
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it succeeds
+
+  Scenario: Checks that can't be read aren't held against a repository
+    Given the state of "example-org" has "one" with protect on and "two" with protect off
+    And "example-org/one" has a protect block requiring "ci / passed"
+    And "example-org/two" exists
+    When I run pubkit "state" "--check"
+    Then it succeeds

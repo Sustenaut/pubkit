@@ -6,7 +6,10 @@
 One file per GitHub owner says which of its repositories are graded, protected
 and governed. This checks its shape, that each repository exists under the
 owner, and that each one with `protect` has a protect block in its pubkit.json,
-since that block is what says how. It is the state repository's one required
+since that block is what says how, and that the repository has reported every check
+the block requires, since a ruleset requiring one it never reports stops anything
+merging. That last check is the best it can be: it looks at the default branch's newest
+commit and a few recent pull requests, and says nothing when it can't read them. It is the state repository's one required
 check, so it builds nothing and takes seconds. It reads GitHub through `gh`,
 with a token that can read every repository the file names.
 """
@@ -25,6 +28,7 @@ from .protect import Api, ApiError
 OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*")
 NAME = re.compile(r"[A-Za-z0-9_.-]+")
 ROLES = ("board", "protect", "govern")
+RECENT_PULLS = 5
 
 
 def shape(state: Any) -> list[str]:
@@ -54,6 +58,22 @@ def shape(state: Any) -> list[str]:
     return out
 
 
+def reported(api: Api, slug: str, branch: str) -> set[str] | None:
+    """Every check `slug` has reported lately on `branch` and its recent pull
+    requests, or None if they can't be read."""
+    try:
+        pulls = api("GET", f"repos/{slug}/pulls?state=closed&per_page={RECENT_PULLS}", None) or []
+        names: set[str] = set()
+        for ref in [branch, *(p["head"]["sha"] for p in pulls)]:
+            runs = api("GET", f"repos/{slug}/commits/{ref}/check-runs?per_page=100", None) or {}
+            names |= {run["name"] for run in runs.get("check_runs", [])}
+            statuses = api("GET", f"repos/{slug}/commits/{ref}/status", None) or {}
+            names |= {status["context"] for status in statuses.get("statuses", [])}
+    except (ApiError, KeyError, TypeError):
+        return None
+    return names
+
+
 def on_github(api: Api, owner: str, repos: dict) -> list[str]:
     """What GitHub says is wrong: a repository missing, moved or unreadable,
     or one to protect that has no sound protect block."""
@@ -71,9 +91,15 @@ def on_github(api: Api, owner: str, repos: dict) -> list[str]:
             continue
         if roles["protect"]:
             try:
-                protect.remote(api, slug)
+                entry = protect.remote(api, slug)
             except ValueError as e:
                 out.append(f"{slug} has \"protect\" on, but {e}")
+                continue
+            seen = reported(api, slug, found.get("default_branch", "main"))
+            for check in [] if seen is None else entry["checks"]:
+                if check not in seen:
+                    out.append(f"{slug} requires the check \"{check}\", which it hasn't reported "
+                               f"lately, so nothing could merge there")
     return out
 
 

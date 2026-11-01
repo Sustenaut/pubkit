@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit state --check refuses a repository with protect on whose block requires a check it hasn't reported on its default branch or recent pull requests, since nothing could merge there. It says nothing when it can't read them."
+}
