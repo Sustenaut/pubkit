@@ -181,8 +181,13 @@ It goes in this order, so that a refusal comes before there is an app to clean u
    random `state` that must come back. You confirm the app on GitHub, which
    redirects to the server with a code, and the code becomes the app and its key.
 5. Your browser opens the app's install page. Signing with the new key, pubkit
-   watches `GET /app/installations` until the app is installed on the owner, and
-   takes the installation's id.
+   watches `GET /app/installations` until the app is installed on the owner, takes
+   the installation's id, and says which repositories it reaches: all of them, or
+   the list of those selected. Opening that page may install the app on every
+   repository straight away, with no step in which to choose. To narrow it, go to
+   the owner's settings, then GitHub Apps, then Configure beside the app, and pick
+   "Only select repositories"; the run has printed the link. The installation's id
+   stays the same, so this can wait until after the run.
 6. It shows what it will write, and writes only when you type `yes`. If a write
    fails it offers to try the ones left with another token.
 

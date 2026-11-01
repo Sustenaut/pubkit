@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -28,6 +29,7 @@ scenarios("github-app.feature")
 PROJECT_ID = "11111111-2222-3333-4444-555555555555"
 APP_ID = 5551234
 INSTALLATION_ID = 7770001
+INSTALLATION_TOKEN = "ghs_the-installation-token"
 
 FAKE_BWS = f"""#!{sys.executable}
 import json, os, sys
@@ -100,7 +102,8 @@ def verified(jwt: str, public, tmp_path) -> bool:
 @pytest.fixture
 def api(key, tmp_path, env):
     """A fake GitHub API, which records what it was asked."""
-    state = {"codes": [], "jwt_ok": [], "looks": 0, "answers": [], "refuse": False}
+    state = {"codes": [], "jwt_ok": [], "looks": 0, "answers": [], "refuse": False,
+             "selection": "all", "repositories": [], "refuse_token": False, "listed_with": []}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):  # noqa: A002
@@ -114,6 +117,14 @@ def api(key, tmp_path, env):
             self.wfile.write(data)
 
         def do_POST(self):  # noqa: N802
+            if self.path == f"/app/installations/{INSTALLATION_ID}/access_tokens":
+                jwt = self.headers.get("Authorization", "").removeprefix("Bearer ")
+                state["jwt_ok"].append(verified(jwt, key["public"], tmp_path))
+                if state["refuse_token"]:
+                    self.reply(403, {"message": "Forbidden"})
+                else:
+                    self.reply(201, {"token": INSTALLATION_TOKEN})
+                return
             state["codes"].append(self.path)
             if state["refuse"] or self.path != "/app-manifests/the-code/conversions":
                 self.reply(404, {"message": "Not Found"})
@@ -123,11 +134,21 @@ def api(key, tmp_path, env):
                              "webhook_secret": "the-webhook-secret"})
 
         def do_GET(self):  # noqa: N802
+            url = urllib.parse.urlsplit(self.path)
+            if url.path == "/installation/repositories":
+                state["listed_with"].append(self.headers.get("Authorization", ""))
+                query = urllib.parse.parse_qs(url.query)
+                size, page = int(query["per_page"][0]), int(query["page"][0])
+                names = state["repositories"][(page - 1) * size:page * size]
+                self.reply(200, {"total_count": len(state["repositories"]),
+                                 "repositories": [{"full_name": name} for name in names]})
+                return
             jwt = self.headers.get("Authorization", "").removeprefix("Bearer ")
             state["jwt_ok"].append(verified(jwt, key["public"], tmp_path))
             answers = state["answers"]
             ready = [{"id": 1, "account": {"login": "someone-else"}},
-                     {"id": INSTALLATION_ID, "account": {"login": state["owner"].upper()}}]
+                     {"id": INSTALLATION_ID, "account": {"login": state["owner"].upper()},
+                      **({"repository_selection": state["selection"]} if state["selection"] else {})}]
             self.reply(200, answers.pop(0) if answers else ready)
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -209,6 +230,28 @@ def has_two(env, name):
 @given(parsers.parse('bws refuses writes with the token "{token}", printing what it was given'))
 def refuses(env, token):
     env["BWS_REFUSE"] = token
+
+
+@given(parsers.parse('the app is installed on the selected repositories "{first}" and "{second}"'))
+def selected(api, first, second):
+    api["selection"] = "selected"
+    api["repositories"] = [first, second]
+
+
+@given(parsers.parse("the app is installed on {count:d} selected repositories"))
+def many_selected(api, count):
+    api["selection"] = "selected"
+    api["repositories"] = [f"example-org/repo-{i}" for i in range(count)]
+
+
+@given("GitHub refuses the installation token")
+def refuses_token(api):
+    api["refuse_token"] = True
+
+
+@given("GitHub does not say which repositories the app reaches")
+def no_selection(api):
+    api["selection"] = None
 
 
 @given("GitHub refuses the code")
@@ -365,6 +408,11 @@ def not_on_disk(repo, key):
     for path in repo.rglob("*"):
         if path.is_file():
             assert body not in path.read_text(errors="replace"), path
+
+
+@then("the list was asked for with the installation's own token")
+def listed_with_token(api):
+    assert api["listed_with"] == [f"Bearer {INSTALLATION_TOKEN}"]
 
 
 @then("the wrong state was answered with 400")
