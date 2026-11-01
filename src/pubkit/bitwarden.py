@@ -75,8 +75,7 @@ def write(token: str, organization: str, project: str, name: str, value: str, no
             if secret is None:
                 answer = client.secrets().create(UUID(organization), name, value, note, [UUID(project)])
             else:
-                answer = client.secrets().update(UUID(organization), UUID(secret), name, value, note,
-                                                 [UUID(project)])
+                answer = client.secrets().update(organization, secret, name, value, note, [UUID(project)])
     except Exception as error:  # noqa: BLE001  # the SDK raises bare Exceptions, and they may quote what it was given
         raise WriteFailed(scrub(str(error), hidden) or type(error).__name__) from None
     if not answer.success:
