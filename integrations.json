@@ -10,6 +10,7 @@
     {
       "plugin": "bitwarden.secrets",
       "paths": [
+        "src/pubkit/github_app.py",
         "src/pubkit/templates/service/with-secrets"
       ],
       "mode": "required"
@@ -55,7 +56,8 @@
         ".github/workflows/ci.yml",
         ".github/workflows/nightly.yml",
         "src/pubkit/app_secrets.py",
-        "src/pubkit/ci.py"
+        "src/pubkit/ci.py",
+        "src/pubkit/github_app.py"
       ],
       "mode": "required"
     },

@@ -20,6 +20,7 @@
     pubkit protect [--check] [--repos FILE | --config FILE | --require CHECK...] [REPO...]
     pubkit state --check [FILE]
     pubkit app-secrets [--check]
+    pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR [--repos FILE | --config FILE --governed FILE] [--rules FILE]
@@ -518,6 +519,17 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("app-secrets", help="send the secrets this repository's pubkit.json "
                                                 "names to it, through ./with-secrets")
     p.add_argument("--check", action="store_true", help="check the values, and send nothing")
+    p = commands.add_parser("github-app", help="make a GitHub App from a manifest, and put its "
+                                               "values in Bitwarden")
+    github_app = p.add_subparsers(dest="github_app_command", required=True)
+    p = github_app.add_parser("create", help="go through GitHub's app-manifest flow, in a browser, "
+                                             "then write the app's id, key and installation id")
+    p.add_argument("manifest", type=Path, metavar="MANIFEST",
+                   help="the app's manifest, with a pubkit section naming its owner, "
+                        "Bitwarden project and secret prefix")
+    p.add_argument("--replace", action="store_true",
+                   help="overwrite secrets that already have those names, instead of refusing")
+    p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -603,6 +615,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "app-secrets":
         from .app_secrets import run as app_secrets
         return app_secrets(read_config(root), args.check)
+    if args.command == "github-app":
+        from .github_app import run as github_app_run
+        from .paths import confined
+        return github_app_run(confined(args.manifest, "the manifest"), args.replace, args.dry_run)
     if args.command == "state":
         from .paths import confined
         from .state import check

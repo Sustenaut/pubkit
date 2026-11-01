@@ -139,6 +139,62 @@ and each value reaches `gh` on its standard input. An app installed on several
 owners has a different installation id on each, so each repository names its own
 owner's. `pubkit sync --check` checks both.
 
+### Creating a GitHub App
+
+`pubkit github-app create` makes an app with GitHub's
+[manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
+and puts its three values in Bitwarden, under names `pubkit app-secrets` can then
+send on. The manifest is the repository's own: GitHub's fields, and a `pubkit`
+section GitHub never sees, naming the owner (`org` or `user`), the Bitwarden
+project (its name or id) and the prefix of the secrets' names:
+
+```json
+{
+  "name": "some-app",
+  "url": "https://example.org",
+  "public": false,
+  "default_permissions": { "contents": "read" },
+  "pubkit": {
+    "org": "some-org",
+    "bitwarden_project": "some-project",
+    "secret_prefix": "some-app"
+  }
+}
+```
+
+```sh
+./pubkit github-app create --dry-run some-app.json   # shows the plan, and does nothing
+./pubkit github-app create some-app.json
+```
+
+It goes in this order, so that a refusal comes before there is an app to clean up:
+
+1. It shows the app, the project and the three names: `some-app-app-id`,
+   `some-app-app-key` and `some-app-installation-id`. `--dry-run` ends here.
+2. It asks for a Bitwarden access token with write access to the project, at a
+   hidden prompt. It is never read from `.env` or a file and never kept, and it
+   reaches `bws` only in its environment. `./with-secrets`' read-only token will
+   not do for the writes.
+3. It looks for the names in the project, and refuses if one is there. `--replace`
+   overwrites them instead, with `bws secret edit`.
+4. A server on 127.0.0.1 opens a page that posts the manifest to GitHub, with a
+   random `state` that must come back. You confirm the app on GitHub, which
+   redirects to the server with a code, and the code becomes the app and its key.
+5. Your browser opens the app's install page. Signing with the new key, pubkit
+   watches `GET /app/installations` until the app is installed on the owner, and
+   takes the installation's id.
+6. It shows what it will write, and writes only when you type `yes`. If a write
+   fails it offers to try the ones left with another token.
+
+The key is never printed or written to disk: it stays in memory, so if the run
+ends before it is written, it is gone, and pubkit gives the app's settings page,
+where you make a new one or delete the app. The same goes for a client secret and
+webhook secret, which GitHub also returns and pubkit does not keep. `bws` takes a
+value only on its command line, so the key is in the process list of this machine
+for the moment that write takes; run it on a machine only you use.
+
+A pull token for `ghcr.io` is no app's to give, so it stays a manual step.
+
 ## Hosting modules
 
 Terraform modules for a repository's domains: their DNS, their email and

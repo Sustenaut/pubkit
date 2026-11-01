@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit github-app create: make a GitHub App from a manifest the repository keeps, through GitHub's app-manifest flow, wait for its installation, and write its id, key and installation id to Bitwarden once you type yes. The access token is asked for at a hidden prompt and never kept; the key is never printed or written to disk. The README describes the flow."
+}
