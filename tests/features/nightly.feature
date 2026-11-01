@@ -161,7 +161,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: The nightly workflow updates one pull request and merges nothing
     When I parse the workflow "nightly.yml"
-    Then it runs on a schedule and by hand
+    Then it runs by hand and when called, with no schedule of its own
     And neither it nor its script merges a pull request
     And its script updates an open pull request before opening one
     And its script re-tests the pins alone when CI fails
@@ -269,6 +269,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
   Scenario: A control plane calls the nightly with a repos input and neutral secrets
     When I parse the workflow "nightly.yml"
     Then it can be called with the input "repos" and the secrets "app-id, app-key, notify-token, notify-user"
-    And it still runs on a schedule, warning that governed.json goes
+    And run by hand it still reads governed.json, warning that it goes
+    And a repository it can't read for the report doesn't stop the others
     And only what the repos input governs gets a pull request
     And it takes pubkit's script and wheel from the same latest release, whichever repository calls it

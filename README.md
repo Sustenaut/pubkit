@@ -1064,8 +1064,8 @@ FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
 governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
 and `nightly.yml` take its contents as a `repos` input.
 
-`protected.json`, `governed.json`, `--config`, `--governed` and the nightly's
-own schedule still work for one more release, and warn that they are going.
+`protected.json`, `governed.json`, `--config` and `--governed` still work for one more
+release, and warn that they are going. The nightly's own schedule has gone.
 
 ### State files
 
@@ -1090,8 +1090,8 @@ one required check.
 ## The nightly
 
 `.github/workflows/nightly.yml` runs over the repositories its `repos` input
-marks to govern, called from a control plane's own schedule, or every night
-over those `governed.json` lists. A caller passes the secrets `app-id`,
+marks to govern, called from a control plane's own schedule. It has no schedule of its
+own. Run by hand, it reads `governed.json`, which goes in a later release. A caller passes the secrets `app-id`,
 `app-key`, `notify-token` and `notify-user`, and the `pubkit` input names the
 repository whose latest release supplies the wheel and the update script. It reports, in its summary, the pubkit each pins,
 whether it conforms to the latest standard, and its open exceptions
@@ -1127,7 +1127,7 @@ App, which is installed on each owner whose repositories it governs. For each re
 with contents, pull-requests and workflows write and actions read, which
 expires within the hour (`actions/create-github-app-token`). pubkit's
 repository variable `NIGHTLY_APP_ID` and secret `NIGHTLY_APP_KEY` (the
-app's private key) set it up on its own schedule, and `app-id` and `app-key` when called. Without them it falls back, with a warning,
+app's private key) set it up when run by hand, and `app-id` and `app-key` when called. Without them it falls back, with a warning,
 to a `PUBKIT_BUMP_TOKEN` secret, and with neither it only reports.
 
 ### Update and security settings

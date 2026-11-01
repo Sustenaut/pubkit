@@ -84,10 +84,11 @@ def parse(name):
     return {"text": text, "data": yaml.safe_load(text), "script": SCRIPT.read_text()}
 
 
-@then("it runs on a schedule and by hand")
+@then("it runs by hand and when called, with no schedule of its own")
 def scheduled(workflow):
-    on = workflow["data"].get("on", workflow["data"].get(True))
-    assert "schedule" in on and "workflow_dispatch" in on
+    on = workflow["data"][True]
+    assert "workflow_dispatch" in on and "workflow_call" in on
+    assert "schedule" not in on
 
 
 @then("neither it nor its script merges a pull request")
@@ -423,11 +424,18 @@ def called(workflow, name, secrets):
     assert "NIGHTLY_APP" not in workflow["data"]["jobs"]["update"]["env"]["REPO"]
 
 
-@then("it still runs on a schedule, warning that governed.json goes")
-def still_scheduled(workflow):
-    assert workflow["data"][True]["schedule"]
+@then("run by hand it still reads governed.json, warning that it goes")
+def by_hand(workflow):
     report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
-    assert "::warning::governed.json and this schedule go in a later release" in report["run"]
+    assert "::warning::governed.json goes in a later release" in report["run"]
+    assert "pubkit/governed.json" in report["run"]
+
+
+@then("a repository it can't read for the report doesn't stop the others")
+def private_report(workflow):
+    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
+    assert "can't be read for the report" in report["run"]
+    assert 'if [ -n "$(ls repos)" ]' in report["run"]
 
 
 @then("only what the repos input governs gets a pull request")

@@ -1,5 +1,6 @@
-# Nightly: every repository the repos input marks to govern, or on pubkit's
-# own schedule, every one governed.json lists, which goes in a later release.
+# Nightly: every repository the repos input marks to govern. It has no schedule of
+# its own: a control plane calls it on one. Run by hand, it reads governed.json,
+# which goes in a later release.
 #
 # Reusable: a control plane calls this with `repos`, the repos file itself as
 # JSON ({"repositories": [{"repo", "govern"}]}), and the secrets app-id, app-key,
@@ -35,7 +36,7 @@
 # Slack when it is green or fails.
 #
 # It pushes and opens pull requests as a GitHub App: the secrets app-id and
-# app-key (its private key), or on pubkit's own schedule the variable
+# app-key (its private key), or run by hand the variable
 # NIGHTLY_APP_ID and the secret NIGHTLY_APP_KEY, give, for each governed repository, a token for that repository
 # alone, with only contents, pull-requests and workflows write (and
 # actions read, to wait for its CI), that expires within the hour. The app is installed on every owner whose
@@ -43,11 +44,10 @@
 # with a warning, to PUBKIT_BUMP_TOKEN, a token that may push branches and
 # open pull requests there; with neither, the job only reports.
 # The secrets notify-token (a Slack bot's, chat:write) and notify-user, whom it
-# DMs; on pubkit's own schedule, SUSTENAUT_SLACK_BOT_TOKEN and SLACK_DM_USER_ID.
+# DMs; run by hand, SUSTENAUT_SLACK_BOT_TOKEN and SLACK_DM_USER_ID.
 name: nightly
 
 on:
-  schedule: [{ cron: '41 1 * * *' }]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -74,7 +74,7 @@ on:
         description: Whom it DMs
 
 env:
-  # Called, the input; on its own schedule, this repository.
+  # Called, the input; run by hand, this repository.
   PUBKIT: '${{ inputs.pubkit || github.repository }}'
 
 jobs:
@@ -102,14 +102,17 @@ jobs:
           if [ -n "$REPOS" ]; then
             governed=$(jq -c '[.repositories[] | select(.govern) | .repo]' <<< "$REPOS")
           else
-            echo "::warning::governed.json and this schedule go in a later release: call this workflow with the repos input."
+            echo "::warning::governed.json goes in a later release: call this workflow with the repos input."
             governed=$(jq -c '[.repositories[].repo]' pubkit/governed.json)
           fi
           mkdir repos
           for repo in $(jq -r '.[]' <<< "$governed"); do
-            git clone --quiet --depth 1 "https://github.com/$repo" "repos/${repo#*/}"
+            # A private repository can't be read here, only updated below: leave it out
+            # of the report, rather than stopping every repository's update.
+            git clone --quiet --depth 1 "https://github.com/$repo" "repos/${repo#*/}" \
+              || echo "::warning::$repo can't be read for the report, so it isn't in it."
           done
-          if [ "$governed" != '[]' ]; then pubkit freshness repos/*; fi
+          if [ -n "$(ls repos)" ]; then pubkit freshness repos/*; fi
           echo "repos=$governed" >> "$GITHUB_OUTPUT"
         env: { REPOS: '${{ inputs.repos }}' }
 
