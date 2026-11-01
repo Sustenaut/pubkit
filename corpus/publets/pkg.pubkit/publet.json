@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.24.4 is released as v0.24.4 from commit 40b437a0d305ae86119268ba9c5cfbea69c21144.",
+      "content": "pubkit 0.25.0 is released as v0.25.0 from commit 51e33c13c339c8bcdac7a14973f52af2708f09f5.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.24.4",
+            "0.25.0",
             "pubkit --version",
-            "pubkit 0.24.4",
-            "v0.24.4",
-            "40b437a0d305ae86119268ba9c5cfbea69c21144"
+            "pubkit 0.25.0",
+            "v0.25.0",
+            "51e33c13c339c8bcdac7a14973f52af2708f09f5"
           ]
         ]
       },
-      "scope": "the published release v0.24.4 of pubkit",
+      "scope": "the published release v0.25.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "40b437a0d305ae86119268ba9c5cfbea69c21144"
+          "revision": "51e33c13c339c8bcdac7a14973f52af2708f09f5"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.24.4 was released on 2026-11-01 from commit 40b437a0d305ae86119268ba9c5cfbea69c21144 with these changes.",
+      "content": "pubkit 0.25.0 was released on 2026-11-01 from commit 51e33c13c339c8bcdac7a14973f52af2708f09f5 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,22 +58,22 @@
         "rows": [
           [
             "added",
-            "terraform/cloud-run-service, terraform/backup-bucket and terraform/cloud-run-access: what a Cloud Run site repeats (its account, registry and service, and a deploy account only its own GitHub repository can use), a backup bucket with an account that can only create objects, and who may pass IAP to each service. The README describes one stack per repository, and how to move a site without changing anything in the cloud."
+            "pubkit github-app create: make a GitHub App from a manifest the repository keeps, through GitHub's app-manifest flow, wait for its installation, and write its id, key and installation id to Bitwarden once you type yes. The access token is asked for at a hidden prompt and never kept; the key is never printed or written to disk. The README describes the flow."
           ],
           [
-            "fixed",
-            "terraform/hosting and terraform/dns-zone no longer show a change on every plan for Cloudflare's DNS settings the module does not set, a zone Cloudflare reports as pending DNSSEC, or a Pages project whose deployment configs its own deploys set."
+            "removed",
+            "protected.json, governed.json, --config, --governed and pubkit pins' --pub are gone: pubkit protect, pubkit board and the nightly take a repos file or their named repositories, and how each is protected stays in its own pubkit.json. A repository with release tags must name its release_app, since no owner gets one by default, and one that should move crates as pins must name them in nightly.pins.crates. The pub-version CI input is gone: list the tool in ci.tools."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.24.4 of pubkit",
+      "scope": "the published release v0.25.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "40b437a0d305ae86119268ba9c5cfbea69c21144"
+          "revision": "51e33c13c339c8bcdac7a14973f52af2708f09f5"
         }
       ]
     }
