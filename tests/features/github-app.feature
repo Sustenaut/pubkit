@@ -1,7 +1,7 @@
 Feature: pubkit github-app create makes an app and puts its values in Bitwarden
   The manifest is the repository's, so pubkit names nothing of anyone's. A
   refusal comes before an app exists. The token is asked for, and reaches bws in
-  its environment; the key is never printed; nothing is written without "yes".
+  its environment; the key is on no command line and never printed; nothing is written without "yes".
 
   Scenario: An organization's app goes through the whole flow
     Given a manifest for the org "example-org"
@@ -11,12 +11,13 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     And GitHub was sent the manifest with a redirect to 127.0.0.1 and no pubkit section
     And the browser opened "https://github.com/apps/the-app/installations/new"
     And GitHub was asked for the installations with a JWT signed by the new key
-    And bws created "the-app-app-id" as "5551234"
-    And bws created "the-app-installation-id" as "7770001"
-    And bws created "the-app-app-key" as the key
-    And bws wrote 3 secrets with the token "write-token"
+    And the SDK created "the-app-app-id" as "5551234"
+    And the SDK created "the-app-installation-id" as "7770001"
+    And the SDK created "the-app-app-key" as the key
+    And the SDK wrote 3 secrets with the token "write-token"
     And neither the key nor the token is printed
     And the token is on no command line
+    And the key is on no command line
     And no file under the repository holds the key
 
   Scenario: A user's app goes to the user's own settings
@@ -24,14 +25,14 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     When I create the app, giving the token "write-token" and answering "yes"
     Then it succeeds
     And the browser posted to "https://github.com/settings/apps/new"
-    And bws wrote 3 secrets with the token "write-token"
+    And the SDK wrote 3 secrets with the token "write-token"
 
   Scenario: The installation that counts is the owner's, once it is there
     Given a manifest for the org "example-org"
     And the first look finds no installation, and the next one on another account too
     When I create the app, giving the token "write-token" and answering "yes"
     Then it succeeds
-    And bws created "the-app-installation-id" as "7770001"
+    And the SDK created "the-app-installation-id" as "7770001"
 
   Scenario: An installation on every repository says so, and where to narrow it
     Given a manifest for the org "example-org"
@@ -71,7 +72,7 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     Then it succeeds
     And it prints "could not list them"
     And it prints "https://github.com/organizations/example-org/settings/installations/7770001"
-    And bws wrote 3 secrets with the token "write-token"
+    And the SDK wrote 3 secrets with the token "write-token"
 
   Scenario: An installation that does not say what it reaches is not taken for either
     Given a manifest for the org "example-org"
@@ -105,16 +106,16 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     Then the exit code is 1
     And it prints "already in project the-project: the-app-app-key"
     And no browser opened
-    And bws wrote 0 secrets with the token "write-token"
+    And the SDK wrote 0 secrets with the token "write-token"
 
   Scenario: --replace edits what is there and creates what is not
     Given a manifest for the org "example-org"
     And Bitwarden already has "the-app-app-key"
     When I create the app with "--replace", giving the token "write-token" and answering "yes"
     Then it succeeds
-    And bws edited the existing "the-app-app-key" to the key
-    And bws created "the-app-app-id" as "5551234"
-    And bws wrote 3 secrets with the token "write-token"
+    And the SDK edited the existing "the-app-app-key" to the key
+    And the SDK created "the-app-app-id" as "5551234"
+    And the SDK wrote 3 secrets with the token "write-token"
     And neither the key nor the token is printed
 
   Scenario: --replace will not guess between two secrets of one name
@@ -131,7 +132,7 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     Then the exit code is 1
     And it prints "Nothing was written"
     And it prints "https://github.com/organizations/example-org/settings/apps/the-app"
-    And bws wrote 0 secrets with the token "write-token"
+    And the SDK wrote 0 secrets with the token "write-token"
     And neither the key nor the token is printed
 
     Examples:
@@ -154,18 +155,18 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     And it prints "It sees: the-project"
     And no browser opened
 
-  Scenario: A failed write hides the key bws echoed, and the rest go with another token
+  Scenario: A failed write hides the key Bitwarden echoed, and the rest go with another token
     Given a manifest for the org "example-org"
-    And bws refuses writes with the token "read-token", printing what it was given
+    And Bitwarden refuses writes with the token "read-token", printing what it was given
     When I create the app, giving the tokens "read-token" and "write-token" and answering "yes"
     Then it succeeds
     And it prints "FAILED   the-app-app-key"
-    And bws wrote 3 secrets with the token "write-token"
+    And the SDK wrote 3 secrets with the token "write-token"
     And neither the key nor the token is printed
 
   Scenario: Giving up after a failed write says the key is gone
     Given a manifest for the org "example-org"
-    And bws refuses writes with the token "read-token", printing what it was given
+    And Bitwarden refuses writes with the token "read-token", printing what it was given
     When I create the app, giving the token "read-token" and answering "yes"
     Then the exit code is 1
     And it prints "Not written: the-app-app-id, the-app-app-key, the-app-installation-id"
@@ -178,7 +179,7 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     When I create the app, giving the token "write-token" and answering "yes"
     Then the exit code is 1
     And it prints "GitHub answered the manifest's code with 404"
-    And bws wrote 0 secrets with the token "write-token"
+    And the SDK wrote 0 secrets with the token "write-token"
 
   Scenario: A missing bws is said plainly
     Given a manifest for the org "example-org"
@@ -214,3 +215,11 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     When I run pubkit "github-app" "create" "/etc/pubkit-manifest.json"
     Then it fails
     And stderr mentions "must be in the working directory or a temporary directory"
+
+  Scenario: An SDK that won't install stops before an app exists
+    Given a manifest for the org "example-org"
+    And the SDK is not installed, and uv refuses to install it
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then the exit code is 1
+    And GitHub was given no code
+    And it prints "could not be installed"

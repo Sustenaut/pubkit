@@ -26,10 +26,10 @@ and the app's own key is used to watch for the installation, and to say which
 repositories it reaches. Last, typing "yes"
 writes `<prefix>-app-id`, `<prefix>-app-key` and `<prefix>-installation-id`.
 
-The token is only ever asked for, never read from a file or kept, and reaches
-bws in its environment. The key stays in this process's memory, and is never
-printed or written to disk; bws has no way to take a value but its command
-line, so it is there for the moment each write takes.
+The token is only ever asked for, never read from a file or kept. It reaches bws,
+which looks the names up, in its environment. The key stays in this process's
+memory, and is never printed or written to disk: Bitwarden's SDK writes the values
+from memory, as bws can take one only on its command line.
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any
 
 from .app_secrets import wrong_value
+from .bitwarden import WriteFailed, ensure, scrub, write
 
 SECTION = "pubkit"
 SETTINGS = {"org", "user", "bitwarden_project", "secret_prefix"}
@@ -153,15 +154,6 @@ def load(path: Path) -> Plan:
                 section["secret_prefix"])
 
 
-def scrub(text: str, hidden: tuple[str, ...]) -> str:
-    """`text` with every hidden value, and each line of one, taken out."""
-    for value in hidden:
-        for part in [value, *value.splitlines()]:
-            if part:
-                text = text.replace(part, "[hidden]")
-    return text
-
-
 def bws(token: str, *args: str, hide: tuple[str, ...] = ()) -> str:
     """Run bws with the token in its environment, and return what it printed."""
     done = subprocess.run(["bws", *args], env={**os.environ, "BWS_ACCESS_TOKEN": token},
@@ -171,14 +163,15 @@ def bws(token: str, *args: str, hide: tuple[str, ...] = ()) -> str:
     return done.stdout
 
 
-def project_id(token: str, plan: Plan) -> str:
+def project_id(token: str, plan: Plan) -> tuple[str, str]:
+    """The project's id and its organization's, which the SDK needs and can't look up."""
     projects = _listed(bws(token, "project", "list", "--output", "json", "--color", "no"))
-    found = [p["id"] for p in projects if plan.project in (p.get("id"), p.get("name"))]
+    found = [p for p in projects if plan.project in (p.get("id"), p.get("name"))]
     if len(found) != 1:
         sees = ", ".join(sorted(str(p.get("name")) for p in projects)) or "none"
         raise Stop(f"this token's machine account sees {len(found)} projects named {plan.project}, "
                    f"not one. It sees: {sees}.")
-    return found[0]
+    return found[0]["id"], found[0]["organizationId"]
 
 
 def existing_ids(token: str, project: str) -> dict[str, list[str]]:
@@ -420,25 +413,16 @@ def ask_hidden(prompt: str) -> str:
         return ""
 
 
-def write_one(token: str, project: str, name: str, value: str, secret: str | None, hide: tuple[str, ...]) -> None:
-    """bws reads a value starting with "-" as an option, and prints it back as
-    a mistake, which a key's first line would be: so "--" and "--value=", always."""
-    quiet = ("--output", "none", "--color", "no")
-    if secret is None:
-        bws(token, "secret", "create", *quiet, "--", name, value, project, hide=hide)
-    else:
-        bws(token, "secret", "edit", *quiet, f"--value={value}", "--", secret, hide=hide)
-
-
-def write_all(token: str, project: str, values: dict[str, str], ids: dict[str, str | None], pem: str) -> list[str]:
+def write_all(token: str, organization: str, project: str, values: dict[str, str],
+              ids: dict[str, str | None]) -> list[str]:
     """Write each value. On a failure, a key that was seen once is worth another
     token: the ones left are tried until they go or nobody offers one. Returns the ones left."""
     left = list(values)
     while True:
         for name in list(left):
             try:
-                write_one(token, project, name, values[name], ids[name], (pem,))
-            except BwsFailed as error:
+                write(token, organization, project, name, values[name], "", ids[name])
+            except WriteFailed as error:
                 print(f"  FAILED   {name}: {error}")
             else:
                 print(f"  wrote    {name}")
@@ -464,11 +448,13 @@ def create(path: Path, replace: bool, dry_run: bool) -> int:
     if dry_run:
         print("--dry-run: no app was made and nothing was written.")
         return 0
+    if why := ensure():
+        raise Stop(why)
     token = ask_hidden(f"Bitwarden access token with write access to {plan.project} "
                        "(hidden, and not kept): ")
     if not token:
         raise Stop("no access token, so no app was made")
-    project = project_id(token, plan)
+    project, organization = project_id(token, plan)
     ids = targets(plan, existing_ids(token, project), replace)
 
     app = make_app(plan)
@@ -494,7 +480,7 @@ def create(path: Path, replace: bool, dry_run: bool) -> int:
         print(f"Nothing was written, and the key is gone with this run. Make a new one, or delete the "
               f"app, at {plan.settings_url(app['slug'])}")
         return 1
-    if left := write_all(token, project, values, ids, app["pem"]):
+    if left := write_all(token, organization, project, values, ids):
         print(f"Not written: {', '.join(left)}. Any key among them is gone with this run: make a new "
               f"one at {plan.settings_url(app['slug'])}")
         return 1
