@@ -1,0 +1,17 @@
+# Bitwarden's Python SDK and what it needs, by hash, on every platform, for the
+# commands that write secrets (bitwarden.py). It is not a dependency of pubkit: only
+# those commands fetch it. Regenerate with:
+#   uv pip compile --universal --generate-hashes --python-version 3.11 --no-header --no-annotate
+
+bitwarden-sdk==2.1.0 \
+    --hash=sha256:2c5de50af003b7b2d16a9a690d3111480d1b1962eb25f39e416812d6d9d4e4d6 \
+    --hash=sha256:659b7e3faaab067f38556ffaaa7edf217e581047234f9a748770fa2926d2664c \
+    --hash=sha256:8374ef97e481c17a0b65e1b8d700df492cb384ff5a4888bd2c697c37457fc332 \
+    --hash=sha256:b6f6b2624e340307891edc20a2860ec0b7c2140683eec2ce2e20d1076ffe9268 \
+    --hash=sha256:cdf85d309aecf21c563c9245322d49a344135761d03cffa43b8703f509bc0df7
+python-dateutil==4.0.0 \
+    --hash=sha256:a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c \
+    --hash=sha256:d7295ff14fdc0f92f662100bfb6c551d160ca090f2939f1ec5b9794265c03f06
+tzdata==2026.6 \
+    --hash=sha256:0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec \
+    --hash=sha256:85d2cd9c09f81f0bb29db27759fc83af4f1e620efb814f8c5bf8b4cc4feece6d

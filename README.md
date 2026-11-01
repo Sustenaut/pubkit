@@ -200,6 +200,30 @@ for the moment that write takes; run it on a machine only you use.
 
 A pull token for `ghcr.io` is no app's to give, so it stays a manual step.
 
+
+### Making a service account key
+
+`pubkit service-account-key create` makes a Google Cloud service account key and
+puts it in Bitwarden, so an app outside Google Cloud can have one without the key
+ever being in a file, on a command line, or in Terraform's state:
+
+```sh
+./pubkit service-account-key create --dry-run --account NAME@PROJECT.iam.gserviceaccount.com --secret some-key
+./pubkit service-account-key create --account NAME@PROJECT.iam.gserviceaccount.com --secret some-key
+```
+
+It shows the plan, and asks for a Bitwarden access token with write access to the
+project, at a hidden prompt, as `github-app create` does. The project is the one
+`with-secrets.json` names, or `--bitwarden-project`. It refuses if the secret is
+there; `--replace` overwrites it. On a typed `yes`, `gcloud` writes the key to
+pubkit's pipe, and Bitwarden's SDK writes it, base64-encoded, from memory. If that
+write fails the new key is deleted from Google. The account's other keys are left
+working, and listed, so whatever holds one can move over before it is deleted.
+
+The SDK is not a dependency of pubkit: the command installs it with `uv` for that
+run alone, by the hashes in `src/pubkit/bitwarden-sdk.lock`. Its wheels are under Bitwarden's own SDK
+licence, not pubkit's.
+
 ## Hosting modules
 
 Terraform modules for a repository's domains: their DNS, their email and
