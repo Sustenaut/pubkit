@@ -350,6 +350,16 @@ own modules, which only a repository on Google Cloud or deSEC takes.
 - **`terraform/cloud-run-sites`:** the Cloud Run sites' domain mappings,
   each to its `service` in its provider's `project` and `region`; output
   `domains`, with the records Google asks for.
+- **`terraform/cloud-run-service`:** what every Cloud Run site repeats: the
+  account it runs as, its registry (the ten newest images kept, older ones
+  deleted after 30 days), and the service, behind IAP by default, on a
+  placeholder image that Terraform ignores after the first deploy. Given
+  `deploy_repository`, an account only that GitHub repository can act as,
+  which can push to this registry and deploy this service and nothing else.
+- **`terraform/backup-bucket`:** a private bucket with an age rule, and an
+  account that can only create objects in it, with a key by default.
+- **`terraform/cloud-run-access`:** who may pass IAP to each Cloud Run
+  service, named rather than referred to, so it can be in another stack.
 - **`terraform/desec-zones`:** each zone a `desec` provider serves: the
   domain, every rrset `terraform/hosting` writes (a TTL below the
   domain's `minimum_ttl` raised to it, as deSEC requires), the apex NS
@@ -516,6 +526,60 @@ before any DS record goes to the registrar; it only reads, and needs
 Each module's tests (`terraform test` in its directory) mock the providers
 and need no credentials; CI runs them on Terraform 1.11, with `fmt`,
 `validate`, and the action's scripts under shellcheck and stubs.
+
+
+### One stack per repository
+
+A site's Terraform lives in the repository that owns its code, in `infra/`, with
+its own state: one bucket, one prefix per repository (`prefix = "<repo>"`). What
+every site shares (the project's APIs, the DNS zone, the Workload Identity
+Federation pool) is in a base stack of its own. A site's stack never reads the
+base's state, which holds keys: it reads the project and region from its own
+`pubkit.json`, and finds shared things by their fixed names.
+
+```hcl
+locals {
+  gcp = jsondecode(file("${path.module}/../pubkit.json")).hosting.providers["gcp"]
+}
+
+module "site" {
+  source         = "github.com/Sustenaut/pubkit//terraform/cloud-run-service?ref=vX.Y.Z"
+  name           = "pub-site"
+  project        = local.gcp.project
+  project_number = "123456789"
+  region         = local.gcp.region
+
+  account_id           = "example-pub-site"
+  account_display_name = "Example pub-site"
+
+  deploy_repository = "example-org/pub-site"
+}
+```
+
+`hosting` may list only `providers` here; the zones are the base's. The base's
+pool must admit the repository, in its provider's `attribute_condition`, as this
+module only makes the account the repository acts as.
+
+**Moving a site out of a shared stack changes nothing in the cloud.** The site's
+repository adds `infra/` with an `import` block for each existing resource, and
+the shared stack replaces its file with `removed` blocks:
+
+```hcl
+removed {
+  from = google_cloud_run_v2_service.pub_site
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+Both plans must show no change before either is applied: imports and removals,
+with 0 to add, 0 to change, 0 to destroy. Apply the site's repository first, then
+the shared stack, then delete the `import` and `removed` blocks. A write-only
+secret version and a service account key do not survive an import unchanged: a
+key's private half is not readable again, so leave those where they are, or move
+the state itself.
 
 ## Caching a build
 

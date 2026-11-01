@@ -84,6 +84,8 @@
     {
       "plugin": "google.cloud",
       "paths": [
+        "terraform/cloud-run-access/",
+        "terraform/cloud-run-service/",
         "terraform/cloud-run-sites/"
       ],
       "mode": "required"
@@ -154,6 +156,30 @@
     }
   ],
   "terraform": [
+    {
+      "dir": "terraform/backup-bucket",
+      "plugins": [
+        "terraform.google"
+      ],
+      "runs": [],
+      "mode": "required"
+    },
+    {
+      "dir": "terraform/cloud-run-access",
+      "plugins": [
+        "terraform.google"
+      ],
+      "runs": [],
+      "mode": "required"
+    },
+    {
+      "dir": "terraform/cloud-run-service",
+      "plugins": [
+        "terraform.google"
+      ],
+      "runs": [],
+      "mode": "required"
+    },
     {
       "dir": "terraform/cloud-run-sites",
       "plugins": [

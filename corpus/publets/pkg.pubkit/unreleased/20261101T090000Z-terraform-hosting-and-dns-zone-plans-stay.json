@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "terraform/hosting and terraform/dns-zone no longer show a change on every plan for Cloudflare's DNS settings the module does not set, a zone Cloudflare reports as pending DNSSEC, or a Pages project whose deployment configs its own deploys set."
+}
