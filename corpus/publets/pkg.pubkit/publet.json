@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.24.1 is released as v0.24.1 from commit add0386fe4aafbf6782bba7cdf56a034d8f8b8eb.",
+      "content": "pubkit 0.24.2 is released as v0.24.2 from commit f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.24.1",
+            "0.24.2",
             "pubkit --version",
-            "pubkit 0.24.1",
-            "v0.24.1",
-            "add0386fe4aafbf6782bba7cdf56a034d8f8b8eb"
+            "pubkit 0.24.2",
+            "v0.24.2",
+            "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
           ]
         ]
       },
-      "scope": "the published release v0.24.1 of pubkit",
+      "scope": "the published release v0.24.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "add0386fe4aafbf6782bba7cdf56a034d8f8b8eb"
+          "revision": "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.24.1 was released on 2026-10-31 from commit add0386fe4aafbf6782bba7cdf56a034d8f8b8eb with these changes.",
+      "content": "pubkit 0.24.2 was released on 2026-11-01 from commit f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,28 @@
         ],
         "rows": [
           [
+            "fixed",
+            "pubkit protect --check and the board no longer report a difference because a read-only token can't see a ruleset's bypass_actors, which GitHub hides from it."
+          ],
+          [
             "added",
-            "pubkit app-secrets can put a value in a GitHub environment, with environment on an entry in the secrets list."
+            "pubkit state --check refuses a repository with protect on whose block requires a check it hasn't reported on its default branch or recent pull requests, since nothing could merge there. It says nothing when it can't read them."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.24.1 of pubkit",
+      "scope": "the published release v0.24.2 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "add0386fe4aafbf6782bba7cdf56a034d8f8b8eb"
+          "revision": "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
         }
       ]
     }
   },
-  "created": "2026-10-31T00:00:00Z",
+  "created": "2026-11-01T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
