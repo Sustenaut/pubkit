@@ -21,6 +21,7 @@
     pubkit state --check [FILE]
     pubkit app-secrets [--check]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
+    pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR --repos FILE [--rules FILE]
@@ -520,6 +521,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--replace", action="store_true",
                    help="overwrite secrets that already have those names, instead of refusing")
     p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
+    p = commands.add_parser("service-account-key", help="make a Google Cloud service account key, and put it "
+                                                        "in Bitwarden, with no file or command line holding it")
+    service_account_key = p.add_subparsers(dest="service_account_key_command", required=True)
+    p = service_account_key.add_parser("create", help="make a new key beside the account's others, and write it "
+                                                      "to a secret")
+    p.add_argument("--account", required=True, metavar="EMAIL", help="the service account")
+    p.add_argument("--secret", required=True, metavar="NAME", help="the secret to write")
+    p.add_argument("--bitwarden-project", metavar="NAME",
+                   help="the Bitwarden project; by default, the one with-secrets.json names")
+    p.add_argument("--replace", action="store_true",
+                   help="overwrite a secret that already has that name, instead of refusing")
+    p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -608,6 +621,10 @@ def main(argv: list[str] | None = None) -> int:
         from .github_app import run as github_app_run
         from .paths import confined
         return github_app_run(confined(args.manifest, "the manifest"), args.replace, args.dry_run)
+    if args.command == "service-account-key":
+        from .service_account_key import run as service_account_key_run
+        return service_account_key_run(Path.cwd(), args.account, args.secret, args.bitwarden_project,
+                                       args.replace, args.dry_run)
     if args.command == "state":
         from .paths import confined
         from .state import check

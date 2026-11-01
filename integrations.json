@@ -10,7 +10,9 @@
     {
       "plugin": "bitwarden.secrets",
       "paths": [
+        "src/pubkit/bitwarden.py",
         "src/pubkit/github_app.py",
+        "src/pubkit/service_account_key.py",
         "src/pubkit/templates/service/with-secrets"
       ],
       "mode": "required"
@@ -86,6 +88,7 @@
     {
       "plugin": "google.cloud",
       "paths": [
+        "src/pubkit/service_account_key.py",
         "terraform/cloud-run-access/",
         "terraform/cloud-run-service/",
         "terraform/cloud-run-sites/"
