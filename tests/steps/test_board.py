@@ -102,6 +102,21 @@ def behind(case, pinned, latest):
     case["facts"]["latest"]["value"]["pubkit"] = latest
 
 
+@given(parsers.parse('its secret scanning is "{scanning}" and its push protection "{push}"'))
+def secret_settings(case, scanning, push):
+    _set(case, "secret_protection", {"secret_scanning": scanning, "secret_scanning_push_protection": push})
+
+
+@given("it is a private repository")
+def private_repository(case):
+    _set(case, "visibility", "private")
+
+
+@given("its secret scanning settings can't be read")
+def secret_unreadable(case):
+    _set(case, "secret_protection", None)
+
+
 @given("it is not in governed.json and has no nightly workflow")
 def ungoverned(case):
     _set(case, "nightly", {"governed": False, "last": None})

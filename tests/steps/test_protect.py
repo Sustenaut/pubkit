@@ -477,3 +477,34 @@ def no_difference(found):
 @then("it reports the bypass actors")
 def bypass_reported(found):
     assert any(line.startswith("bypass_actors is") for line in found)
+
+
+@given(parsers.parse('"{slug}" has secret scanning "{scanning}" and push protection "{push}"'))
+def scanning_settings(github, slug, scanning, push):
+    _edit(github, lambda s: s.setdefault("repos", {}).setdefault(
+        slug, {"visibility": "public", "owner": {"type": "Organization"}}).__setitem__(
+            "security_and_analysis", {"secret_scanning": {"status": scanning},
+                                      "secret_scanning_push_protection": {"status": push}}))
+
+
+@given(parsers.parse('"{slug}"\'s pubkit.json on GitHub says secret_scanning is false, requiring "{check}"'))
+def opt_out(github, slug, check):
+    text = json.dumps({"kind": "utility", "protect": {"checks": [check], "secret_scanning": False}})
+    _edit(github, lambda s: s.setdefault("files", {}).__setitem__(
+        slug, base64.b64encode(text.encode()).decode()))
+
+
+def _turned_on(github, slug):
+    sent = json.loads(github.read_text())["sent"]
+    return [sorted(c["body"]["security_and_analysis"]) for c in sent
+            if c["method"] == "PATCH" and c["url"] == f"repos/{slug}" and "security_and_analysis" in c["body"]]
+
+
+@then(parsers.re(r'GitHub was asked to turn on "(?P<names>[^"]+)" in "(?P<slug>[^"]+)"'))
+def turned_on(github, names, slug):
+    assert _turned_on(github, slug) == [names.split(", ")]
+
+
+@then(parsers.parse('GitHub was asked to turn on nothing in "{slug}"'))
+def turned_on_nothing(github, slug):
+    assert _turned_on(github, slug) == []

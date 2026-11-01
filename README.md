@@ -952,6 +952,11 @@ The repositories come from one of:
   anything else, or a pubkit.json that is not JSON, is refused before GitHub is asked, and `pubkit
   sync --check` refuses it too.
 
+It also turns on secret scanning and push protection on each public repository, unless
+its block says `"secret_scanning": false`. It never turns them off, and leaves a private
+repository alone, since they need GitHub Advanced Security there. Reading them needs
+Administration read, and a token without it changes nothing and fails nothing.
+
 `auto_merge` is the repository's "Allow auto-merge" setting, which lets a
 pull request be set to merge by itself once the ruleset's required checks
 pass (`gh pr merge --auto`). It loosens nothing: the ruleset still decides

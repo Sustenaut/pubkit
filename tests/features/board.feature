@@ -51,6 +51,35 @@ Feature: The board grades every listed repository A to E
     Then Security is "A"
     And Security lists the note "Dependabot alerts not read: Dependabot alerts are disabled for this repository. (HTTP 403)"
 
+  Scenario: Secret scanning or push protection off takes a security notch
+    Given the facts of a package with nothing wrong
+    And its secret scanning is "enabled" and its push protection "disabled"
+    When I grade them
+    Then Security is "B"
+    And Security lists the notch "push protection off"
+
+  Scenario: Both off still take one notch, and name both
+    Given the facts of a package with nothing wrong
+    And its secret scanning is "disabled" and its push protection "disabled"
+    When I grade them
+    Then Security is "B"
+    And Security lists the notch "Secret scanning and push protection off"
+
+  Scenario: A private repository isn't marked down for what it can't have
+    Given the facts of a package with nothing wrong
+    And it is a private repository
+    And its secret scanning is "disabled" and its push protection "disabled"
+    When I grade them
+    Then Security is "A"
+    And Security lists the note "Secret scanning settings: not available on a private repository without GitHub Advanced Security"
+
+  Scenario: A token that can't read them notes it, with no notch
+    Given the facts of a package with nothing wrong
+    And its secret scanning settings can't be read
+    When I grade them
+    Then Security is "A"
+    And Security lists the note "Secret scanning settings not read: this token can't see it"
+
   Scenario: A package behind on pubkit, ungoverned and with open issues grades D
     Given the facts of a package with nothing wrong
     And it pins pubkit "0.12.0" where the latest is "0.14.2"

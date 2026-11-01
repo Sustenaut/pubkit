@@ -15,6 +15,8 @@ The facts, by name:
   service), `{"at": ISO time, "tag": ...}`, or None
 - `issues`, `dependabot_alerts`, `code_scanning_alerts`,
   `secret_scanning_alerts`: counts
+- `secret_protection`: `{"secret_scanning": status, "secret_scanning_push_protection":
+  status}`, or None where the token can't read them
 - `ci`: main's last CI run, `{"workflow", "conclusion", "at", "jobs":
   [{"name", "conclusion"}]}`, or None
 - `nightly`: `{"governed": bool, "last": run or None}`
@@ -149,6 +151,20 @@ def tool_steps(f: Facts, category: str, rules: dict) -> list[dict]:
             elif count:
                 out.append(step(f"{count} open {name} alert{'s' if count != 1 else ''}",
                                 -1, f, fact))
+        elif "settings" in tool:
+            fact = tool["settings"]
+            if fact not in f.facts:
+                continue
+            found = f.value(fact)
+            if f.value("visibility") == "private":
+                out.append(step(f"{name}: not available on a private repository without GitHub "
+                                f"Advanced Security", 0, f, fact))
+            elif found is None:
+                out.append(step(f"{name} not read: this token can't see it", 0, f, fact))
+            else:
+                off = [label for key, label in tool["labels"].items() if found.get(key) != "enabled"]
+                if off:
+                    out.append(step(f"{' and '.join(off)} off", -1, f, fact))
         elif "scorecard_below" in tool:
             if f.value("visibility") != "public":
                 continue
