@@ -299,12 +299,6 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | job-rust-functional.yml |
       | rust-ci.yml             |
 
-  Scenario: pub-version still works, with a warning
-    Given a Rust repository whose ci block is '{"with": {"pub-version": "v0.2.1"}}'
-    When I run pubkit "sync"
-    Then it succeeds
-    And stderr mentions "ci.with.pub-version is deprecated"
-    And "pr.yml"'s job "functional" passes "pub-version" as "v0.2.1"
 
   Scenario: pins moves a tool to the latest release of its git repository
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli.git", "tag": "v1.2.3"}]}'
@@ -357,7 +351,6 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | {"tools": [{"crate": "a", "git": "https://example.eu/a"}]} | tools: tag must be a tag of that repository |
       | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "-v1"}]} | tools: tag must be a tag of that repository |
       | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}, {"crate": "a", "git": "https://example.eu/b", "tag": "v1"}]} | tools lists a crate twice |
-      | {"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}], "with": {"pub-version": "v1"}} | with gives pub-version, the deprecated form of tools |
 
   Scenario: tools is for a Rust repository
     Given a Node repository whose ci block is '{"tools": [{"crate": "a", "git": "https://example.eu/a", "tag": "v1"}]}'
@@ -563,7 +556,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync"
     And I run pubkit "sync" "--check"
     Then it fails
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     And I run pubkit "sync" "--check"
     Then it succeeds
     And ".github/workflows/ci-extra.yml" calls "Sustenaut"'s pubkit workflow "service-ci.yml" at "this pubkit's commit"
@@ -576,7 +569,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then it succeeds
     When I run pubkit "sync" "--check"
     Then it fails
-    When I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     And I run pubkit "sync" "--check"
     Then it succeeds
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
@@ -652,7 +645,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario: The nightly moves the pubrel a ci block names, through pubkit.json
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.1"}}'
     When I run pubkit "sync"
-    And I run pubkit "pins" "--pubrel" "0.5.3" "--pub" "0.2.1" "--no-lock"
+    And I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "pubkit.json: ci.release.pubrel 0.5.1 -> 0.5.3"
     And "pr.yml" calls pubrel's release workflow at "0.5.3" with "pubrel-version" "v0.5.3"

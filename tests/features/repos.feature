@@ -1,6 +1,5 @@
 Feature: A repos file says which repositories pubkit acts on, and a state file which an owner has
-  --repos FILE takes the place of protected.json and governed.json, which stay
-  for one release with a warning. How a repository is protected stays in its
+  How a repository is protected stays in its
   own pubkit.json. `pubkit state --check` is a state repository's fast check.
 
   Scenario: pubkit protect --check reads the repositories the file marks
@@ -17,17 +16,11 @@ Feature: A repos file says which repositories pubkit acts on, and a state file w
     Then it does not succeed
     And it prints "example-org/one: no pubkit.json on its default branch"
 
-  Scenario: --repos takes the place of the other lists
+  Scenario: --repos takes the place of --require
     Given the repos file marks "example-org/one" to protect, and "example-org/two" not
-    When I run pubkit "protect" "--repos" "repos.json" "--config" "repos.json"
+    When I run pubkit "protect" "--repos" "repos.json" "--require" "build"
     Then it does not succeed
-    And it warns "--repos takes the place of --config and --require"
-
-  Scenario: protected.json still works, with a warning
-    Given protected.json lists "example-org/one"
-    When I run pubkit "protect" "--check"
-    Then it prints "example-org/one: no ruleset on its default branch"
-    And it warns "go in a later release"
+    And it warns "--repos takes the place of --require"
 
   Scenario Outline: A repos file that is wrong is refused, saying why
     Given the file "repos.json" reads "<text>"
@@ -57,18 +50,6 @@ Feature: A repos file says which repositories pubkit acts on, and a state file w
     And "site/board.json" names its calls under the connector "repos"
     And "site/index.html" shows "example-org/pubthing" in the project "pub"
 
-  Scenario: The board's old lists still work, with a warning
-    Given the build recording, protected.json and governed.json in the repository
-    When I run pubkit "board" "--out" "site" "--replay" "recorded.json"
-    Then it succeeds
-    And it warns "go in a later release"
-
-  Scenario: The board takes one or the other
-    Given the build recording, and a repos file with projects
-    When I run pubkit "board" "--out" "site" "--repos" "repos.json" "--governed" "repos.json"
-    Then it does not succeed
-    And it warns "--repos takes the place of --config and --governed"
-
   Scenario: A repos file the board can't read is reported
     Given the file "repos.json" reads "nonsense"
     When I run pubkit "board" "--out" "site" "--replay" "repos.json" "--repos" "repos.json"
@@ -97,7 +78,7 @@ Feature: A repos file says which repositories pubkit acts on, and a state file w
 
   Scenario: board.yml takes the repos file as an input
     When I parse the workflow "board.yml"
-    Then it passes the "repos" input to pubkit board as a file, and otherwise the old lists
+    Then it passes the "repos" input to pubkit board as a file
 
   Scenario: A sound state file passes
     Given the state of "example-org" has "one" with protect on and "two" with protect off

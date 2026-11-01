@@ -1,5 +1,4 @@
-"""Steps for `pubkit protect`: the ruleset itself, the shipped
-protected.json, and the command against a fake `gh` that keeps each
+"""Steps for `pubkit protect`: the ruleset itself, and the command against a fake `gh` that keeps each
 repository's rulesets in a JSON file and records what it was sent."""
 
 from __future__ import annotations
@@ -180,79 +179,34 @@ def blocks_tags(built):
     assert {r["type"] for r in built["rules"]} == {"creation", "update", "deletion"}
 
 
-@when(parsers.parse('I build the tag ruleset for "{slug}"'), target_fixture="built")
-def build_tags_for(slug):
-    return protect.tag_ruleset(slug)
-
-
 @then("only GitHub Actions may bypass it")
 def actions_bypass(built):
     assert built["bypass_actors"] == [
         {"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}]
 
 
-@then("only the release app may bypass it")
-def app_bypass(built):
-    assert built["bypass_actors"] == [
-        {"actor_id": protect.RELEASE_APP, "actor_type": "Integration", "bypass_mode": "always"}]
-    assert protect.RELEASE_APP == 5529889
-
-
-@when("I read pubkit's protected.json", target_fixture="entries")
-def read_protected():
-    return json.loads((ROOT / "protected.json").read_text())["repositories"]
-
-
-@then("every repository in it requires at least one check, and is listed once")
-def each_once(entries):
-    repos = [e["repo"] for e in entries]
-    assert len(repos) == len(set(repos)), repos
-    for e in entries:
-        assert e["checks"] and all(isinstance(c, str) and c for c in e["checks"]), e
-
-
-@then("every repository in governed.json is in it")
-def governed_protected(entries):
-    governed = json.loads((ROOT / "governed.json").read_text())["repositories"]
-    assert {g["repo"] for g in governed} <= {e["repo"] for e in entries}
-
-
-@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}"'))
-def lists(repo, github, slug, checks):
-    (repo / "protected.json").write_text(json.dumps(
-        {"repositories": [{"repo": slug, "checks": _checks(checks)}]}))
-
-
-@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", without tags'))
-def lists_without_tags(repo, github, slug, checks):
-    (repo / "protected.json").write_text(json.dumps(
-        {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False}]}))
-
-
-@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", without the merge queue'))
-def lists_without_queue(repo, github, slug, checks):
-    (repo / "protected.json").write_text(json.dumps(
-        {"repositories": [{"repo": slug, "checks": _checks(checks), "queue": False}]}))
-
-
-def _block(checks, tags):
+def _block(checks, setting):
     block = {"checks": _checks(checks)}
-    if tags == "without":
+    if setting == "without tags":
         block["tags"] = False
+    if setting == "without the merge queue":
+        block["queue"] = False
+    if setting == "with auto-merge":
+        block |= {"tags": False, "auto_merge": True}
     return {"kind": "service", "protect": block}
 
 
 @given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubkit.json on GitHub requires "(?P<checks>[^"]+)"'
-                  r'(?:, (?P<tags>without) tags)?$'))
-def remote_config(github, slug, checks, tags):
-    content = base64.b64encode(json.dumps(_block(checks, tags)).encode()).decode()
+                  r'(?:, (?P<setting>without tags|without the merge queue|with auto-merge))?$'))
+def remote_config(github, slug, checks, setting):
+    content = base64.b64encode(json.dumps(_block(checks, setting)).encode()).decode()
     _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
 
 
 @given(parsers.re(r'the working directory is a clone of "(?P<slug>[^"]+)" whose pubkit.json '
-                  r'requires "(?P<checks>[^"]+)"(?:, (?P<tags>without) tags)?$'))
-def local_config(repo, slug, checks, tags):
-    (repo / "pubkit.json").write_text(json.dumps(_block(checks, tags)))
+                  r'requires "(?P<checks>[^"]+)"(?:, (?P<setting>without tags))?$'))
+def local_config(repo, slug, checks, setting):
+    (repo / "pubkit.json").write_text(json.dumps(_block(checks, setting)))
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
                     f"git@github.com:{slug}.git"], check=True)
@@ -277,11 +231,6 @@ def raw_local(repo, text):
 def raw_remote(github, slug, text):
     content = base64.b64encode(text.encode()).decode()
     _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
-
-
-@given(parsers.parse("protected.json is {text}"))
-def raw_protected(repo, github, text):
-    (repo / "protected.json").write_text(text)
 
 
 @given(parsers.parse('GitHub has no ruleset in "{slug}"'))
@@ -345,13 +294,6 @@ def org_repo(github, slug, visibility, plan):
     _edit(github, change)
 
 
-@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", with auto-merge'))
-def lists_with_auto_merge(repo, github, slug, checks):
-    (repo / "protected.json").write_text(json.dumps(
-        {"repositories": [{"repo": slug, "checks": _checks(checks), "tags": False,
-                           "auto_merge": True}]}))
-
-
 @given(parsers.re(r'"(?P<slug>[^"]+)" (?P<on>allows|does not allow) auto-merge$'))
 def auto_merge_setting(github, slug, on):
     _edit(github, lambda s: s.setdefault("repos", {}).setdefault(
@@ -401,7 +343,7 @@ def sent_ruleset(github, slug, checks, old, queue):
 def sent_tags(github, slug):
     (call,) = [c for c in _sent(github) if c["body"].get("target") == "tag"]
     assert (call["method"], call["url"], call["body"]) == (
-        "POST", f"repos/{slug}/rulesets", protect.tag_ruleset(slug))
+        "POST", f"repos/{slug}/rulesets", protect.tag_ruleset())
 
 
 @then(parsers.parse("GitHub was sent a tag ruleset only app {app:d} may bypass"))
@@ -415,12 +357,6 @@ def sent_app_tags(github, app):
 def no_app_note(result):
     out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
     assert "release_app" not in out, out
-
-
-@given(parsers.parse('protected.json lists "{slug}" requiring "{checks}", with the release app {app:d}'))
-def listed_with_app(repo, slug, checks, app):
-    (repo / "protected.json").write_text(json.dumps({"repositories": [
-        {"repo": slug, "checks": checks.split(", "), "release_app": app}]}))
 
 
 @then("GitHub was sent no tag ruleset")

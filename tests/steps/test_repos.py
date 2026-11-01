@@ -144,12 +144,6 @@ def refuses(github, slug):
     _edit(github, lambda state: state.setdefault("refuse", []).append(slug))
 
 
-@given(parsers.parse('protected.json lists "{slug}"'))
-def protected_lists(repo, github, slug):
-    (repo / "protected.json").write_text(json.dumps(
-        {"repositories": [{"repo": slug, "checks": ["ci / passed"]}]}))
-
-
 @given(parsers.re(r'the state of "(?P<owner>[^"]+)" has "(?P<one>[^"]+)" with protect (?P<a>on|off) '
                   r'and "(?P<two>[^"]+)" with protect (?P<b>on|off)'))
 def state_file(repo, github, owner, one, a, two, b):
@@ -164,12 +158,6 @@ def recording_with_repos(repo):
     (repo / "repos.json").write_text(json.dumps({"repositories": [
         {"repo": "example-org/pubthing", "protect": True, "govern": True, "project": "pub"},
         {"repo": "example-org/site-thing", "protect": False, "govern": False}]}))
-
-
-@given("the build recording, protected.json and governed.json in the repository")
-def recording_with_lists(repo):
-    for name in ("recorded.json", "protected.json", "governed.json"):
-        shutil.copy(FIXTURES / name, repo / name)
 
 
 @when(parsers.parse('I parse the workflow "{name}"'), target_fixture="workflow")
@@ -241,9 +229,9 @@ def shows_project(repo, path, slug, project):
     assert f"{slug} <span class=tag>{project}</span>" in (repo / path).read_text()
 
 
-@then(parsers.parse('it passes the "{name}" input to pubkit board as a file, and otherwise the old lists'))
+@then(parsers.parse('it passes the "{name}" input to pubkit board as a file'))
 def board_input(workflow, name):
     assert name in workflow["data"][True]["workflow_call"]["inputs"]
     run = next(s for s in workflow["data"]["jobs"]["board"]["steps"] if "pubkit board" in s.get("run", ""))
-    assert "--repos .pubkit-repos.json" in run["run"] and '--config "$PROTECTED"' in run["run"]
+    assert "--repos .pubkit-repos.json" in run["run"]
     assert run["env"]["REPOS"] == "${{ inputs.repos }}"

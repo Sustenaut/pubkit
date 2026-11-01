@@ -1,0 +1,19 @@
+{
+ "repositories": [
+  {
+   "repo": "example-org/pubthing",
+   "protect": true,
+   "govern": true
+  },
+  {
+   "repo": "example-org/site-thing",
+   "protect": true,
+   "govern": false
+  },
+  {
+   "repo": "example-org/private-thing",
+   "protect": true,
+   "govern": true
+  }
+ ]
+}

@@ -14,7 +14,7 @@ Feature: A command-line argument cannot reach outside the repository
 
     Examples:
       | args                                                                        |
-      | "nightly" "--pubrel" "0.5.3" "--pub" "0.2.1" "--body" "/etc/pubkit-body.md" |
+      | "nightly" "--pubrel" "0.5.3" "--body" "/etc/pubkit-body.md" |
       | "crates" "--report" "../../../../../../../etc/pubkit-crates.json"           |
 
   Scenario: A row's text that pubrel would take for an option is refused

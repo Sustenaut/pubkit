@@ -15,7 +15,6 @@ on:
     inputs:
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages for the functional job. }
-      pub-version: { type: string, default: '', description: 'Deprecated: use tools. A publet tag whose pub the functional suite drives; empty installs none.' }
       tools: { type: string, default: '', description: 'JSON list of the tools the functional suite drives, each {"crate", "git", "tag"}, which pubkit sync gives from ci.tools; empty installs none.' }
       functional: { type: string, default: '', description: "Extra make targets the functional job runs after the required ones." }
       cargo-llvm-cov-version: { type: string, default: 0.9.1, description: "The cargo-llvm-cov the functional job measures coverage with, when there is a SONAR_TOKEN." }
@@ -40,16 +39,6 @@ jobs:
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
-      - if: inputs.pub-version != ''
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.cargo/bin/pub
-          key: pub-${{ inputs.pub-version }}
-      - if: inputs.pub-version != ''
-        run: |
-          command -v pub >/dev/null && pub --version | grep -q "^pub ${PUB#v}$" \
-            || cargo install --locked --git https://github.com/Sustenaut/publet --tag "$PUB" publet-cli
-        env: { PUB: '${{ inputs.pub-version }}' }
       - if: inputs.tools != ''
         id: tools
         run: |

@@ -1,8 +1,7 @@
 """`pubkit board`: grade every repository a repos file names, A to E, for
 quality, security and delivery, into board.json and a static index.html.
 
-It reads the repositories from the repos file (or, until they go, from
-protected.json and governed.json), reads each from GitHub, GitHub Actions, SonarQube Cloud, OpenSSF Scorecard and
+It reads the repositories from the repos file, reads each from GitHub, GitHub Actions, SonarQube Cloud, OpenSSF Scorecard and
 the services' health URLs through one connector per source
 (connectors/), turns what they read into facts (collect.py), and grades
 the facts by rules.json (rules.py). It writes nothing anywhere else and
@@ -63,12 +62,11 @@ def summary(rows: list[dict], built: datetime) -> str:
             f"Built {built.strftime('%Y-%m-%d %H:%M')} UTC.")
 
 
-def build(protected: Path | None, governed: Path | None, rules: dict, transport: Transport,
-          built: datetime, repos: Path | None = None) -> dict:
+def build(repos: Path, rules: dict, transport: Transport, built: datetime) -> dict:
     """The board: every repository's facts and grades, and every call."""
     ledger = Ledger(clock=now if isinstance(transport, (Network, Recording)) else (lambda: built))
     c = connectors(ledger, transport)
-    items, problems = inventory(c, protected, governed, repos)
+    items, problems = inventory(c, repos)
     gatherer = Gatherer(c, rules)
     rows = []
     for item in items:
@@ -85,8 +83,8 @@ def build(protected: Path | None, governed: Path | None, rules: dict, transport:
             "calls": ledger.calls}
 
 
-def run(protected: Path | None, governed: Path | None, out: Path, rules_path: Path | None = None,
-        replay: Path | None = None, record: Path | None = None, repos: Path | None = None) -> int:
+def run(out: Path, rules_path: Path | None, replay: Path | None, record: Path | None,
+        repos: Path) -> int:
     try:
         rules = grading.load(rules_path)
     except (OSError, ValueError) as e:
@@ -97,7 +95,7 @@ def run(protected: Path | None, governed: Path | None, out: Path, rules_path: Pa
     else:
         transport = Recording(Network()) if record else Network()
         built = now()
-    board = build(protected, governed, rules, transport, built, repos)
+    board = build(repos, rules, transport, built)
     if record and isinstance(transport, Recording):
         transport.save(record, built)
     out.mkdir(parents=True, exist_ok=True)

@@ -53,7 +53,7 @@ wait_ci() {
 }
 
 git checkout -q -B "$branch" origin/main
-made=$(pubkit nightly --pubrel "$PUBREL" --pub "$PUB" --body "$body" | tail -n 1)
+made=$(pubkit nightly --pubrel "$PUBREL" --body "$body" | tail -n 1)
 pr=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
 
 if [[ -z "$made" ]]; then

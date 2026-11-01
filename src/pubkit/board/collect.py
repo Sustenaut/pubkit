@@ -50,33 +50,14 @@ def merged(*facts: Fact, value: Any, note: str | None = None) -> Fact:
     return Fact(value, tuple(sources), note)
 
 
-def inventory(c: Connectors, protected: Path | None, governed: Path | None,
-              repos: Path | None = None) -> tuple[list[dict], list[str]]:
-    """The repositories to grade, in the file's order, each with its roles
-    and, from protected.json, its entry; and any problem reading the file."""
-    if repos:
-        read = c.repos.listed(repos)
-        return [{"repo": e["repo"], "entry": None, "listed": True, "governed": e["govern"],
-                 "protect": e["protect"], "project": e.get("project"),
-                 "sources": list(read.sources)} for e in read.value or []], \
-            ([] if read.value is not None else [f"{repos}: {read.note}"])
-    problems = []
-    listed = c.repos.protected(protected)
-    if listed.value is None:
-        problems.append(f"{protected}: {listed.note}")
-    ruled = c.repos.governed(governed) if governed else Fact([], ())
-    if ruled.value is None:
-        problems.append(f"{governed}: {ruled.note}")
-    out: dict[str, dict] = {}
-    for e in listed.value or []:
-        out[e["repo"]] = {"repo": e["repo"], "entry": e, "governed": False,
-                          "sources": list(listed.sources)}
-    for e in ruled.value or []:
-        row = out.setdefault(e["repo"], {"repo": e["repo"], "entry": None, "governed": False,
-                                         "sources": []})
-        row["governed"] = True
-        row["sources"] += list(ruled.sources)
-    return list(out.values()), problems
+def inventory(c: Connectors, repos: Path) -> tuple[list[dict], list[str]]:
+    """The repositories to grade, in the file's order, each with its roles; and any
+    problem reading the file."""
+    read = c.repos.listed(repos)
+    return [{"repo": e["repo"], "governed": e["govern"], "protect": e["protect"],
+             "project": e.get("project"), "sources": list(read.sources)}
+            for e in read.value or []], \
+        ([] if read.value is not None else [f"{repos}: {read.note}"])
 
 
 class Gatherer:
@@ -243,18 +224,12 @@ class Gatherer:
         not at all, where its repos file entry doesn't ask for any."""
         if not item.get("protect", True):
             return Fact({"differences": [], "limit": False}, item["sources"])
-        if item["entry"] is not None:
-            wanted, why = item["entry"], item["sources"]
-        else:
-            try:
-                wanted = protect.entry(repo, config, "its pubkit.json")
-            except ValueError as e:
-                said = str(e) if item.get("listed") else f"not in protected.json, and {e}"
-                return Fact({"differences": [said], "limit": False},
-                            raw.sources)
-            why = list(raw.sources)
+        try:
+            wanted = protect.entry(repo, config, "its pubkit.json")
+        except ValueError as e:
+            return Fact({"differences": [str(e)], "limit": False}, raw.sources)
         found = self.c.github.rulesets(repo)
-        sources = (*why, *found.sources)
+        sources = (*raw.sources, *found.sources)
         if found.value is None:
             if visibility.value == "private":
                 return Fact({"differences": [found.note or "rulesets not readable"], "limit": True},
@@ -264,7 +239,7 @@ class Gatherer:
         targets = [("branch", protect.ruleset(wanted["checks"], wanted.get("queue", True)),
                     "its default branch")]
         if wanted.get("tags", True):
-            targets.append(("tag", protect.tag_ruleset(repo, wanted.get("release_app")), "its release tags"))
+            targets.append(("tag", protect.tag_ruleset(wanted.get("release_app")), "its release tags"))
         for target, want, where in targets:
             test = protect.on_default_branch if target == "branch" else protect.on_release_tags
             have = [r for r in found.value if r.get("target") == target and test(r)]

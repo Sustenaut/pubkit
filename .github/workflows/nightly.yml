@@ -1,6 +1,5 @@
 # Nightly: every repository the repos input marks to govern. It has no schedule of
-# its own: a control plane calls it on one. Run by hand, it reads governed.json,
-# which goes in a later release.
+# its own: a control plane calls it on one, or someone runs it by hand with that input.
 #
 # Reusable: a control plane calls this with `repos`, the repos file itself as
 # JSON ({"repositories": [{"repo", "govern"}]}), and the secrets app-id, app-key,
@@ -15,7 +14,7 @@
 # pubkit-nightly branch, with up to four commits (.github/nightly/update.sh):
 #
 # 1. every outdated pub* pin: the latest pubkit (in any of its *-ci.yml
-#    workflows), pubrel's release workflow and pubrel-version, pub-version,
+#    workflows), pubrel's release workflow and pubrel-version,
 #    each tool ci.tools pins by tag, and the crates nightly.pins.crates names
 #    in Cargo.lock;
 # 2. the other crates' updates that cargo vet covers with an audit (no new
@@ -40,7 +39,7 @@
 # NIGHTLY_APP_ID and the secret NIGHTLY_APP_KEY, give, for each governed repository, a token for that repository
 # alone, with only contents, pull-requests and workflows write (and
 # actions read, to wait for its CI), that expires within the hour. The app is installed on every owner whose
-# repositories governed.json lists. Without NIGHTLY_APP_ID it falls back,
+# repositories the input marks. Without NIGHTLY_APP_ID it falls back,
 # with a warning, to PUBKIT_BUMP_TOKEN, a token that may push branches and
 # open pull requests there; with neither, the job only reports.
 # The secrets notify-token (a Slack bot's, chat:write) and notify-user, whom it
@@ -49,6 +48,11 @@ name: nightly
 
 on:
   workflow_dispatch:
+    inputs:
+      repos:
+        type: string
+        required: true
+        description: 'The repos file itself, as JSON: {"repositories": [{"repo", "govern"}]}'
   workflow_call:
     inputs:
       repos:
@@ -94,17 +98,9 @@ jobs:
             "https://github.com/$PUBKIT/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
         env: { GH_TOKEN: '${{ github.token }}' }
-      - if: inputs.repos == ''
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with: { path: pubkit, persist-credentials: false }
       - id: report
         run: |
-          if [ -n "$REPOS" ]; then
-            governed=$(jq -c '[.repositories[] | select(.govern) | .repo]' <<< "$REPOS")
-          else
-            echo "::warning::governed.json goes in a later release: call this workflow with the repos input."
-            governed=$(jq -c '[.repositories[].repo]' pubkit/governed.json)
-          fi
+          governed=$(jq -c '[.repositories[] | select(.govern) | .repo]' <<< "$REPOS")
           mkdir repos
           for repo in $(jq -r '.[]' <<< "$governed"); do
             # A private repository can't be read here, only updated below: leave it out
@@ -175,9 +171,8 @@ jobs:
           tag=$(latest "$PUBKIT")
           python -m pip install --quiet \
             "https://github.com/$PUBKIT/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
-          pubrel=$(latest Sustenaut/pubrel); pub=$(latest Sustenaut/publet)
+          pubrel=$(latest Sustenaut/pubrel)
           echo "pubrel=${pubrel#v}" >> "$GITHUB_OUTPUT"
-          echo "pub=${pub#v}" >> "$GITHUB_OUTPUT"
         env: { GH_TOKEN: '${{ github.token }}' }
       - if: steps.token.outputs.present == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -201,6 +196,5 @@ jobs:
         env:
           GH_TOKEN: '${{ steps.token.outputs.token }}'
           PUBREL: '${{ steps.latest.outputs.pubrel }}'
-          PUB: '${{ steps.latest.outputs.pub }}'
           SLACK_TOKEN: '${{ secrets.notify-token || secrets.SUSTENAUT_SLACK_BOT_TOKEN }}'
           SLACK_USER: '${{ secrets.notify-user || secrets.SLACK_DM_USER_ID }}'

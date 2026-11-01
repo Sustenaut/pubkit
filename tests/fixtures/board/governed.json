@@ -1,7 +1,0 @@
-{
-  "comment": "A made-up list for the board's recorded build.",
-  "repositories": [
-    { "repo": "example-org/pubthing" },
-    { "repo": "example-org/private-thing" }
-  ]
-}
