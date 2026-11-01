@@ -33,6 +33,53 @@ Feature: pubkit github-app create makes an app and puts its values in Bitwarden
     Then it succeeds
     And bws created "the-app-installation-id" as "7770001"
 
+  Scenario: An installation on every repository says so, and where to narrow it
+    Given a manifest for the org "example-org"
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "It reaches ALL of example-org's repositories"
+    And it prints "https://github.com/organizations/example-org/settings/installations/7770001"
+
+  Scenario: A user's installation is narrowed in the user's own settings
+    Given a manifest for the user "someone"
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "https://github.com/settings/installations/7770001"
+
+  Scenario: An installation on selected repositories lists them
+    Given a manifest for the org "example-org"
+    And the app is installed on the selected repositories "example-org/two" and "example-org/one"
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "It reaches 2 selected repositories: example-org/one, example-org/two."
+    And the list was asked for with the installation's own token
+    And neither the key nor the token is printed
+
+  Scenario: A long list of selected repositories is read to its end
+    Given a manifest for the org "example-org"
+    And the app is installed on 150 selected repositories
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "It reaches 150 selected repositories:"
+    And it prints "example-org/repo-149"
+
+  Scenario: Failing to list the repositories says so, and still writes the key
+    Given a manifest for the org "example-org"
+    And the app is installed on the selected repositories "example-org/one" and "example-org/two"
+    And GitHub refuses the installation token
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "could not list them"
+    And it prints "https://github.com/organizations/example-org/settings/installations/7770001"
+    And bws wrote 3 secrets with the token "write-token"
+
+  Scenario: An installation that does not say what it reaches is not taken for either
+    Given a manifest for the org "example-org"
+    And GitHub does not say which repositories the app reaches
+    When I create the app, giving the token "write-token" and answering "yes"
+    Then it succeeds
+    And it prints "GitHub did not say which repositories it reaches"
+
   Scenario: A callback with the wrong state is refused, and the real one still works
     Given a manifest for the org "example-org"
     And the browser first comes back with the wrong state

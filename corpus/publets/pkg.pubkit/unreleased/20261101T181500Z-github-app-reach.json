@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubkit github-app create says which repositories a new installation reaches, all of them or the list of those selected, and links to where that is changed. The README notes that opening the install page may install the app on every repository straight away."
+}
