@@ -92,14 +92,16 @@ class Plan:
     def names(self) -> dict[str, str]:
         return {slot: f"{self.prefix}-{slot}" for slot in ("app-id", "app-key", "installation-id")}
 
+    def apps_url(self) -> str:
+        """Where the owner's apps are: an organization's, or the signed-in user's."""
+        account = f"organizations/{self.owner}/" if self.org else ""
+        return f"https://github.com/{account}settings/apps"
+
     def new_app_url(self) -> str:
-        if self.org:
-            return f"https://github.com/organizations/{self.owner}/settings/apps/new"
-        return "https://github.com/settings/apps/new"
+        return f"{self.apps_url()}/new"
 
     def settings_url(self, slug: str) -> str:
-        base = f"https://github.com/organizations/{self.owner}" if self.org else "https://github.com"
-        return f"{base}/settings/apps/{urllib.parse.quote(slug, safe='')}"
+        return f"{self.apps_url()}/{urllib.parse.quote(slug, safe='')}"
 
 
 def problems(manifest: Any) -> list[str]:
