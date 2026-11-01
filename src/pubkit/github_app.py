@@ -22,7 +22,8 @@ exists: show the plan (where --dry-run ends), ask for a Bitwarden access token
 with write access, and look for the names in the project. Then a page on
 127.0.0.1 posts the manifest to GitHub, GitHub redirects back with a code, and
 the code becomes the app and its key. The browser opens the app's install page,
-and the app's own key is used to watch for the installation. Last, typing "yes"
+and the app's own key is used to watch for the installation, and to say which
+repositories it reaches. Last, typing "yes"
 writes `<prefix>-app-id`, `<prefix>-app-key` and `<prefix>-installation-id`.
 
 The token is only ever asked for, never read from a file or kept, and reaches
@@ -38,6 +39,7 @@ import getpass
 import hashlib
 import hmac
 import html
+import itertools
 import json
 import os
 import re
@@ -96,6 +98,11 @@ class Plan:
         """Where the owner's apps are: an organization's, or the signed-in user's."""
         account = f"organizations/{self.owner}/" if self.org else ""
         return f"https://github.com/{account}settings/apps"
+
+    def installation_url(self, installation: int) -> str:
+        """Where the owner chooses which repositories an installation reaches."""
+        account = f"organizations/{self.owner}/" if self.org else ""
+        return f"https://github.com/{account}settings/installations/{installation}"
 
     def new_app_url(self) -> str:
         return f"{self.apps_url()}/new"
@@ -335,7 +342,7 @@ def app_jwt(app_id: int, pem: str, now: int | None = None) -> str:
     return f"{signed}.{part(signature)}"
 
 
-def await_installation(plan: Plan, app: dict) -> str:
+def await_installation(plan: Plan, app: dict) -> dict:
     """Open the install page, and wait until the owner has installed the app.
 
     An error only says so and waits on: giving up would throw away a key that
@@ -357,8 +364,41 @@ def await_installation(plan: Plan, app: dict) -> str:
         else:
             for install in installs:
                 if str(install.get("account", {}).get("login", "")).casefold() == plan.owner.casefold():
-                    return str(install["id"])
+                    return install
         time.sleep(POLL_SECONDS)
+
+
+def selected_repositories(app: dict, installation: int) -> list[str]:
+    """The repositories an installation reaches, which only its own token can
+    list. That token lasts an hour and goes no further than this function."""
+    token = github("POST", f"/app/installations/{installation}/access_tokens",
+                   "the request for an installation token", bearer=app_jwt(app["id"], app["pem"]))["token"]
+    names: list[str] = []
+    for page in itertools.count(1):
+        listed = github("GET", f"/installation/repositories?per_page=100&page={page}",
+                        "the list of repositories", bearer=token)["repositories"]
+        names += [repository["full_name"] for repository in listed]
+        if len(listed) < 100:
+            return names
+
+
+def report_reach(plan: Plan, app: dict, install: dict) -> None:
+    """Say which repositories the app reached. Nothing here stops the run: the
+    key is not written yet, and the reach can be changed at any time."""
+    print(f"Installed on {plan.owner}, installation id {install['id']}.")
+    selection = install.get("repository_selection")
+    narrow = f"Change that at {plan.installation_url(install['id'])}"
+    if selection == "selected":
+        try:
+            names = selected_repositories(app, install["id"])
+        except (Stop, KeyError, TypeError) as error:
+            print(f"It reaches selected repositories, but pubkit could not list them: {error}. {narrow}")
+            return
+        print(f"It reaches {len(names)} selected repositories: {', '.join(sorted(names)) or 'none'}. {narrow}")
+    elif selection == "all":
+        print(f"It reaches ALL of {plan.owner}'s repositories, and any made later. {narrow}")
+    else:
+        print(f"GitHub did not say which repositories it reaches. Check at {plan.installation_url(install['id'])}")
 
 
 def make_app(plan: Plan) -> dict:
@@ -437,12 +477,12 @@ def create(path: Path, replace: bool, dry_run: bool) -> int:
           flush=True)
     if unkept := [field for field in ("client_secret", "webhook_secret") if app.get(field)]:
         print(f"Not kept: {' and '.join(unkept)}. Make new ones in the app's settings if it needs them.")
-    installation = await_installation(plan, app)
-    print(f"Installed on {plan.owner}, installation id {installation}.")
+    install = await_installation(plan, app)
+    report_reach(plan, app, install)
 
     names = plan.names
     values = {names["app-id"]: str(app["id"]), names["app-key"]: app["pem"],
-              names["installation-id"]: installation}
+              names["installation-id"]: str(install["id"])}
     print(f"To write in project {plan.project}:")
     for name, secret in ids.items():
         print(f"  {'replace' if secret else 'create '}  {name}")
