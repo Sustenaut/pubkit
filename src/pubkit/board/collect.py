@@ -133,6 +133,8 @@ class Gatherer:
         facts["dependabot_alerts"] = gh.dependabot_alerts(repo)
         facts["code_scanning_alerts"] = gh.code_scanning_alerts(repo)
         facts["secret_scanning_alerts"] = gh.secret_scanning_alerts(repo)
+        facts["secret_protection"] = Fact((about.value or {}).get("security"), about.sources,
+                                          about.note)
         facts["ci"] = self.ci(repo, branch)
         facts["nightly"] = self.nightly(repo, item, workflows, names)
         if kind == "service":

@@ -39,6 +39,9 @@ A repository may instead say how it is protected in its own pubkit.json:
 the ruleset's checks pass: true turns it on, false off, and without it
 protect leaves the setting as it is. It loosens nothing, since the ruleset
 still decides what may merge. A protected.json entry takes it too.
+Each public repository also gets secret scanning and push protection turned on,
+unless its block says `"secret_scanning": false`; a private one isn't touched, since
+those need GitHub Advanced Security there. Nothing here ever turns them off.
 `pubkit protect OWNER/NAME` reads it from GitHub for a repository the list
 does not name, and `pubkit protect` with no list and no repositories reads
 `./pubkit.json`, for the repository `origin` points at.
@@ -205,6 +208,9 @@ def differences(want: dict, have: dict) -> list[str]:
     return out
 
 
+LABELS = {"secret_scanning": "secret scanning", "secret_scanning_push_protection": "push protection"}
+SECRET_SETTINGS = tuple(LABELS)
+
 NO_QUEUE = ("main merges only after its required checks pass on a branch up to date "
             "with main")
 
@@ -235,7 +241,8 @@ def no_queue(api: Api, repo: str) -> str | None:
 def protect(api: Api, repo: str, checks: list[str], check: bool,
             tags: bool = True, queue: bool = True,
             auto_merge: bool | None = None,
-            release_app: int | None = None) -> tuple[list[str], bool]:
+            release_app: int | None = None,
+            scanning: bool = True) -> tuple[list[str], bool]:
     """Bring one repository to both rulesets (with `tags` false, only its
     default branch's; with `queue` false, or where GitHub offers none,
     main's without the merge queue; with `release_app`, its tags' letting
@@ -274,6 +281,9 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
         merge_lines, merge_bad = attempt(lambda: allow_auto_merge(api, repo, auto_merge, check),
                                          repo, check)
         lines, bad = lines + merge_lines, bad or merge_bad
+    if scanning:
+        scan_lines, scan_bad = attempt(lambda: secret_scanning(api, repo, check), repo, check)
+        lines, bad = lines + scan_lines, bad or scan_bad
     return lines, bad
 
 
@@ -290,6 +300,28 @@ def allow_auto_merge(api: Api, repo: str, want: bool, check: bool) -> tuple[list
         return [f"{repo}: auto-merge is {said(bool(have))}; pubkit wants it {said(want)}"], True
     api("PATCH", f"repos/{repo}", {"allow_auto_merge": want})
     return [f"{repo}: auto-merge now {said(want)}"], False
+
+
+def secret_scanning(api: Api, repo: str, check: bool) -> tuple[list[str], bool]:
+    """Bring a public repository's secret scanning and push protection on. It
+    never turns them off, and a token that can't read them changes nothing."""
+    info = api("GET", f"repos/{repo}", None) or {}
+    if info.get("visibility", "public") != "public":
+        return [f"{repo}: secret scanning left alone: it needs GitHub Advanced Security on "
+                f"a private repository"], False
+    found = info.get("security_and_analysis")
+    if found is None:
+        return [f"{repo}: secret scanning not readable; reading it needs Administration read"], False
+    off = [name for name in SECRET_SETTINGS
+           if (found.get(name) or {}).get("status") != "enabled"]
+    if not off:
+        return [f"{repo}: secret scanning and push protection on, up to date"], False
+    said = ", ".join(LABELS[name] for name in off)
+    if check:
+        return [f"{repo}: {said} off; pubkit wants it on"], True
+    api("PATCH", f"repos/{repo}",
+        {"security_and_analysis": {name: {"status": "enabled"} for name in off}})
+    return [f"{repo}: turned on {said}"], False
 
 
 def attempt(step, repo: str, check: bool) -> tuple[list[str], bool]:
@@ -329,7 +361,7 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
             *(f"  was: {d}" for d in diff), *lines], bool(others)
 
 
-KEYS = {"checks", "tags", "queue", "auto_merge", "release_app"}
+KEYS = {"checks", "tags", "queue", "auto_merge", "release_app", "secret_scanning"}
 
 
 def problems(block: Any) -> list[str]:
@@ -347,7 +379,7 @@ def problems(block: Any) -> list[str]:
                        'surrounding spaces')
         elif len(set(checks)) != len(checks):
             out.append('"checks" lists a check twice')
-    for key in ("tags", "queue", "auto_merge"):
+    for key in ("tags", "queue", "auto_merge", "secret_scanning"):
         if not isinstance(block.get(key, True), bool):
             out.append(f'"{key}" must be true or false, not {json.dumps(block[key])}')
     app = block.get("release_app", 1)
@@ -366,12 +398,13 @@ def entry(repo: str, config: Any, where: str) -> dict:
     bad = problems(block)
     if isinstance(block, dict) and block.keys() - KEYS:
         bad.append(f"{', '.join(sorted(block.keys() - KEYS))} is not a protect setting; "
-                   f"it takes checks, tags, queue, auto_merge and release_app")
+                   f"it takes checks, tags, queue, auto_merge, release_app and secret_scanning")
     if bad:
         raise ValueError(f"{where}'s protect block: {'; '.join(bad)}")
     return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True),
             "queue": block.get("queue", True), "auto_merge": block.get("auto_merge"),
-            "release_app": block.get("release_app")}
+            "release_app": block.get("release_app"),
+            "secret_scanning": block.get("secret_scanning", True)}
 
 
 def parse(text: str | bytes, where: str) -> Any:
@@ -488,7 +521,8 @@ def run(config: Path | None, repos: list[str], check: bool, requires: list[str] 
                 continue
         lines, bad = protect(api, item["repo"], item["checks"], check,
                              tags and item.get("tags", True), queue and item.get("queue", True),
-                             item.get("auto_merge"), item.get("release_app"))
+                             item.get("auto_merge"), item.get("release_app"),
+                             item.get("secret_scanning", True))
         print("\n".join(lines))
         failed = failed or bad
     return 1 if failed else 0

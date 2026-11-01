@@ -421,3 +421,60 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Given pubkit's ruleset, with a bypass actor added
     When I compare it with pubkit's ruleset
     Then it reports the bypass actors
+
+  Scenario: A public repository gets secret scanning and push protection turned on
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" has secret scanning "disabled" and push protection "disabled"
+    When I run pubkit "protect"
+    Then it succeeds
+    And it prints "example-org/site: turned on secret scanning, push protection"
+    And GitHub was asked to turn on "secret_scanning, secret_scanning_push_protection" in "example-org/site"
+
+  Scenario: Only what's off is turned on
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" has secret scanning "enabled" and push protection "disabled"
+    When I run pubkit "protect"
+    Then it succeeds
+    And GitHub was asked to turn on "secret_scanning_push_protection" in "example-org/site"
+
+  Scenario: protect --check reports them off, and changes nothing
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has pubkit's ruleset in "example-org/site" requiring "ci / passed"
+    And "example-org/site" has secret scanning "disabled" and push protection "disabled"
+    When I run pubkit "protect" "--check" "--no-tags"
+    Then the exit code is 1
+    And it prints "pubkit wants it on"
+    And GitHub was asked to turn on nothing in "example-org/site"
+
+  Scenario: Already on, nothing is asked
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" has secret scanning "enabled" and push protection "enabled"
+    When I run pubkit "protect"
+    Then it prints "secret scanning and push protection on, up to date"
+    And GitHub was asked to turn on nothing in "example-org/site"
+
+  Scenario: A private repository is left alone
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" is a private repository of an organization on the "team" plan
+    When I run pubkit "protect"
+    Then it prints "secret scanning left alone"
+    And GitHub was asked to turn on nothing in "example-org/site"
+
+  Scenario: A token that can't read them changes nothing, and fails nothing
+    Given protected.json lists "example-org/site" requiring "ci / passed"
+    And GitHub has pubkit's ruleset in "example-org/site" requiring "ci / passed"
+    When I run pubkit "protect" "--check" "--no-tags"
+    Then it succeeds
+    And it prints "secret scanning not readable"
+    And GitHub was asked to turn on nothing in "example-org/site"
+
+  Scenario: A block can opt out
+    Given "example-org/site"'s pubkit.json on GitHub says secret_scanning is false, requiring "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" has secret scanning "disabled" and push protection "disabled"
+    When I run pubkit "protect" "example-org/site"
+    Then GitHub was asked to turn on nothing in "example-org/site"

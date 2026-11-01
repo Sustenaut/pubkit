@@ -18,6 +18,7 @@
     { "tool": "Dependabot", "category": "security", "alerts": "dependabot_alerts" },
     { "tool": "code scanning", "category": "security", "alerts": "code_scanning_alerts" },
     { "tool": "secret scanning", "category": "security", "alerts": "secret_scanning_alerts" },
+    { "tool": "Secret scanning settings", "category": "security", "settings": "secret_protection", "labels": { "secret_scanning": "Secret scanning", "secret_scanning_push_protection": "push protection" } },
     { "tool": "OpenSSF Scorecard", "category": "security", "scorecard_below": 7 }
   ],
   "delivery": [

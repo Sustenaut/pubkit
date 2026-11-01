@@ -33,12 +33,18 @@ class GitHub(Connector):
         super().__init__(ledger, transport, headers(token))
 
     def repository(self, repo: str) -> Fact:
-        """Visibility, default branch and whether it is archived."""
+        """Visibility, default branch, whether it is archived, and the status of
+        secret scanning and push protection, which GitHub shows only to a token with
+        Administration read."""
         response, call = self.get("repository", f"{API}/repos/{repo}")
         if not response.ok:
             return Fact(None, (call,), response.message())
         data = response.json()
-        return Fact({"visibility": data.get("visibility") or
+        security = data.get("security_and_analysis")
+        return Fact({"security": None if security is None else {
+                         name: (security.get(name) or {}).get("status")
+                         for name in ("secret_scanning", "secret_scanning_push_protection")},
+                     "visibility": data.get("visibility") or
                      ("private" if data.get("private") else "public"),
                      "default_branch": data.get("default_branch", "main"),
                      "archived": bool(data.get("archived"))}, (call,))
