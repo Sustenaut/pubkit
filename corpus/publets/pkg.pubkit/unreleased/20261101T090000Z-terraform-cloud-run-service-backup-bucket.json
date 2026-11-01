@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "terraform/cloud-run-service, terraform/backup-bucket and terraform/cloud-run-access: what a Cloud Run site repeats (its account, registry and service, and a deploy account only its own GitHub repository can use), a backup bucket with an account that can only create objects, and who may pass IAP to each service. The README describes one stack per repository, and how to move a site without changing anything in the cloud."
-}
