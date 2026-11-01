@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.24.2 is released as v0.24.2 from commit f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3.",
+      "content": "pubkit 0.24.3 is released as v0.24.3 from commit 71df7061de7498f6d9b7f60a0afd628520d187c5.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.24.2",
+            "0.24.3",
             "pubkit --version",
-            "pubkit 0.24.2",
-            "v0.24.2",
-            "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
+            "pubkit 0.24.3",
+            "v0.24.3",
+            "71df7061de7498f6d9b7f60a0afd628520d187c5"
           ]
         ]
       },
-      "scope": "the published release v0.24.2 of pubkit",
+      "scope": "the published release v0.24.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
+          "revision": "71df7061de7498f6d9b7f60a0afd628520d187c5"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.24.2 was released on 2026-11-01 from commit f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3 with these changes.",
+      "content": "pubkit 0.24.3 was released on 2026-11-01 from commit 71df7061de7498f6d9b7f60a0afd628520d187c5 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "fixed",
-            "pubkit protect --check and the board no longer report a difference because a read-only token can't see a ruleset's bypass_actors, which GitHub hides from it."
-          ],
-          [
             "added",
-            "pubkit state --check refuses a repository with protect on whose block requires a check it hasn't reported on its default branch or recent pull requests, since nothing could merge there. It says nothing when it can't read them."
+            "pubkit protect turns on secret scanning and push protection on public repositories, and the board takes a security notch when either is off. A protect block opts out with secret_scanning false; nothing ever turns them off, and private repositories are left alone."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.24.2 of pubkit",
+      "scope": "the published release v0.24.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "f5c49c6f0149cd4ec05a49d3dc73dc39a37615a3"
+          "revision": "71df7061de7498f6d9b7f60a0afd628520d187c5"
         }
       ]
     }
