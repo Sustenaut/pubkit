@@ -11,14 +11,26 @@ branch=pubkit-nightly
 body=$(mktemp)
 summary=${GITHUB_STEP_SUMMARY:-/dev/null}
 
+# The integrations release that posts to Slack, installed once, when first needed.
+INTEGRATIONS_WHEEL="https://github.com/Sustenaut/integrations/releases/download/v0.3.0/integrations-0.3.0-py3-none-any.whl"
+INTEGRATIONS_SHA256=12b7741186db5e2fa50a4cbf4465b6e17d85d4c7624ef6ac5c1af9a2ba2d0628
+slack_tool=""
+
+post_to_slack() {
+  if [[ -z "$slack_tool" ]]; then
+    slack_tool=$(mktemp -d)
+    echo "integrations @ $INTEGRATIONS_WHEEL --hash=sha256:$INTEGRATIONS_SHA256" > "$slack_tool/requirements.txt"
+    python3 -m pip install --quiet --no-deps --require-hashes --target "$slack_tool" -r "$slack_tool/requirements.txt" \
+      || return 1
+  fi
+  PYTHONPATH="$slack_tool" python3 -m integrations slack post --channel "$SLACK_USER" --text "$1"
+}
+
 notify() {
   if [[ -z "${SLACK_TOKEN:-}" ]] || [[ -z "${SLACK_USER:-}" ]]; then
     echo "No Slack secrets: not sending \"$1\""; return 0
   fi
-  curl -sS -X POST https://slack.com/api/chat.postMessage \
-    -H "Authorization: Bearer $SLACK_TOKEN" -H 'Content-Type: application/json; charset=utf-8' \
-    --data "$(jq -n --arg c "$SLACK_USER" --arg t "$1" '{channel: $c, text: $t}')" \
-    | jq -e .ok >/dev/null || echo "::warning::the Slack DM failed: $1"
+  post_to_slack "$1" || echo "::warning::the Slack DM failed: $1"
 }
 
 # Every workflow run on commit $1 finished, and each succeeded or was
