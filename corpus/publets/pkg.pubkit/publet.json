@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.25.0 is released as v0.25.0 from commit 51e33c13c339c8bcdac7a14973f52af2708f09f5.",
+      "content": "pubkit 0.26.0 is released as v0.26.0 from commit 461b65d791b83f8d826af807e4291ec62e92aff0.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.25.0",
+            "0.26.0",
             "pubkit --version",
-            "pubkit 0.25.0",
-            "v0.25.0",
-            "51e33c13c339c8bcdac7a14973f52af2708f09f5"
+            "pubkit 0.26.0",
+            "v0.26.0",
+            "461b65d791b83f8d826af807e4291ec62e92aff0"
           ]
         ]
       },
-      "scope": "the published release v0.25.0 of pubkit",
+      "scope": "the published release v0.26.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "51e33c13c339c8bcdac7a14973f52af2708f09f5"
+          "revision": "461b65d791b83f8d826af807e4291ec62e92aff0"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.25.0 was released on 2026-11-01 from commit 51e33c13c339c8bcdac7a14973f52af2708f09f5 with these changes.",
+      "content": "pubkit 0.26.0 was released on 2026-11-02 from commit 461b65d791b83f8d826af807e4291ec62e92aff0 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,32 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit github-app create: make a GitHub App from a manifest the repository keeps, through GitHub's app-manifest flow, wait for its installation, and write its id, key and installation id to Bitwarden once you type yes. The access token is asked for at a hidden prompt and never kept; the key is never printed or written to disk. The README describes the flow."
+            "changed",
+            "pubkit github-app create says which repositories a new installation reaches, all of them or the list of those selected, and links to where that is changed. The README notes that opening the install page may install the app on every repository straight away."
           ],
           [
-            "removed",
-            "protected.json, governed.json, --config, --governed and pubkit pins' --pub are gone: pubkit protect, pubkit board and the nightly take a repos file or their named repositories, and how each is protected stays in its own pubkit.json. A repository with release tags must name its release_app, since no owner gets one by default, and one that should move crates as pins must name them in nightly.pins.crates. The pub-version CI input is gone: list the tool in ci.tools."
+            "added",
+            "pubkit service-account-key create makes a Google Cloud service account key and puts it in Bitwarden with Bitwarden's SDK, so no file, command line or Terraform state ever holds it."
+          ],
+          [
+            "security",
+            "pubkit github-app create writes the app's key with Bitwarden's SDK, from memory, so it is no longer on a command line while it is written."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.25.0 of pubkit",
+      "scope": "the published release v0.26.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "51e33c13c339c8bcdac7a14973f52af2708f09f5"
+          "revision": "461b65d791b83f8d826af807e4291ec62e92aff0"
         }
       ]
     }
   },
-  "created": "2026-11-01T00:00:00Z",
+  "created": "2026-11-02T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
