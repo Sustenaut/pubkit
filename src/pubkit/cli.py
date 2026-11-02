@@ -19,6 +19,8 @@
     pubkit freshness [--json] (DIR... | --repos FILE [DIR])
     pubkit protect [--check] [--repos FILE | --require CHECK...] [REPO...]
     pubkit state --check [FILE]
+    pubkit state --repos-for board|govern [FILE]
+    pubkit board-publish --url URL --tenant TENANT [--file FILE]
     pubkit app-secrets [--check]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
@@ -503,9 +505,19 @@ def main(argv: list[str] | None = None) -> int:
                    help="read recorded responses from this file instead of the network")
     p.add_argument("--record", type=Path,
                    help="also keep every response in this file, for --replay")
-    p = commands.add_parser("state", help="check a state repository's state.json")
-    p.add_argument("--check", action="store_true", required=True,
-                   help="check its shape, that each repository exists, and each protected one's block")
+    p = commands.add_parser("board-publish", help="keep a new board.json in storage, if a fact or "
+                                                  "a grade changed, from a GitHub Actions job")
+    p.add_argument("--url", required=True, help="the storage service's address")
+    p.add_argument("--tenant", required=True, help="the storage tenant whose board head it moves")
+    p.add_argument("--file", type=Path, default=Path("site/board.json"), metavar="FILE",
+                   help="the board (default: site/board.json)")
+    p = commands.add_parser("state", help="check a state repository's state.json, or make a "
+                                          "repos file from it")
+    what = p.add_mutually_exclusive_group(required=True)
+    what.add_argument("--check", action="store_true",
+                      help="check its shape, that each repository exists, and each protected one's block")
+    what.add_argument("--repos-for", choices=("board", "govern"), metavar="ROLE",
+                      help="print the repos file for a role, board or govern")
     p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
     p = commands.add_parser("app-secrets", help="send the secrets this repository's pubkit.json "
                                                 "names to it, through ./with-secrets")
@@ -627,8 +639,14 @@ def main(argv: list[str] | None = None) -> int:
                                        args.replace, args.dry_run)
     if args.command == "state":
         from .paths import confined
-        from .state import check
+        from .state import check, repos_for
+        if args.repos_for:
+            return repos_for(confined(args.file, "the state file"), args.repos_for)
         return check(confined(args.file, "the state file"))
+    if args.command == "board-publish":
+        from .board_publish import run as publish
+        from .paths import confined
+        return publish(args.url, args.tenant, confined(args.file, "the --file file"))
     if args.command == "board":
         from .board import run as board
         from .paths import confined

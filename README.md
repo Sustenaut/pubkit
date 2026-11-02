@@ -1186,7 +1186,7 @@ such a file instead of the network.
 checks out the caller, installs what its `tests/requirements.lock` pins
 (wheels only, by hash: the caller's own pubkit),
 runs `pubkit board` with the caller's read-only `token` and its `repos` input
-(the repos file itself, as JSON) or its two lists, and uploads board.json and index.html as the `board` artifact, kept 90 days. It
+(the repos file itself, as JSON), and uploads board.json and index.html as the `board` artifact, kept 90 days. It
 deploys nothing.
 
 ## The repos file
@@ -1208,12 +1208,23 @@ FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
 governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
 and `nightly.yml` take its contents as a `repos` input.
 
+    pubkit board-publish --url URL --tenant TENANT [--file FILE]
+
+keeps a board (by default `site/board.json`) in a storage tenant, for a job whose
+logs must stay quiet: it prints no repository's name. It uploads only if a fact or a grade
+differs from what the tenant's `board` head names, then moves the head, conditionally, so
+a move by someone else fails the run. It signs in with the GitHub Actions job's OpenID
+Connect token, for the audience that is the URL's host name, so the job needs `id-token:
+write` and no secret, and the tenant must let that job write.
+
 ### State files
 
     pubkit state --check [FILE]
+    pubkit state --repos-for board|govern [FILE]
 
-checks a state repository's `state.json` (by default in the working directory),
-which a control plane keeps for one GitHub owner and writes repos files from:
+`--check` checks a state repository's `state.json` (by default in the working directory),
+which a control plane keeps for one GitHub owner, and `--repos-for` prints the repos file
+for one of its roles:
 
 ```json
 { "owner": "example-org",
