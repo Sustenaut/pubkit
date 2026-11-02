@@ -1,0 +1,4 @@
+{
+  "category": "security",
+  "change": "pubkit github-app create writes the app's key with Bitwarden's SDK, from memory, so it is no longer on a command line while it is written."
+}

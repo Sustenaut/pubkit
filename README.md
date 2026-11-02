@@ -176,7 +176,7 @@ It goes in this order, so that a refusal comes before there is an app to clean u
    reaches `bws` only in its environment. `./with-secrets`' read-only token will
    not do for the writes.
 3. It looks for the names in the project, and refuses if one is there. `--replace`
-   overwrites them instead, with `bws secret edit`.
+   overwrites them instead.
 4. A server on 127.0.0.1 opens a page that posts the manifest to GitHub, with a
    random `state` that must come back. You confirm the app on GitHub, which
    redirects to the server with a code, and the code becomes the app and its key.
@@ -194,9 +194,9 @@ It goes in this order, so that a refusal comes before there is an app to clean u
 The key is never printed or written to disk: it stays in memory, so if the run
 ends before it is written, it is gone, and pubkit gives the app's settings page,
 where you make a new one or delete the app. The same goes for a client secret and
-webhook secret, which GitHub also returns and pubkit does not keep. `bws` takes a
-value only on its command line, so the key is in the process list of this machine
-for the moment that write takes; run it on a machine only you use.
+webhook secret, which GitHub also returns and pubkit does not keep. The values are
+written with Bitwarden's SDK, which takes them in memory, so the key is on no command
+line (see "Making a service account key" for how it is installed).
 
 A pull token for `ghcr.io` is no app's to give, so it stays a manual step.
 

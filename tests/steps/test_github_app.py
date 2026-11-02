@@ -1,6 +1,7 @@
-"""Steps for `pubkit github-app create`, end to end against three fakes: a bws
-on PATH, which logs its arguments and environment and reads a key the way the
-real one does; a browser, named by BROWSER, which follows the page pubkit
+"""Steps for `pubkit github-app create`, end to end against fakes: a bws on PATH,
+which logs its arguments and environment and reads a key the way the real one does;
+a stand-in for Bitwarden's SDK on PYTHONPATH, which logs each write in the same form
+and refuses as the real one does; a browser, named by BROWSER, which follows the page pubkit
 serves; and GitHub's API, an HTTP server on 127.0.0.1. Nothing reaches the network.
 
 A scenario runs in a session of its own, with no controlling terminal, so that
@@ -27,6 +28,7 @@ from pubkit.plugin import Completed
 scenarios("github-app.feature")
 
 PROJECT_ID = "11111111-2222-3333-4444-555555555555"
+ORGANIZATION_ID = "99999999-2222-3333-4444-555555555555"
 APP_ID = 5551234
 INSTALLATION_ID = 7770001
 INSTALLATION_TOKEN = "ghs_the-installation-token"
@@ -44,12 +46,55 @@ for arg in args[:args.index("--")] if "--" in args else args:
         sys.stderr.write(f"error: unexpected argument '{{arg}}' found\\n")
         sys.exit(2)
 if args[:2] == ["project", "list"]:
-    print(json.dumps([{{"id": "{PROJECT_ID}", "name": "the-project"}}]))
+    print(json.dumps([{{"id": "{PROJECT_ID}", "name": "the-project", "organizationId": "{ORGANIZATION_ID}"}}]))
 elif args[:2] == ["secret", "list"]:
     print(json.dumps(json.loads(os.environ.get("BWS_EXISTING", "[]"))))
-elif token == os.environ.get("BWS_REFUSE"):
-    sys.stderr.write("403 Forbidden, for " + " ".join(args) + " with " + token + "\\n")
-    sys.exit(1)
+"""
+
+FAKE_SDK = """
+import json, os
+
+
+class Answer:
+    def __init__(self, success, error_message=None):
+        self.success, self.error_message = success, error_message
+
+
+class Auth:
+    def __init__(self, client):
+        self.client = client
+
+    def login_access_token(self, token, state_file=None):
+        self.client.token = token
+        return Answer(True)
+
+
+class Secrets:
+    def __init__(self, client):
+        self.client = client
+
+    def _write(self, args, value):
+        with open(os.environ["BWS_LOG"], "a") as log:
+            log.write(json.dumps({"via": "sdk", "args": args, "token": self.client.token}) + "\\n")
+        if self.client.token == os.environ.get("BWS_REFUSE"):
+            return Answer(False, "403 Forbidden, for " + value + " with " + self.client.token)
+        return Answer(True)
+
+    def create(self, organization, key, value, note, projects=None):
+        return self._write(["secret", "create", "--", key, value, str(projects[0])], value)
+
+    def update(self, organization, secret, key, value, note, projects=None):
+        return self._write(["secret", "edit", f"--value={value}", "--", secret], value)
+
+
+class BitwardenClient:
+    token = None
+
+    def auth(self):
+        return Auth(self)
+
+    def secrets(self):
+        return Secrets(self)
 """
 
 FAKE_BROWSER = f"""#!{sys.executable}
@@ -167,6 +212,10 @@ def fakes(tmp_path, env, api):
         path = bin_dir / name
         path.write_text(text)
         path.chmod(0o755)
+    sdk = tmp_path / "sdk" / "bitwarden_sdk"
+    sdk.mkdir(parents=True)
+    (sdk / "__init__.py").write_text(FAKE_SDK)
+    env["PYTHONPATH"] = str(tmp_path / "sdk")
     env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
     env["BROWSER"] = str(bin_dir / "browser")
     env["BROWSER_LOG"] = str(tmp_path / "browser.log")
@@ -227,7 +276,7 @@ def has_two(env, name):
     _existing(env, name, 2)
 
 
-@given(parsers.parse('bws refuses writes with the token "{token}", printing what it was given'))
+@given(parsers.parse('Bitwarden refuses writes with the token "{token}", printing what it was given'))
 def refuses(env, token):
     env["BWS_REFUSE"] = token
 
@@ -257,6 +306,14 @@ def no_selection(api):
 @given("GitHub refuses the code")
 def refuses_code(api):
     api["refuse"] = True
+
+
+@given("the SDK is not installed, and uv refuses to install it")
+def sdk_refused(tmp_path, env):
+    del env["PYTHONPATH"]
+    uv = tmp_path / "bin" / "uv"
+    uv.write_text("#!/bin/sh\necho no wheel for this platform >&2\nexit 1\n")
+    uv.chmod(0o755)
 
 
 @given("bws is not installed")
@@ -357,17 +414,17 @@ def signed(api):
     assert api["jwt_ok"] and all(api["jwt_ok"])
 
 
-@then(parsers.parse('bws created "{name}" as "{value}"'))
+@then(parsers.parse('the SDK created "{name}" as "{value}"'))
 def created_as(tmp_path, name, value):
     assert created(tmp_path, name) == [value, PROJECT_ID]
 
 
-@then(parsers.parse('bws created "{name}" as the key'))
+@then(parsers.parse('the SDK created "{name}" as the key'))
 def created_key(tmp_path, key, name):
     assert created(tmp_path, name) == [key["pem"], PROJECT_ID]
 
 
-@then(parsers.parse('bws edited the existing "{name}" to the key'))
+@then(parsers.parse('the SDK edited the existing "{name}" to the key'))
 def edited(tmp_path, key, name):
     edits = [call["args"] for call in writes(tmp_path) if call["args"][1] == "edit"]
     assert len(edits) == 1
@@ -375,7 +432,7 @@ def edited(tmp_path, key, name):
     assert edits[0][-1] == f"secret-0-{name}"
 
 
-@then(parsers.parse('bws wrote {count:d} secrets with the token "{token}"'))
+@then(parsers.parse('the SDK wrote {count:d} secrets with the token "{token}"'))
 def wrote(tmp_path, count, token):
     assert len(_succeeded(tmp_path, token)) == count, writes(tmp_path)
 
@@ -402,6 +459,14 @@ def not_on_command_line(tmp_path):
         assert not any(call["token"] in arg for arg in call["args"])
 
 
+@then("the key is on no command line")
+def key_not_on_command_line(tmp_path, key):
+    body = key["pem"].splitlines()[1]
+    for call in bws_calls(tmp_path):
+        if call.get("via") != "sdk":
+            assert not any(body in arg for arg in call["args"])
+
+
 @then("no file under the repository holds the key")
 def not_on_disk(repo, key):
     body = key["pem"].splitlines()[1]
@@ -418,6 +483,11 @@ def listed_with_token(api):
 @then("the wrong state was answered with 400")
 def wrong_answered(tmp_path):
     assert browser(tmp_path)[0]["wrong_state"] == 400
+
+
+@then("GitHub was given no code")
+def no_code(api):
+    assert api["codes"] == []
 
 
 @then("GitHub was given the code once")
