@@ -53,6 +53,13 @@
       "mode": "required"
     },
     {
+      "plugin": "github.actions-oidc",
+      "paths": [
+        "src/pubkit/board_publish.py"
+      ],
+      "mode": "required"
+    },
+    {
       "plugin": "github.app-token",
       "paths": [
         ".github/workflows/ci.yml",

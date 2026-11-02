@@ -644,7 +644,7 @@ def main(argv: list[str] | None = None) -> int:
             return repos_for(confined(args.file, "the state file"), args.repos_for)
         return check(confined(args.file, "the state file"))
     if args.command == "board-publish":
-        from .board.publish import run as publish
+        from .board_publish import run as publish
         from .paths import confined
         return publish(args.url, args.tenant, confined(args.file, "the --file file"))
     if args.command == "board":
