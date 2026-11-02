@@ -1208,8 +1208,6 @@ FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
 governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
 and `nightly.yml` take its contents as a `repos` input.
 
-### State files
-
     pubkit board-publish --url URL --tenant TENANT [--file FILE]
 
 keeps a board (by default `site/board.json`) in a storage tenant, for a job whose
@@ -1218,6 +1216,8 @@ differs from what the tenant's `board` head names, then moves the head, conditio
 a move by someone else fails the run. It signs in with the GitHub Actions job's OpenID
 Connect token, for the audience that is the URL's host name, so the job needs `id-token:
 write` and no secret, and the tenant must let that job write.
+
+### State files
 
     pubkit state --check [FILE]
     pubkit state --repos-for board|govern [FILE]
