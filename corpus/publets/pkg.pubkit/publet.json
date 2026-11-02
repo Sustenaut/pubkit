@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.26.0 is released as v0.26.0 from commit 461b65d791b83f8d826af807e4291ec62e92aff0.",
+      "content": "pubkit 0.26.1 is released as v0.26.1 from commit 114b5b3ea2c0798cb7730a622f885ec66a334948.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.26.0",
+            "0.26.1",
             "pubkit --version",
-            "pubkit 0.26.0",
-            "v0.26.0",
-            "461b65d791b83f8d826af807e4291ec62e92aff0"
+            "pubkit 0.26.1",
+            "v0.26.1",
+            "114b5b3ea2c0798cb7730a622f885ec66a334948"
           ]
         ]
       },
-      "scope": "the published release v0.26.0 of pubkit",
+      "scope": "the published release v0.26.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "461b65d791b83f8d826af807e4291ec62e92aff0"
+          "revision": "114b5b3ea2c0798cb7730a622f885ec66a334948"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.26.0 was released on 2026-11-02 from commit 461b65d791b83f8d826af807e4291ec62e92aff0 with these changes.",
+      "content": "pubkit 0.26.1 was released on 2026-11-02 from commit 114b5b3ea2c0798cb7730a622f885ec66a334948 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,27 +57,19 @@
         ],
         "rows": [
           [
-            "changed",
-            "pubkit github-app create says which repositories a new installation reaches, all of them or the list of those selected, and links to where that is changed. The README notes that opening the install page may install the app on every repository straight away."
-          ],
-          [
             "added",
-            "pubkit service-account-key create makes a Google Cloud service account key and puts it in Bitwarden with Bitwarden's SDK, so no file, command line or Terraform state ever holds it."
-          ],
-          [
-            "security",
-            "pubkit github-app create writes the app's key with Bitwarden's SDK, from memory, so it is no longer on a command line while it is written."
+            "pubkit board-publish keeps a board in a storage tenant only when a fact or a grade changed, signing in with the job's OpenID Connect token, and pubkit state --repos-for prints the repos file for a role, so a control plane needs no copies of these."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.26.0 of pubkit",
+      "scope": "the published release v0.26.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "461b65d791b83f8d826af807e4291ec62e92aff0"
+          "revision": "114b5b3ea2c0798cb7730a622f885ec66a334948"
         }
       ]
     }
