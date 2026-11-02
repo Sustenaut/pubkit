@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit board-publish keeps a board in a storage tenant only when a fact or a grade changed, signing in with the job's OpenID Connect token, and pubkit state --repos-for prints the repos file for a role, so a control plane needs no copies of these."
+}

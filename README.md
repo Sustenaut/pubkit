@@ -1211,6 +1211,7 @@ and `nightly.yml` take its contents as a `repos` input.
 ### State files
 
     pubkit state --check [FILE]
+    pubkit state --repos-for board|govern [FILE]
 
 checks a state repository's `state.json` (by default in the working directory),
 which a control plane keeps for one GitHub owner and writes repos files from:

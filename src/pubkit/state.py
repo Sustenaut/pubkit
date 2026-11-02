@@ -1,4 +1,5 @@
 """`pubkit state --check`: is a state repository's state.json sound?
+`pubkit state --repos-for ROLE`: the repos file for one of its roles.
 
     {"owner": "OWNER",
      "repos": {"NAME": {"project": "some-group", "board": true, "protect": true, "govern": false}}}
@@ -101,6 +102,31 @@ def on_github(api: Api, owner: str, repos: dict) -> list[str]:
                     out.append(f"{slug} requires the check \"{check}\", which it hasn't reported "
                                f"lately, so nothing could merge there")
     return out
+
+
+def repos_file(state: dict, role: str) -> dict:
+    """The repos file pubkit's other commands read: the repositories with `role` on, in the
+    file's order. Nothing else reads a state file's roles."""
+    entries = []
+    for name, roles in state["repos"].items():
+        if roles[role]:
+            entry = {"repo": f"{state['owner']}/{name}", "protect": roles["protect"],
+                     "govern": roles["govern"]}
+            if roles.get("project"):
+                entry["project"] = roles["project"]
+            entries.append(entry)
+    return {"repositories": entries}
+
+
+def repos_for(path: Path, role: str) -> int:
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        sys.exit(f"pubkit state: {path}: {e}")
+    if bad := shape(state):
+        sys.exit(f"pubkit state: {path}: {'; '.join(bad)}")
+    print(json.dumps(repos_file(state, role), separators=(",", ":")))
+    return 0
 
 
 def check(path: Path, api: Api = protect.gh) -> int:
