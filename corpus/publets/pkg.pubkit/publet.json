@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.26.1 is released as v0.26.1 from commit 114b5b3ea2c0798cb7730a622f885ec66a334948.",
+      "content": "pubkit 0.27.0 is released as v0.27.0 from commit 579205a95790c60df0faf3cddf590b9655ee4354.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.26.1",
+            "0.27.0",
             "pubkit --version",
-            "pubkit 0.26.1",
-            "v0.26.1",
-            "114b5b3ea2c0798cb7730a622f885ec66a334948"
+            "pubkit 0.27.0",
+            "v0.27.0",
+            "579205a95790c60df0faf3cddf590b9655ee4354"
           ]
         ]
       },
-      "scope": "the published release v0.26.1 of pubkit",
+      "scope": "the published release v0.27.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "114b5b3ea2c0798cb7730a622f885ec66a334948"
+          "revision": "579205a95790c60df0faf3cddf590b9655ee4354"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.26.1 was released on 2026-11-02 from commit 114b5b3ea2c0798cb7730a622f885ec66a334948 with these changes.",
+      "content": "pubkit 0.27.0 was released on 2026-11-03 from commit 579205a95790c60df0faf3cddf590b9655ee4354 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,24 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit board-publish keeps a board in a storage tenant only when a fact or a grade changed, signing in with the job's OpenID Connect token, and pubkit state --repos-for prints the repos file for a role, so a control plane needs no copies of these."
+            "changed",
+            "pubkit sync adds the workflows it writes that take SONAR_TOKEN to integrations.json's sonarcloud.scan, where a repository keeps one and doesn't list them yet, and sync --check fails until it does, so moving to a pubkit with the sonar job no longer fails the integrations scan."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.26.1 of pubkit",
+      "scope": "the published release v0.27.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "114b5b3ea2c0798cb7730a622f885ec66a334948"
+          "revision": "579205a95790c60df0faf3cddf590b9655ee4354"
         }
       ]
     }
   },
-  "created": "2026-11-02T00:00:00Z",
+  "created": "2026-11-03T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
