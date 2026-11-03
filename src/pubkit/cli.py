@@ -222,7 +222,7 @@ def sync(root: Path, check: bool) -> int:
     if check:
         for path in stale:
             if path == INTEGRATIONS:
-                print(f"pubkit: {path} doesn't declare SONAR_TOKEN for the sonar job pubkit "
+                print(f"pubkit: {path} doesn't declare the token of the sonar job pubkit "
                       f"writes; run `pubkit sync`", file=sys.stderr)
                 continue
             print(f"pubkit: {path} differs from pubkit {__version__}'s; run `pubkit sync`",
