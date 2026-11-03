@@ -616,6 +616,44 @@ def path(event: str) -> str:
     return f".github/workflows/{event}.yml"
 
 
+INTEGRATIONS = "integrations.json"
+
+
+def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
+    """integrations.json as it must read for the integrations scan to pass: every
+    workflow pubkit writes that takes SONAR_TOKEN listed under a sonarcloud use, adding
+    them to "sonarcloud.scan" where none lists them. None where the repository keeps no
+    integrations.json, or one that isn't JSON, which the scan reports itself. A path
+    already listed, by name or by a pattern, leaves the file as it is, byte for byte;
+    nothing is ever taken out, since something else may need it."""
+    path = root / INTEGRATIONS
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(text)
+        uses = data["uses"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(uses, list) or not all(isinstance(u, dict) for u in uses):
+        return None
+    from fnmatch import fnmatch  # noqa: PLC0415
+    listed = [p for u in uses if str(u.get("plugin", "")).startswith("sonarcloud.")
+              for p in u.get("paths") or [] if isinstance(p, str)]
+    missing = [name for name, body in wanted
+               if name.startswith(".github/workflows/") and "secrets.SONAR_TOKEN" in body
+               and not any(name == p or fnmatch(name, p) for p in listed)]
+    if not missing:
+        return INTEGRATIONS, text
+    scan = next((u for u in uses if u.get("plugin") == "sonarcloud.scan"), None)
+    if scan is None:
+        scan = {"plugin": "sonarcloud.scan", "paths": [], "mode": "required"}
+        uses.append(scan)
+        uses.sort(key=lambda u: str(u.get("plugin", "")))
+    scan["paths"] = sorted({*scan.get("paths", []), *missing})
+    return INTEGRATIONS, json.dumps(data, indent=2) + "\n"
+
+
 def generated(config: dict[str, Any], root: Path) -> list[tuple[str, str]]:
     """Each workflow pubkit writes, by path: none without a ci block."""
     ci = settings(config, root)

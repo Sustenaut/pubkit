@@ -193,11 +193,13 @@ def sync(root: Path, check: bool) -> int:
     every = templates(kind)
     stale = []
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
-    from .ci import generated as workflows, leftovers  # noqa: PLC0415
+    from .ci import INTEGRATIONS, declared, generated as workflows, leftovers  # noqa: PLC0415
     wanted = [(path, render(every[path], values(config))) for path in managed(kind)]
     wanted += workflows(config, root)
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
+    if (integrations := declared(root, wanted)) is not None:
+        wanted.append(integrations)
     replaced = leftovers(config, root)
     for path, want in wanted:
         target = root / path
@@ -219,6 +221,10 @@ def sync(root: Path, check: bool) -> int:
               file=sys.stderr)
     if check:
         for path in stale:
+            if path == INTEGRATIONS:
+                print(f"pubkit: {path} doesn't declare SONAR_TOKEN for the sonar job pubkit "
+                      f"writes; run `pubkit sync`", file=sys.stderr)
+                continue
             print(f"pubkit: {path} differs from pubkit {__version__}'s; run `pubkit sync`",
                   file=sys.stderr)
         if lock_stale:

@@ -506,3 +506,8 @@ def token_by_name(repo, names, name):
 @then(parsers.parse('stderr does not mention "{text}"'))
 def stderr_lacks(result, text):
     assert text not in result.stderr, result.stderr
+
+
+@then(parsers.parse('"{path}" is not there'))
+def not_there(repo, path):
+    assert not (repo / path).exists()
