@@ -651,3 +651,33 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And "pr.yml" calls pubrel's release workflow at "0.5.3" with "pubrel-version" "v0.5.3"
     When I run pubkit "sync" "--check"
     Then it succeeds
+
+  Scenario: sync declares the sonar job's token where the repository lists its integrations
+    Given a Node repository whose ci block is '{}'
+    And the file "integrations.json" reads "{"uses": [{"plugin": "github.app-token", "paths": ["a.yml"], "mode": "required"}]}"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "integrations.json doesn't declare the token of the sonar job"
+    When I run pubkit "sync"
+    Then "integrations.json" contains ""plugin": "sonarcloud.scan""
+    And "integrations.json" contains "".github/workflows/pr.yml""
+    And "integrations.json" contains ""plugin": "github.app-token""
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: A token already declared, by name or pattern, leaves integrations.json alone
+    Given a Node repository whose ci block is '{}'
+    And the file "integrations.json" reads "{"uses": [{"plugin": "sonarcloud.read", "paths": [".github/workflows/*.yml"], "mode": "required"}]}"
+    When I run pubkit "sync"
+    Then "integrations.json" does not contain "sonarcloud.scan"
+
+  Scenario: A repository with no integrations.json gets none
+    Given a Node repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "integrations.json" is not there
+
+  Scenario: Without the sonar job, nothing is declared
+    Given a Node repository whose ci block is '{"jobs": {"sonar": false}}'
+    And the file "integrations.json" reads "{"uses": []}"
+    When I run pubkit "sync"
+    Then "integrations.json" does not contain "sonarcloud"

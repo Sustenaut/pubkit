@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubkit sync adds the workflows it writes that take SONAR_TOKEN to integrations.json's sonarcloud.scan, where a repository keeps one and doesn't list them yet, and sync --check fails until it does, so moving to a pubkit with the sonar job no longer fails the integrations scan."
+}
