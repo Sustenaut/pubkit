@@ -36,6 +36,7 @@
     {
       "plugin": "crates-io.publish",
       "paths": [
+        ".github/nightly/pubrel-version.sh",
         "plugins/rust-crate-quality/.claude-plugin/plugin.json",
         "src/pubkit/audit_prepare.py",
         "src/pubkit/nightly.py",
