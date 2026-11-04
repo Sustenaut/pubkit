@@ -22,6 +22,7 @@
     pubkit state --repos-for board|govern [FILE]
     pubkit board-publish --url URL --tenant TENANT [--file FILE]
     pubkit app-secrets [--check]
+    pubkit secrets run [--cwd DIR] -- COMMAND [ARGS...]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
     pubkit dns check ZONE [--record NAME/TYPE...]
@@ -406,11 +407,17 @@ def main(argv: list[str] | None = None) -> int:
         # Its own parser: `run` passes everything after -- to the command.
         from .cache import main as cache
         return cache(given[1:])
+    if given[:1] == ["secrets"]:
+        # The same: everything after -- is the command, with its own options.
+        from .secrets import main as secrets
+        return secrets(given[1:])
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("cache", help="keep what a build fetched or made, by pubkit.json's cache rules "
                                       "(pubkit cache --help)")
+    commands.add_parser("secrets", help="run one command with with-secrets.json's Bitwarden secrets in its "
+                                        "environment: secrets run [--cwd DIR] -- COMMAND")
     p = commands.add_parser("init", help="write the shared files into this repository")
     p.add_argument("--kind", choices=KINDS, required=True)
     p.add_argument("--bin", help="the program under test, for <NAME>_BIN_DIR")

@@ -43,7 +43,7 @@ pubkit = [
 # included, into coverage/coverage.xml for SonarQube Cloud.
 [tool.coverage.run]
 source = ["pubkit"]
-patch = ["subprocess"]
+patch = ["subprocess", "execv"]
 parallel = true
 
 [tool.coverage.xml]

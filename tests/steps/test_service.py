@@ -1,5 +1,6 @@
-"""Steps for the service kind: `with-secrets`, run as a person would, against
-a stand-in for the bws CLI that serves fake secrets from a JSON file."""
+"""Steps for the service kind: `with-secrets` and `pubkit secrets run`, run as a
+person would, against a stand-in for the bws CLI that serves fake secrets from a
+JSON file."""
 
 from __future__ import annotations
 
@@ -26,7 +27,15 @@ esac
 
 SHOW = """#!/bin/sh
 env > "$SHOW_ENV"
+pwd > "$SHOW_ENV.cwd"
 """
+# What a shell sets for itself, so it differs between a bash script and pubkit,
+# and what coverage sets in the Python processes it measures.
+SHELL_OWN = {"_", "SHLVL", "OLDPWD"}
+
+
+def _compared(name: str) -> bool:
+    return name not in SHELL_OWN and not name.startswith("COVERAGE_")
 
 
 def _pubkit():
@@ -82,35 +91,84 @@ def aliases_file(repo, path, alias, secret):
     (repo / "with-secrets.json").write_text(json.dumps(settings))
 
 
-@given(parsers.parse('Bitwarden holds "{k1}" as "{v1}" and "{k2}" as "{v2}" in the project "{project}"'))
-def holds(fake, k1, v1, k2, v2, project):
+def _holds(fake, project, pairs):
     (fake / "projects.json").write_text(json.dumps([{"id": f"id-{project}", "name": project}]))
     (fake / "project_id").write_text(f"id-{project}")
     when = "2026-10-13T11:00:00.123Z"
     (fake / "secrets.json").write_text(json.dumps(
-        [{"key": k1, "value": v1, "revisionDate": when}, {"key": k2, "value": v2, "revisionDate": when}]))
+        [{"key": key, "value": value, "revisionDate": when} for key, value in pairs]))
 
 
-def _wrapper(repo, run, fake, env, *command):
+@given(parsers.parse('Bitwarden holds "{k1}" as "{v1}" and "{k2}" as "{v2}" in the project "{project}"'))
+def holds(fake, k1, v1, k2, v2, project):
+    _holds(fake, project, [(k1, v1), (k2, v2)])
+
+
+@given(parsers.parse('Bitwarden holds "{k1}" as "{v1}" and "{k2}" as "{v2}" and "{k3}" as "{v3}" '
+                     'in the project "{project}"'))
+def holds_three(fake, k1, v1, k2, v2, k3, v3, project):
+    _holds(fake, project, [(k1, v1), (k2, v2), (k3, v3)])
+
+
+def _wrapper(repo, run, fake, env, runner, *command):
     env = {"PATH": f"{fake / 'bin'}:{os.environ['PATH']}", "FAKE_BWS": str(fake),
            "SHOW_ENV": str(fake / "seen.env"), **env}
-    return run(repo / "with-secrets", *command, cwd=repo, env=env)
+    if runner == "./with-secrets":
+        return run(repo / "with-secrets", *command, cwd=repo, env=env)
+    program, *args = runner.split(" ")
+    assert program == "pubkit", runner
+    return run(_pubkit(), *args, "--", *command, cwd=repo, env=env)
 
 
-@when(parsers.parse('I run "./with-secrets" with the token "{token}"'), target_fixture="result")
-def with_token(repo, run, fake, token):
-    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, fake / "show")
+@when(parsers.parse('I run "{runner}" with the token "{token}"'), target_fixture="result")
+def with_token(repo, run, fake, runner, token):
+    (repo / "infra").mkdir(exist_ok=True)
+    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, runner, fake / "show")
 
 
-@when('I run "./with-secrets" with no token', target_fixture="result")
-def no_token(repo, run, fake):
-    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": None}, fake / "show")
+@when(parsers.parse('I run "{runner}" with no token'), target_fixture="result")
+def no_token(repo, run, fake, runner):
+    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": None}, runner, fake / "show")
 
 
-@when(parsers.parse('I run "./with-secrets" with the token "{token}" and a command that exits {code:d}'),
+@when(parsers.parse('I run "{runner}" with the token "{token}" and a command that exits {code:d}'),
       target_fixture="result")
-def exits(repo, run, fake, token, code):
-    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, "sh", "-c", f"exit {code}")
+def exits(repo, run, fake, runner, token, code):
+    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, runner, "sh", "-c", f"exit {code}")
+
+
+@when(parsers.parse('I run "{runner}" with the token "{token}" and the command "{command}"'),
+      target_fixture="result")
+def missing_command(repo, run, fake, runner, token, command):
+    return _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, runner, command)
+
+
+@given(parsers.parse('the repository has no "{path}"'))
+def removed(repo, path):
+    (repo / path).unlink()
+
+
+@when(parsers.parse('I run both "{first}" and "{second}" with the token "{token}"'), target_fixture="both")
+def run_both(repo, run, fake, first, second, token):
+    out = []
+    for runner in (first, second):
+        result = _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, runner, fake / "show")
+        out.append((result, {k: v for k, v in _seen(fake).items() if _compared(k)}))
+        (fake / "seen.env").unlink()
+    return out
+
+
+@then("both succeed, print the same, and give the command the same environment")
+def same(both):
+    (first, first_env), (second, second_env) = both
+    assert first.code == second.code == 0, (first.stderr, second.stderr)
+    assert first.stderr == second.stderr
+    assert first_env == second_env
+
+
+@then(parsers.parse('the command ran in "{directory}"'))
+def ran_in(repo, fake, directory):
+    assert (fake / "seen.env.cwd").read_text().strip() == str(repo / directory)
 
 
 def _seen(fake) -> dict[str, str]:
