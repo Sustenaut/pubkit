@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubkit's nightly installs, and pins release workflows to, the newest pubrel crates.io has, warning when its latest GitHub release isn't published there yet, so a tag published before its crate no longer stops every repository's nightly."
+}

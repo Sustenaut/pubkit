@@ -263,3 +263,27 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And a repository it can't read for the report doesn't stop the others
     And only what the repos input governs gets a pull request
     And it takes pubkit's script and wheel from the same latest release, whichever repository calls it
+
+  Scenario: The nightly takes pubrel's latest release when crates.io has it
+    Given crates.io has pubrel "0.6.1, 0.6.2"
+    When I ask which pubrel to use for the release "v0.6.2"
+    Then it says "0.6.2", with no warning
+
+  Scenario: A release not yet on crates.io gives way to the newest that is, with a warning
+    Given crates.io has pubrel "0.6.0, 0.6.1"
+    When I ask which pubrel to use for the release "v0.6.2"
+    Then it says "0.6.1", warning "pubrel 0.6.2 is tagged but not on crates.io"
+
+  Scenario: A yanked release gives way too
+    Given crates.io has pubrel "0.6.1, 0.6.2", with "0.6.2" yanked
+    When I ask which pubrel to use for the release "v0.6.2"
+    Then it says "0.6.1", warning "not on crates.io"
+
+  Scenario: Without crates.io it tries the latest release, saying so
+    Given crates.io doesn't answer
+    When I ask which pubrel to use for the release "v0.6.2"
+    Then it says "0.6.2", warning "crates.io didn't answer"
+
+  Scenario: The nightly asks crates.io before installing pubrel
+    When I parse the workflow "nightly.yml"
+    Then it chooses pubrel with pubrel-version.sh, and installs that version

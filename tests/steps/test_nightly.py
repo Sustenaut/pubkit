@@ -454,3 +454,83 @@ def same_release(workflow):
     assert checkout["with"]["repository"] == "${{ env.PUBKIT }}"
     assert checkout["with"]["ref"] == "${{ needs.report.outputs.tag }}"
     assert '$GITHUB_REPOSITORY' not in "".join(s.get("run", "") for s in _steps(workflow))
+
+
+# Which pubrel the nightly takes, against a crates.io answered here.
+
+@pytest.fixture
+def crates():
+    """What the fake crates.io has: version -> yanked; None when it doesn't answer."""
+    return {"versions": {}}
+
+
+@given(parsers.re(r'crates\.io has pubrel "(?P<versions>[^"]+)"(?:, with "(?P<yanked>[^"]+)" yanked)?$'))
+def crates_has(crates, versions, yanked):
+    crates["versions"] = {v: v == yanked for v in versions.split(", ")}
+
+
+@given("crates.io doesn't answer")
+def crates_down(crates):
+    crates["versions"] = None
+
+
+@when(parsers.parse('I ask which pubrel to use for the release "{tag}"'), target_fixture="asked")
+def ask_pubrel(crates, tag):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    held = crates["versions"]
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def do_GET(self):
+            assert "pubkit-nightly" in self.headers["User-Agent"]
+            if held is None:
+                self.send_response(503)
+                self.end_headers()
+                return
+            path = self.path.removeprefix("/crates/pubrel")
+            if path == "":
+                stable = [v for v, yanked in held.items() if not yanked]
+                body = {"crate": {"max_stable_version": max(stable, key=lambda v: tuple(map(int, v.split("."))))}}
+            elif path[1:] in held:
+                body = {"version": {"num": path[1:], "yanked": held[path[1:]]}}
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            data = json.dumps(body).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        return subprocess.run([str(GITHUB / "nightly" / "pubrel-version.sh"), tag], capture_output=True,
+                              text=True, check=False, timeout=30,
+                              env={**os.environ, "CRATES_API": f"http://127.0.0.1:{server.server_port}"})
+    finally:
+        server.shutdown()
+
+
+@then(parsers.re(r'it says "(?P<version>[^"]+)", (?:with no warning|warning "(?P<warning>[^"]+)")$'))
+def says(asked, version, warning):
+    assert asked.returncode == 0, asked.stderr
+    assert asked.stdout.strip() == version
+    if warning:
+        assert warning in asked.stderr and "::warning::" in asked.stderr
+    else:
+        assert asked.stderr == ""
+
+
+@then("it chooses pubrel with pubrel-version.sh, and installs that version")
+def chooses(workflow):
+    steps = _steps(workflow)
+    latest = next(s for s in steps if s.get("id") == "latest")
+    assert 'pubrel=$(pubkit/.github/nightly/pubrel-version.sh "$(latest Sustenaut/pubrel)")' in latest["run"]
+    install = next(s for s in steps if "cargo install --locked pubrel" in s.get("run", ""))
+    assert install["env"]["PUBREL"] == "${{ steps.latest.outputs.pubrel }}"

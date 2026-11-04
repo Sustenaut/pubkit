@@ -171,8 +171,9 @@ jobs:
           tag=$(latest "$PUBKIT")
           python -m pip install --quiet \
             "https://github.com/$PUBKIT/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
-          pubrel=$(latest Sustenaut/pubrel)
-          echo "pubrel=${pubrel#v}" >> "$GITHUB_OUTPUT"
+          # The newest pubrel crates.io has: a tag can come before its crate.
+          pubrel=$(pubkit/.github/nightly/pubrel-version.sh "$(latest Sustenaut/pubrel)")
+          echo "pubrel=$pubrel" >> "$GITHUB_OUTPUT"
         env: { GH_TOKEN: '${{ github.token }}' }
       - if: steps.token.outputs.present == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
