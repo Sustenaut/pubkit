@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.27.1 is released as v0.27.1 from commit c6d961cb4506412c3184f85d8cd7cb3b0cffd65c.",
+      "content": "pubkit 0.28.0 is released as v0.28.0 from commit b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.27.1",
+            "0.28.0",
             "pubkit --version",
-            "pubkit 0.27.1",
-            "v0.27.1",
-            "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
+            "pubkit 0.28.0",
+            "v0.28.0",
+            "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
           ]
         ]
       },
-      "scope": "the published release v0.27.1 of pubkit",
+      "scope": "the published release v0.28.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
+          "revision": "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.27.1 was released on 2026-11-05 from commit c6d961cb4506412c3184f85d8cd7cb3b0cffd65c with these changes.",
+      "content": "pubkit 0.28.0 was released on 2026-11-05 from commit b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "fixed",
-            "pubkit's nightly installs, and pins release workflows to, the newest pubrel crates.io has, warning when its latest GitHub release isn't published there yet, so a tag published before its crate no longer stops every repository's nightly."
-          ],
-          [
-            "added",
-            "pubkit secrets run -- COMMAND runs one command with the Bitwarden secrets the repository's with-secrets.json names, exactly as the managed ./with-secrets does (the same settings, .env token, aliases, Terraform modes and messages), so a repository can run it from its pinned pubkit instead of keeping the script. --cwd runs the command in another directory."
+            "changed",
+            "The managed ./with-secrets is now one line that runs ./pubkit secrets run --cwd \"$PWD\" -- COMMAND, so a service's secrets wrapper comes from its pinned pubkit instead of a copied script. It behaves as before, in the directory it is called from, and needs uv and bws but no longer jq."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.27.1 of pubkit",
+      "scope": "the published release v0.28.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
+          "revision": "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
         }
       ]
     }
