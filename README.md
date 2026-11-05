@@ -1036,6 +1036,36 @@ than 0.5.3 or a `pub` older than 0.2.1, and prints the steps it does not take
 itself: the protect block to add to `pubkit.json`, and switching the repository
 on in the release app.
 
+## Backing up signing keys
+
+A repository names every signing key it uses, and where it is backed up, in
+`pubkit.json`:
+
+```json
+"signing_keys": [
+  {"path": "corpus/.publet/signing.key",
+   "bitwarden": {"project": "pub", "name": "pub-signing-key-example"}}
+]
+```
+
+`path` is from the repository's root, or from the home directory when it
+starts with `~/`: a key kept outside any repository, such as one under
+`~/.config`, is declared by the repository whose tools use it. `pubkit sync
+--check` refuses a block it can't use.
+
+    pubkit signing-key backup [--under DIR] [--dry-run]
+
+reads the declarations of this repository, or of every repository directly
+under `DIR`, and writes each declared key that is on this machine and not yet
+in its project, with Bitwarden's SDK, from memory. The access token, which
+must be able to read and write those projects, is asked for at a hidden
+prompt. A secret already there with the same value is left alone; another
+value under the same name is never overwritten and fails the run, as do two
+different keys declared under one name. A key pubkit.json does not declare,
+at `corpus/.publet/signing.key` or `.publet/signing.key`, is pointed out.
+`--dry-run` lists what it would write and asks for nothing. No key or token
+is printed or put on a command line.
+
 ## Protecting main and the release tags
 
 Every repository's default branch carries the same ruleset,

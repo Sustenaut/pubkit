@@ -25,6 +25,7 @@
     pubkit secrets run [--cwd DIR] -- COMMAND [ARGS...]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
+    pubkit signing-key backup [--under DIR] [--dry-run]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR --repos FILE [--rules FILE]
@@ -186,6 +187,10 @@ def sync(root: Path, check: bool) -> int:
             entry("", config, CONFIG)
         except ValueError as e:
             sys.exit(f"pubkit: {e}")
+    if "signing_keys" in config:
+        from .signing_keys import problems as key_problems  # noqa: PLC0415
+        if bad := key_problems(config["signing_keys"]):
+            sys.exit(f"pubkit: {CONFIG}: {'; '.join(bad)}")
     if "github_app" in config or "secrets" in config:
         from .app_secrets import config_problems  # noqa: PLC0415
         if bad := config_problems(config):
@@ -573,6 +578,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--replace", action="store_true",
                    help="overwrite a secret that already has that name, instead of refusing")
     p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
+    p = commands.add_parser("signing-key", help="back up the signing keys pubkit.json declares to Bitwarden")
+    signing_key = p.add_subparsers(dest="signing_key_command", required=True)
+    p = signing_key.add_parser("backup", help="write each declared key on this machine that its Bitwarden "
+                                              "project lacks, never overwriting one")
+    p.add_argument("--under", type=Path, metavar="DIR",
+                   help="every repository directly under DIR, not this one")
+    p.add_argument("--dry-run", action="store_true", help="say what would be written, and ask for nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -683,6 +695,9 @@ def main(argv: list[str] | None = None) -> int:
                                     ("record", args.record), ("repos", args.repos))}
         return board(confined(args.out, "the --out directory"),
                      files["rules"], files["replay"], files["record"], files["repos"])
+    if args.command == "signing-key":
+        from .signing_keys import run as signing_key_backup
+        return signing_key_backup(args.under.expanduser() if args.under else None, args.dry_run)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

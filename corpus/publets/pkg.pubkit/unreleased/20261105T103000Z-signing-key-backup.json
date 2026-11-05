@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit signing-key backup writes the signing keys repositories declare in pubkit.json's new signing_keys block to their Bitwarden projects, with the SDK and a token typed at a hidden prompt: one repository, or every one under --under DIR. It skips a key already backed up, never overwrites a different value, points out an undeclared corpus key, and --dry-run asks for nothing. pubkit sync --check refuses a signing_keys block it can't use."
+}
