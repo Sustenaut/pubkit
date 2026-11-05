@@ -10,12 +10,13 @@ Feature: Keeping a repository's shared files in step
     And "Makefile" contains "DEMO_BIN_DIR"
     And "tests/requirements-pubkit.txt" pins this pubkit's wheel
 
-  Scenario: every repository gets the managed AGENTS.md, with the draft rule
+  Scenario: every repository gets the managed AGENTS.md, with the draft and up-to-date rules
     Given an empty repository
     When I run pubkit "init" "--kind=utility"
     Then it succeeds
     And it prints "managed  AGENTS.md"
     And "AGENTS.md" contains "Mark it **draft** only when something else must happen first"
+    And "AGENTS.md" contains "Before each push, `git fetch origin main`"
     And "AGENTS.md" contains "Managed by pubkit"
 
   Scenario: An edited AGENTS.md fails the check, and sync restores it

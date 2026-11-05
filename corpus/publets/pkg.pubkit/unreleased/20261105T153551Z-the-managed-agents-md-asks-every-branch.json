@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The managed AGENTS.md asks every branch to take in origin/main before each push: a rebase if it was never pushed, a merge if it was, and a stop on any conflict whose resolution is not clear"
+}

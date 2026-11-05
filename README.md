@@ -1165,6 +1165,17 @@ pull request merged, a release published, a pin moved, someone's decision
 -- and its description says what it waits on. The managed `AGENTS.md`
 carries this rule into every repository, where coding agents read it.
 
+### Branches: up to date with main
+
+Before each push, a branch takes in `origin/main`: rebased onto it if it
+was never pushed, `origin/main` merged into it if it was pushed or has a
+pull request, so no force push moves a reviewer's view. A conflict is
+resolved only when the resolution is clear; otherwise the push waits and
+says what conflicts. A folder that only follows main fast-forwards. It
+runs when the branch gets new code, never on a timer, so a pull request
+arrives as up to date as the ruleset requires. The managed `AGENTS.md`
+carries this rule too.
+
 ## The release board
 
     pubkit board --out DIR --repos FILE [--rules FILE]
