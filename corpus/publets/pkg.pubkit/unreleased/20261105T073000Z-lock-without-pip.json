@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pubkit lock, and so pubkit bump, works where pip is not installed, as in the environments uvx and ./pubkit make: it runs the pip wheel Python's ensurepip carries. The with-secrets.json pubkit seeds points at pubkit's README for its settings, as the one-line with-secrets has no header to explain them."
-}
