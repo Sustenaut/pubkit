@@ -177,12 +177,22 @@ def run(under: Path | None, dry_run: bool) -> int:
             continue
         plan[(project, name)] = here[0]
 
+    groups: dict[str, list[str]] = {}
+    for project, name in plan:
+        groups.setdefault(project, []).append(name)
+    titles = {project: next((plan[(project, n)][0].shown for n in names if plan[(project, n)][0].label),
+                            project) for project, names in groups.items()}
+    if plan:
+        print(f"Projects: {', '.join(titles[p] for p in sorted(groups, key=titles.get))}")
     if dry_run or not plan:
-        for (project, name), (key, _) in plan.items():
-            print(f"{name}: would back up {key.path} to the project {key.shown}, unless it is there")
+        for project in sorted(groups, key=titles.get):
+            print(f"Keys that would be backed up to {titles[project]}, unless already there:")
+            for name in groups[project]:
+                print(f"  {name}  {plan[(project, name)][0].path}")
         return 1 if failed else 0
 
-    token = ask_hidden(f"Bitwarden access token that may read and write {', '.join(sorted({p for p, _ in plan}))}: ")
+    token = ask_hidden(f"Bitwarden access token that may read and write "
+                       f"{', '.join(titles[p] for p in sorted(groups, key=titles.get))}: ")
     if not token:
         print("no token given; nothing written")
         return 1
@@ -193,16 +203,16 @@ def run(under: Path | None, dry_run: bool) -> int:
         print(f"bws: {error}")
         return 1
     sdk_ready = False
-    for project in sorted({p for p, _ in plan}):
+    for project in sorted(groups, key=titles.get):
         found = matching(projects, project)
-        names = [(p, n) for p, n in plan if p == project]
+        names = groups[project]
         if len(found) != 1:
             sees = ", ".join(sorted(str(p.get("name")) for p in projects)) or "none"
             print(f"this token sees {len(found)} projects that are {project}, not one (it sees: {sees}); "
-                  f"not backed up: {', '.join(n for _, n in names)}")
+                  f"not backed up: {', '.join(names)}")
             failed = True
             continue
-        labels = {key.label for key, _ in (plan[n] for n in names)} - {None}
+        labels = {plan[(project, n)][0].label for n in names} - {None}
         for label in sorted(labels - {found[0].get("name")}):
             print(f"warning: the project {project} is named {found[0].get('name')} in Bitwarden, "
                   f"not {label} as declared")
@@ -212,16 +222,17 @@ def run(under: Path | None, dry_run: bool) -> int:
             print(f"bws: {error}")
             failed = True
             continue
-        values = {}
+        values: dict[str, list[str]] = {}
         for secret in stored:
             values.setdefault(secret.get("key"), []).append(_digest(str(secret.get("value", ""))))
-        for _, name in names:
+        print(f"Keys being backed up to {titles[project]}:")
+        for name in names:
             key, value = plan[(project, name)]
             if name in values:
                 if values[name] == [_digest(value)]:
-                    print(f"{name}: already backed up in {key.shown}")
+                    print(f"  {name}: already backed up")
                 else:
-                    print(f"{name}: {key.shown} holds another value under this name; not overwritten")
+                    print(f"  {name}: another value is stored under this name; not overwritten")
                     failed = True
                 continue
             if not sdk_ready:
@@ -233,8 +244,8 @@ def run(under: Path | None, dry_run: bool) -> int:
                 write(token, found[0]["organizationId"], found[0]["id"], name, value,
                       f"signing key, a copy of {key.path} (declared in {key.repo / CONFIG})")
             except WriteFailed as error:
-                print(f"{name}: Bitwarden refused the write: {error}")
+                print(f"  {name}: Bitwarden refused the write: {error}")
                 failed = True
                 continue
-            print(f"{name}: backed up {key.path} to {key.shown}")
+            print(f"  {name}: backed up from {key.path}")
     return 1 if failed else 0

@@ -9,7 +9,8 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "the-project"
     When I run pubkit "signing-key" "backup" "--dry-run"
     Then it succeeds
-    And it prints "pub-signing-key-demo: would back up"
+    And it prints "Keys that would be backed up to the-project, unless already there:"
+    And it prints "  pub-signing-key-demo  "
     And nothing was asked of Bitwarden
 
   Scenario: A declared key Bitwarden lacks is written, and never printed
@@ -17,7 +18,8 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     When I back the keys up, giving the token "tok"
     Then it succeeds
     And the SDK created "pub-signing-key-demo" holding the corpus key
-    And it prints "pub-signing-key-demo: backed up"
+    And it prints "Keys being backed up to the-project:"
+    And it prints "  pub-signing-key-demo: backed up from"
     And neither the key nor the token is in what it printed
 
   Scenario: A key already backed up with the same value is left alone
@@ -25,7 +27,7 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     And the project already holds the corpus key as "pub-signing-key-demo"
     When I back the keys up, giving the token "tok"
     Then it succeeds
-    And it prints "pub-signing-key-demo: already backed up"
+    And it prints "  pub-signing-key-demo: already backed up"
     And the SDK wrote nothing
 
   Scenario: Another value under the same name is never overwritten
@@ -33,7 +35,7 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     And the project already holds "another key" as "pub-signing-key-demo"
     When I back the keys up, giving the token "tok"
     Then it fails
-    And it prints "holds another value under this name; not overwritten"
+    And it prints "another value is stored under this name; not overwritten"
     And the SDK wrote nothing
 
   Scenario: A corpus key pubkit.json does not declare is pointed out
@@ -131,3 +133,13 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     When I back the keys up, giving the token "tok"
     Then it succeeds
     And the SDK created "pub-signing-key-demo" holding the corpus key
+
+  Scenario: The output names each project with its id, then lists its keys beneath it
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project with id "11111111-2222-3333-4444-555555555555" named "the-project"
+    When I run pubkit "signing-key" "backup" "--dry-run"
+    Then it succeeds
+    And it prints "Projects: the-project (11111111-2222-3333-4444-555555555555)"
+    And it prints "Keys that would be backed up to the-project (11111111-2222-3333-4444-555555555555), unless already there:"
+    When I back the keys up, giving the token "tok"
+    Then it prints "Keys being backed up to the-project (11111111-2222-3333-4444-555555555555):"
+    And it prints "  pub-signing-key-demo: backed up from"
