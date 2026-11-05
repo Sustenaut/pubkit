@@ -73,6 +73,8 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
       | [{"path": "../k", "bitwarden": {"project": "p", "name": "n"}}]             | path leaves the repository             |
       | [{"path": "k", "bitwarden": {"project": "p", "name": "-n"}}]               | bitwarden.name must be a letter        |
       | [{"path": "k", "bitwarden": {"project": "p", "name": "n"}, "extra": 1}]     | extra is not a setting                 |
+      | [{"path": "k", "bitwarden": {"project": {"id": "nope"}, "name": "n"}}]     | must be the project's id, a UUID       |
+      | [{"path": "k", "bitwarden": {"project": {"id": "11111111-2222-3333-4444-555555555555", "colour": 1}, "name": "n"}}] | bitwarden.project.colour is not a setting |
 
   Scenario: With no token typed, nothing is written
     Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "the-project"
@@ -91,5 +93,41 @@ Feature: pubkit signing-key backup copies the signing keys repositories declare 
     Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "elsewhere"
     When I back the keys up, giving the token "tok"
     Then it fails
-    And it prints "this token sees 0 projects named elsewhere"
+    And it prints "this token sees 0 projects that are elsewhere"
     And the SDK wrote nothing
+
+  Scenario: A project named in another case is found, when only one matches
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "pub"
+    And Bitwarden's projects are named "Pub"
+    When I back the keys up, giving the token "tok"
+    Then it succeeds
+    And the SDK created "pub-signing-key-demo" holding the corpus key
+
+  Scenario: Two projects that differ only in case are not guessed between
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "PUB"
+    And Bitwarden's projects are named "Pub,pub"
+    When I back the keys up, giving the token "tok"
+    Then it fails
+    And it prints "this token sees 2 projects that are PUB, not one (it sees: Pub, pub)"
+    And the SDK wrote nothing
+
+  Scenario: A project declared by id, with its name as a label, is found by the id
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project with id "11111111-2222-3333-4444-555555555555" named "the-project"
+    When I back the keys up, giving the token "tok"
+    Then it succeeds
+    And it does not print "warning"
+    And the SDK created "pub-signing-key-demo" holding the corpus key
+
+  Scenario: A label Bitwarden no longer uses is warned about, and the key still backed up
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project with id "11111111-2222-3333-4444-555555555555" named "Old name"
+    When I back the keys up, giving the token "tok"
+    Then it succeeds
+    And it prints "is named the-project in Bitwarden, not Old name as declared"
+    And the SDK created "pub-signing-key-demo" holding the corpus key
+
+  Scenario: A plain string that is a UUID is the project's id
+    Given a repository that declares its corpus key as "pub-signing-key-demo" in the project "11111111-2222-3333-4444-555555555555"
+    And Bitwarden's projects are named "the-project,11111111-2222-3333-4444-555555555555"
+    When I back the keys up, giving the token "tok"
+    Then it succeeds
+    And the SDK created "pub-signing-key-demo" holding the corpus key
