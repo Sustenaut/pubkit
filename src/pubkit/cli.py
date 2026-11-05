@@ -278,6 +278,21 @@ def published_hashes(name: str, version: str) -> list[str]:
     return sorted({f["digests"]["sha256"] for f in files})
 
 
+def pip() -> list[str]:
+    """How to run pip: the installed one, else the wheel Python's ensurepip
+    carries (Debian keeps it in /usr/share/python-wheels), which runs as it
+    is. `uvx` and `./pubkit` environments have no pip."""
+    import importlib.util
+    if importlib.util.find_spec("pip") is not None:
+        return [sys.executable, "-m", "pip"]
+    import ensurepip
+    wheels = [wheel for where in (Path(ensurepip.__file__).parent / "_bundled", Path("/usr/share/python-wheels"))
+              for wheel in sorted(where.glob("pip-*.whl"))]
+    if not wheels:
+        raise SystemExit("pubkit lock needs pip, and this Python has neither pip nor ensurepip's wheel of it")
+    return [sys.executable, f"{wheels[0]}/pip"]
+
+
 def lock(root: Path) -> int:
     """Resolve requirements.txt and pin every package, with its sha256s.
 
@@ -288,7 +303,7 @@ def lock(root: Path) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--dry-run", "--ignore-installed",
+            [*pip(), "install", "--dry-run", "--ignore-installed",
              "--quiet", "--report", str(report), "-r", str(root / REQUIREMENTS)],
             check=True, stdout=subprocess.DEVNULL,
         )
