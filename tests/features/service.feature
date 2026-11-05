@@ -3,8 +3,8 @@ Feature: A service runs its secret-needing commands through ./with-secrets
   `pubkit init --kind=service` gives it a managed `with-secrets`, which reads
   a Bitwarden Secrets Manager project with bws and runs one command with the
   secrets in its environment, set up by the repository's with-secrets.json.
-  `pubkit secrets run -- COMMAND` does the same from the pinned pubkit, so
-  every scenario that runs one runs both.
+  That script is one line that runs `./pubkit secrets run`, so every
+  scenario that runs one runs both.
 
   Scenario: init writes the wrapper, its settings and the CI its ci block gives
     Given an empty repository
@@ -163,12 +163,13 @@ Feature: A service runs its secret-needing commands through ./with-secrets
       | ./with-secrets      |
       | pubkit secrets run  |
 
-  Scenario: pubkit secrets run says the same and sets the same as ./with-secrets
-    Given a service whose Terraform takes its secrets as a map of "linear-api-key"
-    And the aliases file "infra/aliases.json" maps "TAILSCALE_OAUTH_CLIENT_ID" to "ts-tf-client-id"
-    And Bitwarden holds "linear-api-key" as "lin" and "ts-tf-client-id" as "c1" and "bad.name" as "x" in the project "infra"
-    When I run both "./with-secrets" and "pubkit secrets run" with the token "tok"
-    Then both succeed, print the same, and give the command the same environment
+  Scenario: ./with-secrets runs the command in the directory it is called from
+    Given a service whose Terraform declares "hcloud_token"
+    And Bitwarden holds "HCLOUD_TOKEN" as "h1" and "restic-password" as "r1" in the project "infra"
+    When I run ./with-secrets in the directory "infra" with the token "tok"
+    Then it succeeds
+    And the command ran in "infra"
+    And the command sees "TF_VAR_hcloud_token" as "h1"
 
   Scenario: pubkit secrets run runs the command in --cwd
     Given a service whose Terraform declares "hcloud_token"
