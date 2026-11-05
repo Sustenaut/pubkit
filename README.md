@@ -97,6 +97,18 @@ it cannot see the one configured. `with-secrets.json` is the repository's:
 
 Every other secret goes under its name in upper case, `-` as `_`.
 
+`pubkit secrets run` does the same from the repository's pinned pubkit, with
+the same `with-secrets.json`, `.env` and messages, so a repository need not
+keep the script:
+
+```sh
+./pubkit secrets run -- terraform plan
+./pubkit secrets run --cwd "$PWD" -- scripts/setup-backup.sh   # run it here, not in the root
+```
+
+`./pubkit` runs pubkit in the repository's root, so the command runs there
+unless `--cwd` names another directory.
+
 `service-ci.yml` is a service's CI: `pubkit sync --check` and shellcheck,
 `terraform fmt`, `init -backend=false` and `validate` when `terraform-dir`
 is given, the repository's own tests when `test` is, and SonarQube Cloud's
