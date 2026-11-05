@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.27.0 is released as v0.27.0 from commit 579205a95790c60df0faf3cddf590b9655ee4354.",
+      "content": "pubkit 0.27.1 is released as v0.27.1 from commit c6d961cb4506412c3184f85d8cd7cb3b0cffd65c.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.27.0",
+            "0.27.1",
             "pubkit --version",
-            "pubkit 0.27.0",
-            "v0.27.0",
-            "579205a95790c60df0faf3cddf590b9655ee4354"
+            "pubkit 0.27.1",
+            "v0.27.1",
+            "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
           ]
         ]
       },
-      "scope": "the published release v0.27.0 of pubkit",
+      "scope": "the published release v0.27.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "579205a95790c60df0faf3cddf590b9655ee4354"
+          "revision": "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.27.0 was released on 2026-11-03 from commit 579205a95790c60df0faf3cddf590b9655ee4354 with these changes.",
+      "content": "pubkit 0.27.1 was released on 2026-11-05 from commit c6d961cb4506412c3184f85d8cd7cb3b0cffd65c with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,28 @@
         ],
         "rows": [
           [
-            "changed",
-            "pubkit sync adds the workflows it writes that take SONAR_TOKEN to integrations.json's sonarcloud.scan, where a repository keeps one and doesn't list them yet, and sync --check fails until it does, so moving to a pubkit with the sonar job no longer fails the integrations scan."
+            "fixed",
+            "pubkit's nightly installs, and pins release workflows to, the newest pubrel crates.io has, warning when its latest GitHub release isn't published there yet, so a tag published before its crate no longer stops every repository's nightly."
+          ],
+          [
+            "added",
+            "pubkit secrets run -- COMMAND runs one command with the Bitwarden secrets the repository's with-secrets.json names, exactly as the managed ./with-secrets does (the same settings, .env token, aliases, Terraform modes and messages), so a repository can run it from its pinned pubkit instead of keeping the script. --cwd runs the command in another directory."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.27.0 of pubkit",
+      "scope": "the published release v0.27.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "579205a95790c60df0faf3cddf590b9655ee4354"
+          "revision": "c6d961cb4506412c3184f85d8cd7cb3b0cffd65c"
         }
       ]
     }
   },
-  "created": "2026-11-03T00:00:00Z",
+  "created": "2026-11-05T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
