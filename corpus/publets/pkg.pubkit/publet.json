@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.28.0 is released as v0.28.0 from commit b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0.",
+      "content": "pubkit 0.28.1 is released as v0.28.1 from commit 05bc1d952941cc6ace91766d69eebf4e9b096b93.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.28.0",
+            "0.28.1",
             "pubkit --version",
-            "pubkit 0.28.0",
-            "v0.28.0",
-            "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
+            "pubkit 0.28.1",
+            "v0.28.1",
+            "05bc1d952941cc6ace91766d69eebf4e9b096b93"
           ]
         ]
       },
-      "scope": "the published release v0.28.0 of pubkit",
+      "scope": "the published release v0.28.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
+          "revision": "05bc1d952941cc6ace91766d69eebf4e9b096b93"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.28.0 was released on 2026-11-05 from commit b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0 with these changes.",
+      "content": "pubkit 0.28.1 was released on 2026-11-05 from commit 05bc1d952941cc6ace91766d69eebf4e9b096b93 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "changed",
-            "The managed ./with-secrets is now one line that runs ./pubkit secrets run --cwd \"$PWD\" -- COMMAND, so a service's secrets wrapper comes from its pinned pubkit instead of a copied script. It behaves as before, in the directory it is called from, and needs uv and bws but no longer jq."
+            "fixed",
+            "pubkit lock, and so pubkit bump, works where pip is not installed, as in the environments uvx and ./pubkit make: it runs the pip wheel Python's ensurepip carries. The with-secrets.json pubkit seeds points at pubkit's README for its settings, as the one-line with-secrets has no header to explain them."
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.28.0 of pubkit",
+      "scope": "the published release v0.28.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "b5133cd74a11c8ba30e5e2f7e4c1a6a0da46c9e0"
+          "revision": "05bc1d952941cc6ace91766d69eebf4e9b096b93"
         }
       ]
     }
