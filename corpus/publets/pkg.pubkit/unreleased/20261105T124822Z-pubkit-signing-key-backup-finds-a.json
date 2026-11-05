@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "pubkit signing-key backup finds a declared Bitwarden project by its id, given as {\"id\", \"name\"} with the name as a label (a run warns when Bitwarden's name differs), or by a name matched in any case when only one project has it; its output names each project with its id, then lists that project's keys under it, one per line"
-}
