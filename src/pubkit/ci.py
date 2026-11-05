@@ -617,6 +617,7 @@ def path(event: str) -> str:
 
 
 INTEGRATIONS = "integrations.json"
+WITH_SECRETS = "with-secrets"
 
 
 def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
@@ -625,7 +626,11 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
     them to "sonarcloud.scan" where none lists them. None where the repository keeps no
     integrations.json, or one that isn't JSON, which the scan reports itself. A path
     already listed, by name or by a pattern, leaves the file as it is, byte for byte;
-    nothing is ever taken out, since something else may need it."""
+    nothing else is taken out, since something else may need it.
+
+    The one path moved: the with-secrets pubkit writes runs `pubkit secrets run` and
+    no longer calls bws, so the scan calls a Bitwarden use declared on it stale. Where
+    pubkit writes it, such a use names with-secrets.json, which the scan reads, instead."""
     path = root / INTEGRATIONS
     if not path.is_file():
         return None
@@ -643,8 +648,18 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
     missing = [name for name, body in wanted
                if name.startswith(".github/workflows/") and "secrets.SONAR_TOKEN" in body
                and not any(name == p or fnmatch(name, p) for p in listed)]
-    if not missing:
+    moved = False
+    if any(name == WITH_SECRETS for name, _ in wanted):
+        for use in uses:
+            paths = use.get("paths")
+            if (str(use.get("plugin", "")).startswith("bitwarden.") and isinstance(paths, list)
+                    and WITH_SECRETS in paths):
+                use["paths"] = sorted({*(p for p in paths if p != WITH_SECRETS), f"{WITH_SECRETS}.json"})
+                moved = True
+    if not missing and not moved:
         return INTEGRATIONS, text
+    if not missing:
+        return INTEGRATIONS, json.dumps(data, indent=2) + "\n"
     scan = next((u for u in uses if u.get("plugin") == "sonarcloud.scan"), None)
     if scan is None:
         scan = {"plugin": "sonarcloud.scan", "paths": [], "mode": "required"}
