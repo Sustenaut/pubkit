@@ -1044,9 +1044,14 @@ A repository names every signing key it uses, and where it is backed up, in
 ```json
 "signing_keys": [
   {"path": "corpus/.publet/signing.key",
-   "bitwarden": {"project": "pub", "name": "pub-signing-key-example"}}
+   "bitwarden": {"project": {"id": "PROJECT-UUID", "name": "Pub"},
+                 "name": "pub-signing-key-example"}}
 ]
 ```
+
+The project is found by its `id`; `name` is a label for people, and a run
+warns when Bitwarden's name for the project has changed. A plain string is
+taken as an id when it is a UUID, else as a name, in any case.
 
 `path` is from the repository's root, or from the home directory when it
 starts with `~/`: a key kept outside any repository, such as one under

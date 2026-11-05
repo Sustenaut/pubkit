@@ -34,7 +34,9 @@ args = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps({{"tool": "bws", "args": args}}) + "\\n")
 if args[:2] == ["project", "list"]:
-    print(json.dumps([{{"id": "{PROJECT_ID}", "name": "the-project", "organizationId": "{ORGANIZATION_ID}"}}]))
+    names = os.environ.get("BWS_PROJECTS", "the-project").split(",")
+    print(json.dumps([{{"id": "{PROJECT_ID}" if i == 0 else f"id-{{i}}", "name": name, "organizationId": "{ORGANIZATION_ID}"}}
+                      for i, name in enumerate(names)]))
 elif args[:2] == ["secret", "list"]:
     print(os.environ.get("BWS_EXISTING", "[]"))
 """
@@ -104,6 +106,18 @@ def declares_corpus_key(repo, fakes, name, project):
     _declare(repo, [_entry("corpus/.publet/signing.key", name, project)])
 
 
+@given(parsers.parse('a repository that declares its corpus key as "{name}" in the project with id "{uuid}" '
+                     'named "{label}"'))
+def declares_by_id(repo, fakes, name, uuid, label):
+    _declare(repo, [{"path": "corpus/.publet/signing.key",
+                     "bitwarden": {"project": {"id": uuid, "name": label}, "name": name}}])
+
+
+@then(parsers.parse('it does not print "{text}"'))
+def does_not_print(result, text):
+    assert text not in result.stdout, result.stdout
+
+
 @given(parsers.parse('a repository that declares "{path}" as "{name}" in the project "{project}"'))
 def declares_home_key(repo, fakes, path, name, project):
     _declare(repo, [_entry(path, name, project)], key=None)
@@ -132,6 +146,11 @@ def two_checkouts(fakes, name):
 def second_differs(fakes):
     (fakes / "checkouts" / "two" / "corpus" / ".publet" / "signing.key").write_text(HOME_KEY)
     (fakes / "fakes.log").unlink(missing_ok=True)
+
+
+@given(parsers.parse('Bitwarden\'s projects are named "{names}"'))
+def projects_named(env, names):
+    env["BWS_PROJECTS"] = names
 
 
 @given(parsers.parse('the project already holds the corpus key as "{name}"'))
