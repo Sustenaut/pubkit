@@ -5,12 +5,15 @@ pubkit.json:
 
     "signing_keys": [
       {"path": "corpus/.publet/signing.key",
-       "bitwarden": {"project": "pub", "name": "pub-signing-key-example"}}
+       "bitwarden": {"project": {"id": "PROJECT-UUID", "name": "Pub"},
+                     "name": "pub-signing-key-example"}}
     ]
 
 `path` is from the repository's root, or from the home directory when it
 starts with "~/": a key kept outside any repository is declared by the one
-whose tools use it.
+whose tools use it. The project is found by its id; its name is a label for
+people, and a run warns when Bitwarden's name for it has changed. A plain
+string is taken as an id when it is a UUID, else as a name, in any case.
 
     pubkit signing-key backup [--under DIR] [--dry-run]
 
@@ -35,6 +38,7 @@ from pathlib import Path
 CONFIG = "pubkit.json"
 FIELD = "signing_keys"
 NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 # Where a corpus keeps the key pub signs with: a package's corpus/, or a
 # corpus at the repository's root.
 KEY_PLACES = ("corpus/.publet/signing.key", ".publet/signing.key")
@@ -44,8 +48,13 @@ KEY_PLACES = ("corpus/.publet/signing.key", ".publet/signing.key")
 class Declared:
     repo: Path
     path: Path
-    project: str
+    project: str  # the project's id, or the name a plain string gave
     name: str
+    label: str | None = None  # the project's name, as the declaration gives it
+
+    @property
+    def shown(self) -> str:
+        return f"{self.label} ({self.project})" if self.label else self.project
 
 
 def problems(block: object) -> list[str]:
@@ -75,8 +84,16 @@ def problems(block: object) -> list[str]:
             continue
         out += [f"{where}: bitwarden.{key} is not a setting" for key in sorted(bitwarden.keys() - {"project", "name"})]
         project, name = bitwarden.get("project"), bitwarden.get("name")
-        if not (isinstance(project, str) and project.strip()):
-            out.append(f"{where} needs bitwarden.project, the project's name or id")
+        if isinstance(project, dict):
+            out += [f"{where}: bitwarden.project.{key} is not a setting"
+                    for key in sorted(project.keys() - {"id", "name"})]
+            if not (isinstance(project.get("id"), str) and UUID.fullmatch(project["id"])):
+                out.append(f"{where}: bitwarden.project.id must be the project's id, a UUID")
+            if "name" in project and not (isinstance(project["name"], str) and project["name"].strip()):
+                out.append(f"{where}: bitwarden.project.name, if given, is the project's name")
+            project = project.get("id")
+        elif not (isinstance(project, str) and project.strip()):
+            out.append(f"{where} needs bitwarden.project: {{\"id\": …, \"name\": …}}, or the project's id or name")
         if not (isinstance(name, str) and NAME.fullmatch(name)):
             out.append(f"{where}: bitwarden.name must be a letter, then letters, digits, _ and -")
         elif (project, name) in names:
@@ -89,7 +106,11 @@ def declared(repo: Path, config: dict) -> list[Declared]:
     out = []
     for entry in config.get(FIELD) or []:
         path = Path(entry["path"]).expanduser() if entry["path"].startswith("~/") else repo / entry["path"]
-        out.append(Declared(repo, path, entry["bitwarden"]["project"], entry["bitwarden"]["name"]))
+        project = entry["bitwarden"]["project"]
+        if isinstance(project, dict):
+            out.append(Declared(repo, path, project["id"], entry["bitwarden"]["name"], project.get("name")))
+        else:
+            out.append(Declared(repo, path, project, entry["bitwarden"]["name"]))
     return out
 
 
@@ -105,6 +126,15 @@ def repositories(under: Path | None) -> list[Path]:
         return [Path.cwd()]
     candidates = [under, *sorted(p for p in under.iterdir() if p.is_dir())]
     return [p for p in candidates if (p / CONFIG).is_file()]
+
+
+def matching(projects: list[dict], project: str) -> list[dict]:
+    """The projects `project` names: by id when it is a UUID; else by exact name,
+    then by name in any case ("pub" for "Pub")."""
+    if UUID.fullmatch(project):
+        return [p for p in projects if str(p.get("id", "")).lower() == project.lower()]
+    exact = [p for p in projects if p.get("name") == project]
+    return exact or [p for p in projects if str(p.get("name", "")).casefold() == project.casefold()]
 
 
 def _digest(text: str) -> str:
@@ -147,12 +177,22 @@ def run(under: Path | None, dry_run: bool) -> int:
             continue
         plan[(project, name)] = here[0]
 
+    groups: dict[str, list[str]] = {}
+    for project, name in plan:
+        groups.setdefault(project, []).append(name)
+    titles = {project: next((plan[(project, n)][0].shown for n in names if plan[(project, n)][0].label),
+                            project) for project, names in groups.items()}
+    if plan:
+        print(f"Projects: {', '.join(titles[p] for p in sorted(groups, key=titles.get))}")
     if dry_run or not plan:
-        for (project, name), (key, _) in plan.items():
-            print(f"{name}: would back up {key.path} to the project {project}, unless it is there")
+        for project in sorted(groups, key=titles.get):
+            print(f"Keys that would be backed up to {titles[project]}, unless already there:")
+            for name in groups[project]:
+                print(f"  {name}  {plan[(project, name)][0].path}")
         return 1 if failed else 0
 
-    token = ask_hidden(f"Bitwarden access token that may read and write {', '.join(sorted({p for p, _ in plan}))}: ")
+    token = ask_hidden(f"Bitwarden access token that may read and write "
+                       f"{', '.join(titles[p] for p in sorted(groups, key=titles.get))}: ")
     if not token:
         print("no token given; nothing written")
         return 1
@@ -163,30 +203,36 @@ def run(under: Path | None, dry_run: bool) -> int:
         print(f"bws: {error}")
         return 1
     sdk_ready = False
-    for project in sorted({p for p, _ in plan}):
-        found = [p for p in projects if project in (p.get("id"), p.get("name"))]
-        names = [(p, n) for p, n in plan if p == project]
+    for project in sorted(groups, key=titles.get):
+        found = matching(projects, project)
+        names = groups[project]
         if len(found) != 1:
-            print(f"this token sees {len(found)} projects named {project}, not one; "
-                  f"not backed up: {', '.join(n for _, n in names)}")
+            sees = ", ".join(sorted(str(p.get("name")) for p in projects)) or "none"
+            print(f"this token sees {len(found)} projects that are {project}, not one (it sees: {sees}); "
+                  f"not backed up: {', '.join(names)}")
             failed = True
             continue
+        labels = {plan[(project, n)][0].label for n in names} - {None}
+        for label in sorted(labels - {found[0].get("name")}):
+            print(f"warning: the project {project} is named {found[0].get('name')} in Bitwarden, "
+                  f"not {label} as declared")
         try:
             stored = _listed(bws(token, "secret", "list", found[0]["id"], "--output", "json", "--color", "no"))
         except BwsFailed as error:
             print(f"bws: {error}")
             failed = True
             continue
-        values = {}
+        values: dict[str, list[str]] = {}
         for secret in stored:
             values.setdefault(secret.get("key"), []).append(_digest(str(secret.get("value", ""))))
-        for _, name in names:
+        print(f"Keys being backed up to {titles[project]}:")
+        for name in names:
             key, value = plan[(project, name)]
             if name in values:
                 if values[name] == [_digest(value)]:
-                    print(f"{name}: already backed up in {project}")
+                    print(f"  {name}: already backed up")
                 else:
-                    print(f"{name}: {project} holds another value under this name; not overwritten")
+                    print(f"  {name}: another value is stored under this name; not overwritten")
                     failed = True
                 continue
             if not sdk_ready:
@@ -198,8 +244,8 @@ def run(under: Path | None, dry_run: bool) -> int:
                 write(token, found[0]["organizationId"], found[0]["id"], name, value,
                       f"signing key, a copy of {key.path} (declared in {key.repo / CONFIG})")
             except WriteFailed as error:
-                print(f"{name}: Bitwarden refused the write: {error}")
+                print(f"  {name}: Bitwarden refused the write: {error}")
                 failed = True
                 continue
-            print(f"{name}: backed up {key.path} to {project}")
+            print(f"  {name}: backed up from {key.path}")
     return 1 if failed else 0
