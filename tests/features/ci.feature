@@ -657,7 +657,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And the file "integrations.json" reads "{"uses": [{"plugin": "github.app-token", "paths": ["a.yml"], "mode": "required"}]}"
     When I run pubkit "sync" "--check"
     Then it fails
-    And stderr mentions "integrations.json doesn't declare the token of the sonar job"
+    And stderr mentions "integrations.json doesn't declare what the files pubkit writes use"
     When I run pubkit "sync"
     Then "integrations.json" contains ""plugin": "sonarcloud.scan""
     And "integrations.json" contains "".github/workflows/pr.yml""

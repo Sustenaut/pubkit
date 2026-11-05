@@ -218,3 +218,22 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     When I run "pubkit secrets run" with the token "tok" and the command "no-such-command"
     Then the exit code is 127
     And stderr mentions "no-such-command: not found"
+
+  Scenario: sync moves a Bitwarden use declared on with-secrets to with-secrets.json
+    Given a repository initialised as service for the project "infra"
+    And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets", "push-secrets.sh"], "mode": "required"}]}"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "or with-secrets.json for Bitwarden"
+    When I run pubkit "sync"
+    Then "integrations.json" contains ""push-secrets.sh""
+    And "integrations.json" contains ""with-secrets.json""
+    And "integrations.json" does not contain ""with-secrets","
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: A repository that does not run pubkit's with-secrets keeps its declaration
+    Given a repository initialised as "utility"
+    And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets"], "mode": "required"}]}"
+    When I run pubkit "sync"
+    Then "integrations.json" does not contain "with-secrets.json"
