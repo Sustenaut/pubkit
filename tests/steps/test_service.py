@@ -29,13 +29,7 @@ SHOW = """#!/bin/sh
 env > "$SHOW_ENV"
 pwd > "$SHOW_ENV.cwd"
 """
-# What a shell sets for itself, so it differs between a bash script and pubkit,
-# and what coverage sets in the Python processes it measures.
-SHELL_OWN = {"_", "SHLVL", "OLDPWD"}
 
-
-def _compared(name: str) -> bool:
-    return name not in SHELL_OWN and not name.startswith("COVERAGE_")
 
 
 def _pubkit():
@@ -51,6 +45,11 @@ def fake(tmp_path):
     bws = root / "bin" / "bws"
     bws.write_text(BWS)
     bws.chmod(0o755)
+    # ./with-secrets runs ./pubkit, which runs the release wheel through uvx:
+    # this stand-in runs the pubkit under test with the same arguments.
+    uvx = root / "bin" / "uvx"
+    uvx.write_text(f'#!/bin/sh\n[ "$1 $3" = "--from pubkit" ] || exit 9\nshift 3\nexec "{_pubkit()}" "$@"\n')
+    uvx.chmod(0o755)
     show = root / "show"
     show.write_text(SHOW)
     show.chmod(0o755)
@@ -148,22 +147,13 @@ def removed(repo, path):
     (repo / path).unlink()
 
 
-@when(parsers.parse('I run both "{first}" and "{second}" with the token "{token}"'), target_fixture="both")
-def run_both(repo, run, fake, first, second, token):
-    out = []
-    for runner in (first, second):
-        result = _wrapper(repo, run, fake, {"BWS_ACCESS_TOKEN": token}, runner, fake / "show")
-        out.append((result, {k: v for k, v in _seen(fake).items() if _compared(k)}))
-        (fake / "seen.env").unlink()
-    return out
-
-
-@then("both succeed, print the same, and give the command the same environment")
-def same(both):
-    (first, first_env), (second, second_env) = both
-    assert first.code == second.code == 0, (first.stderr, second.stderr)
-    assert first.stderr == second.stderr
-    assert first_env == second_env
+@when(parsers.parse('I run ./with-secrets in the directory "{directory}" with the token "{token}"'),
+      target_fixture="result")
+def from_directory(repo, run, fake, directory, token):
+    (repo / directory).mkdir(exist_ok=True)
+    env = {"PATH": f"{fake / 'bin'}:{os.environ['PATH']}", "FAKE_BWS": str(fake),
+           "SHOW_ENV": str(fake / "seen.env"), "BWS_ACCESS_TOKEN": token}
+    return run(repo / "with-secrets", fake / "show", cwd=repo / directory, env=env)
 
 
 @then(parsers.parse('the command ran in "{directory}"'))

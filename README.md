@@ -97,17 +97,15 @@ it cannot see the one configured. `with-secrets.json` is the repository's:
 
 Every other secret goes under its name in upper case, `-` as `_`.
 
-`pubkit secrets run` does the same from the repository's pinned pubkit, with
-the same `with-secrets.json`, `.env` and messages, so a repository need not
-keep the script:
+`./with-secrets` is one line: it runs `./pubkit secrets run --cwd "$PWD" --
+COMMAND`, so the repository's pinned pubkit does the work, in the directory
+it is called from, and needs `uv` (for `./pubkit`) and `bws`. `pubkit secrets
+run` can be called directly too:
 
 ```sh
-./pubkit secrets run -- terraform plan
-./pubkit secrets run --cwd "$PWD" -- scripts/setup-backup.sh   # run it here, not in the root
+./pubkit secrets run -- terraform plan        # in the repository's root
+./pubkit secrets run --cwd "$PWD" -- make deploy
 ```
-
-`./pubkit` runs pubkit in the repository's root, so the command runs there
-unless `--cwd` names another directory.
 
 `service-ci.yml` is a service's CI: `pubkit sync --check` and shellcheck,
 `terraform fmt`, `init -backend=false` and `validate` when `terraform-dir`
