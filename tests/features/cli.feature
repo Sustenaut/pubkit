@@ -137,6 +137,15 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
+  Scenario: lock works where pip is not installed, as under uvx and ./pubkit
+    Given an empty repository
+    And a package "demo" 1.0 whose index lists files hashed "aaaa" and "bbbb"
+    And the file "tests/requirements.txt" reads "demo==1.0"
+    And pip can't be imported
+    When I run pubkit "lock"
+    Then it succeeds
+    And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
+
   Scenario: The built wheel carries every template, and the standard's rules
     When pubkit's wheel is built
     Then it holds every file under src/pubkit/templates, and standard.json

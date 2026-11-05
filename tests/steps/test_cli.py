@@ -43,6 +43,17 @@ def indexed(tmp_path, env, name, version, a, b):
     env["resolved"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
 
 
+@given("pip can't be imported")
+def no_pip(tmp_path, env):
+    """A sitecustomize that hides pip from pubkit's own process, as in an
+    environment uvx made; the pip it starts still runs."""
+    hide = tmp_path / "hide-pip"
+    hide.mkdir()
+    (hide / "sitecustomize.py").write_text(
+        "import os, sys\nif os.environ.pop('HIDE_PIP', None):\n    sys.modules['pip'] = None\n")
+    env.update(PYTHONPATH=str(hide), HIDE_PIP="1")
+
+
 @then(parsers.parse('"{path}" pins this pubkit\'s wheel'))
 def pins_wheel(repo, path):
     assert f"/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl" in (
