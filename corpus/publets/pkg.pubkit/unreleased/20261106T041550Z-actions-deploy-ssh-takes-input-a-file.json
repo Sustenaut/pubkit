@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "actions/deploy-ssh takes input, a file sent as it is on the command's standard input in place of a bundle, such as rendered manifests for a program that applies what it reads"
-}
