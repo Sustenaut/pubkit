@@ -2,14 +2,17 @@
 `pubkit state --repos-for ROLE`: the repos file for one of its roles.
 
     {"owner": "OWNER",
-     "repos": {"NAME": {"project": "some-group", "board": true, "protect": true, "govern": false}}}
+     "repos": {"NAME": {"project": "some-group", "board": true, "protect": true, "govern": false,
+                        "variables": {"SOME_SETTING": "a value"}}}}
 
 One file per GitHub owner says which of its repositories are graded, protected
 and governed. This checks its shape, that each repository exists under the
 owner, and that each one with `protect` has a protect block in its pubkit.json,
 since that block is what says how, and that the repository has reported every check
 the block requires, since a ruleset requiring one it never reports stops anything
-merging. That last check is the best it can be: it looks at the default branch's newest
+merging. A repository's `variables` (optional) are the values of its GitHub variables,
+which `pubkit variables` keeps them to: each a string or JSON, and each one its own
+pubkit.json declares in its variables block. That last check is the best it can be: it looks at the default branch's newest
 commit and a few recent pull requests, and says nothing when it can't read them. It is the state repository's one required
 check, so it builds nothing and takes seconds. It reads GitHub through `gh`,
 with a token that can read every repository the file names.
@@ -23,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import protect
+from . import protect, variables
 from .protect import Api, ApiError
 
 OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*")
@@ -49,8 +52,11 @@ def shape(state: Any) -> list[str]:
         if not isinstance(roles, dict):
             out.append(f"{name}: its roles must be an object, not {json.dumps(roles)}")
             continue
-        for key in sorted(roles.keys() - {"project", *ROLES}):
-            out.append(f"{name}: {key} is not a setting; it takes project, board, protect and govern")
+        for key in sorted(roles.keys() - {"project", variables.BLOCK, *ROLES}):
+            out.append(f"{name}: {key} is not a setting; it takes project, board, protect, govern "
+                       f"and variables")
+        if variables.BLOCK in roles:
+            out += [f"{name}: {p}" for p in variables.value_problems(roles[variables.BLOCK])]
         for role in ROLES:
             if not isinstance(roles.get(role), bool):
                 out.append(f"{name}: \"{role}\" must be true or false")
@@ -77,7 +83,8 @@ def reported(api: Api, slug: str, branch: str) -> set[str] | None:
 
 def on_github(api: Api, owner: str, repos: dict) -> list[str]:
     """What GitHub says is wrong: a repository missing, moved or unreadable,
-    or one to protect that has no sound protect block."""
+    one to protect that has no sound protect block, or one given variables its
+    pubkit.json doesn't declare."""
     out = []
     for name, roles in repos.items():
         slug = f"{owner}/{name}"
@@ -101,6 +108,15 @@ def on_github(api: Api, owner: str, repos: dict) -> list[str]:
                 if check not in seen:
                     out.append(f"{slug} requires the check \"{check}\", which it hasn't reported "
                                f"lately, so nothing could merge there")
+        if values := roles.get(variables.BLOCK):
+            try:
+                block = variables.declared(api, slug)
+            except ValueError as e:
+                out.append(f"{slug} has variables in the state, but {e}")
+                continue
+            if names := variables.undeclared(block, values):
+                out.append(f"{slug}: its pubkit.json doesn't declare {', '.join(names)}, "
+                           f"which the state gives it")
     return out
 
 

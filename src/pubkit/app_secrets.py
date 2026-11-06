@@ -138,6 +138,15 @@ def env_name(name: str) -> str:
     return name.upper().replace("-", "_")
 
 
+def send(kind: str, name: str, repo: str, value: str, environment: str | None = None) -> str | None:
+    """Set one secret or variable in `repo` through gh, the value on its standard
+    input; what gh said if it refused, else None."""
+    done = subprocess.run(["gh", kind, "set", name, "-R", repo,
+                           *(["--env", environment] if environment else [])],
+                          input=value, text=True, capture_output=True, check=False)
+    return done.stderr.strip() if done.returncode != 0 else None
+
+
 def run(config: dict, check: bool) -> int:
     if BLOCK not in config and OTHERS not in config:
         print(f"pubkit app-secrets: pubkit.json has no {BLOCK} block or {OTHERS} list")
@@ -175,11 +184,8 @@ def run(config: dict, check: bool) -> int:
     for item in items:
         environment = item.get("environment")
         where = f"{repo}, environment {environment}" if environment else repo
-        done = subprocess.run(["gh", item["kind"], "set", item["to"], "-R", repo,
-                               *(["--env", environment] if environment else [])],
-                              input=values[item["from"]], text=True, capture_output=True, check=False)
-        if done.returncode != 0:
-            print(f"  FAILED   {item['kind']} {item['to']} in {where}: {done.stderr.strip()}")
+        if (refused := send(item["kind"], item["to"], repo, values[item["from"]], environment)) is not None:
+            print(f"  FAILED   {item['kind']} {item['to']} in {where}: {refused}")
             failed = True
         else:
             print(f"  sent     {item['kind']} {item['to']} in {where}")

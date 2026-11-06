@@ -1375,6 +1375,41 @@ token that can read every repository named, which a workflow's own
 `GITHUB_TOKEN` can't. It builds nothing, so it suits being a state repository's
 one required check.
 
+### Variables from a state file
+
+    pubkit variables --check|--apply [--state FILE] [--repos FILE | REPO...]
+
+A repository's GitHub variables that aren't secret can live in the state file, so a
+change to one is a reviewed pull request with a history. The repository's own
+`pubkit.json` declares only their names, and may name the workflow that reads them,
+to run once one changes:
+
+```json
+"variables": { "names": ["SOME_SETTING", "SOME_MAP"], "deploy": "deploy.yml" }
+```
+
+The state file gives their values, under the repository:
+
+```json
+"some-tool": { "board": true, "protect": true, "govern": false,
+  "variables": { "SOME_SETTING": "a string", "SOME_MAP": { "some-key": "some-value" } } }
+```
+
+A string goes to GitHub as it is; anything else is JSON, kept structured in the state
+so that a diff shows the entry that changed, and sent compact, in the file's order. A
+JSON value matches what GitHub holds if that parses to the same thing. `state --check`
+refuses a name the repository doesn't declare, and an empty value.
+
+`--check` changes nothing: it prints how each repository's variables differ, a diff of
+the changed entries for JSON, and fails when one does, which suits a pull request's
+plan and a nightly drift report. `--apply` sets those that differ, each value on
+`gh`'s standard input, and then runs the repository's `deploy` workflow on its default
+branch, once. Both act on every repository the state gives variables, those named, or
+those a repos file lists, and neither touches a variable the state leaves out nor
+removes one. The token needs to read the repositories' contents and variables, and for
+`--apply` to write variables and run workflows (the Variables and Actions permissions,
+for a GitHub App).
+
 ## The nightly
 
 `.github/workflows/nightly.yml` runs over the repositories its `repos` input

@@ -396,6 +396,11 @@ def parse(text: str | bytes, where: str) -> Any:
 
 def remote(api: Api, repo: str) -> dict:
     """`repo`'s entry, from the pubkit.json on its default branch."""
+    return entry(repo, remote_config(api, repo), f"its {OWN}")
+
+
+def remote_config(api: Api, repo: str) -> Any:
+    """The pubkit.json on `repo`'s default branch, parsed, or a ValueError saying why not."""
     try:
         found = api("GET", f"repos/{repo}/contents/{OWN}", None)
     except ApiError as e:
@@ -407,7 +412,7 @@ def remote(api: Api, repo: str) -> dict:
         text = base64.b64decode(found["content"])
     except ValueError as e:
         raise ValueError(f"GitHub returned its {OWN} undecodable ({e})") from e
-    return entry(repo, parse(text, f"its {OWN}"), f"its {OWN}")
+    return parse(text, f"its {OWN}")
 
 
 def origin() -> str:
