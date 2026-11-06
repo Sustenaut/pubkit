@@ -22,6 +22,7 @@
     pubkit state --repos-for board|govern [FILE]
     pubkit board-publish --url URL --tenant TENANT [--file FILE]
     pubkit app-secrets [--check]
+    pubkit variables --check|--apply [--state FILE] [--repos FILE | REPO...]
     pubkit secrets run [--cwd DIR] -- COMMAND [ARGS...]
     pubkit github-app create [--replace] [--dry-run] MANIFEST
     pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
@@ -195,6 +196,10 @@ def sync(root: Path, check: bool) -> int:
         from .app_secrets import config_problems  # noqa: PLC0415
         if bad := config_problems(config):
             sys.exit(f"pubkit: {CONFIG}: {'; '.join(bad)}")
+    if "variables" in config:
+        from .variables import block_problems  # noqa: PLC0415
+        if bad := block_problems(config["variables"]):
+            sys.exit(f"pubkit: {CONFIG}'s variables block: {'; '.join(bad)}")
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -556,6 +561,19 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("app-secrets", help="send the secrets this repository's pubkit.json "
                                                 "names to it, through ./with-secrets")
     p.add_argument("--check", action="store_true", help="check the values, and send nothing")
+    p = commands.add_parser("variables", help="keep repositories' GitHub variables to the values "
+                                              "a state file gives them")
+    what = p.add_mutually_exclusive_group(required=True)
+    what.add_argument("--check", action="store_true",
+                      help="change nothing: print how each differs, and fail when one does")
+    what.add_argument("--apply", action="store_true",
+                      help="set those that differ, then run each changed repository's deploy workflow")
+    p.add_argument("--state", type=Path, default=Path("state.json"), metavar="FILE",
+                   help="the state file (default: state.json)")
+    p.add_argument("--repos", dest="repos_file", type=Path, metavar="FILE",
+                   help="the repos file: act on those it lists that the state gives variables")
+    p.add_argument("repos", nargs="*", metavar="REPO",
+                   help="NAME or OWNER/NAME; by default every repository the state gives variables")
     p = commands.add_parser("github-app", help="make a GitHub App from a manifest, and put its "
                                                "values in Bitwarden")
     github_app = p.add_subparsers(dest="github_app_command", required=True)
@@ -670,6 +688,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "app-secrets":
         from .app_secrets import run as app_secrets
         return app_secrets(read_config(root), args.check)
+    if args.command == "variables":
+        from .paths import confined
+        from .variables import run as variables
+        if args.repos_file and args.repos:
+            sys.exit("pubkit variables: --repos takes the place of naming them")
+        repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
+        return variables(confined(args.state, "the state file"), args.repos, args.apply, repos_file)
     if args.command == "github-app":
         from .github_app import run as github_app_run
         from .paths import confined

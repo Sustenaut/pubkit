@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit variables --check and --apply keep repositories' GitHub variables to the values a state file gives each one, strings or structured JSON: --check prints how they differ, a diff of the changed entries for JSON, and fails; --apply sets those that differ and runs the deploy workflow the repository's pubkit.json names. A pubkit.json declares the names it reads in a variables block, which sync checks, and state --check refuses a state value for a name its repository does not declare"
+}
