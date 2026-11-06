@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs COMMAND on TARGET over SSH as DEPLOY_KEY, with BUNDLE's paths as a
-# gzipped tar on its standard input (nothing when BUNDLE is empty). The key
+# gzipped tar on its standard input, or the file INPUT as it is (nothing
+# when both are empty). The key
 # and known_hosts are written to the runner's temporary directory and used
 # by this ssh alone, so nothing in ~/.ssh is touched. The command's exit
 # status is the step's.
@@ -18,7 +19,9 @@ ssh_opts=(-p "${PORT:-22}" -i "$ssh_dir/key" -o IdentitiesOnly=yes -o BatchMode=
 
 # COMMAND is meant for the server, which reads it as SSH_ORIGINAL_COMMAND.
 # shellcheck disable=SC2029
-if [[ -n "${BUNDLE:-}" ]]; then
+if [[ -n "${INPUT:-}" ]]; then
+  ssh "${ssh_opts[@]}" "$TARGET" "$COMMAND" < "$INPUT"
+elif [[ -n "${BUNDLE:-}" ]]; then
   read -r -a paths <<<"$BUNDLE"
   tar -czf - -- "${paths[@]}" | ssh "${ssh_opts[@]}" "$TARGET" "$COMMAND"
 else

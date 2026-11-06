@@ -27,8 +27,8 @@ NAMED = [re.compile(rf"github\.com[:/]({NAME}){END}"),
 # pubkit itself, its release tool, and what the examples use.
 ALWAYS = {"pubkit", "pubrel"}
 NEUTRAL = "example-org"
-# The owners of the actions and of the registry pubkit's own files depend on.
-DEPENDENCIES = {"actions", "bitwarden", "docker", "google", "hashicorp", "pypa", "rust-lang", "SonarSource",
+# The owners of the actions, the tools (actionlint) and the registry pubkit's own files depend on.
+DEPENDENCIES = {"actions", "bitwarden", "docker", "google", "hashicorp", "pypa", "rhysd", "rust-lang", "SonarSource",
                 "tailscale"}
 
 # pub is a pubkit tool, like pubrel, so `pubkit new` names where it comes from.

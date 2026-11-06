@@ -33,6 +33,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | job-service-terraform.yml |
       | job-service-tests.yml     |
       | board.yml                 |
+      | k8s-deploy.yml            |
 
   Scenario: board.yml grades with the caller's token, keeps board.json and deploys nothing
     When I parse the workflow "board.yml"
@@ -142,6 +143,7 @@ Feature: The reusable workflows parse as GitHub reads them
       | job-service-checks.yml    |
       | job-service-terraform.yml |
       | job-service-tests.yml     |
+      | k8s-deploy.yml            |
 
   Scenario: node-ci installs dependencies without running their scripts
     When I parse the workflow "node-ci.yml"

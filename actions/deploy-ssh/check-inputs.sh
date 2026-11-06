@@ -17,6 +17,10 @@ fail() {
 if [[ "$TAILSCALE_ID_SET" != "$TAILSCALE_SECRET_SET" ]]; then
   fail "tailscale-oauth-client-id and tailscale-oauth-secret go together"
 fi
+if [[ -n "${INPUT:-}" ]]; then
+  [[ -z "$BUNDLE" ]] || fail "bundle and input go one at a time: give one"
+  [[ -f "$INPUT" ]] || fail "input: $INPUT is not a file"
+fi
 if [[ -n "$BUNDLE" ]]; then
   read -r -a paths <<<"$BUNDLE"
   for path in "${paths[@]}"; do

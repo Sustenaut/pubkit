@@ -17,12 +17,21 @@
 #
 #   command="/usr/local/bin/example-deploy",restrict ssh-ed25519 AAAA...
 #
+# Give input in place of bundle to send one file as it is, such as rendered
+# Kubernetes manifests for a program that applies what it reads:
+#
+#   - uses: Sustenaut/pubkit/actions/deploy-ssh@vX.Y.Z
+#     with:
+#       command: example
+#       input: ${{ runner.temp }}/example.yaml
+#       ...
+#
 # The program must check the command against the units it knows. Give
 # tailscale-oauth-client-id and tailscale-oauth-secret when the server's SSH
 # is reachable over a tailnet only: the runner joins it first, with
 # tailscale-tags, and leaves when the job ends.
 name: deploy-ssh
-description: Deploy by running one command on a server over SSH with a restricted key, sending a bundle of files on its standard input.
+description: Deploy by running one command on a server over SSH with a restricted key, sending a bundle of files or one file on its standard input.
 
 inputs:
   command:
@@ -35,6 +44,11 @@ inputs:
     description: >
       Paths in the workspace, space-separated, sent to the command as a
       gzipped tar on its standard input. Leave empty to send nothing.
+    default: ''
+  input:
+    description: >
+      A file sent as it is on the command's standard input, in place of a
+      bundle. Leave empty to send nothing.
     default: ''
   deploy-key:
     description: An SSH private key the server restricts to one program (a forced command).
@@ -68,6 +82,7 @@ runs:
       env:
         COMMAND: ${{ inputs.command }}
         BUNDLE: ${{ inputs.bundle }}
+        INPUT: ${{ inputs.input }}
         DEPLOY_KEY_SET: ${{ inputs.deploy-key != '' }}
         TARGET: ${{ inputs.target }}
         PORT: ${{ inputs.port }}
@@ -89,6 +104,7 @@ runs:
       env:
         COMMAND: ${{ inputs.command }}
         BUNDLE: ${{ inputs.bundle }}
+        INPUT: ${{ inputs.input }}
         DEPLOY_KEY: ${{ inputs.deploy-key }}
         TARGET: ${{ inputs.target }}
         PORT: ${{ inputs.port }}
