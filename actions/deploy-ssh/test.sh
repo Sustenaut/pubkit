@@ -35,6 +35,14 @@ check "ssh uses the key alone" "-o IdentitiesOnly=yes -o BatchMode=yes"
 if tar -tzf "$work/stdin" | grep -qx deploy/file.txt; then echo "ok: the bundle is a tar of its paths"; else fail "the bundle"; fi
 [[ ! -e "$work/tmp/deploy-ssh" ]] || fail "key left behind"
 
+# An input goes on standard input as it is.
+: > "$work/calls"
+printf 'kind: Deployment\n' > "$work/manifest.yaml"
+(cd "$work/repo" && COMMAND=example INPUT="$work/manifest.yaml" BUNDLE='' DEPLOY_KEY=secret \
+  TARGET=deploy@example.eu PORT=22 KNOWN_HOSTS="example.eu ssh-ed25519 AAAA" "$here/deploy.sh")
+check "an input: the command as the ssh command" "deploy@example.eu example"
+if cmp -s "$work/manifest.yaml" "$work/stdin"; then echo "ok: the input is sent as it is"; else fail "the input"; fi
+
 # Without a bundle, nothing is sent (ssh -n).
 : > "$work/calls"
 COMMAND="check all" BUNDLE='' DEPLOY_KEY=secret TARGET=deploy@example.eu PORT=2222 \
@@ -62,5 +70,8 @@ refuses "a port that is not a number" "${base[@]}" PORT=ssh
 refuses "no host key" "${base[@]}" KNOWN_HOSTS=
 refuses "a Tailscale client without its secret" "${base[@]}" TAILSCALE_ID_SET=true
 refuses "a bundle path that is not there" "${base[@]}" BUNDLE="$work/none"
+refuses "an input that is not there" "${base[@]}" INPUT="$work/none"
+refuses "an input with a bundle" "${base[@]}" INPUT="$work/manifest.yaml" BUNDLE="$work/repo/deploy"
+if env "${base[@]}" INPUT="$work/manifest.yaml" "$here/check-inputs.sh"; then echo "ok: an input passes"; else fail "an input refused"; fi
 
 [[ "$failures" -eq 0 ]]

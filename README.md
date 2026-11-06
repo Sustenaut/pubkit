@@ -548,6 +548,8 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   `tailscale-oauth-client-id` and `tailscale-oauth-secret` the runner
   first joins a tailnet (tailscale/github-action, as `tailscale-tags`,
   `tag:ci` by default), for a server whose SSH is reachable there only.
+  `input`, in place of `bundle`, sends one file as it is, such as rendered
+  manifests for a program that applies what it reads.
   The command's exit status is the step's.
 
   ```yaml
