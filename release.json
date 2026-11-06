@@ -35,6 +35,8 @@
     ".github/workflows/job-service-terraform.yml",
     ".github/workflows/job-service-tests.yml",
     ".github/workflows/board.yml",
+    ".github/workflows/k8s-deploy.yml",
+    "k8s/",
     "plugins/",
     ".claude-plugin/",
     "terraform/",

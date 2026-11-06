@@ -109,7 +109,8 @@ jobs:
         env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}' }
 
   # The hosting modules (terraform/) and the deploy actions
-  # (actions/: deploy-static and deploy-ssh, which share one job), which consumers take by tag from this repository. Each
+  # (actions/: deploy-static and deploy-ssh, which share one job with
+  # k8s-deploy.yml), which consumers take by tag from this repository. Each
   # module's tests mock its providers, so nothing here needs credentials.
   # Terraform is the oldest version the modules allow, 1.11.
   terraform:
@@ -142,6 +143,18 @@ jobs:
       - run: actions/deploy-static/test.sh
       - run: shellcheck actions/deploy-ssh/*.sh
       - run: actions/deploy-ssh/test.sh
+      # k8s-deploy.yml, which calls deploy-ssh, as GitHub and shellcheck read
+      # it. actionlint is the release's binary, checked against its sha256.
+      - name: actionlint k8s-deploy.yml
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tgz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz"
+          echo "${SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" .github/workflows/k8s-deploy.yml
+        env:
+          VERSION: 1.7.12
+          SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
 
   # Builds one image twice under one scope: the second must come from the cache.
   docker-build-action:

@@ -678,6 +678,83 @@ secret version and a service account key do not survive an import unchanged: a
 key's private half is not readable again, so leave those where they are, or move
 the state itself.
 
+## Deploying a service to k3s
+
+`k8s-deploy.yml` is a service's whole deploy workflow, for a server whose
+deploy key runs one program (a forced command) that applies the manifests it
+reads in the namespace its command names, and waits:
+
+```yaml
+name: deploy
+on: { push: { branches: [main] }, workflow_dispatch: {} }
+permissions: { contents: read, packages: write }
+jobs:
+  deploy:
+    uses: Sustenaut/pubkit/.github/workflows/k8s-deploy.yml@<commit> # vX.Y.Z
+    with:
+      image: ghcr.io/example/example-app
+      deploys: |
+        k8s example
+        k8s-other example-other DEPLOY_OTHER
+      check: docker run --rm "$IMAGE" python -c 'import example.main'
+    secrets: inherit
+```
+
+- The `build` job builds `image`, tagged with the commit, with
+  `actions/docker-build` (its layer cache scoped to the image's name, and
+  `build-args`), runs `check` with the image in `IMAGE`, and only then pushes
+  it to GitHub's container registry with the job's token.
+- The `deploy` job runs once for each line of `deploys`: an overlay
+  directory, the unit the server's program deploys it as, and optionally a
+  variable that must be `on` for that unit to deploy (one whose namespace and
+  Secrets are not on the server yet). It sets the image in the overlay with
+  `kustomize edit set image`, runs `render` there if given (to add a
+  ConfigMap from the caller's variables, say), renders it with `kustomize
+  build`, and fails if the image is not in what it rendered. Every overlay is
+  rendered on every run, so a broken one fails even while it is off.
+- It deploys with `actions/deploy-ssh`: the unit as the command, the rendered
+  manifests as `input`, to `deploy@` the variable `SUSTENAUT_SERVER`, with the
+  host key in the variable `SUSTENAUT_KNOWN_HOSTS` and the key in the secret
+  `SUSTENAUT_DEPLOY_SSH_KEY`, after joining the tailnet as `tag:ci` with the
+  secrets `TS_GH_OAUTH_CLIENT_ID` and `TS_GH_OAUTH_SECRET`. Without
+  `SUSTENAUT_SERVER` the image is built and pushed, and nothing is deployed.
+- The deploy job runs in the environment `environment` names, `server` by
+  default, so a public repository can keep the deploy secrets to main. A
+  secret or variable set on the repository instead reaches it too, and GitHub
+  makes the environment on its first run if it is not there.
+- A unit deploys one run at a time (concurrency group `deploy-<unit>`), so the
+  caller sets no concurrency group of its own with that name.
+
+Pin it like pubkit's other workflows, to the commit of the release your lock
+pins.
+
+**The app component.** `k8s/components/app` is a kustomize Component with the
+hardening and probes every service's app shares. It patches the Deployment
+named `app` and its container named `app`, which serves `/healthz` and
+`/livez` on the port named `http`, and leaves every other Deployment (a
+sign-in proxy, a database) alone:
+
+```yaml
+components:
+  - https://github.com/Sustenaut/pubkit//k8s/components/app?ref=<commit> # vX.Y.Z
+```
+
+- The pod runs as user 1000, not root (`runAsNonRoot`), under the runtime's
+  seccomp profile, with no API token (`automountServiceAccountToken: false`);
+  a token projected for another audience is a volume of its own and is kept.
+- The container can't gain privileges, drops every capability and can't
+  write its root filesystem, so whatever it writes goes to a volume it mounts
+  (an `emptyDir` at `/tmp`, say).
+- `startupProbe` waits up to a minute for `/healthz`; `livenessProbe`
+  restarts the container after a minute without `/livez`; `readinessProbe`
+  sends it requests only while `/healthz` answers. `/livez` should only say
+  the process is up; `/healthz` checks what the app can't serve without.
+
+A kustomization's own patches come after its components', so a service that
+needs something else (its API token, a longer start) patches it back in its
+own `patches`. Pin the component by commit, as above: every service takes it,
+so a change to it reaches each one only when that service moves its pin.
+
 ## Caching a build
 
 A build that downloads slow-changing data, or makes many outputs one by

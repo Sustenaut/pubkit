@@ -1,0 +1,194 @@
+# Builds a service's image, pushes it to GitHub's container registry, renders its
+# kustomize overlays with that image and sends each to a k3s server over SSH, where
+# the deploy key can only run one program (a forced command) that applies what it
+# reads in the namespace its command names, and waits.
+#
+#   on: { push: { branches: [main] }, workflow_dispatch: {} }
+#   permissions: { contents: read, packages: write }
+#   jobs:
+#     deploy:
+#       uses: Sustenaut/pubkit/.github/workflows/k8s-deploy.yml@<commit> # vX.Y.Z
+#       with:
+#         image: ghcr.io/example/example-app
+#         deploys: |
+#           k8s example
+#           k8s-other example-other DEPLOY_OTHER
+#         check: docker run --rm "$IMAGE" python -c 'import example.main'
+#       secrets: inherit
+#
+# Each line of deploys is an overlay directory, the unit the server's program
+# deploys it as, and optionally a variable that must be "on" for that unit to
+# deploy (for a unit whose namespace and Secrets are not on the server yet). Every
+# overlay is rendered on every run, so a broken one fails even when it is off.
+#
+# The server is the variable SUSTENAUT_SERVER, its host key SUSTENAUT_KNOWN_HOSTS,
+# the key the secret SUSTENAUT_DEPLOY_SSH_KEY. SSH is reachable over a tailnet only,
+# so the job joins it first as tag:ci, with the secrets TS_GH_OAUTH_CLIENT_ID and
+# TS_GH_OAUTH_SECRET. The deploy job runs in the environment named by
+# `environment` (server), so a public repository can keep these to main; secrets
+# set on the repository instead reach it too. Without SUSTENAUT_SERVER the image
+# is built and pushed, and nothing is deployed.
+#
+# A unit deploys one run at a time (concurrency deploy-<unit>), so a caller sets no
+# concurrency group of its own named that way.
+name: k8s-deploy
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: The image, without a tag, such as ghcr.io/example/example-app. It is tagged with the commit.
+        type: string
+        required: true
+      deploys:
+        description: One line per unit, "DIR UNIT [VARIABLE]"; the unit deploys only when VARIABLE, if given, is "on".
+        type: string
+        required: true
+      check:
+        description: A command run once the image is built, before it is pushed, with the image in IMAGE.
+        type: string
+        default: ''
+      render:
+        description: A command run in each overlay directory after its image is set and before it is built, such as kustomize edit add configmap.
+        type: string
+        default: ''
+      build-args:
+        description: Build arguments, one NAME=value per line.
+        type: string
+        default: ''
+      environment:
+        description: The environment the deploy job runs in.
+        type: string
+        default: server
+    secrets:
+      SUSTENAUT_DEPLOY_SSH_KEY:
+        required: false
+      TS_GH_OAUTH_CLIENT_ID:
+        required: false
+      TS_GH_OAUTH_SECRET:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      deploys: ${{ steps.deploys.outputs.deploys }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { persist-credentials: false }
+
+      - name: Read the inputs
+        id: deploys
+        env:
+          IMAGE: ${{ inputs.image }}
+          DEPLOYS: ${{ inputs.deploys }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9._/-]*$ && "$IMAGE" != *:* ]] ||
+            fail "image: '$IMAGE' is not an image name in lower case, without a tag"
+          deploys=$(jq -cnR '[inputs | gsub("^\\s+|\\s+$"; "") | select(length > 0)
+            | [splits("\\s+")] | {dir: .[0], unit: .[1], gate: (.[2] // ""), words: length}]' <<<"$DEPLOYS")
+          [[ $(jq length <<<"$deploys") -gt 0 ]] || fail "deploys: no units"
+          # Fields split on a unit separator: a tab is whitespace to read, and runs of it collapse.
+          while IFS=$'\x1f' read -r dir unit gate words; do
+            [[ "$words" -le 3 && -n "$unit" ]] || fail "deploys: '$dir $unit $gate' is not DIR UNIT [VARIABLE]"
+            [[ -f "$dir/kustomization.yaml" ]] || fail "deploys: $dir has no kustomization.yaml"
+            [[ "$unit" =~ ^[a-z][a-z0-9-]{0,30}$ ]] || fail "deploys: '$unit' is not a unit name"
+            [[ -z "$gate" || "$gate" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "deploys: '$gate' is not a variable name"
+          done < <(jq -r '.[] | [.dir, .unit // "", .gate, (.words | tostring)] | join("\u001f")' <<<"$deploys")
+          echo "deploys=$(jq -c 'map(del(.words))' <<<"$deploys")" >> "$GITHUB_OUTPUT"
+          echo "scope=${IMAGE##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the image
+        uses: Sustenaut/pubkit/actions/docker-build@0e5477594d4ce20e411721c86d40a6547f026db9 # v0.29.0
+        with:
+          tags: ${{ inputs.image }}:${{ github.sha }}
+          scope: ${{ steps.deploys.outputs.scope }}
+          build-args: ${{ inputs.build-args }}
+
+      - name: Check the image
+        if: inputs.check != ''
+        env:
+          IMAGE: ${{ inputs.image }}:${{ github.sha }}
+        run: ${{ inputs.check }}
+
+      - name: Push the image
+        env:
+          IMAGE: ${{ inputs.image }}:${{ github.sha }}
+          TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "$IMAGE"
+
+  deploy:
+    name: deploy ${{ matrix.unit }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.build.outputs.deploys) }}
+    concurrency:
+      group: deploy-${{ matrix.unit }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { persist-credentials: false }
+
+      - name: Set the image
+        working-directory: ${{ matrix.dir }}
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: kustomize edit set image "${IMAGE}=${IMAGE}:${GITHUB_SHA}"
+
+      - name: Prepare the overlay
+        if: inputs.render != ''
+        working-directory: ${{ matrix.dir }}
+        run: ${{ inputs.render }}
+
+      - name: Render the manifests
+        working-directory: ${{ matrix.dir }}
+        env:
+          IMAGE: ${{ inputs.image }}
+          OUT: ${{ runner.temp }}/${{ matrix.unit }}.yaml
+        run: |
+          kustomize build . > "$OUT"
+          grep -q "${IMAGE}:${GITHUB_SHA}" "$OUT" || { echo "::error::$OUT does not use ${IMAGE}:${GITHUB_SHA}"; exit 1; }
+
+      - name: Is it deployed?
+        id: gate
+        env:
+          SERVER: ${{ vars.SUSTENAUT_SERVER }}
+          UNIT: ${{ matrix.unit }}
+          GATE: ${{ matrix.gate }}
+          GATE_VALUE: ${{ matrix.gate != '' && vars[matrix.gate] || '' }}
+        run: |
+          if [[ -z "$SERVER" ]]; then
+            echo "::notice::SUSTENAUT_SERVER is not set: nothing is deployed"
+          elif [[ -n "$GATE" && "$GATE_VALUE" != on ]]; then
+            echo "::notice::$GATE is not on: $UNIT is not deployed"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to the server
+        if: steps.gate.outputs.deploy == 'true'
+        uses: Sustenaut/pubkit/actions/deploy-ssh@3d43a4297c92725f8dac383ed4019c4ead0573c4 # v0.30.0
+        with:
+          command: ${{ matrix.unit }}
+          input: ${{ runner.temp }}/${{ matrix.unit }}.yaml
+          deploy-key: ${{ secrets.SUSTENAUT_DEPLOY_SSH_KEY }}
+          target: deploy@${{ vars.SUSTENAUT_SERVER }}
+          known-hosts: ${{ vars.SUSTENAUT_KNOWN_HOSTS }}
+          tailscale-oauth-client-id: ${{ secrets.TS_GH_OAUTH_CLIENT_ID }}
+          tailscale-oauth-secret: ${{ secrets.TS_GH_OAUTH_SECRET }}

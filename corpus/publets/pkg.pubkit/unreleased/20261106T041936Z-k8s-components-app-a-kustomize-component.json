@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "k8s/components/app, a kustomize Component a service takes by a pinned remote URL: it patches the Deployment app to run as user 1000, not root, under RuntimeDefault seccomp, with no API token, its container app with no privilege escalation, no capabilities and a read-only root filesystem, and probes /healthz to start and be ready and /livez to stay alive, on the port http"
+}
