@@ -708,8 +708,9 @@ jobs:
   directory, the unit the server's program deploys it as, and optionally a
   variable that must be `on` for that unit to deploy (one whose namespace and
   Secrets are not on the server yet). It sets the image in the overlay with
-  `kustomize edit set image`, runs `render` there if given (to add a
-  ConfigMap from the caller's variables, say), renders it with `kustomize
+  `kustomize edit set image`, runs `render` there if given, with the
+  caller's variables as JSON in `VARS` (to add a ConfigMap from them with
+  `jq -r .NAME <<<"$VARS"`, say), renders it with `kustomize
   build`, and fails if the image is not in what it rendered. Every overlay is
   rendered on every run, so a broken one fails even while it is off.
 - It deploys with `actions/deploy-ssh`: the unit as the command, the rendered

@@ -138,5 +138,7 @@ def deploys(workflow):
     assert with_["known-hosts"] == "${{ vars.SUSTENAUT_KNOWN_HOSTS }}"
     assert with_["tailscale-oauth-client-id"] == "${{ secrets.TS_GH_OAUTH_CLIENT_ID }}"
     assert with_["tailscale-oauth-secret"] == "${{ secrets.TS_GH_OAUTH_SECRET }}"
+    prepare = next(s for s in steps(workflow, "deploy") if s.get("name") == "Prepare the overlay")
+    assert prepare["env"] == {"VARS": "${{ toJSON(vars) }}"} and prepare["run"] == "${{ inputs.render }}"
     render = next(s for s in steps(workflow, "deploy") if s.get("name") == "Render the manifests")
     assert render["env"]["OUT"] == with_["input"]

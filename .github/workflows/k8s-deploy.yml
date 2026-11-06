@@ -49,7 +49,7 @@ on:
         type: string
         default: ''
       render:
-        description: A command run in each overlay directory after its image is set and before it is built, such as kustomize edit add configmap.
+        description: A command run in each overlay directory after its image is set and before it is built, such as kustomize edit add configmap, with the caller's variables as JSON in VARS.
         type: string
         default: ''
       build-args:
@@ -154,6 +154,8 @@ jobs:
       - name: Prepare the overlay
         if: inputs.render != ''
         working-directory: ${{ matrix.dir }}
+        env:
+          VARS: ${{ toJSON(vars) }}
         run: ${{ inputs.render }}
 
       - name: Render the manifests
