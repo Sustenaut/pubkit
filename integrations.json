@@ -79,6 +79,13 @@
       "mode": "required"
     },
     {
+      "plugin": "github.ghcr",
+      "paths": [
+        ".github/workflows/k8s-deploy.yml"
+      ],
+      "mode": "required"
+    },
+    {
       "plugin": "github.repo-ops",
       "paths": [
         ".github/nightly/update.sh",
@@ -163,6 +170,7 @@
     {
       "plugin": "tailscale.tailnet",
       "paths": [
+        ".github/workflows/k8s-deploy.yml",
         "actions/deploy-ssh/"
       ],
       "mode": "required"
@@ -238,6 +246,10 @@
     {
       "name": "PUBKIT_BUMP_TOKEN",
       "reason": "The nightly's fallback GitHub token, for when no app is set up; it reaches only GitHub"
+    },
+    {
+      "name": "SUSTENAUT_DEPLOY_SSH_KEY",
+      "reason": "k8s-deploy.yml's SSH key to a caller's k3s server, which the server pins to its deploy program"
     }
   ],
   "exclude": [
