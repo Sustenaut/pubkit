@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "k8s-deploy.yml, a service's whole deploy workflow for a k3s server: it builds the image with actions/docker-build, runs the caller's check, pushes it to ghcr.io, renders each overlay deploys lists with kustomize and sends it to the server's forced command with actions/deploy-ssh over the tailnet, one run at a time per unit, in the environment server; a unit can wait on a variable set to on, and nothing deploys without SUSTENAUT_SERVER"
-}

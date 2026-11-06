@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.29.0 is released as v0.29.0 from commit d52574bbf21362fa405d2463d721b9de84586a4c.",
+      "content": "pubkit 0.30.0 is released as v0.30.0 from commit 7ac743dbdf0ced536bd584ed74eacbcb238fabb9.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.29.0",
+            "0.30.0",
             "pubkit --version",
-            "pubkit 0.29.0",
-            "v0.29.0",
-            "d52574bbf21362fa405d2463d721b9de84586a4c"
+            "pubkit 0.30.0",
+            "v0.30.0",
+            "7ac743dbdf0ced536bd584ed74eacbcb238fabb9"
           ]
         ]
       },
-      "scope": "the published release v0.29.0 of pubkit",
+      "scope": "the published release v0.30.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d52574bbf21362fa405d2463d721b9de84586a4c"
+          "revision": "7ac743dbdf0ced536bd584ed74eacbcb238fabb9"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.29.0 was released on 2026-11-05 from commit d52574bbf21362fa405d2463d721b9de84586a4c with these changes.",
+      "content": "pubkit 0.30.0 was released on 2026-11-06 from commit 7ac743dbdf0ced536bd584ed74eacbcb238fabb9 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,32 +57,36 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit signing-key backup writes the signing keys repositories declare in pubkit.json's new signing_keys block to their Bitwarden projects, each found by its id with its name as a label (a run warns when Bitwarden's name differs; a plain name matches in any case when only one project has it), with the SDK and a token typed at a hidden prompt: one repository, or every one under --under DIR. It skips a key already backed up, never overwrites a different value, points out an undeclared corpus key, and --dry-run asks for nothing. pubkit sync --check refuses a signing_keys block it can't use."
-          ],
-          [
-            "fixed",
-            "pubkit sync moves a Bitwarden use integrations.json declares on with-secrets to with-secrets.json in a service, as the one-line with-secrets pubkit 0.28.0 writes no longer calls bws and the integrations scan called that declaration stale; sync --check fails until it is moved."
-          ],
-          [
             "changed",
-            "pubkit signing-key backup finds a declared Bitwarden project by its id, given as {\"id\", \"name\"} with the name as a label (a run warns when Bitwarden's name differs), or by a name matched in any case when only one project has it; its output names each project with its id, then lists that project's keys under it, one per line"
+            "The managed AGENTS.md asks every branch to take in origin/main before each push: a rebase if it was never pushed, a merge if it was, and a stop on any conflict whose resolution is not clear"
+          ],
+          [
+            "added",
+            "actions/deploy-ssh takes input, a file sent as it is on the command's standard input in place of a bundle, such as rendered manifests for a program that applies what it reads"
+          ],
+          [
+            "added",
+            "k8s/components/app, a kustomize Component a service takes by a pinned remote URL: it patches the Deployment app to run as user 1000, not root, under RuntimeDefault seccomp, with no API token, its container app with no privilege escalation, no capabilities and a read-only root filesystem, and probes /healthz to start and be ready and /livez to stay alive, on the port http"
+          ],
+          [
+            "added",
+            "k8s-deploy.yml, a service's whole deploy workflow for a k3s server: it builds the image with actions/docker-build, runs the caller's check, pushes it to ghcr.io, renders each overlay deploys lists with kustomize and sends it to the server's forced command with actions/deploy-ssh over the tailnet, one run at a time per unit, in the environment server; a unit can wait on a variable set to on, and nothing deploys without SUSTENAUT_SERVER"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.29.0 of pubkit",
+      "scope": "the published release v0.30.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d52574bbf21362fa405d2463d721b9de84586a4c"
+          "revision": "7ac743dbdf0ced536bd584ed74eacbcb238fabb9"
         }
       ]
     }
   },
-  "created": "2026-11-05T00:00:00Z",
+  "created": "2026-11-06T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
