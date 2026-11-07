@@ -1,0 +1,63 @@
+# Four Secrets: example-app-env whole (envFrom), example-files' token (a
+# volume and an env), example-page-secrets' cookie secret, and example-extra,
+# which is optional.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  selector: { matchLabels: { app: example } }
+  template:
+    metadata: { labels: { app: example } }
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/example/example-app
+          envFrom:
+            - secretRef: { name: example-app-env }
+          env:
+            - name: EXTRA
+              valueFrom: { secretKeyRef: { name: example-extra, key: x, optional: true } }
+          volumeMounts:
+            - { name: files, mountPath: /files }
+      volumes:
+        - name: files
+          secret:
+            secretName: example-files
+            items:
+              - { key: token, path: token }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+spec:
+  selector: { matchLabels: { app: proxy } }
+  template:
+    metadata: { labels: { app: proxy } }
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.12.0
+          args: ["--provider=oidc"]
+          env:
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: { secretKeyRef: { name: example-page-secrets, key: cookie-secret } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: worker
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: worker
+              image: ghcr.io/example/example-app
+              env:
+                - name: TOKEN
+                  valueFrom: { secretKeyRef: { name: example-files, key: token } }

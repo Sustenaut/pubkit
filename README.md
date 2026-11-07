@@ -821,6 +821,83 @@ needs something else (its API token, a longer start) patches it back in its
 own `patches`. Pin the component by commit, as above: every service takes it,
 so a change to it reaches each one only when that service moves its pin.
 
+## Declaring what a service needs
+
+A service needs more than its manifests before it runs: a namespace, the
+Secrets its pods read and what fills them, GitHub secrets and variables for
+its deploy, the services it calls, its host in the DNS. pubkit.json's
+`deploy` block says so, and `pubkit deploy check` checks each, changing
+nothing:
+
+```json
+"deploy": {
+  "namespace": "example",
+  "host": "example.example.eu",
+  "workflow": "deploy.yml",
+  "gate": "DEPLOY_EXAMPLE",
+  "overlay": "k8s",
+  "needs": [
+    {"type": "bitwarden.generated", "name": "example-cookie-secret", "shape": "oauth2-proxy-cookie",
+     "secret": {"name": "example-page-secrets", "key": "cookie-secret"}},
+    {"type": "k8s.manifests", "path": "k8s/admin/network-policy.yaml"},
+    {"type": "upstream", "name": "storage", "health": "https://storage.example.eu/healthz"},
+    {"type": "service.health", "path": "/healthz", "job": "cronjob/worker", "after": ["upstream:storage"]}
+  ]
+}
+```
+
+`namespace` is the only key it must have. `workflow` (default `deploy.yml`)
+must be in `.github/workflows`, and `overlay` (default `k8s`) must hold a
+`kustomization.yaml`. Each need has a `type`, maybe a `name` (each type has a
+default; a need's id is `TYPE:NAME`), maybe `after`, the ids it waits for,
+and its type's keys; `pubkit deploy types` lists them. A need with a `secret`
+(`{"name", "key"?, "decode"?: "base64"}`) says it fills that Kubernetes
+Secret.
+
+The block and the other blocks imply the rest, so they are not written
+twice: the namespace a `k8s.namespace`, a `deploy.rollout` and a
+`k8s.secrets-declared`, the host a `dns.site` and a `service.health`, the gate
+a `github.gate`; each entry of `secrets` and `github_app` a `github.secret` or
+`github.variable`, and the server's settings a `github.deploy-settings`; each
+of `variables.names` a `github.variable` that must be set; each need's
+`secret`, and each Secret the rendered overlay reads, a `k8s.secret`.
+
+`pubkit deploy check` walks them in order: the namespace before what is in
+it, what fills a Secret before the Secret, the gate after everything but the
+rollout and the service's health. Each is `ready`, `missing`, `drift`,
+`blocked` (missing while something it waits for is not ready) or `unknown`
+(not checked, refused, or over its time), with what to do about it. It exits
+0 when every need is ready, 1 when one is not, and 2 for a bad block.
+
+```
+./with-secrets ./pubkit deploy check                 # everything, Bitwarden included
+./pubkit deploy check --offline                      # the manifests and the files only
+./pubkit deploy check --zones ../infra/pubkit.json   # the hosting block that keeps the zone
+./pubkit deploy check --json                         # the walk as a deploy-journal/1 document
+```
+
+It reads the cluster through `kubectl` (`--kubectl CMD` for another, such as
+`k3s kubectl --kubeconfig FILE`), GitHub through `gh`, health addresses over
+HTTPS, the DNS through `dig`, and Bitwarden only as `./with-secrets` gives
+it: a Bitwarden need is looked for by name in the environment, and is
+`unknown` outside with-secrets. It never prints a value: a secret is named,
+with its length and kind. `--zones` reads only a file named `pubkit.json`, in
+this repository or a checkout beside it.
+
+`pubkit sync --check` checks the block too, and runs the offline walk: every
+Secret the manifests read must be one a need fills, with the keys they read,
+and every Secret a need fills must be read, so a manifest that reads a new
+Secret fails CI until the block says where it comes from. What it cannot
+check (no kustomize, a zone kept in another repository) it says, and fails
+nothing for.
+
+A package may offer more need types under the entry-point group
+`sustenaut.needs`, each `module:object` naming an object with a `type`, a
+JSON `schema` of its keys that takes no other, a `grade`, a `budget` in
+seconds (at most 10), `offline`, and `default_name`, `depends_on`, `check`
+and `fulfil`. One pubkit cannot use is left out with a warning. Checks only,
+for now: every type's `fulfil` waits for a later release.
+
 ## Terraform from CI
 
 `terraform.yml` applies a Terraform stack from the default branch, as a
