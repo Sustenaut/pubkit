@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "pubkit init and sync add .env to a repository's .gitignore when it is missing, leaving the rest of the file as it is, and pubkit sync --check fails until it is there: local tools such as ./with-secrets read secrets from .env, so no repository may commit one"
-}

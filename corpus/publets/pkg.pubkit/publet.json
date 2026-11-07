@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.30.1 is released as v0.30.1 from commit c2bd664bb5df4833e2ed6003005a016765a555aa.",
+      "content": "pubkit 0.31.0 is released as v0.31.0 from commit d9131ec530aac049ed93fd5107eaf531ecf870e5.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.30.1",
+            "0.31.0",
             "pubkit --version",
-            "pubkit 0.30.1",
-            "v0.30.1",
-            "c2bd664bb5df4833e2ed6003005a016765a555aa"
+            "pubkit 0.31.0",
+            "v0.31.0",
+            "d9131ec530aac049ed93fd5107eaf531ecf870e5"
           ]
         ]
       },
-      "scope": "the published release v0.30.1 of pubkit",
+      "scope": "the published release v0.31.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c2bd664bb5df4833e2ed6003005a016765a555aa"
+          "revision": "d9131ec530aac049ed93fd5107eaf531ecf870e5"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.30.1 was released on 2026-11-06 from commit c2bd664bb5df4833e2ed6003005a016765a555aa with these changes.",
+      "content": "pubkit 0.31.0 was released on 2026-11-07 from commit d9131ec530aac049ed93fd5107eaf531ecf870e5 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,28 @@
         ],
         "rows": [
           [
+            "changed",
+            "k8s-deploy.yml deploys a commit only once CI has passed on it: a ready job finds the commit (the one a workflow_run tested, when that run passed on a push to the default branch; a pull request's or the merge queue's run deploys nothing) and waits, up to wait minutes, for the latest push run on it of each workflow require names, main and, where there is one, integrations, failing if one did not pass; build and deploy check out, tag and deploy that commit, and a commit the default branch has moved on from is not deployed, except by hand. A caller grants actions: read and moves its trigger from push to a workflow_run of its CI. pubkit k8s preflight, for a server's deploy program to run before it applies, checks through kubectl that every Secret rendered manifests read is there with every key they name (env, envFrom, secret and projected volumes, imagePullSecrets; an optional reference may be missing), and that oauth2-proxy's cookie secret is 16, 24 or 32 bytes as it is or after URL-safe base64 decoding, naming standard base64 as the likely mistake; it fails in seconds, naming the Secret, the key and what reads it, and never prints a value. pubkit k8s diagnose prints the state, last exit, warning events and last logs of each pod that is not ready. Both are one file that runs without pubkit"
+          ],
+          [
             "added",
-            "pubkit variables --check and --apply keep repositories' GitHub variables to the values a state file gives each one, strings or structured JSON: --check prints how they differ, a diff of the changed entries for JSON, and fails; --apply sets those that differ and runs the deploy workflow the repository's pubkit.json names. A pubkit.json declares the names it reads in a variables block, which sync checks, and state --check refuses a state value for a name its repository does not declare"
+            "pubkit init and sync add .env to a repository's .gitignore when it is missing, leaving the rest of the file as it is, and pubkit sync --check fails until it is there: local tools such as ./with-secrets read secrets from .env, so no repository may commit one"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.30.1 of pubkit",
+      "scope": "the published release v0.31.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c2bd664bb5df4833e2ed6003005a016765a555aa"
+          "revision": "d9131ec530aac049ed93fd5107eaf531ecf870e5"
         }
       ]
     }
   },
-  "created": "2026-11-06T00:00:00Z",
+  "created": "2026-11-07T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
