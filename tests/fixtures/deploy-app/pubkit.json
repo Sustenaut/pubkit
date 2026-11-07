@@ -1,0 +1,27 @@
+{
+  "kind": "service",
+  "ci": {},
+  "secrets": [
+    {"from": "example-token", "to": "EXAMPLE_TOKEN", "kind": "secret"},
+    {"from": "example-user", "to": "EXAMPLE_USER", "kind": "variable"},
+    {"from": "example-deploy-key", "to": "SUSTENAUT_DEPLOY_SSH_KEY", "kind": "secret", "environment": "server"}
+  ],
+  "variables": {"names": ["EXAMPLE_SETTING"], "deploy": "deploy.yml"},
+  "deploy": {
+    "namespace": "example",
+    "host": "example.example.eu",
+    "workflow": "deploy.yml",
+    "gate": "DEPLOY_EXAMPLE",
+    "overlay": "k8s",
+    "needs": [
+      {"type": "bitwarden.generated", "name": "example-cookie-secret", "shape": "oauth2-proxy-cookie",
+       "secret": {"name": "example-page-secrets", "key": "cookie-secret"}},
+      {"type": "bitwarden.secret", "name": "example-files-token",
+       "secret": {"name": "example-files", "key": "token"}},
+      {"type": "k8s.secret", "name": "example-app-env"},
+      {"type": "k8s.manifests", "path": "k8s/admin/network-policy.yaml"},
+      {"type": "upstream", "name": "storage", "health": "https://storage.example.eu/healthz"},
+      {"type": "service.health", "path": "/healthz", "job": "cronjob/worker", "after": ["upstream:storage"]}
+    ]
+  }
+}

@@ -17,7 +17,8 @@ written to disk, and the calling shell never holds them.
 with-secrets.json's settings (project, terraform.dir, terraform.secrets
 "declared" or "map" with terraform.names_from, and aliases) are in pubkit's
 README, "Services", and the managed with-secrets' header. Every secret not sent
-some other way is exported under its name in upper case, with "-" as "_".
+some other way is exported under its name in upper case, with "-" as "_", and
+PUBKIT_SECRETS_PROJECT names the project they came from.
 """
 
 from __future__ import annotations
@@ -144,7 +145,9 @@ def environment(root: Path) -> dict[str, str]:
     if shutil.which("bws") is None:
         raise Stop(BWS_MISSING)
     project, tf_dir, tf_mode, names_from, aliases = settings(root)
-    env = {**os.environ, "BWS_ACCESS_TOKEN": token(root)}
+    # PUBKIT_SECRETS_PROJECT says the command runs with the project's secrets,
+    # so a check such as pubkit deploy's can tell an absent one from none read.
+    env = {**os.environ, "BWS_ACCESS_TOKEN": token(root), "PUBKIT_SECRETS_PROJECT": project}
 
     # A token without access to a project lists no secrets rather than failing,
     # so check it can see the project first.

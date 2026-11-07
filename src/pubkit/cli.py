@@ -32,6 +32,8 @@
     pubkit board --out DIR --repos FILE [--rules FILE]
     pubkit k8s preflight --namespace NS [--kubectl CMD] [--offline] < MANIFESTS
     pubkit k8s diagnose --namespace NS [--kubectl CMD] [--selector SEL]
+    pubkit deploy check [--offline] [--json] [--kubectl CMD] [--zones PATH] [--namespace NS]
+    pubkit deploy types
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -208,6 +210,13 @@ def sync(root: Path, check: bool) -> int:
         from .variables import block_problems  # noqa: PLC0415
         if bad := block_problems(config["variables"]):
             sys.exit(f"pubkit: {CONFIG}'s variables block: {'; '.join(bad)}")
+    deploy_failed = False
+    if "deploy" in config:
+        # The block, and the offline walk: the manifests agree with the needs.
+        from .deploy import offline_lines  # noqa: PLC0415
+        lines, deploy_failed = offline_lines(root, config)
+        for line in lines:
+            print(line, file=sys.stderr)
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -264,7 +273,7 @@ def sync(root: Path, check: bool) -> int:
         for use in unversioned:
             print(f"pubkit: {use} names no pubkit version, so `pubkit bump` leaves it as it is",
                   file=sys.stderr)
-        if stale or lock_stale or replaced or actions or unignored:
+        if stale or lock_stale or replaced or actions or unignored or deploy_failed:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":
@@ -417,7 +426,7 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
 # to this pubkit (bump, pins, nightly), start one (init, new), or act on
 # other repositories run as whichever pubkit is installed.
 PINNED_COMMANDS = {"sync", "lock", "supply-chain", "doc-coverage", "required", "conform", "audit",
-                   "record"}
+                   "record", "deploy"}
 
 
 def wrong_pubkit(root: Path, command: str) -> str | None:
@@ -640,6 +649,21 @@ def main(argv: list[str] | None = None) -> int:
                                       "large enough image, and robots.txt lets preview bots in")
     p.add_argument("dir", type=Path, help="the built site, such as _site")
     p.add_argument("--url", help="the site's https:// address, to find og:image files in DIR")
+    p = commands.add_parser("deploy", help="check what pubkit.json's deploy block says the service needs "
+                                           "before it deploys, changing nothing")
+    deploy = p.add_subparsers(dest="deploy_command", required=True)
+    p = deploy.add_parser("check", help="check every need, in order, and print each one's state; "
+                                        "exit 1 when one is not ready")
+    p.add_argument("--offline", action="store_true",
+                   help="check only what needs no network: the manifests against the needs, and the files")
+    p.add_argument("--json", action="store_true", help="print the walk as a deploy-journal/1 document")
+    p.add_argument("--kubectl", default="kubectl",
+                   help="the kubectl command, such as 'k3s kubectl --kubeconfig FILE'")
+    p.add_argument("--zones", type=Path, metavar="PATH",
+                   help="the pubkit.json, here or in a checkout beside this one, whose hosting block "
+                        "keeps the zone of the deploy's host")
+    p.add_argument("--namespace", metavar="NS", help="another namespace than the block's, for a second overlay")
+    deploy.add_parser("types", help="every need type pubkit and the installed packages offer, and its keys")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -745,6 +769,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "signing-key":
         from .signing_keys import run as signing_key_backup
         return signing_key_backup(args.under.expanduser() if args.under else None, args.dry_run)
+    if args.command == "deploy" and args.deploy_command == "types":
+        from .deploy import run_types
+        return run_types()
+    if args.command == "deploy":
+        from .deploy import run_check
+        from .paths import confined
+        # --zones is another repository's pubkit.json, so it may be in a
+        # checkout beside this one: a pubkit.json in the parent directory's tree.
+        zones = confined(args.zones, "the --zones file", also=(root.parent,)) if args.zones else None
+        if zones is not None and zones.name != "pubkit.json":
+            sys.exit(f"pubkit: the --zones file ({args.zones}) must be a repository's pubkit.json")
+        return run_check(root, args.offline, args.json, args.kubectl, zones, args.namespace)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

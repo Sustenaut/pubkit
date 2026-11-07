@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Sustenaut/pubkit/blob/main/src/pubkit/deploy/schema.json",
+  "title": "pubkit.json's deploy block",
+  "description": "What a service needs before it deploys. Each need's own keys are its type's schema (pubkit deploy types).",
+  "type": "object",
+  "x-phrase": "must be an object, with namespace and maybe host, workflow, gate, overlay and needs",
+  "required": ["namespace"],
+  "additionalProperties": false,
+  "properties": {
+    "namespace": {
+      "description": "The k3s namespace the service runs in.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,30}$",
+      "x-phrase": "must be a lower-case name of at most 31 characters"
+    },
+    "host": {
+      "description": "The public host; it implies dns.site, and service.health asks it.",
+      "type": "string",
+      "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$",
+      "x-phrase": "must be a host name in lower case, such as example.example.eu"
+    },
+    "workflow": {
+      "description": "The deploy workflow's file in .github/workflows (default deploy.yml).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+\\.ya?ml$",
+      "x-phrase": "must be a workflow's file name, such as deploy.yml"
+    },
+    "gate": {
+      "description": "The repository variable that must be on for the deploy; it implies github.gate.",
+      "type": "string",
+      "pattern": "^(?!GITHUB_)[A-Z_][A-Z0-9_]*$",
+      "x-phrase": "must be a variable's name: upper case letters, digits and _, not starting GITHUB_"
+    },
+    "overlay": {
+      "description": "The kustomize overlay the manifest checks render (default k8s).",
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9_./-]+$",
+      "x-phrase": "must be a directory in the repository, such as k8s"
+    },
+    "needs": {
+      "description": "The needs nothing implies, each an object with type and that type's keys.",
+      "type": "array",
+      "x-phrase": "must be a list of needs, each an object with a type",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "x-phrase": "must be an object with a type",
+        "properties": {"type": {"type": "string"}}
+      }
+    }
+  }
+}
