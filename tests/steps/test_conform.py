@@ -68,6 +68,7 @@ def conforming(repo, env):
         "Cargo.toml": MANIFEST,
         "src/lib.rs": LIB,
         "SECURITY.md": "# Security\n",
+        ".gitignore": ".env\n",
         "testdata/cases.json": "[]\n",
         "fuzz/fuzz_targets/parse.rs": "",
         "deny.toml": deny_toml(),

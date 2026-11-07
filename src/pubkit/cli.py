@@ -35,7 +35,10 @@ Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
 by `init` and the repository's own from then on. Extensions go in seeded
 files (the Makefile includes `pubkit.mk`; requirements.txt includes
-requirements-pubkit.txt), so nothing managed is ever edited by hand.
+requirements-pubkit.txt), so nothing managed is ever edited by hand. One
+file is neither: .gitignore is the repository's own, but `init` and `sync`
+add `.env` to it when it's missing (ignores.py), and `sync --check` fails
+until they have.
 """
 
 from __future__ import annotations
@@ -151,6 +154,9 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
         print(f"managed  {path}")
+    from .ignores import GITIGNORE, heal  # noqa: PLC0415
+    if added := heal(root):
+        print(f"ignored  {', '.join(added)} (in {GITIGNORE})")
 
 
 def init(root: Path, kind: str, binary: str | None, project: str | None = None) -> int:
@@ -212,6 +218,10 @@ def sync(root: Path, check: bool) -> int:
     if (integrations := declared(root, wanted)) is not None:
         wanted.append(integrations)
     replaced = leftovers(config, root)
+    from .ignores import GITIGNORE, heal, missing  # noqa: PLC0415
+    unignored = missing(root) if check else heal(root)
+    if unignored and not check:
+        print(f"updated  {GITIGNORE} (now ignores {', '.join(unignored)})")
     for path, want in wanted:
         target = root / path
         have = target.read_text(encoding="utf-8") if target.exists() else None
@@ -239,6 +249,9 @@ def sync(root: Path, check: bool) -> int:
                 continue
             print(f"pubkit: {path} differs from pubkit {__version__}'s; run `pubkit sync`",
                   file=sys.stderr)
+        for name in unignored:
+            print(f"pubkit: {GITIGNORE} doesn't ignore {name}, where local tools read secrets; "
+                  f"run `pubkit sync`, which adds it", file=sys.stderr)
         if lock_stale:
             print(f"pubkit: {LOCK} does not pin pubkit {__version__}; run `pubkit lock`",
                   file=sys.stderr)
@@ -249,7 +262,7 @@ def sync(root: Path, check: bool) -> int:
         for use in unversioned:
             print(f"pubkit: {use} names no pubkit version, so `pubkit bump` leaves it as it is",
                   file=sys.stderr)
-        if stale or lock_stale or replaced or actions:
+        if stale or lock_stale or replaced or actions or unignored:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":
@@ -258,7 +271,7 @@ def sync(root: Path, check: bool) -> int:
                 return 0
             return conform(root)
         return 0
-    if not stale:
+    if not stale and not unignored:
         print(f"already in step with pubkit {__version__}")
     if lock_stale:
         print(f"now run `pubkit lock`: {LOCK} pins another pubkit")

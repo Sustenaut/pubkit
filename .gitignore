@@ -13,3 +13,6 @@ coverage/
 
 # Written by the release CI into the wheel it builds (src/pubkit/refs.py).
 /src/pubkit/release-commit
+
+# Local secrets, such as the Bitwarden token ./with-secrets reads: never committed.
+.env

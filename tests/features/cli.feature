@@ -72,6 +72,58 @@ Feature: Keeping a repository's shared files in step
     When I run pubkit "sync" "--check"
     Then it succeeds
 
+  Scenario: init writes a .gitignore that ignores .env
+    Given a repository initialised as "rust"
+    Then ".gitignore" holds the line ".env" once
+
+  Scenario: A .gitignore that doesn't ignore .env fails the check, and sync adds it to the rest
+    Given a repository initialised as "utility"
+    And the file ".gitignore" reads "/build/"
+    When I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions ".gitignore doesn't ignore .env"
+    When I run pubkit "sync"
+    Then it succeeds
+    And it prints "updated  .gitignore (now ignores .env)"
+    And ".gitignore" holds the line "/build/" once
+    And ".gitignore" holds the line ".env" once
+    When I run pubkit "sync" "--check"
+    Then it succeeds
+    When I run pubkit "sync"
+    Then it prints "already in step"
+    And ".gitignore" holds the line ".env" once
+
+  Scenario: sync adds .env on a line of its own after a last line with no newline
+    Given a repository initialised as "utility"
+    And the .gitignore ends without a newline after "/build/"
+    When I run pubkit "sync"
+    Then it succeeds
+    And ".gitignore" holds the line "/build/" once
+    And ".gitignore" holds the line ".env" once
+
+  Scenario: sync writes a .gitignore where there is none
+    Given a repository initialised as "utility"
+    And there is no ".gitignore"
+    When I run pubkit "sync"
+    Then it succeeds
+    And ".gitignore" holds the line ".env" once
+
+  Scenario Outline: A pattern that covers .env counts, and a later ! takes it back
+    Given a repository initialised as "utility"
+    And the .gitignore reads <lines>
+    When I run pubkit "sync" "--check"
+    Then it <result>
+
+    Examples:
+      | lines                 | result   |
+      | "/.env"               | succeeds |
+      | ".env*"               | succeeds |
+      | "**/.env"             | succeeds |
+      | ".env/"               | fails    |
+      | ".env" and "!.env"    | fails    |
+      | "!.env" and ".env"    | succeeds |
+      | ".envrc"              | fails    |
+
   Scenario: Seeded files are the repository's to change
     Given a repository initialised as "rust"
     And the file "Makefile" reads "include pubkit.mk"
