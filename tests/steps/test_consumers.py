@@ -124,8 +124,9 @@ def consumer_names(text: str) -> set[str]:
 
 @when("I scan pubkit deploy's files for consumers' names", target_fixture="names")
 def scan_deploy():
-    listed = subprocess.run(["git", "ls-files", "--others", "--cached", "--", *DEPLOY], cwd=ROOT, check=True,
-                            capture_output=True, text=True).stdout.split()
+    # What git tracks or would, so bytecode and other ignored files a run leaves behind do not count.
+    listed = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", *DEPLOY],
+                            cwd=ROOT, check=True, capture_output=True, text=True).stdout.split()
     assert any(name.startswith("src/pubkit/deploy/") for name in listed), listed
     return {(name, found) for name in listed
             for found in consumer_names((ROOT / name).read_text(encoding="utf-8", errors="ignore"))}
