@@ -1,10 +1,15 @@
 # Builds a service's image, pushes it to GitHub's container registry, renders its
 # kustomize overlays with that image and sends each to a k3s server over SSH, where
 # the deploy key can only run one program (a forced command) that applies what it
-# reads in the namespace its command names, and waits.
+# reads in the namespace its command names, and waits. It deploys a commit only once
+# the workflows `require` names have passed on it, and only while it is still the
+# head of the default branch, so a deploy never races the tests, nor an older commit
+# a newer one.
 #
-#   on: { push: { branches: [main] }, workflow_dispatch: {} }
-#   permissions: { contents: read, packages: write }
+#   on:
+#     workflow_run: { workflows: [main], types: [completed], branches: [main] }
+#     workflow_dispatch: {}
+#   permissions: { actions: read, contents: read, packages: write }
 #   jobs:
 #     deploy:
 #       uses: Sustenaut/pubkit/.github/workflows/k8s-deploy.yml@<commit> # vX.Y.Z
@@ -15,6 +20,13 @@
 #           k8s-other example-other DEPLOY_OTHER
 #         check: docker run --rm "$IMAGE" python -c 'import example.main'
 #       secrets: inherit
+#
+# Started by workflow_run, it deploys the commit that run tested, when the run passed
+# on a push to the default branch, and skips every job otherwise: a pull request's or
+# the merge queue's run never deploys. However it starts (workflow_run, a push, by
+# hand), the ready job waits, up to `wait` minutes, for the latest push run on that
+# commit of each workflow `require` names, and fails if one did not pass. A name
+# starting with ? is waited for only where the repository has that workflow.
 #
 # Each line of deploys is an overlay directory, the unit the server's program
 # deploys it as, and optionally a variable that must be "on" for that unit to
@@ -60,6 +72,14 @@ on:
         description: The environment the deploy job runs in.
         type: string
         default: server
+      require:
+        description: The workflows, by name and space-separated, that must have passed on a push of the commit before it deploys; a name starting with ? only where the repository has it.
+        type: string
+        default: main ?integrations
+      wait:
+        description: The minutes the ready job waits for those workflows to finish.
+        type: number
+        default: 30
     secrets:
       SUSTENAUT_DEPLOY_SSH_KEY:
         required: false
@@ -72,7 +92,79 @@ permissions:
   contents: read
 
 jobs:
+  # The commit to deploy, once every workflow require names has passed on it. A
+  # workflow_run that did not pass, or ran for a pull request, the merge queue or
+  # another branch, skips it, and every job after it.
+  ready:
+    if: >-
+      github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_branch == github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      sha: ${{ steps.passed.outputs.sha }}
+    steps:
+      - name: Wait for the commit's checks
+        id: passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REQUIRE: ${{ inputs.require }}
+          WAIT: ${{ inputs.wait }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || fail "no commit to deploy: '$SHA'"
+          [[ "$WAIT" =~ ^[0-9]+$ ]] || fail "wait: '$WAIT' is not a number of minutes"
+          known=$(gh api --paginate "repos/$REPO/actions/workflows" --jq '.workflows[].name')
+          read -r -a wanted <<<"$REQUIRE"
+          names=()
+          for name in "${wanted[@]}"; do
+            optional=false
+            if [[ "$name" == '?'* ]]; then optional=true; name=${name#'?'}; fi
+            if ! grep -qxF -- "$name" <<<"$known"; then
+              [[ "$optional" == true ]] || fail "require: $REPO has no workflow named $name"
+              echo "$REPO has no workflow named $name, so it is not waited for."
+              continue
+            fi
+            names+=("$name")
+          done
+          # A run is listed a moment after its push; one that has not started by
+          # then never will, as for a commit pushed nowhere the workflow runs.
+          deadline=$((SECONDS + WAIT * 60)) start=$((SECONDS + ${GRACE:-300}))
+          declare -A passed=()
+          while :; do
+            runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=push&per_page=100" --jq .workflow_runs)
+            pending=()
+            for name in "${names[@]}"; do
+              [[ -z "${passed[$name]:-}" ]] || continue
+              run=$(jq -c --arg name "$name" '[.[] | select(.name == $name)] | sort_by(.created_at) | last // empty' <<<"$runs")
+              if [[ -z "$run" ]]; then
+                (( SECONDS < start )) || fail "$name has not run on a push of $SHA: nothing deploys"
+                pending+=("$name"); continue
+              fi
+              IFS=$'\x1f' read -r status conclusion url < <(jq -r '[.status, .conclusion // "", .html_url] | join("\u001f")' <<<"$run")
+              if [[ "$status" != completed ]]; then
+                pending+=("$name")
+              elif [[ "$conclusion" != success ]]; then
+                fail "$name did not pass on $SHA ($conclusion): nothing deploys. $url"
+              else
+                passed[$name]=1
+                echo "$name passed on $SHA: $url"
+              fi
+            done
+            [[ ${#pending[@]} -gt 0 ]] || break
+            (( SECONDS < deadline )) || fail "waited $WAIT minutes for ${pending[*]} on $SHA: nothing deploys"
+            echo "Waiting for ${pending[*]} on $SHA."
+            sleep "${INTERVAL:-20}"
+          done
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: ready
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -81,7 +173,7 @@ jobs:
       deploys: ${{ steps.deploys.outputs.deploys }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with: { persist-credentials: false }
+        with: { ref: '${{ needs.ready.outputs.sha }}', persist-credentials: false }
 
       - name: Read the inputs
         id: deploys
@@ -108,19 +200,19 @@ jobs:
       - name: Build the image
         uses: Sustenaut/pubkit/actions/docker-build@0e5477594d4ce20e411721c86d40a6547f026db9 # v0.29.0
         with:
-          tags: ${{ inputs.image }}:${{ github.sha }}
+          tags: ${{ inputs.image }}:${{ needs.ready.outputs.sha }}
           scope: ${{ steps.deploys.outputs.scope }}
           build-args: ${{ inputs.build-args }}
 
       - name: Check the image
         if: inputs.check != ''
         env:
-          IMAGE: ${{ inputs.image }}:${{ github.sha }}
+          IMAGE: ${{ inputs.image }}:${{ needs.ready.outputs.sha }}
         run: ${{ inputs.check }}
 
       - name: Push the image
         env:
-          IMAGE: ${{ inputs.image }}:${{ github.sha }}
+          IMAGE: ${{ inputs.image }}:${{ needs.ready.outputs.sha }}
           TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: |
@@ -129,7 +221,7 @@ jobs:
 
   deploy:
     name: deploy ${{ matrix.unit }}
-    needs: build
+    needs: [ready, build]
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
@@ -143,13 +235,14 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with: { persist-credentials: false }
+        with: { ref: '${{ needs.ready.outputs.sha }}', persist-credentials: false }
 
       - name: Set the image
         working-directory: ${{ matrix.dir }}
         env:
           IMAGE: ${{ inputs.image }}
-        run: kustomize edit set image "${IMAGE}=${IMAGE}:${GITHUB_SHA}"
+          SHA: ${{ needs.ready.outputs.sha }}
+        run: kustomize edit set image "${IMAGE}=${IMAGE}:${SHA}"
 
       - name: Prepare the overlay
         if: inputs.render != ''
@@ -162,11 +255,15 @@ jobs:
         working-directory: ${{ matrix.dir }}
         env:
           IMAGE: ${{ inputs.image }}
+          SHA: ${{ needs.ready.outputs.sha }}
           OUT: ${{ runner.temp }}/${{ matrix.unit }}.yaml
         run: |
           kustomize build . > "$OUT"
-          grep -q "${IMAGE}:${GITHUB_SHA}" "$OUT" || { echo "::error::$OUT does not use ${IMAGE}:${GITHUB_SHA}"; exit 1; }
+          grep -q "${IMAGE}:${SHA}" "$OUT" || { echo "::error::$OUT does not use ${IMAGE}:${SHA}"; exit 1; }
 
+      # Inside the unit's concurrency group: a commit the default branch has moved
+      # on from is not deployed over a newer one, whose own run deploys it. A
+      # deploy by hand deploys the commit it is given.
       - name: Is it deployed?
         id: gate
         env:
@@ -174,11 +271,22 @@ jobs:
           UNIT: ${{ matrix.unit }}
           GATE: ${{ matrix.gate }}
           GATE_VALUE: ${{ matrix.gate != '' && vars[matrix.gate] || '' }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+          SHA: ${{ needs.ready.outputs.sha }}
         run: |
+          head=$SHA
+          if [[ "$EVENT" != workflow_dispatch ]]; then
+            head=$(gh api "repos/$REPO/branches/$BRANCH" --jq .commit.sha)
+          fi
           if [[ -z "$SERVER" ]]; then
             echo "::notice::SUSTENAUT_SERVER is not set: nothing is deployed"
           elif [[ -n "$GATE" && "$GATE_VALUE" != on ]]; then
             echo "::notice::$GATE is not on: $UNIT is not deployed"
+          elif [[ "$head" != "$SHA" ]]; then
+            echo "::notice::$BRANCH has moved on from $SHA to $head, which its own run deploys: $UNIT is not deployed"
           else
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
