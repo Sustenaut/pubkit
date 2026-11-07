@@ -209,12 +209,24 @@ def test_deploy_check_runs_whole(tmp_path, run):
     shutil.copytree(FIXTURE, root)
     bin_dir = tmp_path / "bin"
     program(bin_dir, "kustomize", f"print(open({str(root / 'rendered.yaml')!r}).read())")
-    zones = tmp_path / "zones.json"
+    zones = tmp_path / "infra" / "pubkit.json"
+    zones.parent.mkdir()
     shutil.move(root / "zones.json", zones)
     from conftest import pubkit  # noqa: PLC0415
     env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "PUBKIT_ANY_VERSION": "1"}
     done = run(pubkit(), "deploy", "check", "--offline", "--zones", str(zones), cwd=root, env=env)
     assert done.code == 0, done.describe()
     assert "ready   k8s.secrets-declared:example" in done.stdout
-    done = run(pubkit(), "deploy", "check", "--offline", "--zones", str(tmp_path / "gone.json"), cwd=root, env=env)
+    done = run(pubkit(), "deploy", "check", "--offline", "--zones", str(tmp_path / "gone" / "pubkit.json"),
+               cwd=root, env=env)
     assert done.code == 2 and "--zones" in done.stderr
+
+
+@pytest.mark.parametrize(("path", "why"), [("../infra/zones.json", "must be a repository's pubkit.json"),
+                                           ("/pubkit.json", "must be in the working directory")])
+def test_deploy_check_reads_only_a_pubkit_json_beside_the_repository(tmp_path, run, path, why):
+    root = tmp_path / "repo"
+    shutil.copytree(FIXTURE, root)
+    from conftest import pubkit  # noqa: PLC0415
+    done = run(pubkit(), "deploy", "check", "--offline", "--zones", path, cwd=root, env={"PUBKIT_ANY_VERSION": "1"})
+    assert done.code != 0 and why in done.stderr, done.describe()

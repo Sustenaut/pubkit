@@ -881,7 +881,8 @@ It reads the cluster through `kubectl` (`--kubectl CMD` for another, such as
 HTTPS, the DNS through `dig`, and Bitwarden only as `./with-secrets` gives
 it: a Bitwarden need is looked for by name in the environment, and is
 `unknown` outside with-secrets. It never prints a value: a secret is named,
-with its length and kind.
+with its length and kind. `--zones` reads only a file named `pubkit.json`, in
+this repository or a checkout beside it.
 
 `pubkit sync --check` checks the block too, and runs the offline walk: every
 Secret the manifests read must be one a need fills, with the keys they read,

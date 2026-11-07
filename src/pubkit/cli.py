@@ -660,7 +660,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--kubectl", default="kubectl",
                    help="the kubectl command, such as 'k3s kubectl --kubeconfig FILE'")
     p.add_argument("--zones", type=Path, metavar="PATH",
-                   help="a pubkit.json whose hosting block keeps the zone of the deploy's host")
+                   help="the pubkit.json, here or in a checkout beside this one, whose hosting block "
+                        "keeps the zone of the deploy's host")
     p.add_argument("--namespace", metavar="NS", help="another namespace than the block's, for a second overlay")
     deploy.add_parser("types", help="every need type pubkit and the installed packages offer, and its keys")
     p = commands.add_parser("required",
@@ -773,9 +774,13 @@ def main(argv: list[str] | None = None) -> int:
         return run_types()
     if args.command == "deploy":
         from .deploy import run_check
-        # --zones is read, not written, and is another repository's pubkit.json,
-        # so it may be outside this one.
-        return run_check(root, args.offline, args.json, args.kubectl, args.zones, args.namespace)
+        from .paths import confined
+        # --zones is another repository's pubkit.json, so it may be in a
+        # checkout beside this one: a pubkit.json in the parent directory's tree.
+        zones = confined(args.zones, "the --zones file", also=(root.parent,)) if args.zones else None
+        if zones is not None and zones.name != "pubkit.json":
+            sys.exit(f"pubkit: the --zones file ({args.zones}) must be a repository's pubkit.json")
+        return run_check(root, args.offline, args.json, args.kubectl, zones, args.namespace)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())
