@@ -28,8 +28,8 @@ NAMED = [re.compile(rf"github\.com[:/]({NAME}){END}"),
 ALWAYS = {"pubkit", "pubrel"}
 NEUTRAL = "example-org"
 # The owners of the actions, the tools (actionlint) and the registry pubkit's own files depend on.
-DEPENDENCIES = {"actions", "bitwarden", "docker", "google", "hashicorp", "pypa", "rhysd", "rust-lang", "SonarSource",
-                "tailscale"}
+DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google-github-actions", "hashicorp", "pypa",
+                "rhysd", "rust-lang", "SonarSource", "tailscale"}
 
 # pub is a pubkit tool, like pubrel, so `pubkit new` names where it comes from.
 # pubkit's own CI, which it does not ship to anyone, runs the integrations scan,

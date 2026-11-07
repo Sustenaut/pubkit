@@ -898,6 +898,61 @@ seconds (at most 10), `offline`, and `default_name`, `depends_on`, `check`
 and `fulfil`. One pubkit cannot use is left out with a warning. Checks only,
 for now: every type's `fulfil` waits for a later release.
 
+## Terraform from CI
+
+`terraform.yml` applies a Terraform stack from the default branch, as a
+Google account it gets through Workload Identity Federation, so no key is
+kept anywhere:
+
+```yaml
+name: terraform
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+permissions: { contents: read, id-token: write, pull-requests: read }
+jobs:
+  terraform:
+    uses: Sustenaut/pubkit/.github/workflows/terraform.yml@<commit> # vX.Y.Z
+    with:
+      terraform-dir: infra
+      workload-identity-provider: projects/123456789/locations/global/workloadIdentityPools/github/providers/github-terraform
+      service-account: terraform-example@example-project.iam.gserviceaccount.com
+    secrets: inherit
+```
+
+- Nothing runs until the repository variable `TERRAFORM_CI` is `on`, nor
+  for any ref but the default branch. A first job, outside any environment,
+  checks both.
+- The `terraform` job runs in the environment `environment` names
+  (`terraform`). Make it before `TERRAFORM_CI` is on, with its deployment
+  branches limited to the default branch: GitHub makes an environment it
+  does not find, open to every branch. GitHub Team allows that limit on a
+  private repository; required reviewers there need Enterprise, so merging
+  is what approves a change. Nothing runs for a pull request, so a pull
+  request's code never runs with the account's credentials: plan it from a
+  checkout first.
+- Google trusts the job by its OIDC token's subject,
+  `repo:OWNER/REPO:environment:terraform`, or
+  `repo:OWNER@OWNER_ID/REPO@REPO_ID:environment:terraform` where the
+  repository uses GitHub's immutable subjects (`gh api
+  repos/OWNER/REPO/actions/oidc/customization/sub` shows which): the
+  provider's condition and the account's `roles/iam.workloadIdentityUser`
+  binding need nothing else, and a workflow that runs outside the
+  environment gets no credentials.
+- It plans to a file and applies exactly that file, one run at a time
+  (concurrency group `terraform-<repository>`, never cancelled). The plan is
+  in the job's summary; the file never leaves the runner. A plan that
+  deletes anything, replacements included, is applied only when the pull
+  request merged as that commit has the label `terraform-destroy`; either
+  way the job lists what it deletes.
+- Every run starts with a fresh `terraform init` against the backend the
+  stack names.
+- With `secrets` (the default), each terraform command runs as
+  `./pubkit secrets run -- terraform -chdir=DIR ...`, with the environment's
+  secret `BWS_ACCESS_TOKEN`, so the stack gets what `./with-secrets` gives it
+  on a laptop. bws is the release's binary, checked against its sha256. With
+  `secrets: false` terraform runs plainly and no token is read.
+
 ## Caching a build
 
 A build that downloads slow-changing data, or makes many outputs one by

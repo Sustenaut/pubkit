@@ -143,15 +143,16 @@ jobs:
       - run: actions/deploy-static/test.sh
       - run: shellcheck actions/deploy-ssh/*.sh
       - run: actions/deploy-ssh/test.sh
-      # k8s-deploy.yml, which calls deploy-ssh, as GitHub and shellcheck read
-      # it. actionlint is the release's binary, checked against its sha256.
-      - name: actionlint k8s-deploy.yml
+      # k8s-deploy.yml, which calls deploy-ssh, and terraform.yml, as GitHub
+      # and shellcheck read them. actionlint is the release's binary, checked
+      # against its sha256.
+      - name: actionlint k8s-deploy.yml terraform.yml
         run: |
           curl -fsSLo "$RUNNER_TEMP/actionlint.tgz" \
             "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz"
           echo "${SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c
           tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" .github/workflows/k8s-deploy.yml
+          "$RUNNER_TEMP/actionlint" .github/workflows/k8s-deploy.yml .github/workflows/terraform.yml
         env:
           VERSION: 1.7.12
           SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
