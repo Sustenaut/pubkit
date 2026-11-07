@@ -91,6 +91,7 @@
         ".github/nightly/update.sh",
         ".github/workflows/ci.yml",
         ".github/workflows/job-tested.yml",
+        ".github/workflows/k8s-deploy.yml",
         ".github/workflows/nightly.yml",
         "Makefile",
         "actions/pr-label/",

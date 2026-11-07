@@ -30,6 +30,8 @@
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR --repos FILE [--rules FILE]
+    pubkit k8s preflight MANIFESTS --namespace NS [--kubectl CMD] [--offline]
+    pubkit k8s diagnose --namespace NS [--kubectl CMD] [--selector SEL]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -437,11 +439,17 @@ def main(argv: list[str] | None = None) -> int:
         # The same: everything after -- is the command, with its own options.
         from .secrets import main as secrets
         return secrets(given[1:])
+    if given[:1] == ["k8s"]:
+        # Its own parser, in a file a server can run without pubkit.
+        from .k8s import main as k8s
+        return k8s(given[1:])
     parser = argparse.ArgumentParser(prog="pubkit", description=__doc__.split("\n")[0])
     parser.add_argument("--version", action="version", version=f"pubkit {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("cache", help="keep what a build fetched or made, by pubkit.json's cache rules "
                                       "(pubkit cache --help)")
+    commands.add_parser("k8s", help="check the Secrets rendered manifests read before a deploy, or show "
+                                    "why a rollout failed (pubkit k8s --help)")
     commands.add_parser("secrets", help="run one command with with-secrets.json's Bitwarden secrets in its "
                                         "environment: secrets run [--cwd DIR] -- COMMAND")
     p = commands.add_parser("init", help="write the shared files into this repository")

@@ -682,12 +682,15 @@ the state itself.
 
 `k8s-deploy.yml` is a service's whole deploy workflow, for a server whose
 deploy key runs one program (a forced command) that applies the manifests it
-reads in the namespace its command names, and waits:
+reads in the namespace its command names, and waits. It deploys a commit only
+once the repository's CI has passed on it, never beside it:
 
 ```yaml
 name: deploy
-on: { push: { branches: [main] }, workflow_dispatch: {} }
-permissions: { contents: read, packages: write }
+on:
+  workflow_run: { workflows: [main], types: [completed], branches: [main] }
+  workflow_dispatch:
+permissions: { actions: read, contents: read, packages: write }
 jobs:
   deploy:
     uses: Sustenaut/pubkit/.github/workflows/k8s-deploy.yml@<commit> # vX.Y.Z
@@ -700,10 +703,21 @@ jobs:
     secrets: inherit
 ```
 
-- The `build` job builds `image`, tagged with the commit, with
-  `actions/docker-build` (its layer cache scoped to the image's name, and
-  `build-args`), runs `check` with the image in `IMAGE`, and only then pushes
-  it to GitHub's container registry with the job's token.
+- The `ready` job finds the commit and waits until it has passed. Started by
+  `workflow_run`, the commit is the one that run tested, and the run deploys
+  only when that run passed on a push to the default branch: a pull
+  request's or the merge queue's run of the same workflow skips every job.
+  However it starts, `ready` then waits, up to `wait` minutes (30), for the
+  latest push run on the commit of each workflow `require` names (`main
+  ?integrations`), and fails, naming it, if one did not pass. A name
+  starting with `?` is waited for only where the repository has such a
+  workflow, so `integrations` counts wherever there is one. `main` is the
+  workflow `pubkit sync` writes for pushes to main; a repository whose CI
+  is another workflow names it in `require`, and in `workflow_run`.
+- The `build` job checks out that commit and builds `image`, tagged with it,
+  with `actions/docker-build` (its layer cache scoped to the image's name,
+  and `build-args`), runs `check` with the image in `IMAGE`, and only then
+  pushes it to GitHub's container registry with the job's token.
 - The `deploy` job runs once for each line of `deploys`: an overlay
   directory, the unit the server's program deploys it as, and optionally a
   variable that must be `on` for that unit to deploy (one whose namespace and
@@ -713,6 +727,10 @@ jobs:
   `jq -r .NAME <<<"$VARS"`, say), renders it with `kustomize
   build`, and fails if the image is not in what it rendered. Every overlay is
   rendered on every run, so a broken one fails even while it is off.
+- A commit the default branch has moved on from is not deployed: the newer
+  commit's own run deploys it, so an older one never lands over it. A deploy
+  by hand (`workflow_dispatch`) deploys the commit it is given, once that
+  has passed.
 - It deploys with `actions/deploy-ssh`: the unit as the command, the rendered
   manifests as `input`, to `deploy@` the variable `SUSTENAUT_SERVER`, with the
   host key in the variable `SUSTENAUT_KNOWN_HOSTS` and the key in the secret
@@ -725,6 +743,52 @@ jobs:
   makes the environment on its first run if it is not there.
 - A unit deploys one run at a time (concurrency group `deploy-<unit>`), so the
   caller sets no concurrency group of its own with that name.
+
+`push: { branches: [main] }` still works in place of `workflow_run`: `ready`
+then holds a runner while it waits for CI. Either way the caller grants
+`actions: read`, with which `ready` reads the commit's runs.
+
+**Moving to it from 0.30.** In the deploy workflow, move the pin; replace
+`push` with the `workflow_run` above (on the CI workflow's name, `main` where
+`pubkit sync` writes it); and add `actions: read` to `permissions`. A
+repository without a `main` workflow also gives `require`. Nothing else
+changes: inputs, secrets and variables are as they were.
+
+**Checking the Secrets before anything is applied.** The runner sees no
+cluster, only the forced command, so the check runs there, on the manifests
+it reads, before it applies them: `pubkit k8s preflight` reads every Secret
+the pods use (env `secretKeyRef`, `envFrom`, secret and projected volumes,
+`imagePullSecrets`, of containers and init containers), each must be there
+with every key a reference names, unless it is `optional: true`, and a
+value of a known shape must have it. oauth2-proxy's cookie secret
+(`OAUTH2_PROXY_COOKIE_SECRET`, or `--cookie-secret` on oauth2-proxy's image)
+must be 16, 24 or 32 bytes as it is or after URL-safe base64 decoding, as
+oauth2-proxy itself requires; standard base64, with `+` or `/`, is named as
+the likely mistake. It fails in the seconds kubectl takes, naming the
+Secret, the key and what reads it, and never prints a value. `pubkit k8s
+diagnose` shows, for each pod that is not ready or restarted, its
+containers' state and last exit, its warning events and its last log
+lines (the crashed container's too).
+
+`src/pubkit/k8s.py` needs nothing of pubkit's, and PyYAML (which
+cloud-init brings) only for YAML, so a server installs that one file, pinned
+by the commit of a release and its sha256, and its deploy program calls it:
+
+```bash
+check() { python3 /usr/local/lib/pubkit/k8s.py "$@" --namespace "$app" \
+  --kubectl "/usr/local/bin/k3s kubectl --kubeconfig $cfg"; }
+check preflight "$manifests" || exit 1
+k apply -f "$manifests"
+for d in $(k get deployment -o name); do
+  k rollout status "$d" --timeout=3m || { check diagnose; exit 1; }
+done
+```
+
+The deploy identity needs `get` on `secrets` in its namespace for the
+preflight. It reads no more than it could before: it already makes pods
+that mount any Secret there, and reads their logs. Three minutes is enough
+for a rollout whose pods start within the app component's minute; a
+longer wait only delays the failure.
 
 Pin it like pubkit's other workflows, to the commit of the release your lock
 pins.

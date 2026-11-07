@@ -4,12 +4,15 @@ workflow parsed as GitHub reads it."""
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
+import pytest
 import yaml
-from pytest_bdd import parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("k8s.feature")
 
@@ -111,7 +114,7 @@ def build_job(workflow):
 @then("its deploy job runs once per unit, in the environment the caller names, one run at a time per unit")
 def deploy_job(workflow):
     job = workflow["data"]["jobs"]["deploy"]
-    assert job["needs"] == "build"
+    assert job["needs"] == ["ready", "build"]
     assert job["environment"] == "${{ inputs.environment }}"
     assert job["strategy"]["matrix"]["include"] == "${{ fromJSON(needs.build.outputs.deploys) }}"
     assert job["concurrency"] == {"group": "deploy-${{ matrix.unit }}", "cancel-in-progress": False}
@@ -142,3 +145,176 @@ def deploys(workflow):
     assert prepare["env"] == {"VARS": "${{ toJSON(vars) }}"} and prepare["run"] == "${{ inputs.render }}"
     render = next(s for s in steps(workflow, "deploy") if s.get("name") == "Render the manifests")
     assert render["env"]["OUT"] == with_["input"]
+
+
+READY = "${{ needs.ready.outputs.sha }}"
+
+
+@then("its ready job runs for a workflow_run only when that run passed on a push to the default branch")
+def ready_if(workflow):
+    condition = " ".join(workflow["data"]["jobs"]["ready"]["if"].split())
+    assert condition == ("github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success'"
+                         " && github.event.workflow_run.event == 'push'"
+                         " && github.event.workflow_run.head_branch == github.event.repository.default_branch)")
+
+
+@then("its build and deploy jobs need ready, and check out, tag and deploy the commit ready gives")
+def ready_sha(workflow):
+    jobs = workflow["data"]["jobs"]
+    assert jobs["build"]["needs"] == "ready" and "ready" in jobs["deploy"]["needs"]
+    for job in ("build", "deploy"):
+        checkout = step(workflow, job, "actions/checkout@")
+        assert checkout["with"]["ref"] == READY, job
+    build = step(workflow, "build", "Sustenaut/pubkit/actions/docker-build@")
+    assert build["with"]["tags"] == "${{ inputs.image }}:" + READY
+    for name in ("Check the image", "Push the image"):
+        s = next(s for s in steps(workflow, "build") if s.get("name") == name)
+        assert s["env"]["IMAGE"] == "${{ inputs.image }}:" + READY, name
+    for name in ("Set the image", "Render the manifests", "Is it deployed?"):
+        s = next(s for s in steps(workflow, "deploy") if s.get("name") == name)
+        assert s["env"]["SHA"] == READY, name
+    text = (WORKFLOW / "k8s-deploy.yml").read_text()
+    assert "GITHUB_SHA" not in text and text.count("github.sha") == 1  # ready's, outside a workflow_run
+
+
+@then("its ready job may read the repository's runs, and waits for main and, where there is one, integrations")
+def ready_reads(workflow):
+    data = workflow["data"]
+    assert data["jobs"]["ready"]["permissions"] == {"actions": "read", "contents": "read"}
+    inputs = data[True]["workflow_call"]["inputs"]  # YAML 1.1 reads "on" as true
+    assert inputs["require"]["default"] == "main ?integrations"
+    assert inputs["wait"]["default"] == 30
+
+
+# The ready job's and the deploy gate's scripts run as GitHub runs them,
+# against a fake gh answering from a JSON file: the repository's
+# workflows, the runs on the commit at each successive call, and the head
+# of its default branch.
+SHA = "a" * 40
+HEAD = "b" * 40
+FAKE_GH = f"""#!{sys.executable}
+import json, os, subprocess, sys
+state = json.load(open(os.environ["FAKE_GH"]))
+args = [a for a in sys.argv[2:] if a != "--paginate"]
+endpoint, jq = args[0], args[args.index("--jq") + 1]
+if endpoint.endswith("/actions/workflows"):
+    answer = {{"workflows": [{{"name": n}} for n in state["workflows"]]}}
+elif "/actions/runs?" in endpoint:
+    count = os.environ["FAKE_GH"] + ".count"
+    n = int(open(count).read()) if os.path.exists(count) else 0
+    open(count, "w").write(str(n + 1))
+    answer = {{"workflow_runs": state["runs"][min(n, len(state["runs"]) - 1)]}}
+elif "/branches/" in endpoint:
+    answer = {{"commit": {{"sha": state["head"]}}}}
+else:
+    sys.exit("fake gh: " + endpoint)
+sys.stdout.write(subprocess.run(["jq", "-r", jq], input=json.dumps(answer), capture_output=True,
+                                text=True, check=True).stdout)
+"""
+
+
+@pytest.fixture
+def gh(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "gh").write_text(FAKE_GH)
+    (bin_dir / "gh").chmod(0o755)
+    return {"workflows": [], "runs": [], "head": SHA, "bin": bin_dir}
+
+
+def runs(text):
+    """'"main" passed and "integrations" passed' as the runs on the commit."""
+    out = []
+    for part in text.split(" and "):
+        name, said = part.split('" ')
+        status, conclusion = {"passed": ("completed", "success"), "failed": ("completed", "failure"),
+                              "is running": ("in_progress", None)}[said]
+        out.append({"name": name.strip('"'), "status": status, "conclusion": conclusion,
+                    "created_at": "2026-11-07T00:00:00Z", "html_url": f"https://example.invalid/{name}"})
+    return out
+
+
+@given(parsers.parse('the repository\'s workflows are "{names}"'))
+def workflows(gh, names):
+    gh["workflows"] = names.split(", ")
+
+
+@given(parsers.parse("on the commit {said}"))
+def on_commit(gh, said):
+    gh["runs"].append(runs(said.removeprefix("only ")))
+
+
+@given(parsers.parse("then {said}"))
+def then_runs(gh, said):
+    gh["runs"].append(runs(said))
+
+
+@given("the default branch has moved on from the commit")
+def moved_on(gh):
+    gh["head"] = HEAD
+
+
+def script(job, name):
+    data = yaml.safe_load((WORKFLOW / "k8s-deploy.yml").read_text())
+    return next(s for s in data["jobs"][job]["steps"] if s.get("name") == name)["run"]
+
+
+def run_script(tmp_path, gh, text, env):
+    state = tmp_path / "gh.json"
+    state.write_text(json.dumps({k: v for k, v in gh.items() if k != "bin"}))
+    out = tmp_path / "output"
+    out.write_text("")
+    path = tmp_path / "step.sh"
+    path.write_text(text)
+    done = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", str(path)],
+                          capture_output=True, text=True, check=False, timeout=60,
+                          env={"PATH": f"{gh['bin']}:/usr/bin:/bin", "FAKE_GH": str(state),
+                               "GITHUB_OUTPUT": str(out), "GH_TOKEN": "t", "REPO": "example/service",
+                               **env})
+    return {"code": done.returncode, "stdout": done.stdout + done.stderr, "stderr": done.stderr,
+            "output": out.read_text()}
+
+
+class Result:
+    def __init__(self, done):
+        self.code, self.stdout, self.stderr, self.output = (
+            done["code"], done["stdout"], done["stderr"], done["output"])
+
+
+@when("ready runs for the commit", target_fixture="result")
+def ready_runs(tmp_path, gh):
+    return ready_requiring(tmp_path, gh, "main ?integrations")
+
+
+@when(parsers.parse('ready runs for the commit, requiring "{require}"'), target_fixture="result")
+def ready_requiring(tmp_path, gh, require):
+    (tmp_path / "gh.json.count").unlink(missing_ok=True)
+    return Result(run_script(tmp_path, gh, script("ready", "Wait for the commit's checks"),
+                             {"SHA": SHA, "REQUIRE": require, "WAIT": "1", "GRACE": "0", "INTERVAL": "0"}))
+
+
+@then("ready gives the commit")
+def gives(result):
+    assert result.output == f"sha={SHA}\n", result.output
+
+
+@then("ready gives no commit")
+def gives_none(result):
+    assert result.output == "", result.output
+
+
+@when(parsers.parse('the deploy gate runs for a "{event}"'), target_fixture="result")
+def gate_runs(tmp_path, gh, event):
+    return Result(run_script(tmp_path, gh, script("deploy", "Is it deployed?"),
+                             {"SERVER": "server.example", "UNIT": "example", "GATE": "", "GATE_VALUE": "",
+                              "EVENT": event, "BRANCH": "main", "SHA": SHA}))
+
+
+@then("the gate deploys")
+def deploys_now(result):
+    assert result.code == 0 and result.output == "deploy=true\n", result.stdout
+
+
+@then("the gate does not deploy")
+def does_not_deploy(result):
+    assert result.output == "", result.output
