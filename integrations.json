@@ -10,6 +10,7 @@
     {
       "plugin": "bitwarden.secrets",
       "paths": [
+        ".github/workflows/terraform.yml",
         "src/pubkit/bitwarden.py",
         "src/pubkit/github_app.py",
         "src/pubkit/secrets.py",
@@ -56,6 +57,7 @@
     {
       "plugin": "github.actions-oidc",
       "paths": [
+        ".github/workflows/terraform.yml",
         "src/pubkit/board_publish.py"
       ],
       "mode": "required"
@@ -93,6 +95,7 @@
         ".github/workflows/job-tested.yml",
         ".github/workflows/k8s-deploy.yml",
         ".github/workflows/nightly.yml",
+        ".github/workflows/terraform.yml",
         "Makefile",
         "actions/pr-label/",
         "src/pubkit/app_secrets.py",
@@ -104,6 +107,7 @@
     {
       "plugin": "google.cloud",
       "paths": [
+        ".github/workflows/terraform.yml",
         "src/pubkit/service_account_key.py",
         "terraform/cloud-run-access/",
         "terraform/cloud-run-service/",
