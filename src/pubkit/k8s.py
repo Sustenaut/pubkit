@@ -278,11 +278,19 @@ def pod(found: Found, spec: dict[str, Any], ns: str, workload: str) -> None:
         need(p.get("name"), f"imagePullSecrets of {workload}")
 
 
-class Cluster:
-    """Secrets read through kubectl, each once."""
+def run_kubectl(argv: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run one kubectl command line, as Cluster does unless given another way."""
+    return subprocess.run(argv, capture_output=True, text=True, timeout=TIMEOUT, check=False)
 
-    def __init__(self, kubectl: list[str]) -> None:
+
+class Cluster:
+    """Secrets read through kubectl, each once. `run` runs a command line and
+    returns its exit code, stdout and stderr, as subprocess.run does; another
+    program, such as a test, may answer in kubectl's place."""
+
+    def __init__(self, kubectl: list[str], run: Callable[[list[str]], Any] = run_kubectl) -> None:
         self.kubectl = kubectl
+        self.run = run
         self.read: dict[tuple[str, str], dict[str, bytes] | str | None] = {}
 
     def secret(self, ns: str, name: str) -> dict[str, bytes] | str | None:
@@ -294,8 +302,7 @@ class Cluster:
 
     def get(self, ns: str, name: str) -> dict[str, bytes] | str | None:
         try:
-            done = subprocess.run([*self.kubectl, "-n", ns, "get", "secret", name, "-o", "json"],
-                                  capture_output=True, text=True, timeout=TIMEOUT, check=False)
+            done = self.run([*self.kubectl, "-n", ns, "get", "secret", name, "-o", "json"])
         except (OSError, subprocess.TimeoutExpired) as error:
             return f"kubectl did not run: {error}"
         if done.returncode == 0:

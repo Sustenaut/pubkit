@@ -96,6 +96,7 @@
         "Makefile",
         "actions/pr-label/",
         "src/pubkit/app_secrets.py",
+        "src/pubkit/deploy/",
         "src/pubkit/nightly.py",
         "src/pubkit/protect.py"
       ],
@@ -172,7 +173,8 @@
       "plugin": "tailscale.tailnet",
       "paths": [
         ".github/workflows/k8s-deploy.yml",
-        "actions/deploy-ssh/"
+        "actions/deploy-ssh/",
+        "src/pubkit/deploy/implied.py"
       ],
       "mode": "required"
     }

@@ -1,0 +1,8 @@
+{
+  "kind": "utility",
+  "hosting": {
+    "zones": {
+      "example.eu": {"dns": ["dns"], "sites": {"example": {"provider": "server", "kind": "server", "server": "web"}}}
+    }
+  }
+}

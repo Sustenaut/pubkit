@@ -1,0 +1,86 @@
+# What `kustomize build k8s` prints for this overlay; the tests read this, and run no kustomize.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      containers:
+      - env:
+        - name: EXTRA
+          valueFrom:
+            secretKeyRef:
+              key: x
+              name: example-extra
+              optional: true
+        envFrom:
+        - secretRef:
+            name: example-app-env
+        image: ghcr.io/example/example-app
+        name: app
+        volumeMounts:
+        - mountPath: /files
+          name: files
+      volumes:
+      - name: files
+        secret:
+          items:
+          - key: token
+            path: token
+          secretName: example-files
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: example
+spec:
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      containers:
+      - args:
+        - --provider=oidc
+        env:
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: cookie-secret
+              name: example-page-secrets
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.12.0
+        name: oauth2-proxy
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: worker
+  namespace: example
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - env:
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: token
+                  name: example-files
+            image: ghcr.io/example/example-app
+            name: worker
+          restartPolicy: Never
+  schedule: 0 * * * *

@@ -1,0 +1,11 @@
+# The example service's deploy, as a consumer of k8s-deploy.yml writes it.
+name: deploy
+on:
+  workflow_run: { workflows: [main], types: [completed], branches: [main] }
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploys k8s when DEPLOY_EXAMPLE is on"

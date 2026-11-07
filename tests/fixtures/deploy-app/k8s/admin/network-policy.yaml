@@ -1,0 +1,11 @@
+# Applied by an admin, not by the deploy: what may reach the app.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: example-app
+  namespace: example
+spec:
+  podSelector: { matchLabels: { app: example } }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: proxy } }

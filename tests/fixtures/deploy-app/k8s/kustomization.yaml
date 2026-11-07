@@ -1,0 +1,6 @@
+# The example service: an app, the proxy in front of it, and a worker.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: example
+resources:
+  - app.yaml
