@@ -153,3 +153,23 @@ def lock_moves(repo):
 @then(parsers.parse('stdout does not mention "{text}"'))
 def stdout_lacks(result, text):
     assert text not in result.stdout, result.stdout
+
+
+@given(parsers.parse('there is no "{path}"'))
+def no_file(repo, path):
+    (repo / path).unlink(missing_ok=True)
+
+
+@given(parsers.re(r'the \.gitignore reads (?P<lines>(?:"[^"]*"(?: and )?)+)'))
+def gitignore_reads(repo, lines):
+    (repo / ".gitignore").write_text("".join(f"{line}\n" for line in lines.strip('"').split('" and "')))
+
+
+@then(parsers.parse('"{path}" holds the line "{line}" once'))
+def holds_line_once(repo, path, line):
+    assert (repo / path).read_text().splitlines().count(line) == 1
+
+
+@given(parsers.parse('the .gitignore ends without a newline after "{line}"'))
+def gitignore_unterminated(repo, line):
+    (repo / ".gitignore").write_text(line)

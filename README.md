@@ -51,6 +51,7 @@ Files are **managed**, owned by pubkit and rewritten by `sync`, or
 
 - **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel), `pubkit` (below), and `AGENTS.md`, the working rules agents and people follow in every repository, starting with when a pull request is draft (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a service, `with-secrets`.
 - **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, for a Rust package a `Makefile` that includes `pubkit.mk`, and for a service `with-secrets.json`.
+- **Healed:** `.gitignore` is the repository's own, but it must ignore `.env`, where local tools read secrets (`./with-secrets` its Bitwarden token). `init` and `sync` append `.env` when it's missing, with a comment above it, and leave the rest of the file as it is; `sync --check` fails until it's there. A pattern that already covers it, such as `/.env` or `.env*`, counts, and a later `!.env` takes it back.
 
 Extensions go in the seeded files, so nothing managed is ever edited by
 hand. `sync --check` also fails when `tests/requirements.lock` pins another
