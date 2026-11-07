@@ -204,15 +204,16 @@ def write(tmp_path, cluster, manifests) -> Path:
 def preflight(tmp_path, run, cluster, manifests, ns):
     path = write(tmp_path, cluster, manifests)
     from conftest import pubkit  # noqa: PLC0415
-    return run(pubkit(), "k8s", "preflight", str(path), "--namespace", ns, "--kubectl", cluster["kubectl"])
+    return run(pubkit(), "k8s", "preflight", "--namespace", ns, "--kubectl", cluster["kubectl"],
+               stdin=path.read_text())
 
 
 @when("I preflight the sample offline", target_fixture="result")
 def preflight_offline(tmp_path, run, cluster, manifests):
     path = write(tmp_path, cluster, manifests)
     from conftest import pubkit  # noqa: PLC0415
-    return run(pubkit(), "k8s", "preflight", str(path), "--namespace", "example", "--offline",
-               "--kubectl", cluster["kubectl"])
+    return run(pubkit(), "k8s", "preflight", "--namespace", "example", "--offline",
+               "--kubectl", cluster["kubectl"], stdin=path.read_text())
 
 
 @when("I run the preflight's file alone, offline", target_fixture="result")
@@ -221,7 +222,7 @@ def file_alone(tmp_path, run, cluster, manifests):
     alone = tmp_path / "alone"
     alone.mkdir()
     shutil.copy(SOURCE, alone / "k8s.py")
-    return run(sys.executable, "-I", str(alone / "k8s.py"), "preflight", "-", "--namespace", "example",
+    return run(sys.executable, "-I", str(alone / "k8s.py"), "preflight", "--namespace", "example",
                "--offline", stdin=path.read_text(), cwd=alone)
 
 

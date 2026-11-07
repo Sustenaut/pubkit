@@ -2,12 +2,12 @@
 Kubernetes checks before it applies anything, and what it shows when a
 rollout fails.
 
-    pubkit k8s preflight MANIFESTS --namespace NS [--kubectl CMD] [--offline]
+    pubkit k8s preflight --namespace NS [--kubectl CMD] [--offline] < MANIFESTS
     pubkit k8s diagnose --namespace NS [--kubectl CMD] [--selector SEL] [--tail N]
 
-`preflight` reads rendered manifests (YAML, or JSON where PyYAML is not
-installed; `-` is standard input) and collects every Secret their pods
-use: env secretKeyRef, envFrom secretRef, secret and projected secret
+`preflight` reads rendered manifests on standard input, and opens no
+file: YAML, or JSON where PyYAML is not installed. It collects every
+Secret their pods use: env secretKeyRef, envFrom secretRef, secret and projected secret
 volumes (with the keys their items name), and imagePullSecrets, of every
 container and init container of a Pod, Deployment, StatefulSet,
 DaemonSet, ReplicaSet, Job or CronJob. A reference marked `optional: true`
@@ -36,7 +36,7 @@ its logs (the previous container's too, after a restart).
 `kubectl` is `kubectl` unless --kubectl gives another command, such as
 `k3s kubectl --kubeconfig FILE`. The file needs nothing of pubkit's, and
 PyYAML only for YAML, so a server's deploy program can run it as it is:
-`python3 k8s.py preflight - --namespace NS --kubectl '...'`.
+`python3 k8s.py preflight --namespace NS --kubectl '...' < manifests`.
 """
 
 from __future__ import annotations
@@ -441,9 +441,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pubkit k8s", description="Check the Secrets rendered manifests "
                                      "read before a deploy, or show why a rollout failed.")
     commands = parser.add_subparsers(dest="command", required=True)
-    p = commands.add_parser("preflight", help="every Secret the manifests read is there, with its "
-                                              "keys, and values of a known shape have it")
-    p.add_argument("manifests", help="the rendered manifests, or - for standard input")
+    p = commands.add_parser("preflight", help="every Secret the manifests on standard input read is "
+                                              "there, with its keys, and values of a known shape have it")
     p.add_argument("--offline", action="store_true",
                    help="read no cluster: list what is needed, and check what the manifests hold")
     p = commands.add_parser("diagnose", help="what is wrong with the pods that are not ready")
@@ -459,12 +458,7 @@ def main(argv: list[str] | None = None) -> int:
     kubectl = shlex.split(args.kubectl)
     if args.command == "diagnose":
         return diagnose(kubectl, args.namespace, args.selector, args.tail)
-    if args.manifests == "-":
-        text = sys.stdin.read()
-    else:
-        with open(args.manifests, encoding="utf-8") as f:
-            text = f.read()
-    return preflight(text, args.namespace, None if args.offline else Cluster(kubectl))
+    return preflight(sys.stdin.read(), args.namespace, None if args.offline else Cluster(kubectl))
 
 
 if __name__ == "__main__":

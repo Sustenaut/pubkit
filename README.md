@@ -777,7 +777,7 @@ by the commit of a release and its sha256, and its deploy program calls it:
 ```bash
 check() { python3 /usr/local/lib/pubkit/k8s.py "$@" --namespace "$app" \
   --kubectl "/usr/local/bin/k3s kubectl --kubeconfig $cfg"; }
-check preflight "$manifests" || exit 1
+check preflight < "$manifests" || exit 1
 k apply -f "$manifests"
 for d in $(k get deployment -o name); do
   k rollout status "$d" --timeout=3m || { check diagnose; exit 1; }

@@ -30,7 +30,7 @@
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR --repos FILE [--rules FILE]
-    pubkit k8s preflight MANIFESTS --namespace NS [--kubectl CMD] [--offline]
+    pubkit k8s preflight --namespace NS [--kubectl CMD] [--offline] < MANIFESTS
     pubkit k8s diagnose --namespace NS [--kubectl CMD] [--selector SEL]
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
