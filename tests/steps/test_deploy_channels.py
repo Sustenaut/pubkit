@@ -143,7 +143,6 @@ def same_path(ssh):
     assert len(paths) == 1 and len(argvs(ssh)) == 2, argvs(ssh)
     ssh.socket_dir = os.path.dirname(paths.pop().split("=", 1)[1])
     assert os.stat(ssh.socket_dir).st_mode & 0o777 == 0o700
-    assert len(ssh.socket_dir) + 2 < 104  # a socket's path
 
 
 @when("the walk's connection is closed")

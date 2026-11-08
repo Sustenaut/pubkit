@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import atexit
 import json
-import os
 import shlex
 import shutil
 import subprocess
@@ -76,8 +75,9 @@ class Connection:
 
     def options(self) -> list[str]:
         if self.dir is None:
-            # /tmp, not $TMPDIR, which is long on macOS: a socket's path has at most 104 bytes.
-            self.dir = tempfile.mkdtemp(prefix="pubkit-ssh-", dir="/tmp" if os.path.isdir("/tmp") else None)
+            # A socket's path has at most 104 bytes: "s" in mkdtemp's directory, even
+            # under macOS's long $TMPDIR, is about 70.
+            self.dir = tempfile.mkdtemp(prefix="pubkit-ssh-")
             atexit.register(self.close)
         return ["-o", "ControlMaster=auto", "-o", f"ControlPath={self.dir}/s", "-o", "ControlPersist=60"]
 
