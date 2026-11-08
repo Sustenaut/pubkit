@@ -17,7 +17,7 @@ from typing import Any
 
 from ...protect import ApiError
 from ..model import Context, Need, Result
-from . import Base, github_refused, kubectl_json, kubectl_refused, schema
+from . import Base, at_once, github_refused, kubectl_json, kubectl_refused, schema
 from .github import GITHUB_NAME, NO_ORIGIN, gate_value
 
 LAST = ("deploy.rollout", "service.health")
@@ -108,7 +108,8 @@ class Rollout(Base):
     every Deployment in the namespace has its replicas ready."""
     type = "deploy.rollout"
     grade = "auto"
-    budget = 5.0
+    # Two GitHub calls, then three at once, at about 0.6 s each, and a kubectl call.
+    budget = 8.0
     fulfil_budget = 900.0
     singleton = True
 
@@ -145,11 +146,10 @@ class Rollout(Base):
         try:
             branch = (ctx.gh("GET", f"repos/{ctx.slug}", None) or {}).get("default_branch", "main")
             head = ((ctx.gh("GET", f"repos/{ctx.slug}/branches/{branch}", None) or {}).get("commit") or {}).get("sha", "")
-            runs = []
-            for event in ("push", "workflow_run", "workflow_dispatch"):
-                found = ctx.gh("GET", f"repos/{ctx.slug}/actions/workflows/{workflow}/runs"
-                                      f"?branch={branch}&event={event}&per_page=1", None) or {}
-                runs += found.get("workflow_runs") or []
+            listings = at_once(ctx.gh, [("GET", f"repos/{ctx.slug}/actions/workflows/{workflow}/runs"
+                                                       f"?branch={branch}&event={event}&per_page=1", None)
+                                                for event in ("push", "workflow_run", "workflow_dispatch")])
+            runs = [r for found in listings for r in (found or {}).get("workflow_runs") or []]
         except ApiError as e:
             if e.status == 404:
                 return Result("missing", f"{workflow} is not a workflow of {ctx.slug}", fixable=False,

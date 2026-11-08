@@ -930,7 +930,10 @@ run). It visits the needs in order again: each missing one whose grade is
 auto, whose dependencies are ready, is fulfilled and checked again, and
 that check is its result, `fulfilled`. A fulfil that fails leaves the need
 as it was, with why, and the walk goes on with what does not wait for it.
-A propose need is never acted on: its fix is the change to make, such as
+A Secret that is ready by its keys is made again, and what reads it
+restarted, when the walk makes a new value of a need it is made from, such
+as a generated secret that was misshapen: otherwise Bitwarden and the
+cluster would differ. A propose need is never acted on: its fix is the change to make, such as
 the JSON entry and the file it goes in; a human one's is the step. What auto
 does, type by type:
 
@@ -956,7 +959,11 @@ terminal, asks for none, and those needs are unknown, saying so.
 
 The channels: with `--server HOST` (or `SUSTENAUT_SERVER`) and no
 `--kubectl`, kubectl is `ssh root@HOST k3s kubectl`, and a command can run
-on the server: the admin channel, everything a fulfil does. `--kubectl 'ssh
+on the server: the admin channel, everything a fulfil does. Every command
+goes over one SSH connection the walk opens before its first check and
+closes at its end (ssh's `ControlMaster`, its socket in a directory only
+the user may enter): a new connection over a tailnet takes about a second,
+longer than a check's budget. `--kubectl 'ssh
 -i KEY deploy@HOST {unit} kubectl-read'` is the server's read-only verb, a
 JSON line a call over one connection, in the unit's namespace (`{unit}`):
 every write is unknown there, the namespace is judged on the admin channel

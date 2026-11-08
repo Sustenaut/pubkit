@@ -112,9 +112,50 @@ def argvs(ssh) -> list[list[str]]:
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
-@then(parsers.parse('ssh was run as "{base}" and the line "{line}"'))
+CONTROL = ("ControlMaster=auto", "ControlPath=", "ControlPersist=60")
+
+
+def without_control(argv: list[str]) -> tuple[list[str], list[str]]:
+    """The argv without its -o Control... options, and those options."""
+    kept, options, k = [], [], 0
+    while k < len(argv):
+        if argv[k] == "-o" and k + 1 < len(argv) and argv[k + 1].startswith("Control"):
+            options.append(argv[k + 1])
+            k += 2
+            continue
+        kept.append(argv[k])
+        k += 1
+    return kept, options
+
+
+@then(parsers.parse('ssh was run as "{base}", over the walk\'s connection, and the line "{line}"'))
 def ran_as(ssh, base, line):
-    assert argvs(ssh) == [[*base.split()[1:], line]], argvs(ssh)
+    (argv,) = argvs(ssh)
+    kept, options = without_control(argv)
+    assert kept == [*base.split()[1:], line], argv
+    assert [o.split("=")[0] for o in options] == [c.split("=")[0] for c in CONTROL], options
+
+
+@then("both commands named the same ControlPath, in a directory of mode 0700")
+def same_path(ssh):
+    import os  # noqa: PLC0415
+    paths = {o for argv in argvs(ssh) for o in without_control(argv)[1] if o.startswith("ControlPath=")}
+    assert len(paths) == 1 and len(argvs(ssh)) == 2, argvs(ssh)
+    ssh.socket_dir = os.path.dirname(paths.pop().split("=", 1)[1])
+    assert os.stat(ssh.socket_dir).st_mode & 0o777 == 0o700
+    assert len(ssh.socket_dir) + 2 < 104  # a socket's path
+
+
+@when("the walk's connection is closed")
+def close_connection(ssh):
+    ssh.made.connection.close()
+
+
+@then("ssh was asked to close it, and its directory is gone")
+def closed(ssh):
+    import os  # noqa: PLC0415
+    assert argvs(ssh)[-1][-3:-1] == ["-O", "exit"], argvs(ssh)[-1]
+    assert not os.path.exists(ssh.socket_dir)
 
 
 @then("the value came on ssh's standard input, and in no argv")

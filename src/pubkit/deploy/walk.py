@@ -151,6 +151,14 @@ def walk(needs: Mapping[str, Need], types: Mapping[str, NeedType], ctx: Context,
     return journal
 
 
+def refilled(kind: NeedType, need: Need, ctx: Context, among: set[str]) -> list[str]:
+    """The needs among `among` whose value this need is made from: a Secret
+    ready by its keys still holds the value a filler had before this walk
+    made a new one, so it is made again from the new one."""
+    made_from = getattr(kind, "made_from", None)
+    return [i for i in made_from(need, ctx) if i in among] if callable(made_from) else []
+
+
 def planned(journal: Journal, types: Mapping[str, NeedType], ctx: Context,
             token_coming: bool = False) -> list[tuple[str, str]]:
     """The needs fulfil acts on, in walk order, each with its plan's line.
@@ -161,6 +169,11 @@ def planned(journal: Journal, types: Mapping[str, NeedType], ctx: Context,
     out = []
     for need, result in journal.entries:
         kind = types[need.type]
+        changed = refilled(kind, need, ctx, {i for i, _ in out}) if result.state == "ready" else []
+        if (changed and grade_of(kind, need) == "auto" and result.fixable
+                and not lacking(kind, need, ctx, token_coming)):
+            out.append((need.id, f"{action(kind, need, ctx)}, again: {changed[0]} changes"))
+            continue
         if (result.state not in ACTING or not result.fixable or grade_of(kind, need) != "auto"
                 or lacking(kind, need, ctx, token_coming) or not waits[need.id] <= expected):
             continue
@@ -211,8 +224,13 @@ def fulfil(journal: Journal, types: Mapping[str, NeedType], ctx: Context, approv
         need, kind = ctx.needs[i], types[ctx.needs[i].type]
         result = ctx.results[i]
         if result.state == "ready":
-            continue
-        if waits[i] & done:
+            changed = refilled(kind, need, ctx, done) if i in approved else []
+            if not changed:
+                continue
+            result = Result("drift", f"{result.summary}, made before this walk changed {changed[0]}",
+                            result.fix, result.details, result.checked_at, result.seconds, fixable=True)
+            keep(i, result)
+        elif waits[i] & done:
             result = checked(kind, need, ctx, waits[i], order)
             keep(i, result)
         grade = grade_of(kind, need)
