@@ -1,7 +1,8 @@
 Feature: How a walk reaches the cluster and the server
   The admin channel is ssh root@HOST, from --server or SUSTENAUT_SERVER:
   kubectl is `k3s kubectl` there, and a command runs there, its arguments
-  one quoted line, what is secret on its standard input. The deploy channel
+  one quoted line, what is secret on its standard input, every command over
+  one SSH connection the walk keeps. The deploy channel
   is the server's read-only verb, one JSON line a call over one connection,
   in the unit's own namespace. A kubeconfig's kubectl is plain, and the plane
   is in-cluster. Here ssh is a stand-in that keeps what it was given.
@@ -25,15 +26,24 @@ Feature: How a walk reaches the cluster and the server
     Given the walk is given --server "server.example.eu"
     When I make the channels for the namespace "example"
     And kubectl applies a Secret manifest holding a value
-    Then ssh was run as "ssh -o BatchMode=yes root@server.example.eu" and the line "k3s kubectl -n example apply -f -"
+    Then ssh was run as "ssh -o BatchMode=yes root@server.example.eu", over the walk's connection, and the line "k3s kubectl -n example apply -f -"
     And the value came on ssh's standard input, and in no argv
 
   Scenario: A command on the server is quoted as one line
     Given the walk is given --server "server.example.eu"
     When I make the channels for the namespace "example"
     And the server runs "python3 -I - --name 'example.eu team sites'" with a script on its standard input
-    Then ssh was run as "ssh -o BatchMode=yes root@server.example.eu" and the line "python3 -I - --name 'example.eu team sites'"
+    Then ssh was run as "ssh -o BatchMode=yes root@server.example.eu", over the walk's connection, and the line "python3 -I - --name 'example.eu team sites'"
     And the value came on ssh's standard input, and in no argv
+
+  Scenario: The admin channel keeps one connection, in a directory only this user may enter, and closes it
+    Given the walk is given --server "server.example.eu"
+    When I make the channels for the namespace "example"
+    And the server runs "true" with a script on its standard input
+    And the server runs "true" with a script on its standard input
+    Then both commands named the same ControlPath, in a directory of mode 0700
+    When the walk's connection is closed
+    Then ssh was asked to close it, and its directory is gone
 
   Scenario: The deploy channel sends each call as a JSON line in the unit's namespace, over one connection
     Given the walk is given --kubectl "ssh -i key deploy@server.example.eu {unit} kubectl-read"

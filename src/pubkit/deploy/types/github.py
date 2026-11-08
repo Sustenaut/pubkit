@@ -18,7 +18,7 @@ from ...app_secrets import env_name
 from ...protect import ApiError
 from ..implied import DEPLOY_SETTINGS
 from ..model import Context, Need, Result
-from . import Base, github_refused, schema
+from . import Base, at_once, github_refused, schema
 
 GITHUB_NAME = {"type": "string", "pattern": r"^(?!GITHUB_)[A-Z_][A-Z0-9_]*$",
                "x-phrase": "must be upper case letters, digits and _, not starting GITHUB_"}
@@ -158,19 +158,21 @@ class DeploySettings(Base):
     schema = schema({"environment": ENVIRONMENT})
 
     def missing(self, need: Need, ctx: Context) -> tuple[list[str], Result | None]:
+        """The settings set nowhere. The four listings are asked at once, as
+        one after another overran the budget."""
         env = need.params.get("environment", SERVER_ENVIRONMENT)
         held: set[tuple[str, str]] = set()
-        for kind in ("secret", "variable"):
-            for scope in (f"repos/{ctx.slug}/actions", f"repos/{ctx.slug}/environments/{env}"):
-                listing = f"{scope}/{kind}s?per_page={100 if kind == 'secret' else 30}"
-                try:
-                    found = ctx.gh("GET", listing, None) or {}
-                except ApiError as e:
-                    if e.status == 404 and "environments" in scope:
-                        continue
-                    return [], github_refused(e, f"the {kind}s of {ctx.slug}")
-                held |= {(kind, str(item.get("name"))) for item in found.get(f"{kind}s") or []
-                         if isinstance(item, dict)}
+        asked = [(kind, scope) for kind in ("secret", "variable")
+                 for scope in (f"repos/{ctx.slug}/actions", f"repos/{ctx.slug}/environments/{env}")]
+        answers = at_once(ctx.gh, [("GET", f"{scope}/{kind}s?per_page={100 if kind == 'secret' else 30}", None)
+                                   for kind, scope in asked], keep_errors=True)
+        for (kind, scope), found in zip(asked, answers):
+            if isinstance(found, ApiError):
+                if found.status == 404 and "environments" in scope:
+                    continue
+                return [], github_refused(found, f"the {kind}s of {ctx.slug}")
+            held |= {(kind, str(item.get("name"))) for item in (found or {}).get(f"{kind}s") or []
+                     if isinstance(item, dict)}
         return [name for name, kind in DEPLOY_SETTINGS.items() if (kind, name) not in held], None
 
     def action(self, need: Need, ctx: Context) -> str:

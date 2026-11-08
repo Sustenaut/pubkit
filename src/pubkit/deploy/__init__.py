@@ -209,6 +209,8 @@ def context(root: Path, config: dict[str, Any], offline: bool, kubectl_command: 
     block = unit_block(config[BLOCK], unit)
     ns = namespace or block["namespace"]
     reach = channels(kubectl_command, server, os.environ, ns)
+    if reach.connection is not None and not offline:
+        reach.connection.open()  # a failure shows in the first check that uses it
     return Context(root=root, config=config, block=block, namespace=ns, kubectl=reach.kubectl,
                    server=reach.server, channel=reach.name, gh=gh, send=send, http_get=http_get, env=os.environ,
                    now=lambda: datetime.now(UTC), rendered=renderer(root, block.get("overlay", DEFAULT_OVERLAY)),

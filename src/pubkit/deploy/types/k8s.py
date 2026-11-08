@@ -59,7 +59,9 @@ class Namespace(Base):
     server's sustenaut-app program makes them."""
     type = "k8s.namespace"
     grade = "auto"
-    budget = 2.0
+    # Four kubectl calls: over the admin channel's kept connection about 0.35 s
+    # each, as measured to the k3s server over the tailnet.
+    budget = 4.0
     fulfil_budget = 60.0
     singleton = True
     needs_of_context = ("server",)
@@ -111,6 +113,10 @@ class Secret(Base):
     def fillers(self, need: Need, ctx: Context) -> list[Need]:
         """The needs whose secret fills this Secret, in the plan."""
         return [n for n in ctx.needs.values() if (secret_of(n) or {}).get("name") == need.name]
+
+    def made_from(self, need: Need, ctx: Context) -> list[str]:
+        """The needs it is made from: when a fulfil changes one's value, the walk makes it again."""
+        return [n.id for n in self.fillers(need, ctx)]
 
     def action(self, need: Need, ctx: Context) -> str:
         sources = ", ".join(n.id for n in self.fillers(need, ctx))

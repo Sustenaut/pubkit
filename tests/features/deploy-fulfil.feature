@@ -73,6 +73,21 @@ Feature: pubkit deploy walk --fulfil makes what is missing, once the plan is con
     And the cluster's Secret "example-page-secrets" holds what Bitwarden was given for "example-cookie-secret" as "cookie-secret"
     And it prints "restarted Deployment/proxy, which reads Secret example-page-secrets"
 
+  Scenario: A Secret ready by its keys is made again when the walk changes a value it is made from
+    Given Bitwarden's "example-cookie-secret" is 20 bytes
+    When I run pubkit "deploy" "walk" "--fulfil" "--yes"
+    Then it succeeds
+    And stderr mentions "k8s.secret:example-page-secrets: apply Secret example-page-secrets in example from bitwarden.generated:example-cookie-secret, and restart what reads it, again: bitwarden.generated:example-cookie-secret changes"
+    And "bitwarden.generated:example-cookie-secret" is ready, "(fulfilled)"
+    And "k8s.secret:example-page-secrets" is ready, "(fulfilled)"
+    And the cluster's Secret "example-page-secrets" holds what Bitwarden was given for "example-cookie-secret" as "cookie-secret"
+    And it prints "restarted Deployment/proxy, which reads Secret example-page-secrets"
+
+  Scenario: A Secret whose values the walk did not change is left alone
+    When I run pubkit "deploy" "walk" "--fulfil" "--yes"
+    Then it succeeds
+    And kubectl was given nothing to write
+
   Scenario Outline: Without a terminal no token is asked for, and the needs that want one are unknown
     Given Bitwarden has no "example-cookie-secret"
     And the Secret "example-page-secrets" is not in the cluster

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ...protect import ApiError
@@ -148,6 +149,22 @@ def kubectl_refused(ran: Ran, ns: str, what: str) -> Result:
         return Result("unknown", f"kubectl may not read {what} in {ns}",
                       fix=f"use a kubeconfig that may get {what} in {ns} ({last})")
     return Result("unknown", f"kubectl could not read {what} in {ns}", fix=f"kubectl said: {last}")
+
+
+def at_once(gh: Callable[..., Any], calls: list[tuple[str, str, Any]], keep_errors: bool = False) -> list[Any]:
+    """GitHub calls asked together, each `gh api` its own process, and their
+    answers in order: a check that asks several one after another overruns
+    its budget at about 0.6 s a call. A refusal is raised, or, with
+    `keep_errors`, is that call's answer."""
+    def one(call: tuple[str, str, Any]) -> Any:
+        try:
+            return gh(*call)
+        except ApiError as e:
+            if keep_errors:
+                return e
+            raise
+    with ThreadPoolExecutor(max_workers=max(1, len(calls))) as pool:
+        return list(pool.map(one, calls))
 
 
 def github_refused(error: ApiError, what: str) -> Result:

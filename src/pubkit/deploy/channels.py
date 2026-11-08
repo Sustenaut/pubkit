@@ -2,7 +2,11 @@
 
     admin    --server HOST, or SUSTENAUT_SERVER, and no --kubectl: kubectl is
              `ssh root@HOST k3s kubectl`, and a command on the server `ssh
-             root@HOST`. Everything a fulfil does it may do.
+             root@HOST`. Everything a fulfil does it may do. Every command
+             goes over one SSH connection the walk keeps (ssh's ControlMaster,
+             its socket in a directory only this user may enter), opened
+             before the first check: a new connection over the tailnet takes
+             about a second, longer than some checks' budgets.
     deploy   --kubectl naming the server's read-only verb, `ssh ... deploy@HOST
              UNIT kubectl-read` ({unit} in it is each unit's namespace): reads
              only, so every write fulfil is unknown, and nothing runs on the server.
@@ -23,9 +27,12 @@ namespace, so the client moves a leading `-n NS` out of the arguments.
 
 from __future__ import annotations
 
+import atexit
 import json
 import shlex
+import shutil
 import subprocess
+import tempfile
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -56,19 +63,48 @@ def plain(command: str) -> Kubectl:
     return kubectl
 
 
-def ssh(host: str) -> list[str]:
-    return ["ssh", "-o", "BatchMode=yes", f"root@{host}"]
+class Connection:
+    """root@HOST over one SSH connection: the first command opens it, and
+    each after it starts in about 0.1 s. The socket is in a directory of its
+    own, made 0700, and the connection is closed when the walk ends. The
+    path stays short, as a socket's must."""
+
+    def __init__(self, host: str) -> None:
+        self.host = host
+        self.dir: str | None = None
+
+    def options(self) -> list[str]:
+        if self.dir is None:
+            # A socket's path has at most 104 bytes: "s" in mkdtemp's directory, even
+            # under macOS's long $TMPDIR, is about 70.
+            self.dir = tempfile.mkdtemp(prefix="pubkit-ssh-")
+            atexit.register(self.close)
+        return ["-o", "ControlMaster=auto", "-o", f"ControlPath={self.dir}/s", "-o", "ControlPersist=60"]
+
+    def argv(self) -> list[str]:
+        return ["ssh", "-o", "BatchMode=yes", *self.options(), f"root@{self.host}"]
+
+    def open(self) -> Ran:
+        """The connection, opened now, outside any check's budget."""
+        return run([*self.argv(), "true"])
+
+    def close(self) -> None:
+        if self.dir is None:
+            return
+        run(["ssh", "-o", f"ControlPath={self.dir}/s", "-O", "exit", f"root@{self.host}"], timeout=5)
+        shutil.rmtree(self.dir, ignore_errors=True)
+        self.dir = None
 
 
-def admin_server(host: str) -> Server:
+def admin_server(connection: Connection) -> Server:
     """A command on the server, as root, its arguments one quoted line."""
     def server(args: list[str], input: bytes | None = None) -> Ran:  # noqa: A002
-        return run([*ssh(host), shlex.join(args)], input, timeout=120)
+        return run([*connection.argv(), shlex.join(args)], input, timeout=120)
     return server
 
 
-def admin_kubectl(host: str) -> Kubectl:
-    on = admin_server(host)
+def admin_kubectl(connection: Connection) -> Kubectl:
+    on = admin_server(connection)
 
     def kubectl(args: list[str], input: bytes | None = None) -> Ran:  # noqa: A002
         return on(["k3s", "kubectl", *args], input)
@@ -132,6 +168,7 @@ class Channels:
     name: str  # admin, deploy, plain or plane
     kubectl: Kubectl
     server: Server
+    connection: Connection | None = None  # the admin channel's
 
 
 def channels(kubectl_command: str | None, server_host: str | None, env: Mapping[str, str],
@@ -146,5 +183,6 @@ def channels(kubectl_command: str | None, server_host: str | None, env: Mapping[
         return Channels("plain", plain(shlex.join(argv)), no_server)
     host = server_host or env.get("SUSTENAUT_SERVER")
     if host:
-        return Channels("admin", admin_kubectl(host), admin_server(host))
+        connection = Connection(host)
+        return Channels("admin", admin_kubectl(connection), admin_server(connection), connection)
     return Channels("plain", plain("kubectl"), no_server)
