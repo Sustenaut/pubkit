@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.31.2 is released as v0.31.2 from commit c59e1b5824901643a718575652c63f0bb44c3360.",
+      "content": "pubkit 0.31.3 is released as v0.31.3 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.31.2",
+            "0.31.3",
             "pubkit --version",
-            "pubkit 0.31.2",
-            "v0.31.2",
-            "c59e1b5824901643a718575652c63f0bb44c3360"
+            "pubkit 0.31.3",
+            "v0.31.3",
+            "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
           ]
         ]
       },
-      "scope": "the published release v0.31.2 of pubkit",
+      "scope": "the published release v0.31.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c59e1b5824901643a718575652c63f0bb44c3360"
+          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.31.2 was released on 2026-11-08 from commit c59e1b5824901643a718575652c63f0bb44c3360 with these changes.",
+      "content": "pubkit 0.31.3 was released on 2026-11-08 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,23 @@
         ],
         "rows": [
           [
-            "added",
-            "pubkit deploy walk: the deploy check (deploy check is now walk without --fulfil), and with --fulfil it makes what is missing. It prints the plan, waits for a typed yes (--yes skips it), asks once at a hidden prompt for a Bitwarden write token when a need wants one, and fulfils each auto need that is missing and whose dependencies are ready, checking it again: namespaces over the admin channel (ssh root@HOST), Secrets from the values that fill them on kubectl's standard input with a restart of what reads them, manifests, GitHub secrets and variables from Bitwarden as app-secrets sends them, the gate, the rollout, CronJob runs, generated Bitwarden secrets and service account keys; propose needs print the change to make. The deploy channel (--kubectl naming the server's kubectl-read verb) reads only, and lists a Secret's key names with secret-keys. New need types gcp.service-account-key, auth.sign-in-client, storage.tenant, github.variable-entry and k8s.cronjob; deploy.units walks several units, each journaled; deploy.providers runs ./pubkit with the packages whose types the needs use, each wheel checked against its sha256, and pubkit bump moves them; --journal URL writes the deploy-journal/2 document to storage; the reusable deploy-check.yml walks it every 30 minutes, read-only, and pubkit sync seeds its caller. pubkit sync manages with-secrets in every repository with a with-secrets.json, and sync --check fails when the deploys lines of k8s-deploy.yml and the units disagree, or when a deploy calling k8s-deploy.yml 0.31.0 or later is not started by workflow_run, which pubkit bump rewrites"
+            "fixed",
+            "CI: the Terraform module job retries terraform init up to three times, caches each module's providers, and no longer cancels the other modules when one fails, so a timed-out provider checksum download from GitHub no longer fails the run"
+          ],
+          [
+            "fixed",
+            "pubkit deploy walk: the admin channel keeps one SSH connection for the walk (ControlMaster, its socket in a private directory), opened before the first check, so k8s.namespace, deploy.rollout and the Secrets no longer run out of their budgets on a new connection's second over the tailnet; k8s.namespace's budget is 4 s and deploy.rollout's 8 s, which asks for its three run listings at once; github.deploy-settings asks for its four listings at once, inside its 3 s; and a k8s.secret that is ready by its keys is made again, and its readers restarted, when the walk makes a new value of a need it is made from, so Bitwarden and the cluster no longer differ after a misshapen generated secret is replaced"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.31.2 of pubkit",
+      "scope": "the published release v0.31.3 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "c59e1b5824901643a718575652c63f0bb44c3360"
+          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
         }
       ]
     }

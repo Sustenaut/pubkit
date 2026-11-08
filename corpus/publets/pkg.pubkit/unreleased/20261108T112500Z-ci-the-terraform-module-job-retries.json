@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "CI: the Terraform module job retries terraform init up to three times, caches each module's providers, and no longer cancels the other modules when one fails, so a timed-out provider checksum download from GitHub no longer fails the run"
-}

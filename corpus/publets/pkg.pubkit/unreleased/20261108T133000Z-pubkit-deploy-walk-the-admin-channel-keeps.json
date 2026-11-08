@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pubkit deploy walk: the admin channel keeps one SSH connection for the walk (ControlMaster, its socket in a private directory), opened before the first check, so k8s.namespace, deploy.rollout and the Secrets no longer run out of their budgets on a new connection's second over the tailnet; k8s.namespace's budget is 4 s and deploy.rollout's 8 s, which asks for its three run listings at once; github.deploy-settings asks for its four listings at once, inside its 3 s; and a k8s.secret that is ready by its keys is made again, and its readers restarted, when the walk makes a new value of a need it is made from, so Bitwarden and the cluster no longer differ after a misshapen generated secret is replaced"
-}
