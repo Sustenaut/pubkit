@@ -56,12 +56,16 @@ def bump(root: Path, gh: Any = None, find: Any = None) -> list[str]:
     for given in (deploy or {}).get("providers") or [] if isinstance(deploy, dict) else []:
         if not isinstance(given, dict) or not isinstance(given.get("wheel"), str):
             continue
+        if not isinstance(given.get("sha256"), str) or not given["sha256"]:
+            out.append(f"left     deploy.providers {given.get('distribution')}: it has no sha256 to move; "
+                       f"give it the wheel's, as `pubkit sync --check` says")
+            continue
         found = (find or latest)(given["wheel"], gh)
         if found is None or found[0] == given["wheel"]:
             continue
-        text = text.replace(given["wheel"], found[0]).replace(str(given.get("sha256")), found[1])
+        text = text.replace(given["wheel"], found[0]).replace(given["sha256"], found[1])
         out.append(f"updated  pubkit.json (deploy.providers {given.get('distribution')}: "
                    f"{WHEEL.fullmatch(found[0])['version'] if WHEEL.fullmatch(found[0]) else found[0]})")
-    if out:
+    if any(line.startswith("updated") for line in out):
         path.write_text(text, encoding="utf-8")
     return out

@@ -3,7 +3,8 @@ Feature: A deploy block's units, each walked and journaled on its own
   with its own namespace, overlay, gate and host, sharing the workflow and
   every need with no `unit`. When the workflow calls k8s-deploy.yml, its
   deploys lines and the units must agree, and from 0.31.0 it must start on
-  workflow_run of main, with actions: read.
+  workflow_run of main, with actions: read, and on workflow_dispatch, by
+  which a walk's fulfil runs it.
 
   Background:
     Given the example service
@@ -75,8 +76,13 @@ Feature: A deploy block's units, each walked and journaled on its own
   Scenario: From k8s-deploy.yml 0.31.0, a deploy started by push names the two lines to change
     Given the deploy workflow calls k8s-deploy.yml "v0.31.1" deploying "k8s example; k8s-other example-other", on push
     When I check the workflow against the units
-    Then the only problem starts "deploy: deploy.yml calls k8s-deploy.yml 0.31.1, which deploys what a run of main tested: under on, have"
-    And the problem names "workflow_run: { workflows: [main], types: [completed], branches: [main] }" and "permissions: { actions: read, contents: read, packages: write }"
+    Then the only problem starts "deploy: deploy.yml calls k8s-deploy.yml 0.31.1, which deploys what a run of main tested, and a walk runs it by hand: under on, have"
+    And the problem names "workflow_run: { workflows: [main], types: [completed], branches: [main] }", "workflow_dispatch: {}" and "permissions: { actions: read, contents: read, packages: write }"
+
+  Scenario: A deploy the gate's fulfil cannot run by hand names the lines too
+    Given the deploy workflow calls k8s-deploy.yml "v0.31.1" deploying "k8s example; k8s-other example-other", on workflow_run alone
+    When I check the workflow against the units
+    Then the only problem starts "deploy: deploy.yml calls k8s-deploy.yml 0.31.1, which deploys what a run of main tested, and a walk runs it by hand"
 
   Scenario: Before 0.31.0 a deploy started by push is as it was
     Given the deploy workflow calls k8s-deploy.yml "v0.30.0" deploying "k8s example; k8s-other example-other", on push

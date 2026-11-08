@@ -33,13 +33,16 @@ from .net import HOST, HTTPS
 FILE = {"type": "string", "pattern": r"^(?!/)[A-Za-z0-9_./-]+$", "x-phrase": "must be a path from the repository"}
 WORD = {"type": "string", "pattern": r"^[a-z0-9][a-z0-9-]*$", "x-phrase": "must be a lower-case name"}
 KEYS = ["client-id", "client-secret"]
-# Run on the server: the client kept there, as a Secret manifest for kubectl's standard input.
-SECRET_SCRIPT = b'''import base64, json, sys
+# Run on the server, on python3's standard input: the client kept there,
+# applied as a Secret manifest on kubectl's standard input. argv: the
+# client's file, the Secret's name and its namespace, none of them a value.
+SECRET_SCRIPT = b'''import base64, json, subprocess, sys
 client = json.load(open(sys.argv[1]))
 b64 = lambda v: base64.b64encode(v.encode()).decode()
-print(json.dumps({"apiVersion": "v1", "kind": "Secret", "type": "Opaque",
-                  "metadata": {"name": sys.argv[2], "namespace": sys.argv[3]},
-                  "data": {"client-id": b64(client["client_id"]), "client-secret": b64(client["client_secret"])}}))
+manifest = json.dumps({"apiVersion": "v1", "kind": "Secret", "type": "Opaque",
+                       "metadata": {"name": sys.argv[2], "namespace": sys.argv[3]},
+                       "data": {"client-id": b64(client["client_id"]), "client-secret": b64(client["client_secret"])}})
+sys.exit(subprocess.run(["k3s", "kubectl", "apply", "-f", "-"], input=manifest.encode()).returncode)
 '''
 
 
@@ -138,8 +141,8 @@ class SignInClient(Base):
         if found["status"] != "registered":
             return Result("missing", "the client is not registered", fix="see the check's fix")
         secret = (secret_of(need) or {})["name"]
-        ran = ctx.server(["sh", "-c", f"python3 -I - {need.params['state']}/client.json {secret} {ctx.namespace} "
-                                      f"| k3s kubectl apply -f -"], SECRET_SCRIPT)
+        ran = ctx.server(["python3", "-I", "-", f"{need.params['state']}/client.json", secret, ctx.namespace],
+                         SECRET_SCRIPT)
         if ran.returncode != 0:
             return failed(f"Secret {secret} was not made on the server", ran)
         return Result("ready", f"made Secret {secret} in {ctx.namespace} on the server, from the client kept there",

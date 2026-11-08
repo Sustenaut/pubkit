@@ -17,8 +17,9 @@ units must agree: each unit's overlay and namespace (the unit the server's
 program deploys, and the namespace it deploys into) a line, and each line a
 unit. And from pubkit 0.31.0, k8s-deploy.yml deploys what a run of the CI
 workflow tested, so the workflow must start on `workflow_run` of it, with
-`actions: read`; `pubkit bump` rewrites a trigger it moves across that
-release (`retrigger`).
+`actions: read`, and on `workflow_dispatch`, by which the gate's and the
+rollout's fulfils run it; `pubkit bump` rewrites a trigger it moves across
+that release (`retrigger`).
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ K8S_DEPLOY = re.compile(r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]*)/pubkit/\.github/wo
 WORKFLOW_RUN = (0, 31, 0)  # the first k8s-deploy.yml that needs workflow_run
 CI = "main"  # the CI workflow pubkit writes, by name
 TRIGGER = "  workflow_run: { workflows: [main], types: [completed], branches: [main] }"
+DISPATCH = "  workflow_dispatch: {}"
 PERMISSIONS = "permissions: { actions: read, contents: read, packages: write }"
 
 
@@ -112,12 +114,13 @@ def trigger_problems(text: str, workflow: str) -> list[str]:
     on = found.get("on", found.get(True)) if isinstance(found, dict) else None  # YAML 1.1 reads `on` as true
     run = on.get("workflow_run") if isinstance(on, dict) else None
     runs = isinstance(run, dict) and CI in (run.get("workflows") or [])
+    dispatched = isinstance(on, dict) and "workflow_dispatch" in on
     permissions = found.get("permissions") if isinstance(found, dict) else None
     reads = isinstance(permissions, dict) and permissions.get("actions") in ("read", "write")
-    if runs and reads:
+    if runs and reads and dispatched:
         return []
     return [f"deploy: {workflow} calls k8s-deploy.yml {m['version']}, which deploys what a run of {CI} "
-            f"tested: under on, have\n{TRIGGER}\nand\n{PERMISSIONS}"]
+            f"tested, and a walk runs it by hand: under on, have\n{TRIGGER}\n{DISPATCH}\nand\n{PERMISSIONS}"]
 
 
 def retrigger(text: str) -> str:
@@ -141,6 +144,9 @@ def retrigger(text: str) -> str:
                     in_push = bool(re.match(r"^\s+push:", b))
                 if not in_push:
                     kept.append(b)
+            if not any(re.match(r"^\s+workflow_dispatch:", b) for b in kept):
+                at = next((k for k in range(len(kept), 0, -1) if kept[k - 1].strip()), 0)
+                kept.insert(at, DISPATCH + "\n")
             if not any(re.match(r"^\s+workflow_run:", b) for b in body):
                 kept.insert(0, TRIGGER + "\n")
             out += kept
@@ -148,7 +154,8 @@ def retrigger(text: str) -> str:
         m = re.match(r"^on:\s*(\[[^\]]*\]|[A-Za-z_]+|\{.*\})\s*$", line)
         if m:
             words = [w.strip() for w in re.split(r"[\[\],{}:]", m[1]) if w.strip() and w.strip() not in ("push", "{}")]
-            out += ["on:\n", TRIGGER + "\n", *[f"  {w}: {{}}\n" for w in words if w != "workflow_run"]]
+            words = [w for w in words if w not in ("workflow_run", "workflow_dispatch")] + ["workflow_dispatch"]
+            out += ["on:\n", TRIGGER + "\n", *[f"  {w}: {{}}\n" for w in words]]
             i += 1
             continue
         flow = re.match(r"^permissions:\s*\{(.*)\}\s*$", line)

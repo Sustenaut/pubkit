@@ -939,7 +939,7 @@ does, type by type:
 | k8s.namespace | `sustenaut-app NS` on the server | the admin channel |
 | k8s.secret | a Secret manifest from the values of the needs that fill it, on kubectl's standard input, then a restart of each Deployment the manifests show reading it | kubectl that writes |
 | k8s.manifests | `kubectl apply -f -` of the file | kubectl that writes |
-| k8s.cronjob, service.health | a Job from the CronJob, waited for | kubectl that writes |
+| k8s.cronjob, service.health | a Job from the CronJob, waited for; a Job made by hand, NAME-pubkit-... or NAME-now, counts as the CronJob's success, as kubectl does not make it the CronJob's | kubectl that writes |
 | github.secret, github.variable, github.deploy-settings | `gh secret set` or `gh variable set` of what the secrets and github_app blocks name, from Bitwarden, as `pubkit app-secrets` does | ./with-secrets |
 | github.gate | the gate set on, once every need before it is ready, and the workflow run | gh |
 | deploy.rollout | the workflow run on the default branch, and waited for | gh |
@@ -971,8 +971,9 @@ need with no `unit` (`"unit": "other"` scopes one). Each is walked and
 journaled on its own; `--unit` walks one. When the workflow calls
 k8s-deploy.yml, `pubkit sync --check` fails unless its `deploys` lines and
 the units agree, and, from k8s-deploy.yml 0.31.0, unless the workflow
-starts on `workflow_run` of main with `actions: read`; `pubkit bump`
-rewrites a `push` trigger when it moves that pin across 0.31.0.
+starts on `workflow_run` of main with `actions: read`, and on
+`workflow_dispatch`, by which the gate's and the rollout's fulfils run it;
+`pubkit bump` rewrites a `push` trigger when it moves that pin across 0.31.0.
 
 `--json` prints a deploy-journal/2 document per unit (a list for more than
 one): each need with its grade and whether it was fulfilled. `--journal URL`
@@ -985,8 +986,10 @@ could not be written is said, and fails nothing.
 
 pubkit's `deploy-check.yml` walks it every 30 minutes, read-only, over the
 deploy channel, with the deploy key, host and tailnet secrets k8s-deploy.yml
-takes and the environment's read-only `BWS_ACCESS_TOKEN`; it fails when a
-need is not ready. `pubkit sync` seeds its caller,
+takes and the environment's read-only `BWS_ACCESS_TOKEN`, with
+`--tolerate-unknown`: it fails when a need is missing, drift or blocked, and
+a need the job cannot judge, such as a secret its token may not list, stays
+unknown in the journal and fails nothing. `pubkit sync` seeds its caller,
 `.github/workflows/deploy-check.yml`, in a repository with a deploy block.
 And every repository with a `with-secrets.json` gets the managed
 `with-secrets`: an older copied script is why `bitwarden.*` needs were

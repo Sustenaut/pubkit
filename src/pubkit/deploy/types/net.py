@@ -19,7 +19,7 @@ from typing import Any
 
 from ...protect import ApiError
 from ..model import Context, Need, Result
-from . import Base, github_refused, kubectl_json, kubectl_refused, run_job, schema
+from . import Base, github_refused, kubectl_json, kubectl_refused, last_success, run_job, schema
 
 HTTPS = {"type": "string", "pattern": r"^https://[^\s/?#]+(/[^\s]*)?$", "x-phrase": "must be an https:// address"}
 HOST = {"type": "string", "pattern": r"^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$",
@@ -163,7 +163,7 @@ class Health(Base):
                 return Result("missing", f"CronJob {name} is not in {ctx.namespace}", fixable=False,
                               fix=f"see that the manifests in {ctx.block.get('overlay', 'k8s')} hold it")
             return kubectl_refused(ran, ctx.namespace, "cronjobs")
-        last = (found.get("status") or {}).get("lastSuccessfulTime")
+        last = last_success(ctx, name, found.get("status") or {})
         if not last:
             return Result("missing", f"CronJob {name} has not succeeded yet", step="job",
                           fix=f"kubectl -n {ctx.namespace} create job --from=cronjob/{name} {name}-now")

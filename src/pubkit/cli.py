@@ -720,6 +720,8 @@ def main(argv: list[str] | None = None) -> int:
                            help="after the checks, make each auto need that is missing, once the plan is confirmed")
             p.add_argument("--yes", action="store_true", help="confirm the plan without asking (no write token "
                                                               "is asked for without a terminal)")
+        p.add_argument("--tolerate-unknown", action="store_true",
+                       help="exit 0 unless a need is missing, drift or blocked: an unknown one fails nothing")
         p.add_argument("--unit", metavar="NAME", help="walk one unit of the deploy block; every unit by default")
         p.add_argument("--offline", action="store_true",
                        help="check only what needs no network: the manifests against the needs, and the files")
@@ -853,7 +855,8 @@ def main(argv: list[str] | None = None) -> int:
             sys.exit(f"pubkit: the --zones file ({args.zones}) must be a repository's pubkit.json")
         return run_walk(root, args.offline, args.json, args.kubectl, zones, args.namespace,
                         fulfil=getattr(args, "fulfil", False), unit=args.unit, server=args.server,
-                        yes=getattr(args, "yes", False), journal_url=args.journal)
+                        yes=getattr(args, "yes", False), journal_url=args.journal,
+                        tolerate_unknown=args.tolerate_unknown)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

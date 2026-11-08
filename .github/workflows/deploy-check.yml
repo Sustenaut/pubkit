@@ -1,6 +1,6 @@
 # Walks a service's deploy block on a schedule, read-only: every need is
 # checked, the states table printed, and the journal written to storage. A
-# run whose walk is not all ready fails. `pubkit sync` seeds the caller in a
+# run with a need missing, drifted or blocked fails. `pubkit sync` seeds the caller in a
 # repository with a deploy block:
 #
 #   on: { schedule: [{ cron: '*/30 * * * *' }], workflow_dispatch: {} }
@@ -19,7 +19,9 @@
 # machine account's, the walk runs through ./pubkit secrets run, which puts
 # the Bitwarden project's names and values in the job's environment only,
 # as terraform.yml does; without it every bitwarden.* need is unknown. The
-# log prints states and names, never a value.
+# log prints states and names, never a value. A need the job cannot judge,
+# such as a secret its token may not list, is unknown, in the journal, and
+# fails nothing (--tolerate-unknown); missing, drift or blocked fails the run.
 #
 # `zones` is the pubkit.json whose hosting block keeps the host's zone, in
 # this repository or a checkout beside it (`zones-repository` checks one out
@@ -147,7 +149,8 @@ jobs:
           unset DEPLOY_KEY
           # {unit} is each unit's namespace, which the walk puts in.
           kubectl="ssh -i $ssh_dir/key -o IdentitiesOnly=yes -o BatchMode=yes -o UserKnownHostsFile=$ssh_dir/known_hosts deploy@$SERVER {unit} kubectl-read"
-          args=(deploy walk --yes --kubectl "$kubectl")
+          # An unknown need fails nothing: the job's token cannot read every secret's name.
+          args=(deploy walk --yes --tolerate-unknown --kubectl "$kubectl")
           [[ -z "$ZONES" ]] || args+=(--zones "$ZONES")
           [[ -z "$JOURNAL" ]] || args+=(--journal "$JOURNAL")
           code=0

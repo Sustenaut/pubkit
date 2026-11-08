@@ -34,6 +34,26 @@ Feature: pubkit deploy walk --fulfil makes what is missing, once the plan is con
     And "github.gate:example" is ready
     And no output holds a value
 
+  Scenario: A declined plan asks for no token, and leaves each need as its check found it
+    Given Bitwarden has no "example-cookie-secret"
+    And "no" is typed at the prompt
+    When I run pubkit "deploy" "walk" "--fulfil"
+    Then the write token was never asked for
+    And "bitwarden.generated:example-cookie-secret" is missing
+    And it does not print "needs a Bitwarden write token"
+
+  Scenario: --tolerate-unknown fails only for a need missing, drifted or blocked
+    Given the environment is not ./with-secrets'
+    When I run pubkit "deploy" "walk" "--tolerate-unknown"
+    Then it succeeds
+    And "bitwarden.secret:example-files-token" is unknown
+
+  Scenario: --tolerate-unknown still fails for a missing need
+    Given the environment is not ./with-secrets'
+    And the Secret "example-files" is not in the cluster
+    When I run pubkit "deploy" "walk" "--tolerate-unknown"
+    Then the exit code is 1
+
   Scenario: Without --fulfil nothing is planned or done
     Given the Secret "example-files" is not in the cluster
     When I run pubkit "deploy" "walk"
@@ -160,6 +180,12 @@ Feature: pubkit deploy walk --fulfil makes what is missing, once the plan is con
     Then it succeeds
     And "service.health:example" is ready, "(fulfilled)"
     And a Job was made from the CronJob "worker"
+
+  Scenario: service.health counts a Job made from its CronJob by hand
+    Given the CronJob "worker" never succeeded
+    And the Job "worker-now", made from it by hand, completed 2 hours ago
+    When I run pubkit "deploy" "walk"
+    Then "service.health:example" is ready
 
   Scenario: A host that does not answer is not acted on
     Given "https://example.example.eu/healthz" answers 502

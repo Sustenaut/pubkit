@@ -163,7 +163,13 @@ def test_the_trigger_rewrite_satisfies_the_check():
     rewritten = retrigger(moved)
     assert trigger_problems(rewritten, "deploy.yml") == []
     assert "push:" not in rewritten and "branches: [main]\n  workflow_dispatch" not in rewritten
-    assert "  workflow_dispatch: {}\n" in rewritten and "  actions: read\n  contents: read\n" in rewritten
+    assert rewritten.count("workflow_dispatch") == 1 and "  actions: read\n  contents: read\n" in rewritten
+
+
+def test_the_trigger_rewrite_adds_workflow_dispatch():
+    only = PUSHED.replace("  workflow_dispatch: {}\n", "").replace("@v0.30.0", "@v0.31.1")
+    rewritten = retrigger(only)
+    assert "  workflow_dispatch: {}\n" in rewritten and trigger_problems(rewritten, "deploy.yml") == [], rewritten
 
 
 @pytest.mark.parametrize("text", [
@@ -200,3 +206,13 @@ def test_bump_leaves_a_trigger_already_past_0_31(repo, monkeypatch):
     monkeypatch.setattr(freshness, "__version__", "0.31.1")
     freshness.bump(repo)
     assert "push:" in (repo / ".github" / "workflows" / "deploy.yml").read_text()
+
+
+def test_bump_leaves_a_provider_without_a_sha256_saying_so(repo):
+    (repo / "pubkit.json").write_text(json.dumps({"kind": "service", "deploy": {"namespace": "example", "providers": [
+        {"distribution": "example-needs", "wheel": WHEEL}]}}, indent=2))
+    before = (repo / "pubkit.json").read_text()
+    lines = providers.bump(repo, lambda *_: (_ for _ in ()).throw(AssertionError("no release is read")))
+    assert lines == ["left     deploy.providers example-needs: it has no sha256 to move; give it the wheel's, "
+                     "as `pubkit sync --check` says"]
+    assert (repo / "pubkit.json").read_text() == before

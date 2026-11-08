@@ -164,6 +164,20 @@ Feature: The need types phase 2 adds: a service account key, a sign-in client, a
     Then "k8s.cronjob:worker" is ready, "(fulfilled)"
     And a Job was made from the CronJob "worker"
 
+  Scenario Outline: A Job made from the CronJob by hand, which is not its own, counts when it completed in time
+    Given the deploy block also needs {"type": "k8s.cronjob", "name": "worker"}
+    And the CronJob "worker" never succeeded
+    And the Job "<job>", made from it by hand, completed <hours> hours ago
+    When I run pubkit "deploy" "walk"
+    Then "k8s.cronjob:worker" is <state>
+
+    Examples:
+      | job                               | hours | state   |
+      | worker-now                        | 1     | ready   |
+      | worker-pubkit-20261107070000      | 1     | ready   |
+      | worker-now                        | 3     | drift   |
+      | worker-other                      | 1     | missing |
+
   Scenario: A suspended CronJob is drift, and not acted on
     Given the deploy block also needs {"type": "k8s.cronjob", "name": "worker"}
     And the CronJob "worker" is suspended

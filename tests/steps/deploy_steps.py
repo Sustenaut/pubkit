@@ -939,10 +939,11 @@ def journal_of_says(world, unit, need_id, state):
     assert next(n for n in document["needs"] if n["id"] == need_id)["state"] == state
 
 
-def caller(version: str, deploys: str, push: bool) -> str:
+def caller(version: str, deploys: str, push: bool, dispatch: bool = True) -> str:
     lines = "".join(f"        {line.strip()}\n" for line in deploys.split(";"))
     on = "on:\n  push: { branches: [main] }\n" if push else (
-        "on:\n  workflow_run: { workflows: [main], types: [completed], branches: [main] }\n")
+        "on:\n  workflow_run: { workflows: [main], types: [completed], branches: [main] }\n"
+        + ("  workflow_dispatch: {}\n" if dispatch else ""))
     permissions = "permissions: { contents: read, packages: write }\n" if push else (
         "permissions: { actions: read, contents: read, packages: write }\n")
     return (f"name: deploy\n{on}{permissions}jobs:\n  deploy:\n"
@@ -951,9 +952,9 @@ def caller(version: str, deploys: str, push: bool) -> str:
 
 
 @given(parsers.re(r'the deploy workflow calls k8s-deploy.yml "(?P<version>[^"]+)" deploying "(?P<deploys>[^"]+)"'
-                  r'(?P<push>, on push)?$'))
-def calls_k8s_deploy(world, version, deploys, push):
-    (world.root / ".github" / "workflows" / "deploy.yml").write_text(caller(version, deploys, bool(push)))
+                  r'(?P<push>, on push)?(?P<only>, on workflow_run alone)?$'))
+def calls_k8s_deploy(world, version, deploys, push, only):
+    (world.root / ".github" / "workflows" / "deploy.yml").write_text(caller(version, deploys, bool(push), not only))
 
 
 @when("I check the workflow against the units")
@@ -962,9 +963,9 @@ def check_units(world):
     world.problems = unit_problems(world.root, world.block)
 
 
-@then(parsers.parse('the problem names "{first}" and "{second}"'))
-def problem_names(world, first, second):
-    assert first in world.problems[0] and second in world.problems[0], world.problems
+@then(parsers.parse('the problem names "{first}", "{second}" and "{third}"'))
+def problem_names(world, first, second, third):
+    assert all(line in world.problems[0] for line in (first, second, third)), world.problems
 
 
 # --- the journal in storage -------------------------------------------------------------------------
@@ -1065,3 +1066,14 @@ def fulfilled_nothing(world):
 @then(parsers.parse('the journal fulfilled "{need_id}" only'))
 def fulfilled_only(world, need_id):
     assert [n["id"] for n in world.journal["needs"] if n["fulfilled"]] == [need_id]
+
+
+@given(parsers.parse('the Job "{job}", made from it by hand, completed {hours:d} hours ago'))
+def job_completed(world, job, hours):
+    namespace(world).setdefault("job", []).append({"metadata": {"name": job}, "status": {
+        "succeeded": 1, "completionTime": (NOW - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")}})
+
+
+@then(parsers.parse('it does not print "{text}"'))
+def not_printed(world, text):
+    assert text not in world.stdout, world.stdout

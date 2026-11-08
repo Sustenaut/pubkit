@@ -99,8 +99,8 @@ class FakeKubectl:
             return self.write(ns, verb, rest, input, space)
         kind = rest[0]
         name = rest[1] if len(rest) > 1 else None
-        if kind == "deployment" and name is None:
-            return Ran(0, json.dumps({"items": (space or {}).get("deployment", [])}))
+        if kind in ("deployment", "job") and name is None:
+            return Ran(0, json.dumps({"items": (space or {}).get(kind, [])}))
         if "/" in kind:
             found = space is not None and kind in space["objects"]
             return Ran(0, kind) if found else Ran(1, "", f'Error from server (NotFound): "{kind}" not found')
@@ -159,12 +159,16 @@ class FakeKubectl:
             cronjob = rest[1].removeprefix("--from=cronjob/")
             if cronjob not in space["cronjob"]:
                 return Ran(1, "", f'Error from server (NotFound): cronjobs "{cronjob}" not found')
+            # As kubectl makes it: not the CronJob's, so its success never moves the CronJob's status.
             self.state.setdefault("jobs", []).append(rest[2])
-            space["cronjob"][cronjob]["status"]["lastSuccessfulTime"] = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+            space.setdefault("job", []).append({"metadata": {"name": rest[2]}, "status": {}})
             return Ran(0, f"job.batch/{rest[2]} created")
         if verb == "wait":
-            return Ran(0 if not self.state.get("job_fails") else 1, "condition met",
-                       "" if not self.state.get("job_fails") else "timed out waiting for the condition")
+            if self.state.get("job_fails"):
+                return Ran(1, "", "timed out waiting for the condition")
+            job = next(j for j in space["job"] if j["metadata"]["name"] == rest[1].removeprefix("job/"))
+            job["status"] = {"succeeded": 1, "completionTime": NOW.strftime("%Y-%m-%dT%H:%M:%SZ")}
+            return Ran(0, "condition met")
         raise AssertionError(f"kubectl {verb} {rest}")
 
 
@@ -187,8 +191,9 @@ class FakeServer:
             return Ran(0, f"namespace {args[1]} ready")
         if args[:3] == ["python3", "-I", "-"] and "--status" in args:
             return Ran(0, json.dumps(w.auth))
-        if args[:2] == ["sh", "-c"] and "k3s kubectl apply" in args[2]:
-            _, _, _, _, name, ns = args[2].split(" | ")[0].split()
+        if args[:3] == ["python3", "-I", "-"] and args[3].endswith("/client.json"):
+            assert input is not None and b"k3s" in input and len(args) == 6, args
+            name, ns = args[4], args[5]
             w.cluster["namespaces"][ns]["secrets"][name] = {"client-id": f"{CANARY}-id".encode(),
                                                             "client-secret": f"{CANARY}-secret".encode()}
             return Ran(0, f"secret/{name} configured")

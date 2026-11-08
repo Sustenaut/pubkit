@@ -174,14 +174,19 @@ def wants_token(plan: list[tuple[str, str]], types: Mapping[str, NeedType], ctx:
                for i, _ in plan)
 
 
-def unable(journal: Journal, types: Mapping[str, NeedType], ctx: Context) -> None:
+def unable(journal: Journal, types: Mapping[str, NeedType], ctx: Context, declined: bool = False) -> None:
     """Each auto need not ready whose fulfil needs what the context lacks
-    becomes unknown, saying what it needs, and what its check found."""
+    becomes unknown, saying what it needs, and what its check found. When
+    the plan was declined, no token was asked for: a need wanting one keeps
+    what its check found."""
     for k, (need, result) in enumerate(journal.entries):
         kind = types[need.type]
         if result.state not in ACTING or not result.fixable or grade_of(kind, need) != "auto":
             continue
-        if (why := lacking(kind, need, ctx)) is not None:
+        why = lacking(kind, need, ctx)
+        if why == LACKS["write-token"] and declined:
+            continue
+        if why is not None:
             new = Result("unknown", f"not fulfilled: {why.split(':')[0]}", why,
                          [f"found {result.state}: {result.summary}", *result.details], result.checked_at,
                          result.seconds)

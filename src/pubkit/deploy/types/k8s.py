@@ -21,7 +21,7 @@ import yaml
 
 from ... import k8s
 from ..model import Context, Need, Ran, Result, Stop
-from . import Base, failed, kubectl_json, kubectl_refused, not_found, restart, run_job, schema, secret_of
+from . import Base, failed, kubectl_json, kubectl_refused, last_success, not_found, restart, run_job, schema, secret_of
 
 KEYS = {"type": "array", "items": {"type": "string", "pattern": r"^[-._a-zA-Z0-9]{1,253}$"},
         "x-phrase": "must list the Secret's keys"}
@@ -413,7 +413,7 @@ class CronJob(Base):
         if spec.get("suspend") is True:
             return Result("drift", f"CronJob {name} is suspended", fixable=False,
                           fix=f"kubectl -n {ns} patch cronjob {name} -p '{{\"spec\":{{\"suspend\":false}}}}'")
-        last, scheduled = status.get("lastSuccessfulTime"), status.get("lastScheduleTime")
+        last, scheduled = last_success(ctx, name, status), status.get("lastScheduleTime")
         hours = f"{within.total_seconds() / 3600:g} h"
         if last and ctx.now() - when(last) <= within:
             return Result("ready", f"CronJob {name} succeeded at {last}, within {hours}")

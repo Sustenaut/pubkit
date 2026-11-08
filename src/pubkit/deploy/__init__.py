@@ -25,7 +25,10 @@ want one are unknown. The channels kubectl and the server are reached by are
 channels.py's; a block's units, units.py's: each is walked, and journaled,
 on its own.
 
-Exit 0 when every need checked is ready, 1 otherwise, 2 for a bad block.
+Exit 0 when every need checked is ready, 1 otherwise, 2 for a bad block;
+with --tolerate-unknown, 0 unless one is missing, drift or blocked, for a
+scheduled walk whose token may not read everything (the unknowns stay in
+the journal).
 `--json` prints the walk as a deploy-journal/2 document instead (journal.json),
 a list of them for more than one unit; `--journal URL` also writes it to
 storage (store.py). No value is printed: a check names a secret, its key,
@@ -286,7 +289,7 @@ def project_of(root: Path, env: Any) -> str | None:
 
 def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | None, zones: Path | None,
              namespace: str | None, fulfil: bool = False, unit: str | None = None, server: str | None = None,
-             yes: bool = False, journal_url: str | None = None) -> int:
+             yes: bool = False, journal_url: str | None = None, tolerate_unknown: bool = False) -> int:
     from ..cli import read_config  # noqa: PLC0415
     from .registry import load as registry  # noqa: PLC0415
     from .units import names  # noqa: PLC0415
@@ -324,6 +327,7 @@ def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | No
         terminal = sys.stdin.isatty() and env.get("GITHUB_ACTIONS") != "true"
         acts = [(ctx, planned(journal, loaded.types, ctx, token_coming=terminal)) for ctx, journal in walks]
         approved: set[tuple[str, str]] = set()
+        declined = False
         if any(plan for _, plan in acts):
             print("deploy: the walk will:", file=sys.stderr)
             for ctx, plan in acts:
@@ -332,6 +336,7 @@ def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | No
             if yes or ask('Type "yes" to do it: ') == "yes":
                 approved = {(ctx.unit, i) for ctx, plan in acts for i, _ in plan}
             else:
+                declined = True
                 print("deploy: nothing was fulfilled", file=sys.stderr)
         writer = None
         if approved and terminal and any(wants_token(plan, loaded.types, ctx) for ctx, plan in acts):
@@ -341,7 +346,7 @@ def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | No
             writer = BitwardenWriter(token, project) if token and project else None
         for ctx, journal in walks:
             ctx.bitwarden_writer = ctx.bitwarden_writer or writer
-            unable(journal, loaded.types, ctx)
+            unable(journal, loaded.types, ctx, declined)
             act(journal, loaded.types, ctx, {i for u, i in approved if u == ctx.unit})
     documents = [journal.document() for _, journal in walks]
     if as_json:
@@ -356,7 +361,8 @@ def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | No
         from .store import write  # noqa: PLC0415
         for document in documents:
             print(write(url, document, walks[0][0].env), file=sys.stderr)
-    ready = all(r.state == "ready" for _, journal in walks for _, r in counted(journal, loaded.types, offline))
+    passing = ("ready", "unknown") if tolerate_unknown else ("ready",)
+    ready = all(r.state in passing for _, journal in walks for _, r in counted(journal, loaded.types, offline))
     return 0 if ready else 1
 
 
