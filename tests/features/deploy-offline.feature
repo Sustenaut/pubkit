@@ -117,7 +117,7 @@ Feature: pubkit deploy check --offline checks what needs no network
   Scenario: --json prints a journal document, with no need's params
     When I run pubkit "deploy" "check" "--offline" "--json"
     Then it succeeds
-    And the journal is a deploy-journal/1 document
+    And the journal is a deploy-journal/2 document
     And the journal's walk is offline, from "laptop"
     And the journal lists the 18 needs in walk order, none with params
     And the journal counts 3 ready and 15 unknown

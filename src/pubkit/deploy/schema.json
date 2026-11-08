@@ -4,8 +4,10 @@
   "title": "pubkit.json's deploy block",
   "description": "What a service needs before it deploys. Each need's own keys are its type's schema (pubkit deploy types).",
   "type": "object",
-  "x-phrase": "must be an object, with namespace and maybe host, workflow, gate, overlay and needs",
-  "required": ["namespace"],
+  "x-phrase": "must be an object, with namespace and maybe host, workflow, gate, overlay, units, providers and needs",
+  "required": [
+    "namespace"
+  ],
   "additionalProperties": false,
   "properties": {
     "namespace": {
@@ -38,15 +40,82 @@
       "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9_./-]+$",
       "x-phrase": "must be a directory in the repository, such as k8s"
     },
+    "units": {
+      "description": "More units, by name, each its own namespace, overlay, gate and host; a need's unit scopes it to one.",
+      "type": "object",
+      "x-phrase": "must be an object of units, by name",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "namespace"
+        ],
+        "additionalProperties": false,
+        "x-name": "a unit",
+        "x-phrase": "must be an object, with namespace and maybe overlay, gate and host",
+        "properties": {
+          "namespace": {
+            "$ref": "#/properties/namespace"
+          },
+          "overlay": {
+            "$ref": "#/properties/overlay"
+          },
+          "gate": {
+            "$ref": "#/properties/gate"
+          },
+          "host": {
+            "$ref": "#/properties/host"
+          }
+        }
+      }
+    },
+    "providers": {
+      "description": "The packages whose sustenaut.needs types the needs use: ./pubkit runs with each wheel, checked against its sha256.",
+      "type": "array",
+      "x-phrase": "must be a list of packages, each with distribution, wheel and sha256",
+      "items": {
+        "type": "object",
+        "required": [
+          "distribution",
+          "wheel",
+          "sha256"
+        ],
+        "additionalProperties": false,
+        "x-name": "a provider",
+        "x-phrase": "must be an object with distribution, wheel and sha256",
+        "properties": {
+          "distribution": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "x-phrase": "must be a package's name"
+          },
+          "wheel": {
+            "type": "string",
+            "pattern": "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+/releases/download/[^/\\s]+/[A-Za-z0-9_.]+-[^-/\\s]+-py3-none-any\\.whl$",
+            "x-phrase": "must be the address of a GitHub release's wheel, NAME-VERSION-py3-none-any.whl"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "x-phrase": "must be the wheel's sha256, 64 hex digits"
+          }
+        }
+      }
+    },
     "needs": {
       "description": "The needs nothing implies, each an object with type and that type's keys.",
       "type": "array",
       "x-phrase": "must be a list of needs, each an object with a type",
       "items": {
         "type": "object",
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "x-phrase": "must be an object with a type",
-        "properties": {"type": {"type": "string"}}
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
       }
     }
   }

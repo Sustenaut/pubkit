@@ -31,7 +31,7 @@ DEPLOY_SETTINGS = {"SUSTENAUT_SERVER": "variable", "SUSTENAUT_KNOWN_HOSTS": "var
                    "SUSTENAUT_DEPLOY_SSH_KEY": "secret", "TS_GH_OAUTH_CLIENT_ID": "secret",
                    "TS_GH_OAUTH_SECRET": "secret"}
 SERVER_NAMES = ("SUSTENAUT_SERVER", "SUSTENAUT_KNOWN_HOSTS", "SUSTENAUT_DEPLOY_SSH_KEY")
-COMMON = ("type", "name", "after")
+COMMON = ("type", "name", "after", "unit")
 
 
 def github_name(entry: dict[str, Any]) -> str:
@@ -77,10 +77,14 @@ class Builder:
 
 
 def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, namespace: str | None = None,
-          found: k8s.Found | None = None) -> tuple[dict[str, Need], list[str]]:
-    """Every need of a sound block, and what is wrong with them together: a
-    need declared twice. `found` is what the rendered manifests read."""
-    block = config["deploy"]
+          found: k8s.Found | None = None, unit: str | None = None) -> tuple[dict[str, Need], list[str]]:
+    """Every need of a sound block's unit (the top level's, by default), and
+    what is wrong with them together: a need declared twice. `found` is what
+    the rendered manifests read. A unit's needs are those whose `unit` names
+    it, and those that name none."""
+    from .units import unit_block  # noqa: PLC0415
+    unit = unit or config["deploy"]["namespace"]
+    block = unit_block(config["deploy"], unit)
     ns = namespace or block["namespace"]
     problems = []
     out = Builder()
@@ -90,6 +94,8 @@ def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, 
         params = {k: v for k, v in entry.items() if k not in COMMON}
         name = entry.get("name") or kind.default_name(params) or ns
         need = Need(entry["type"], name, params, None, tuple(entry.get("after", [])))
+        if entry.get("unit", unit) != unit:
+            continue
         text = json.dumps(entry, sort_keys=True)
         if need.id in written:
             if written[need.id] != text:
@@ -128,7 +134,7 @@ def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, 
         if isinstance(secret, dict):
             shape = getattr(types[need.type], "secret_shape", lambda _p: None)(need.params)
             key = secret.get("key")
-            params: dict[str, Any] = {"keys": [key] if key else []}
+            params: dict[str, Any] = {"keys": [key] if key else keys_of(types[need.type], need.params)}
             if shape and key:
                 params["shapes"] = {key: shape}
             out.add("k8s.secret", secret["name"], params, f"secret of {need.id}")
@@ -136,6 +142,12 @@ def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, 
         for name, params in manifest_secrets(found, ns).items():
             out.add("k8s.secret", name, params, "manifests")
     return out.needs, problems
+
+
+def keys_of(kind: NeedType, params: dict[str, Any]) -> list[str]:
+    """The keys a need fills when its secret names none: its type's, if it says."""
+    said = getattr(kind, "secret_keys", None)
+    return list(said(params) or []) if callable(said) else []
 
 
 def declarers(block: dict[str, Any], types: dict[str, NeedType], namespace: str
@@ -147,13 +159,15 @@ def declarers(block: dict[str, Any], types: dict[str, NeedType], namespace: str
     out: dict[str, list[tuple[str, list[str] | None]]] = {}
     for entry in block.get("needs", []):
         kind = types.get(entry.get("type"))
-        if kind is None:
+        if kind is None or entry.get("unit", block.get("unit", block.get("namespace"))) != block.get(
+                "unit", block.get("namespace")):
             continue
         params = {k: v for k, v in entry.items() if k not in COMMON}
         need_id = f"{entry['type']}:{entry.get('name') or kind.default_name(params) or namespace}"
         if isinstance(entry.get("secret"), dict):
             key = entry["secret"].get("key")
-            out.setdefault(entry["secret"]["name"], []).append((need_id, [key] if key else None))
+            keys = [key] if key else keys_of(kind, params) or None
+            out.setdefault(entry["secret"]["name"], []).append((need_id, keys))
         if entry["type"] == "k8s.secret":
             out.setdefault(need_id.split(":", 1)[1], []).append((need_id, list(entry.get("keys", [])) or None))
     return out

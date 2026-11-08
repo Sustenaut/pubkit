@@ -1,5 +1,4 @@
-"""The need types pubkit has itself. Phase 1 checks only: every fulfil
-raises NotImplementedError("phase 2")."""
+"""The need types pubkit has itself, and what their checks and fulfils share."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...protect import ApiError
-from ..model import Context, Grade, Need, Ran, Result
+from ..model import FULFIL_BUDGET, Context, Grade, Need, Ran, Result
 
 
 class Base:
@@ -17,8 +16,10 @@ class Base:
     schema: dict[str, Any] = {"type": "object", "additionalProperties": False, "properties": {}}
     grade: Grade = "none"
     budget = 1.0
+    fulfil_budget = FULFIL_BUDGET
     offline = False
     singleton = False
+    needs_of_context: tuple[str, ...] = ()  # what requires() says, for every need of the type
 
     def default_name(self, params: dict[str, Any]) -> str | None:
         return None
@@ -29,8 +30,69 @@ class Base:
     def check(self, need: Need, ctx: Context) -> Result:
         raise NotImplementedError
 
+    def requires(self, need: Need) -> tuple[str, ...]:
+        return self.needs_of_context
+
+    def action(self, need: Need, ctx: Context) -> str:
+        return "fulfil it"
+
     def fulfil(self, need: Need, ctx: Context) -> Result:
-        raise NotImplementedError("phase 2")
+        return Result("unknown", f"{self.type} has no fulfil", fix="see the check's fix")
+
+
+def failed(what: str, ran: Ran, hidden: tuple[bytes, ...] = ()) -> Result:
+    """A fulfil's failure, with the last line the command said, any hidden value taken out."""
+    last = (ran.stderr.strip().splitlines() or [f"exit {ran.returncode}"])[-1][:300]
+    for value in hidden:
+        for part in [value, *value.splitlines()]:
+            if part:
+                last = last.replace(part.decode(errors="replace"), "[hidden]")
+    return Result("missing", what, fix=last)
+
+
+def secret_of(need: Need) -> dict[str, Any] | None:
+    secret = need.params.get("secret")
+    return secret if isinstance(secret, dict) else None
+
+
+def readers(ctx: Context, secret: str) -> list[str]:
+    """The Deployments the rendered manifests show reading the Secret in the namespace."""
+    from ... import k8s  # noqa: PLC0415
+    try:
+        found = k8s.collect(k8s.documents(ctx.rendered()), ctx.namespace)
+    except Exception:  # noqa: BLE001 - no manifests to read, no Deployment to restart
+        return []
+    out = []
+    for n in found.needs:
+        workload = n.where.split(" of ", 1)[-1].split(" ", 1)[0]
+        if n.namespace == ctx.namespace and n.secret == secret and workload.startswith("Deployment/"):
+            out.append(workload.split("/", 1)[1])
+    return sorted(set(out))
+
+
+def restart(ctx: Context, secret: str) -> list[str]:
+    """Restart each Deployment reading the Secret, so its pods read the new one: a detail each."""
+    out = []
+    for name in readers(ctx, secret):
+        ran = ctx.kubectl(["-n", ctx.namespace, "rollout", "restart", f"deployment/{name}"])
+        if ran.returncode == 0:
+            out.append(f"restarted Deployment/{name}, which reads Secret {secret}")
+        elif not not_found(ran):
+            out.append(f"Deployment/{name} was not restarted: {failed('', ran).fix}")
+    return out
+
+
+def run_job(ctx: Context, cronjob: str, budget: float) -> Result:
+    """A Job made from the CronJob, waited for: ready once it completes."""
+    job = f"{cronjob}-pubkit-{ctx.now().strftime('%Y%m%d%H%M%S')}"[:63]
+    ran = ctx.kubectl(["-n", ctx.namespace, "create", "job", f"--from=cronjob/{cronjob}", job])
+    if ran.returncode != 0:
+        return failed(f"a Job could not be made from CronJob {cronjob}", ran)
+    wait = max(int(budget) - 20, 10)
+    ran = ctx.kubectl(["-n", ctx.namespace, "wait", "--for=condition=complete", f"job/{job}", f"--timeout={wait}s"])
+    if ran.returncode != 0:
+        return failed(f"Job {job}, from CronJob {cronjob}, did not complete in {wait} s", ran)
+    return Result("ready", f"ran Job {job} from CronJob {cronjob}, which completed")
 
 
 def schema(properties: dict[str, Any], required: tuple[str, ...] = ()) -> dict[str, Any]:

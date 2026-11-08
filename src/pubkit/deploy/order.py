@@ -1,7 +1,7 @@
 """The order needs are walked in: each after the needs it waits for.
 
 The built-in rules: everything waits for k8s.namespace but the needs outside
-the cluster (github.*, bitwarden.*, dns.site, upstream) and
+the cluster (github.*, bitwarden.*, gcp.*, storage.*, dns.site, upstream) and
 k8s.secrets-declared, which reads only the manifests; a k8s.secret waits for
 the need whose secret fills it; github.gate waits for everything but
 deploy.rollout and service.health; deploy.rollout waits for the gate, or,
@@ -19,7 +19,7 @@ from collections.abc import Mapping
 
 from .model import Need, NeedType
 
-OUTSIDE = ("github.", "bitwarden.")
+OUTSIDE = ("github.", "bitwarden.", "gcp.", "storage.")
 OUTSIDE_TYPES = {"dns.site", "upstream", "k8s.secrets-declared", "k8s.namespace"}
 LAST = {"deploy.rollout", "service.health"}
 

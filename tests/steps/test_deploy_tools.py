@@ -176,12 +176,11 @@ def test_a_check_that_returns_no_result_is_unknown():
     assert (result.state, result.summary) == ("unknown", "the check returned no result (str)")
 
 
-def test_every_builtin_fulfil_waits_for_phase_2():
-    from pubkit.deploy.model import Need  # noqa: PLC0415
-    from pubkit.deploy.registry import BUILTIN  # noqa: PLC0415
-    for kind in BUILTIN:
-        with pytest.raises(NotImplementedError, match="phase 2"):
-            kind.fulfil(Need(kind.type, "one", {}), Context.for_tests())
+def test_every_builtin_type_is_one_the_registry_takes():
+    from pubkit.deploy.registry import BUILTIN, type_problems  # noqa: PLC0415
+    # pubkit's own may be one word, as upstream is.
+    found = {kind.type: [p for p in type_problems(kind) if "dotted" not in p] for kind in BUILTIN}
+    assert found == {kind.type: [] for kind in BUILTIN}
 
 
 def test_a_summary_is_one_line_of_at_most_120_characters():
@@ -230,3 +229,62 @@ def test_deploy_check_reads_only_a_pubkit_json_beside_the_repository(tmp_path, r
     from conftest import pubkit  # noqa: PLC0415
     done = run(pubkit(), "deploy", "check", "--offline", "--zones", path, cwd=root, env={"PUBKIT_ANY_VERSION": "1"})
     assert done.code != 0 and why in done.stderr, done.describe()
+
+
+def test_a_providers_result_need_not_be_pubkits():
+    """An out-of-tree type imports nothing of pubkit's: any object with
+    state, summary, fix and details is a result, for its check and its fulfil."""
+    from pubkit.deploy.model import Need  # noqa: PLC0415
+    from pubkit.deploy.walk import fulfil, walk  # noqa: PLC0415
+
+    class Found:
+        def __init__(self, state, summary, fix="", details=()):
+            self.state, self.summary, self.fix, self.details = state, summary, fix, list(details)
+
+    class Foreign:
+        type, grade, budget, offline, schema = "example.database", "auto", 1.0, False, {}
+        made = False
+
+        def default_name(self, params):
+            return None
+
+        def depends_on(self, need, needs):
+            return []
+
+        def check(self, need, ctx):
+            return Found("ready", "the database is there") if self.made else Found("missing", "no database",
+                                                                                   "make it", ["one"])
+
+        def fulfil(self, need, ctx):
+            self.made = True
+            return Found("ready", "made the database")
+
+    need, kinds, ctx = Need("example.database", "one", {}), {"example.database": Foreign()}, Context.for_tests()
+    journal = walk({need.id: need}, kinds, ctx, service={})
+    (_, found), = journal.entries
+    assert (found.state, found.summary, found.fix, found.details) == ("missing", "no database", "make it", ["one"])
+    (_, made), = fulfil(journal, kinds, ctx, {need.id}).entries
+    assert (made.state, made.fulfilled, made.details) == ("ready", True, ["fulfilled: made the database"])
+
+
+def test_a_fulfil_over_its_budget_is_left(monkeypatch):
+    import time  # noqa: PLC0415
+    from pubkit.deploy.model import Need  # noqa: PLC0415
+    from pubkit.deploy.walk import timed  # noqa: PLC0415
+
+    class Slow:
+        type, grade, budget, fulfil_budget, offline, schema = "example.slow", "auto", 1.0, 0.05, False, {}
+
+        def fulfil(self, need, ctx):
+            time.sleep(0.5)
+
+    result = timed(Slow(), Need("example.slow", "one", {}), Context.for_tests(), "fulfil")
+    assert (result.state, result.summary) == ("unknown", "the fulfil took longer than 0.05 s, and was left")
+
+
+def test_a_fulfil_budget_over_900_seconds_is_refused():
+    from pubkit.deploy.registry import type_problems  # noqa: PLC0415
+    from pubkit.deploy.types.k8s import CronJob  # noqa: PLC0415
+    kind = CronJob()
+    kind.fulfil_budget = 901
+    assert "its fulfil_budget must be more than 0 and at most 900 seconds" in type_problems(kind)

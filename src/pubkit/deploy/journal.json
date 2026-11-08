@@ -1,69 +1,205 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Sustenaut/pubkit/blob/main/src/pubkit/deploy/journal.json",
-  "title": "deploy-journal/1",
-  "description": "One walk of pubkit deploy: who ran it, where, and what each need was found to be. It holds no need's params, and no value.",
+  "title": "deploy-journal/2",
+  "description": "One walk of pubkit deploy, of one unit: who ran it, where, whether it fulfilled, and what each need was found to be. It holds no need's params, and no value.",
   "type": "object",
-  "required": ["schema", "service", "walk", "needs", "summary"],
+  "required": [
+    "schema",
+    "service",
+    "walk",
+    "needs",
+    "summary"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema": {"const": "deploy-journal/1"},
+    "schema": {
+      "const": "deploy-journal/2"
+    },
     "service": {
       "type": "object",
-      "required": ["repository", "namespace", "commit", "pubkit"],
+      "required": [
+        "repository",
+        "namespace",
+        "unit",
+        "commit",
+        "pubkit"
+      ],
       "additionalProperties": false,
       "properties": {
-        "repository": {"type": "string"},
-        "namespace": {"type": "string"},
-        "commit": {"type": "string"},
-        "pubkit": {"type": "string"}
+        "repository": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "pubkit": {
+          "type": "string"
+        }
       }
     },
     "walk": {
       "type": "object",
-      "required": ["mode", "offline", "started_at", "seconds", "by", "from"],
+      "required": [
+        "mode",
+        "offline",
+        "started_at",
+        "seconds",
+        "by",
+        "from"
+      ],
       "additionalProperties": false,
       "properties": {
-        "mode": {"enum": ["check"]},
-        "offline": {"type": "boolean"},
-        "started_at": {"type": "string"},
-        "seconds": {"type": "number", "minimum": 0},
-        "by": {"type": "string"},
-        "from": {"enum": ["laptop", "actions", "plane"]}
+        "mode": {
+          "enum": [
+            "check",
+            "fulfil"
+          ]
+        },
+        "offline": {
+          "type": "boolean"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "by": {
+          "type": "string"
+        },
+        "from": {
+          "enum": [
+            "laptop",
+            "actions",
+            "plane"
+          ]
+        }
       }
     },
     "needs": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "type", "name", "implied_by", "after", "state", "summary", "fix", "details",
-                     "seconds", "checked_at"],
+        "required": [
+          "id",
+          "type",
+          "name",
+          "implied_by",
+          "after",
+          "grade",
+          "state",
+          "fulfilled",
+          "summary",
+          "fix",
+          "details",
+          "seconds",
+          "checked_at"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": {"type": "string"},
-          "type": {"type": "string"},
-          "name": {"type": "string"},
-          "implied_by": {"type": ["string", "null"]},
-          "after": {"type": "array", "items": {"type": "string"}},
-          "state": {"enum": ["ready", "missing", "drift", "blocked", "unknown"]},
-          "summary": {"type": "string", "maxLength": 120},
-          "fix": {"type": "string"},
-          "details": {"type": "array", "items": {"type": "string"}},
-          "seconds": {"type": "number", "minimum": 0},
-          "checked_at": {"type": "string"}
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "implied_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grade": {
+            "enum": [
+              "auto",
+              "propose",
+              "human",
+              "none"
+            ]
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "missing",
+              "drift",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "fulfilled": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "fix": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "checked_at": {
+            "type": "string"
+          }
         }
       }
     },
     "summary": {
       "type": "object",
-      "required": ["ready", "missing", "drift", "blocked", "unknown"],
+      "required": [
+        "ready",
+        "missing",
+        "drift",
+        "blocked",
+        "unknown"
+      ],
       "additionalProperties": false,
       "properties": {
-        "ready": {"type": "integer", "minimum": 0},
-        "missing": {"type": "integer", "minimum": 0},
-        "drift": {"type": "integer", "minimum": 0},
-        "blocked": {"type": "integer", "minimum": 0},
-        "unknown": {"type": "integer", "minimum": 0}
+        "ready": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "drift": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

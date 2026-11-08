@@ -37,6 +37,7 @@ COMMON: dict[str, Any] = {
     "after": {"type": "array", "items": {"type": "string", "pattern": f"^{ID.pattern}$",
                                          "x-phrase": "must be a need's id, TYPE:NAME"},
               "x-phrase": "must be a list of needs' ids, each TYPE:NAME"},
+    "unit": {"type": "string", "x-phrase": "must be a unit's name"},
 }
 # Where a need's type says it fills a Kubernetes Secret: its name, the key, and
 # whether the value is base64 that goes into the Secret decoded.
@@ -169,12 +170,17 @@ def need_schema(kind: NeedType) -> dict[str, Any]:
     return schema
 
 
-def need_problems(entry: Any, i: int, types: dict[str, NeedType], root: Path) -> list[str]:
+def need_problems(entry: Any, i: int, types: dict[str, NeedType], root: Path,
+                  providers: list[str] | None = None) -> list[str]:
     """What is wrong with one need as written."""
     kind = types.get(entry["type"])
     if kind is None:
+        if providers:
+            return [f"deploy: needs[{i}]: {entry['type']} is no type of need pubkit or an installed package "
+                    f"offers; it would be {listed(providers, 'or')}'s, of deploy.providers, which ./pubkit runs "
+                    f"with: run ./pubkit, or install {listed(providers, 'or')}"]
         return [f"deploy: needs[{i}]: {entry['type']} is no type of need pubkit knows; "
-                f"it knows {listed(sorted(types))}"]
+                f"it knows {listed(sorted(types))}; a package's types are named in deploy.providers"]
     name = entry.get("name") if isinstance(entry.get("name"), str) else None
     label = f"deploy: needs[{i}] ({entry['type']}:{name})" if name else f"deploy: needs[{i}] ({entry['type']})"
     out = [phrase(label, *found) for found in validate(entry, need_schema(kind))]
@@ -199,19 +205,30 @@ def problems(config: dict[str, Any], root: Path, types: dict[str, NeedType] | No
     out = [phrase(BLOCK, *found) for found in validate(block, block_schema())]
     if out or not isinstance(block, dict):
         return out
+    from .units import names, unit_block  # noqa: PLC0415
     workflow = block.get("workflow", DEFAULT_WORKFLOW)
     if not (root / WORKFLOWS / workflow).is_file():
         out.append(f"deploy: workflow {workflow} is not in {WORKFLOWS}")
-    overlay = block.get("overlay", DEFAULT_OVERLAY)
-    if not any((root / overlay / k).is_file() for k in KUSTOMIZATIONS):
-        out.append(f"deploy: overlay {overlay} has no kustomization.yaml")
+    units = names(block)
+    if block["namespace"] in (block.get("units") or {}):
+        out.append(f"deploy: units: {block['namespace']} is the top level's unit, named by its namespace")
+    for unit in units:
+        overlay = unit_block(block, unit).get("overlay", DEFAULT_OVERLAY)
+        if not any((root / overlay / k).is_file() for k in KUSTOMIZATIONS):
+            of = "" if unit == block["namespace"] else f" (unit {unit})"
+            out.append(f"deploy: overlay {overlay}{of} has no kustomization.yaml")
+    offered = [p["distribution"] for p in block.get("providers", [])]
     for i, entry in enumerate(block.get("needs", [])):
-        out += need_problems(entry, i, types, root)
+        out += need_problems(entry, i, types, root, offered)
+        if "unit" in entry and entry["unit"] not in units:
+            out.append(f"deploy: needs[{i}]: unit {entry['unit']} is no unit of the block; it has {listed(units)}")
     if out:
         return out
     from .implied import build  # noqa: PLC0415
     from .order import cycle_problems  # noqa: PLC0415
-    plan, bad = build(config, types, root=root)
-    if bad:
-        return bad
-    return cycle_problems(plan, types)
+    for unit in units:
+        plan, bad = build(config, types, root=root, unit=unit)
+        bad = bad or cycle_problems(plan, types)
+        if bad:
+            return bad
+    return []
