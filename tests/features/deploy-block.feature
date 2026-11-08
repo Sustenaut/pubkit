@@ -57,12 +57,12 @@ Feature: pubkit sync --check checks pubkit.json's deploy block
       | needs     | {"type": "upstream"}                     | deploy: needs must be a list of needs, each an object with a type                            |
       | needs     | [{"name": "storage"}]                    | deploy: needs[0]: type is missing                                                            |
       | needs     | ["upstream"]                             | deploy: needs[0] must be an object with a type                                               |
-      | frob      | true                                     | deploy: frob is not a setting; it takes namespace, host, workflow, gate, overlay and needs  |
+      | frob      | true                                     | deploy: frob is not a setting; it takes namespace, host, workflow, gate, overlay, units, providers and needs  |
 
   Scenario: The block must be an object
     Given the deploy block is []
     When I check the deploy block
-    Then the only problem is "deploy must be an object, with namespace and maybe host, workflow, gate, overlay and needs"
+    Then the only problem is "deploy must be an object, with namespace and maybe host, workflow, gate, overlay, units, providers and needs"
 
   Scenario: The workflow must be in .github/workflows
     Given the deploy block's "workflow" is "release.yml"
@@ -84,12 +84,12 @@ Feature: pubkit sync --check checks pubkit.json's deploy block
   Scenario: A need of a type pubkit does not know is named, with the types it knows
     Given the deploy block also needs {"type": "example.thing", "name": "one"}
     When I check the deploy block
-    Then the only problem starts "deploy: needs[6]: example.thing is no type of need pubkit knows; it knows bitwarden.generated, bitwarden.secret, deploy.rollout,"
+    Then the only problem starts "deploy: needs[6]: example.thing is no type of need pubkit knows; it knows auth.sign-in-client, bitwarden.generated, bitwarden.secret,"
 
   Scenario: A key a need's type does not take is named, with the keys it takes
     Given the deploy block also needs {"type": "upstream", "name": "files", "health": "https://files.example.eu/healthz", "healthz": "/"}
     When I check the deploy block
-    Then the only problem is "deploy: needs[6] (upstream:files): healthz is not a setting of upstream; it takes type, name, after and health"
+    Then the only problem is "deploy: needs[6] (upstream:files): healthz is not a setting of upstream; it takes type, name, after, unit and health"
 
   Scenario: A need's own key that is malformed is named
     Given the deploy block also needs {"type": "upstream", "name": "files", "health": "http://files.example.eu/healthz"}
@@ -173,14 +173,14 @@ Feature: pubkit sync --check checks pubkit.json's deploy block
     Then it succeeds
     And the listing shows "example.thing" graded "none", from "example-needs", taking "size?"
     And the listing shows "k8s.secret" graded "auto", from "pubkit", taking "keys?, shapes?"
-    And it prints "15 types; every need also takes type, name and after"
+    And it prints "20 types; every need also takes type, name, after and unit"
 
   Scenario: A package offering a type pubkit has is left out, naming both
     Given the package "example-needs" offers the need type "k8s.secret"
     When I run pubkit "deploy" "types"
     Then it succeeds
     And stderr mentions "sustenaut.needs entry point k8s.secret (example_needs:K8S_SECRET, from example-needs) offers k8s.secret, which pubkit offers too; example-needs's is left out"
-    And it prints "14 types"
+    And it prints "19 types"
 
   Scenario Outline: A need type a package offers is checked as it loads
     Given the package "example-needs" offers a need type whose <part> is <value>

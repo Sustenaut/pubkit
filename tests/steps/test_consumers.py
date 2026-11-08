@@ -100,12 +100,12 @@ def finds_nothing(names):
 # pubkit's deploy workflow and the server's program already use; any other
 # host, and any other mention of the owner, is a consumer's.
 DEPLOY = ("src/pubkit/deploy", "tests/fixtures/deploy-app", "tests/features/deploy-*.feature",
-          "tests/steps/deploy_*.py", "tests/steps/test_deploy_*.py")
+          "tests/steps/deploy_*.py", "tests/steps/test_deploy_*.py", ".github/workflows/deploy-check.yml")
 # A host, not a module path such as .types.net.
 HOST = re.compile(r"(?<![.\w])(?:[a-z0-9-]+\.)+(?:eu|com|org|net|io|dev|app|cloud)\b")
 EXAMPLE_HOSTS = re.compile(r"(?:^|\.)example\.(?:eu|com|org|net)$")
 TOOL_HOSTS = {"github.com", "json-schema.org", "quay.io", "ghcr.io"}
-TOOL_DOMAINS = (".k8s.io",)  # Kubernetes' API groups
+TOOL_DOMAINS = (".k8s.io", ".iam.gserviceaccount.com")  # Kubernetes' API groups, Google's service accounts
 OWNER = re.compile(r"(?i)\b(sustenaut|schryer)\b[-.\w]*")
 OWNER_NAMES = {"sustenaut.needs", "sustenaut-app", "Sustenaut/pubkit"}
 

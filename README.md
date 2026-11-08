@@ -873,7 +873,7 @@ rollout and the service's health. Each is `ready`, `missing`, `drift`,
 ./with-secrets ./pubkit deploy check                 # everything, Bitwarden included
 ./pubkit deploy check --offline                      # the manifests and the files only
 ./pubkit deploy check --zones ../infra/pubkit.json   # the hosting block that keeps the zone
-./pubkit deploy check --json                         # the walk as a deploy-journal/1 document
+./pubkit deploy check --json                         # the walk as a deploy-journal/2 document
 ```
 
 It reads the cluster through `kubectl` (`--kubectl CMD` for another, such as
@@ -892,11 +892,108 @@ check (no kustomize, a zone kept in another repository) it says, and fails
 nothing for.
 
 A package may offer more need types under the entry-point group
-`sustenaut.needs`, each `module:object` naming an object with a `type`, a
-JSON `schema` of its keys that takes no other, a `grade`, a `budget` in
-seconds (at most 10), `offline`, and `default_name`, `depends_on`, `check`
-and `fulfil`. One pubkit cannot use is left out with a warning. Checks only,
-for now: every type's `fulfil` waits for a later release.
+`sustenaut.needs`, each `module:object` naming an instance (not a class)
+with a `type`, a JSON `schema` of its keys that takes no other, a `grade`, a
+`budget` in seconds (at most 10), `offline`, and `default_name`,
+`depends_on`, `check` and `fulfil`; and optionally a `fulfil_budget` (at
+most 900 seconds, default 60). It need import nothing of pubkit's: any
+result with `state`, `summary`, `fix` and `details` serves. The walk takes
+`type`, `name`, `after` and `unit` out of a need's params, and a `secret` on
+any need implies the `k8s.secret` it fills. One pubkit cannot use is left
+out with a warning. `deploy.providers` names the packages a repository's
+needs use, and the managed `./pubkit` runs with each:
+
+```json
+"providers": [{"distribution": "example-needs", "sha256": "…",
+               "wheel": "https://github.com/example-org/example-needs/releases/download/v1.0.0/example_needs-1.0.0-py3-none-any.whl"}]
+```
+
+uv does not check a `--with` address's `#sha256`, so `./pubkit` fetches each
+wheel once into the user's cache and checks it against its sha256 on every
+run before uv sees it. `pubkit bump` moves each to its latest release, as
+it moves pubkit's own pin. A need whose type no installed package offers
+names the providers that would.
+
+### Making what a service needs
+
+`pubkit deploy walk` is the check (`deploy check` is it without `--fulfil`);
+with `--fulfil` it then makes what is missing:
+
+```
+./with-secrets ./pubkit deploy walk --fulfil --server server.example.eu
+./pubkit deploy walk --unit other --json
+```
+
+It checks every need first, then prints the plan, a line per need it will
+act on, and waits for a typed `yes` (`--yes` skips that, for a scheduled
+run). It visits the needs in order again: each missing one whose grade is
+auto, whose dependencies are ready, is fulfilled and checked again, and
+that check is its result, `fulfilled`. A fulfil that fails leaves the need
+as it was, with why, and the walk goes on with what does not wait for it.
+A propose need is never acted on: its fix is the change to make, such as
+the JSON entry and the file it goes in; a human one's is the step. What auto
+does, type by type:
+
+| type | its fulfil | it needs |
+| --- | --- | --- |
+| k8s.namespace | `sustenaut-app NS` on the server | the admin channel |
+| k8s.secret | a Secret manifest from the values of the needs that fill it, on kubectl's standard input, then a restart of each Deployment the manifests show reading it | kubectl that writes |
+| k8s.manifests | `kubectl apply -f -` of the file | kubectl that writes |
+| k8s.cronjob, service.health | a Job from the CronJob, waited for; a Job made by hand, NAME-pubkit-... or NAME-now, counts as the CronJob's success, as kubectl does not make it the CronJob's | kubectl that writes |
+| github.secret, github.variable, github.deploy-settings | `gh secret set` or `gh variable set` of what the secrets and github_app blocks name, from Bitwarden, as `pubkit app-secrets` does | ./with-secrets |
+| github.gate | the gate set on, once every need before it is ready, and the workflow run | gh |
+| deploy.rollout | the workflow run on the default branch, and waited for | gh |
+| bitwarden.generated | a new value of its shape, written to Bitwarden, and kept for the Secret it fills | a write token |
+| gcp.service-account-key | a new key, written to Bitwarden, deleted from Google if that fails | gcloud, a write token |
+| auth.sign-in-client | its Secret made on the server, from the client kept there; or the approval record written into `approvals` | the admin channel |
+
+A variable the variables block declares, `dns.site`, `storage.tenant` and
+`github.variable-entry` propose; `upstream`, `bitwarden.secret` and
+`k8s.secrets-declared` have no fulfil. The write token is asked for once,
+at a hidden prompt, when the plan holds a need that wants one, and kept
+only by the process; a walk from GitHub Actions, or with `--yes` and no
+terminal, asks for none, and those needs are unknown, saying so.
+
+The channels: with `--server HOST` (or `SUSTENAUT_SERVER`) and no
+`--kubectl`, kubectl is `ssh root@HOST k3s kubectl`, and a command can run
+on the server: the admin channel, everything a fulfil does. `--kubectl 'ssh
+-i KEY deploy@HOST {unit} kubectl-read'` is the server's read-only verb, a
+JSON line a call over one connection, in the unit's namespace (`{unit}`):
+every write is unknown there, the namespace is judged on the admin channel
+only, and a Secret is read by its key names (`secret-keys`) or, on a server
+without that verb, by name alone. Any other `--kubectl`, or `kubectl`, is
+what its kubeconfig may do. A value moves only on a standard input: never
+in an argv, a file, a log or the journal.
+
+`deploy.units` adds units beside the top level's, each with its own
+`namespace`, `overlay`, `gate` and `host`; they share the workflow and every
+need with no `unit` (`"unit": "other"` scopes one). Each is walked and
+journaled on its own; `--unit` walks one. When the workflow calls
+k8s-deploy.yml, `pubkit sync --check` fails unless its `deploys` lines and
+the units agree, and, from k8s-deploy.yml 0.31.0, unless the workflow
+starts on `workflow_run` of main with `actions: read`, and on
+`workflow_dispatch`, by which the gate's and the rollout's fulfils run it;
+`pubkit bump` rewrites a `push` trigger when it moves that pin across 0.31.0.
+
+`--json` prints a deploy-journal/2 document per unit (a list for more than
+one): each need with its grade and whether it was fulfilled. `--journal URL`
+(or `PUBKIT_JOURNAL_URL`) also writes it to storage, as a file of the tenant
+`plane`, and moves the head `services/OWNER/REPO/UNIT` to it, If-Match its
+ETag, trying once more when another walk moved it first. The token is
+`PUBKIT_STORAGE_TOKEN`, or in GitHub Actions the job's OIDC token for
+`PUBKIT_STORAGE_AUDIENCE` (default the address's host). A journal that
+could not be written is said, and fails nothing.
+
+pubkit's `deploy-check.yml` walks it every 30 minutes, read-only, over the
+deploy channel, with the deploy key, host and tailnet secrets k8s-deploy.yml
+takes and the environment's read-only `BWS_ACCESS_TOKEN`, with
+`--tolerate-unknown`: it fails when a need is missing, drift or blocked, and
+a need the job cannot judge, such as a secret its token may not list, stays
+unknown in the journal and fails nothing. `pubkit sync` seeds its caller,
+`.github/workflows/deploy-check.yml`, in a repository with a deploy block.
+And every repository with a `with-secrets.json` gets the managed
+`with-secrets`: an older copied script is why `bitwarden.*` needs were
+unknown, and `pubkit sync --check` says so.
 
 ## Terraform from CI
 

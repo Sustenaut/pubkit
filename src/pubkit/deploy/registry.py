@@ -1,11 +1,14 @@
 """The need types a walk knows: pubkit's own, and any an installed package
 offers under the entry-point group `sustenaut.needs`, each `module:object`
-naming an object with what model.NeedType has.
+naming an object with what model.NeedType has: an instance, whose check and
+fulfil the walk calls, not a class. A provider need import nothing of
+pubkit's: any result with state, summary, fix and details serves.
 
 A type is checked as it loads: its name is dotted lower-case words, its
 schema an object schema that takes no key it does not name, its budget more
 than 0 and at most 10 seconds, its grade one of auto, propose, human and
-none. One that fails, or does not load, is left out with a warning, and
+none, and its fulfil_budget, when it gives one, more than 0 and at most 900
+seconds. One that fails, or does not load, is left out with a warning, and
 never stops `pubkit sync --check`. A type a second package offers again is
 left out, naming both.
 """
@@ -18,18 +21,22 @@ from importlib.metadata import EntryPoint, entry_points
 from typing import Any
 
 from .model import GRADES, NeedType
+from .types.auth import SignInClient
 from .types.bitwarden import BitwardenGenerated, BitwardenSecret
-from .types.github import DeploySettings, GitHubSecret, GitHubVariable
-from .types.k8s import Manifests, Namespace, Secret, SecretsDeclared
-from .types.net import Health, Site, Upstream
+from .types.gcp import ServiceAccountKey
+from .types.github import DeploySettings, GitHubSecret, GitHubVariable, VariableEntry
+from .types.k8s import CronJob, Manifests, Namespace, Secret, SecretsDeclared
+from .types.net import Health, Site, Tenant, Upstream
 from .types.rollout import Gate, Rollout
 
 GROUP = "sustenaut.needs"
 TYPE = re.compile(r"[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+")
 LONGEST = 10.0
-BUILTIN: tuple[NeedType, ...] = (Namespace(), Secret(), SecretsDeclared(), Manifests(), GitHubSecret(),
-                                 GitHubVariable(), DeploySettings(), Gate(), Upstream(), Site(), Rollout(),
-                                 Health(), BitwardenSecret(), BitwardenGenerated())
+LONGEST_FULFIL = 900.0
+BUILTIN: tuple[NeedType, ...] = (Namespace(), Secret(), SecretsDeclared(), Manifests(), CronJob(), GitHubSecret(),
+                                 GitHubVariable(), DeploySettings(), VariableEntry(), Gate(), Upstream(), Site(),
+                                 Tenant(), Rollout(), Health(), BitwardenSecret(), BitwardenGenerated(),
+                                 ServiceAccountKey(), SignInClient())
 PUBKIT = "pubkit"
 
 
@@ -52,6 +59,9 @@ def type_problems(kind: Any) -> list[str]:
     budget = getattr(kind, "budget", None)
     if isinstance(budget, bool) or not isinstance(budget, int | float) or not 0 < budget <= LONGEST:
         out.append(f"its budget must be more than 0 and at most {LONGEST:g} seconds")
+    fulfil = getattr(kind, "fulfil_budget", 1.0)
+    if isinstance(fulfil, bool) or not isinstance(fulfil, int | float) or not 0 < fulfil <= LONGEST_FULFIL:
+        out.append(f"its fulfil_budget must be more than 0 and at most {LONGEST_FULFIL:g} seconds")
     if getattr(kind, "grade", None) not in GRADES:
         out.append(f"its grade must be one of {', '.join(GRADES)}")
     if not isinstance(getattr(kind, "offline", None), bool):

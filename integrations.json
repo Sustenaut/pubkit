@@ -10,6 +10,7 @@
     {
       "plugin": "bitwarden.secrets",
       "paths": [
+        ".github/workflows/deploy-check.yml",
         ".github/workflows/terraform.yml",
         "src/pubkit/bitwarden.py",
         "src/pubkit/github_app.py",
@@ -57,8 +58,11 @@
     {
       "plugin": "github.actions-oidc",
       "paths": [
+        ".github/workflows/deploy-check.yml",
         ".github/workflows/terraform.yml",
-        "src/pubkit/board_publish.py"
+        "src/pubkit/board_publish.py",
+        "src/pubkit/deploy/scheduled.py",
+        "src/pubkit/deploy/store.py"
       ],
       "mode": "required"
     },
@@ -83,7 +87,8 @@
     {
       "plugin": "github.ghcr",
       "paths": [
-        ".github/workflows/k8s-deploy.yml"
+        ".github/workflows/k8s-deploy.yml",
+        "src/pubkit/deploy/units.py"
       ],
       "mode": "required"
     },
@@ -92,6 +97,7 @@
       "paths": [
         ".github/nightly/update.sh",
         ".github/workflows/ci.yml",
+        ".github/workflows/deploy-check.yml",
         ".github/workflows/job-tested.yml",
         ".github/workflows/k8s-deploy.yml",
         ".github/workflows/nightly.yml",
@@ -109,6 +115,7 @@
       "plugin": "google.cloud",
       "paths": [
         ".github/workflows/terraform.yml",
+        "src/pubkit/deploy/types/gcp.py",
         "src/pubkit/service_account_key.py",
         "terraform/cloud-run-access/",
         "terraform/cloud-run-service/",
@@ -176,6 +183,7 @@
     {
       "plugin": "tailscale.tailnet",
       "paths": [
+        ".github/workflows/deploy-check.yml",
         ".github/workflows/k8s-deploy.yml",
         "actions/deploy-ssh/",
         "src/pubkit/deploy/implied.py"

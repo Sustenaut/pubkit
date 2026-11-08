@@ -32,7 +32,8 @@
     pubkit board --out DIR --repos FILE [--rules FILE]
     pubkit k8s preflight --namespace NS [--kubectl CMD] [--offline] < MANIFESTS
     pubkit k8s diagnose --namespace NS [--kubectl CMD] [--selector SEL]
-    pubkit deploy check [--offline] [--json] [--kubectl CMD] [--zones PATH] [--namespace NS]
+    pubkit deploy walk [--fulfil] [--yes] [--unit NAME] [--kubectl CMD] [--server HOST] [--zones PATH] [--journal URL] [--json]
+    pubkit deploy check [--offline] [--json] [--unit NAME] [--kubectl CMD] [--server HOST] [--zones PATH] [--namespace NS]
     pubkit deploy types
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
@@ -77,6 +78,7 @@ MANAGED = {
 }
 # Managed files that are programs, written executable.
 EXECUTABLE = {"with-secrets", "pubkit"}
+WITH_SECRETS = "with-secrets"
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
@@ -124,10 +126,46 @@ def read_config(root: Path) -> dict[str, str]:
     return config
 
 
+# The launcher's part for deploy.providers: uv does not check a --with URL's
+# #sha256, so each wheel is fetched once into the user's cache and checked
+# against its pin on every run before uv is given the file.
+PROVIDER = """# The packages pubkit.json's deploy.providers names, each wheel checked against its sha256.
+with=()
+provider() {
+  local dir="${XDG_CACHE_HOME:-$HOME/.cache}/pubkit/providers/$2" sum
+  local file="$dir/${1##*/}"
+  if [ ! -f "$file" ]; then
+    mkdir -p "$dir"
+    curl -fsSL -o "$file.part" "$1" || { echo "pubkit: could not fetch $1" >&2; exit 1; }
+    mv "$file.part" "$file"
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then sum=$(sha256sum "$file"); else sum=$(shasum -a 256 "$file"); fi
+  if [ "${sum%% *}" != "$2" ]; then
+    rm -f "$file"
+    echo "pubkit: $1 is not the wheel deploy.providers pins (sha256 $2)" >&2
+    exit 1
+  fi
+  with+=(--with "$file")
+}
+"""
+
+
+def providers(config: dict) -> list[dict[str, str]]:
+    deploy = config.get("deploy")
+    given = deploy.get("providers") if isinstance(deploy, dict) else None
+    return [p for p in given or [] if isinstance(p, dict) and isinstance(p.get("wheel"), str)
+            and isinstance(p.get("sha256"), str)]
+
+
 def values(config: dict[str, str]) -> dict[str, str]:
+    import shlex  # noqa: PLC0415
     from .new import PUBREL_PIN
+    wheels = providers(config)
+    launched = PROVIDER + "".join(f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n"
+                                  for p in wheels)
     return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
-            "pubrel": PUBREL_PIN}
+            "pubrel": PUBREL_PIN, "providers": launched + "\n" if wheels else "",
+            "with": '"${with[@]}" ' if wheels else ""}
 
 
 def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,
@@ -217,12 +255,26 @@ def sync(root: Path, check: bool) -> int:
         lines, deploy_failed = offline_lines(root, config)
         for line in lines:
             print(line, file=sys.stderr)
+        # The scheduled walk: seeded once, the repository's own from then on.
+        from .deploy.scheduled import CALLER, caller  # noqa: PLC0415
+        if not (root / CALLER).exists():
+            if check:
+                print(f"pubkit: no {CALLER}, the scheduled deploy walk: `pubkit sync` seeds it", file=sys.stderr)
+            else:
+                (root / CALLER).parent.mkdir(parents=True, exist_ok=True)
+                (root / CALLER).write_text(caller(config), encoding="utf-8")
+                print(f"seeded   {CALLER}")
     kind = config["kind"]
     every = templates(kind)
     stale = []
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
     from .ci import INTEGRATIONS, declared, generated as workflows, leftovers  # noqa: PLC0415
-    wanted = [(path, render(every[path], values(config))) for path in managed(kind)]
+    owned = managed(kind)
+    # Any repository with a with-secrets.json runs it through the managed with-secrets.
+    if WITH_SECRETS not in owned and (root / f"{WITH_SECRETS}.json").is_file():
+        owned = [*owned, WITH_SECRETS]
+        every = {**every, WITH_SECRETS: templates("service", ("service",))[WITH_SECRETS]}
+    wanted = [(path, render(every[path], values(config))) for path in owned]
     wanted += workflows(config, root)
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
@@ -253,6 +305,13 @@ def sync(root: Path, check: bool) -> int:
               file=sys.stderr)
     if check:
         for path in stale:
+            held = root / path
+            if path == WITH_SECRETS and held.is_file() and "Managed by pubkit" not in held.read_text(
+                    encoding="utf-8", errors="replace"):
+                print(f"pubkit: {path} differs from pubkit {__version__}'s: it is an older script, which does not "
+                      f"say which Bitwarden project it read (PUBKIT_SECRETS_PROJECT), so pubkit deploy finds every bitwarden.* need "
+                      f"unknown through it; run `pubkit sync`, which writes the managed one", file=sys.stderr)
+                continue
             if path == INTEGRATIONS:
                 print(f"pubkit: {path} doesn't declare what the files pubkit writes use (the "
                       f"sonar job's token, or with-secrets.json for Bitwarden); run `pubkit sync`",
@@ -650,19 +709,33 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("dir", type=Path, help="the built site, such as _site")
     p.add_argument("--url", help="the site's https:// address, to find og:image files in DIR")
     p = commands.add_parser("deploy", help="check what pubkit.json's deploy block says the service needs "
-                                           "before it deploys, changing nothing")
+                                           "before it deploys, and make what is missing")
     deploy = p.add_subparsers(dest="deploy_command", required=True)
-    p = deploy.add_parser("check", help="check every need, in order, and print each one's state; "
-                                        "exit 1 when one is not ready")
-    p.add_argument("--offline", action="store_true",
-                   help="check only what needs no network: the manifests against the needs, and the files")
-    p.add_argument("--json", action="store_true", help="print the walk as a deploy-journal/1 document")
-    p.add_argument("--kubectl", default="kubectl",
-                   help="the kubectl command, such as 'k3s kubectl --kubeconfig FILE'")
-    p.add_argument("--zones", type=Path, metavar="PATH",
-                   help="the pubkit.json, here or in a checkout beside this one, whose hosting block "
-                        "keeps the zone of the deploy's host")
-    p.add_argument("--namespace", metavar="NS", help="another namespace than the block's, for a second overlay")
+    for verb, said in (("walk", "check every need, in order, print each one's state, and with --fulfil make "
+                                "what is missing; exit 1 when one is not ready"),
+                       ("check", "deploy walk without --fulfil: check every need, changing nothing")):
+        p = deploy.add_parser(verb, help=said)
+        if verb == "walk":
+            p.add_argument("--fulfil", action="store_true",
+                           help="after the checks, make each auto need that is missing, once the plan is confirmed")
+            p.add_argument("--yes", action="store_true", help="confirm the plan without asking (no write token "
+                                                              "is asked for without a terminal)")
+        p.add_argument("--tolerate-unknown", action="store_true",
+                       help="exit 0 unless a need is missing, drift or blocked: an unknown one fails nothing")
+        p.add_argument("--unit", metavar="NAME", help="walk one unit of the deploy block; every unit by default")
+        p.add_argument("--offline", action="store_true",
+                       help="check only what needs no network: the manifests against the needs, and the files")
+        p.add_argument("--json", action="store_true", help="print the walk as a deploy-journal/2 document")
+        p.add_argument("--kubectl", metavar="CMD",
+                       help="the kubectl command, such as 'k3s kubectl --kubeconfig FILE', or the server's "
+                            "read-only verb, 'ssh -i KEY deploy@HOST {unit} kubectl-read'")
+        p.add_argument("--server", metavar="HOST", help="the admin channel: kubectl and commands over ssh root@HOST "
+                                                         "(default SUSTENAUT_SERVER, without --kubectl)")
+        p.add_argument("--zones", type=Path, metavar="PATH",
+                       help="the pubkit.json, here or in a checkout beside this one, whose hosting block "
+                            "keeps the zone of the deploy's host")
+        p.add_argument("--journal", metavar="URL", help="also write the journal to storage (or PUBKIT_JOURNAL_URL)")
+        p.add_argument("--namespace", metavar="NS", help="another namespace than the unit's")
     deploy.add_parser("types", help="every need type pubkit and the installed packages offer, and its keys")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
@@ -773,14 +846,17 @@ def main(argv: list[str] | None = None) -> int:
         from .deploy import run_types
         return run_types()
     if args.command == "deploy":
-        from .deploy import run_check
+        from .deploy import run_walk
         from .paths import confined
         # --zones is another repository's pubkit.json, so it may be in a
         # checkout beside this one: a pubkit.json in the parent directory's tree.
         zones = confined(args.zones, "the --zones file", also=(root.parent,)) if args.zones else None
         if zones is not None and zones.name != "pubkit.json":
             sys.exit(f"pubkit: the --zones file ({args.zones}) must be a repository's pubkit.json")
-        return run_check(root, args.offline, args.json, args.kubectl, zones, args.namespace)
+        return run_walk(root, args.offline, args.json, args.kubectl, zones, args.namespace,
+                        fulfil=getattr(args, "fulfil", False), unit=args.unit, server=args.server,
+                        yes=getattr(args, "yes", False), journal_url=args.journal,
+                        tolerate_unknown=args.tolerate_unknown)
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())
