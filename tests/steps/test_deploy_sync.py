@@ -59,8 +59,9 @@ def test_a_utility_with_a_with_secrets_json_gets_the_managed_with_secrets(repo, 
     (repo / "with-secrets").write_text(OLD_SCRIPT)
     assert cli.main(["sync", "--check"]) == 1
     err = capsys.readouterr().err
-    assert ("pubkit: with-secrets is not pubkit's but an older script: it does not say which Bitwarden project it "
-            "read (PUBKIT_SECRETS_PROJECT), so pubkit deploy finds every bitwarden.* need unknown through it") in err
+    assert ("with-secrets differs from pubkit" in err and "it is an older script, which does not say which Bitwarden "
+            "project it read (PUBKIT_SECRETS_PROJECT), so pubkit deploy finds every bitwarden.* need unknown "
+            "through it") in err
     assert cli.main(["sync"]) == 0
     assert "Managed by pubkit" in (repo / "with-secrets").read_text()
     assert (repo / "with-secrets").stat().st_mode & 0o111

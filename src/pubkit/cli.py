@@ -308,8 +308,8 @@ def sync(root: Path, check: bool) -> int:
             held = root / path
             if path == WITH_SECRETS and held.is_file() and "Managed by pubkit" not in held.read_text(
                     encoding="utf-8", errors="replace"):
-                print(f"pubkit: {path} is not pubkit's but an older script: it does not say which Bitwarden "
-                      f"project it read (PUBKIT_SECRETS_PROJECT), so pubkit deploy finds every bitwarden.* need "
+                print(f"pubkit: {path} differs from pubkit {__version__}'s: it is an older script, which does not "
+                      f"say which Bitwarden project it read (PUBKIT_SECRETS_PROJECT), so pubkit deploy finds every bitwarden.* need "
                       f"unknown through it; run `pubkit sync`, which writes the managed one", file=sys.stderr)
                 continue
             if path == INTEGRATIONS:
