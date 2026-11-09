@@ -692,8 +692,19 @@ def mirror():
     return ""
 
 
-def _config(mirror):
-    return {"kind": "utility", "mirror": {"wheels": mirror}} if mirror else {"kind": "utility"}
+@pytest.fixture
+def pypi():
+    return ""
+
+
+def _config(mirror, pypi=""):
+    block = {**({"wheels": mirror} if mirror else {}), **({"pypi": pypi} if pypi else {})}
+    return {"kind": "utility", "mirror": block} if block else {"kind": "utility"}
+
+
+@given(parsers.parse('pubkit.json\'s PyPI mirror is "{url}"'), target_fixture="pypi")
+def pypi_mirror(url):
+    return url
 
 
 @given(parsers.parse('pubkit.json\'s wheel mirror is "{url}"'), target_fixture="mirror")
@@ -708,20 +719,34 @@ def lock_file(tmp_path):
     return lock
 
 
-@when("tests/install-lock runs with a pip that fails every install of a GitHub release URL", target_fixture="installed")
-def run_install_lock(tmp_path, lock, mirror):
+@when(parsers.re(r"tests/install-lock runs with a pip that fails every install "
+                 r"(?P<how>of a GitHub release URL|without an index of its own)"), target_fixture="installed")
+def run_install_lock(tmp_path, lock, mirror, pypi, how):
     script = tmp_path / "install-lock"
-    script.write_text(cli.render(cli.templates("utility")["tests/install-lock"], cli.values(_config(mirror))))
+    script.write_text(cli.render(cli.templates("utility")["tests/install-lock"], cli.values(_config(mirror, pypi))))
     seen = tmp_path / "seen"
     seen.mkdir()
     pip = tmp_path / "pip"
-    # Keeps each lock it is given, and fails while one still names a GitHub release.
-    pip.write_text('#!/bin/bash\nn=$(ls "$SEEN" | wc -l)\ncp "$5" "$SEEN/$n"\n! grep -q "https://github.com/" "$5"\n')
+    # Keeps each lock it is given (after -r) and its arguments, and fails while
+    # the lock names a GitHub release, or while it has no --index-url.
+    fails = '! grep -q "https://github.com/" "$lock"' if how.startswith("of") else '[[ " $* " == *" --index-url "* ]]'
+    pip.write_text('#!/bin/bash\nn=$(ls "$SEEN" | grep -vc args)\nlock=""; prev=""\n'
+                   'for a in "$@"; do [ "$prev" = -r ] && lock=$a; prev=$a; done\n'
+                   'cp "$lock" "$SEEN/$n"; echo "$*" > "$SEEN/$n.args"\n' + fails + "\n")
     pip.chmod(0o755)
     done = subprocess.run(["bash", str(script), str(pip), str(lock)], capture_output=True, text=True, check=False,
                           env={**os.environ, "SEEN": str(seen), "INSTALL_LOCK_PAUSE": "0"})
-    locks = [(seen / str(n)).read_text() for n in range(len(list(seen.iterdir())))]
-    return {"code": done.returncode, "locks": locks, "stderr": done.stderr}
+    runs = len([p for p in seen.iterdir() if not p.name.endswith(".args")])
+    locks = [(seen / str(n)).read_text() for n in range(runs)]
+    args = [(seen / f"{n}.args").read_text().split() for n in range(runs)]
+    return {"code": done.returncode, "locks": locks, "args": args, "stderr": done.stderr}
+
+
+@then(parsers.parse('the last install took its packages from "{index}"'))
+def from_index(installed, index):
+    last = installed["args"][-1]
+    assert last[last.index("--index-url") + 1] == index, installed
+    assert all("--index-url" not in a for a in installed["args"][:-1]), "the first three tries use PyPI"
 
 
 @then(parsers.re(r"pip was run (?P<times>\d) times, and the install (?P<how>passed|failed)"))
@@ -750,7 +775,8 @@ def mirror_setting(setting):
 def mirror_refused(setting):
     with pytest.raises(SystemExit) as stop:
         cli.values({"kind": "utility", "mirror": setting})
-    assert 'mirror is {"wheels": "https://host/path", "terraform": "https://host/path"}' in str(stop.value)
+    assert 'mirror is {"wheels": "https://host/path", "terraform": "https://host/path", "pypi": "https://host/path"}' \
+        in str(stop.value)
 
 
 @given("a lock that pins this pubkit's wheel", target_fixture="repo_dir")

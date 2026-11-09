@@ -182,6 +182,8 @@ MIRRORS = {
     "wheels": "the base its files are at as <base>/f/<sha256>/<file>.whl",
     # The Terraform workflows' last init: a provider network mirror.
     "terraform": "a Terraform provider network mirror",
+    # tests/install-lock's last try: a simple repository index at <base>/simple/.
+    "pypi": "a simple repository index (PEP 503) at <base>/simple/",
 }
 
 
@@ -196,7 +198,7 @@ def mirrors(config: dict) -> dict[str, str]:
     if not isinstance(mirror, dict) or set(mirror) - set(MIRRORS) or not all(
             isinstance(url, str) and re.fullmatch(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~-]+)*", url)
             for url in mirror.values()):
-        sys.exit(f'pubkit: {CONFIG}\'s mirror is {{"wheels": "https://host/path", "terraform": "https://host/path"}}, '
+        sys.exit(f'pubkit: {CONFIG}\'s mirror is {{"wheels": "https://host/path", "terraform": "https://host/path", "pypi": "https://host/path"}}, '
                  f"each an https base with no / at its end ({known})")
     return mirror
 
@@ -221,7 +223,8 @@ def values(config: dict[str, str]) -> dict[str, str]:
         launch = f'exec uvx --from "https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl" '
     return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
             "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
-            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror}
+            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
+            "pypi": mirrors(config).get("pypi", "")}
 
 
 def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,

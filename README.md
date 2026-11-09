@@ -1863,9 +1863,18 @@ pip-audit's last try reads the locks rewritten the same way
 from the mirror when GitHub fails to give them. Without the setting, the
 installs only retry, and `./pubkit` is as before.
 
+With a PyPI mirror too, the fourth try takes every other package from its
+simple repository index (PEP 503) instead of PyPI, again checked against
+the lock's hashes:
+
+```json
+"mirror": {"wheels": "https://storage.sustenaut.eu/wheels", "pypi": "https://storage.sustenaut.eu/pypi"}
+```
+
 Filling the mirror is the mirror's own job. For storage.sustenaut.eu, an
 hourly workflow in Sustenaut/storage copies every wheel attached to a
-release of Sustenaut's public repositories.
+release of Sustenaut's public repositories, and the PyPI files and
+Terraform providers the repositories' locks pin.
 
 ## CI
 
