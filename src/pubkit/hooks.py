@@ -34,8 +34,8 @@ def sync(root: Path, config: dict[str, Any], check: bool,
     out, failed = [], False
     if isinstance(config.get("deploy"), dict) and not any(p.name == PUBDEPLOY for p in hooks):
         out.append(f"pubkit: deploy: the deploy block is pubdeploy's to check, and pubdeploy is not installed: "
-                   f"./pubkit runs with it, as deploy.providers lists it (`pubkit sync` lists it), or add "
-                   f"its wheel to tests/requirements.txt and run `pubkit lock`")
+                   f"`pubkit sync` lists it in deploy.providers and tests/requirements-pubkit.txt; run "
+                   f"`pubkit lock` and install the lock, or run ./pubkit, which runs with it")
         failed = check
     for point in hooks:
         try:

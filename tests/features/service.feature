@@ -63,7 +63,7 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     And pubkit.json has a deploy block
     When I run pubkit "sync"
     Then it succeeds
-    And "tests/requirements-pubkit.txt" lists the pubsec of deploy.providers by its wheel
+    And "tests/requirements-pubkit.txt" lists the pubsec and pubdeploy of deploy.providers by their wheels
 
   Scenario: Without a deploy block the tests' requirements name no provider
     Given a repository initialised as "utility"

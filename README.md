@@ -602,8 +602,8 @@ contract"). pubkit keeps three things of it:
   pubdeploy's workflows to their latest releases. A hook that fails is said
   by its name and its error's type alone. With a deploy block and no
   pubdeploy installed, `sync --check` fails, saying so: CI's environment
-  installs it from `tests/requirements.txt`, as `./pubkit` does from
-  deploy.providers.
+  installs it from the lock, since `tests/requirements-pubkit.txt` lists
+  every deploy.providers wheel, and `./pubkit` runs with each.
 
 ## Terraform from CI
 
