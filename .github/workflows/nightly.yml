@@ -171,6 +171,11 @@ jobs:
           tag=$(latest "$PUBKIT")
           python -m pip install --quiet \
             "https://github.com/$PUBKIT/releases/download/$tag/pubkit-${tag#v}-py3-none-any.whl"
+          # pubdeploy, whose sustenaut.bump hook `pubkit pins` calls: it moves
+          # deploy.providers and the uses of pubdeploy's workflows, as bump does.
+          deploy=$(latest Sustenaut/pubdeploy)
+          python -m pip install --quiet \
+            "https://github.com/Sustenaut/pubdeploy/releases/download/$deploy/pubdeploy-${deploy#v}-py3-none-any.whl"
           # The newest pubrel crates.io has: a tag can come before its crate.
           pubrel=$(pubkit/.github/nightly/pubrel-version.sh "$(latest Sustenaut/pubrel)")
           echo "pubrel=$pubrel" >> "$GITHUB_OUTPUT"

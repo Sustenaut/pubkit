@@ -255,12 +255,25 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
     changes = []
+    # What installed packages move, as `pubkit bump` has them do: pubdeploy's
+    # moves deploy.providers (pubsec and pubdeploy among them) and the uses of
+    # pubdeploy's workflows, before sync writes the launchers and the tests'
+    # requirements from them. A failing hook is said, and moves nothing.
+    from .hooks import bump as bump_hooks  # noqa: PLC0415
+    moved = []
+    for line in bump_hooks(root):
+        if line.startswith("updated"):
+            moved.append(line.removeprefix("updated").strip())
+        else:
+            print(line, file=sys.stderr)
+    changes += moved
     before = pinned(root)
-    if before and before != __version__:
+    if (before and before != __version__) or moved:
         from .cli import lock as lock_requirements, sync  # noqa: PLC0415
         sync(root, check=False)
         if lock:
             lock_requirements(root)
+    if before and before != __version__:
         changes.append(f"pubkit {before} -> {__version__}")
     released = bool(pubrel) and released_by_config(root, pubrel, changes)
     if tools_by_config(root, changes) or released:

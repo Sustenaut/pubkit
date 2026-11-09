@@ -37,6 +37,8 @@ DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google
 TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
          ("src/pubkit/new.py", "Sustenaut/pubsec"),
          ("src/pubkit/new.py", "Sustenaut/pubdeploy"),
+         # The nightly installs pubdeploy, whose bump hook `pubkit pins` calls.
+         (".github/workflows/nightly.yml", "Sustenaut/pubdeploy"),
          (".github/workflows/integrations.yml", "Sustenaut/integrations"),
          (".github/nightly/update.sh", "Sustenaut/integrations")}
 ALLOWED = TOOLS
