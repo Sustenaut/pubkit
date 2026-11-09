@@ -34,7 +34,6 @@
     ".github/workflows/job-service-checks.yml",
     ".github/workflows/job-service-terraform.yml",
     ".github/workflows/job-service-tests.yml",
-    ".github/workflows/board.yml",
     ".github/workflows/terraform.yml",
     "plugins/",
     ".claude-plugin/",

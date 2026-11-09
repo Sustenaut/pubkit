@@ -1163,76 +1163,15 @@ carries this rule too.
 
 ## The release board
 
-    pubkit board --out DIR --repos FILE [--rules FILE]
-
-grades every repository the repos file (or the two lists) names, public and private, A to E for
-quality, security and delivery, and writes `DIR/board.json` and a static
-`DIR/index.html`: no scripts, rows worst first, each grade a dot in
-SonarQube's colours whose breakdown opens on hover or keyboard focus. It
-only reads, and keeps nothing between builds. `GITHUB_TOKEN` (or
-`GH_TOKEN`) is the token it reads GitHub with; `SONAR_TOKEN`, when set,
-reads private SonarQube Cloud projects.
-
-The rules are [`src/pubkit/board/rules.json`](src/pubkit/board/rules.json),
-applied by `rules.py`; `--rules FILE` reads others, such as a client's.
-Each grade is a starting letter less one letter per notch, never below E,
-with every notch listed; the overall grade is the worst of the three.
-
-- **Quality** starts at SonarQube Cloud's worse rating of reliability and
-  maintainability, **Security** at its security rating. With no analysis,
-  each starts at A and takes a notch. Then each other tool with findings
-  takes one: a CI job on main's last run that failed (format and lint,
-  tests, functional and browser tests, MSRV, fuzzing, cross builds and
-  toolchains for Quality; the dependency audit, OSV-Scanner and dependency
-  review for Security), open Dependabot, code scanning or secret scanning
-  alerts, and an OpenSSF Scorecard under 7 for a public repository.
-  Alerts that are switched off are listed with no notch.
-- **Delivery** starts at A and takes a notch for each of: a pinned pubkit
-  or pubrel behind its latest release; not integrated with pubkit
-  (services) or with pubkit and pubrel (packages, which have a
-  release.json); for a service, no observability (its health URL does not
-  answer) and no continuous live testing (its live-test workflow not green
-  in the last 24 hours); no release (a package's tag, a service's
-  production deploy) in two months; any open issue (pull requests aside);
-  no nightly (not governed, and no `nightly.yml` run in two days);
-  protection that differs from what `pubkit protect --check` wants, or no
-  ruleset at all on a private repository GitHub's plan gives none; and a
-  red last CI run on main. A fact the board could not read takes its
-  notch: a board that cannot see does not grade green.
-
-A service declares what its observability and live testing are in its
-`pubkit.json`:
-
-```json
-"live": { "health": "https://example.eu/health", "test": "live.yml", "deploy": "deploy.yml" }
-```
-
-`health` is the URL that must answer, `test` the scheduled workflow that
-tests the live site, and `deploy` the workflow whose successful runs are
-its production deploys (`deploy.yml` by default).
-
-Each source has one connector in `src/pubkit/board/connectors/`, and
-nothing else reads it: `lists` (the two lists), `github` (the REST API:
-visibility, pubkit.json, release.json, the lock and workflow pins,
-rulesets, releases, issues and alerts), `actions` (runs and jobs on main,
-nightly, live-test and deploy runs), `sonarcloud` (project `OWNER_REPO`),
-`scorecard` (public repositories) and `live` (the health URLs). Each
-query is a named method, and each call is recorded with its connector,
-method, endpoint and time: board.json lists every call, and links every
-fact and every notch to the calls it rests on, which the breakdown names.
-`--record FILE` keeps every response, and `--replay FILE` builds from
-such a file instead of the network.
-
-[`board.yml`](.github/workflows/board.yml) is the reusable workflow: it
-checks out the caller, installs what its `tests/requirements.lock` pins
-(wheels only, by hash: the caller's own pubkit),
-runs `pubkit board` with the caller's read-only `token` and its `repos` input
-(the repos file itself, as JSON), and uploads board.json and index.html as the `board` artifact, kept 90 days. It
-deploys nothing.
+The board that grades every repository A to E, and the commands a control
+plane runs across many repositories (state files, their GitHub variables,
+freshness, and the nightly's loop), are
+[pubfleet](https://github.com/Sustenaut/pubfleet)'s. It grades protection
+against this pubkit's rulesets, as `pubkit protect --check` does.
 
 ## The repos file
 
-Which repositories pubkit acts on comes from outside it, in one file:
+Which repositories `pubkit protect` acts on can come from outside it, in one file:
 
 ```json
 { "repositories": [
@@ -1244,93 +1183,35 @@ Which repositories pubkit acts on comes from outside it, in one file:
 `protect` says it should carry pubkit's rulesets, and `govern` that a nightly
 keeps it current; each is false when left out. `project`, optional, labels it on
 the board. How a repository is protected stays in its own `pubkit.json`'s
-protect block. `pubkit board --repos FILE`, `pubkit protect [--check] --repos
-FILE` and `pubkit freshness --repos FILE [DIR]` read it (freshness reports the
-governed ones, each checked out at `DIR/<name>`), and the reusable `board.yml`
-and `nightly.yml` take its contents as a `repos` input.
+protect block. `pubkit protect [--check] --repos FILE` reads it; pubfleet reads
+the same file, and makes it from an owner's state file.
 
-    pubkit board-publish --url URL --tenant TENANT [--file FILE]
-
-keeps a board (by default `site/board.json`) in a storage tenant, for a job whose
-logs must stay quiet: it prints no repository's name. It uploads only if a fact or a grade
-differs from what the tenant's `board` head names, then moves the head, conditionally, so
-a move by someone else fails the run. It signs in with the GitHub Actions job's OpenID
-Connect token, for the audience that is the URL's host name, so the job needs `id-token:
-write` and no secret, and the tenant must let that job write.
-
-### State files
-
-    pubkit state --check [FILE]
-    pubkit state --repos-for board|govern [FILE]
-
-`--check` checks a state repository's `state.json` (by default in the working directory),
-which a control plane keeps for one GitHub owner, and `--repos-for` prints the repos file
-for one of its roles:
-
-```json
-{ "owner": "example-org",
-  "repos": {
-    "some-tool": { "project": "tools", "board": true, "protect": true, "govern": true }
-} }
-```
-
-It checks the file's shape, then through `gh` that each repository exists under
-the owner, and that each with `protect` has a sound protect block. `gh` needs a
-token that can read every repository named, which a workflow's own
-`GITHUB_TOKEN` can't. It builds nothing, so it suits being a state repository's
-one required check.
-
-### Variables from a state file
-
-    pubkit variables --check|--apply [--state FILE] [--repos FILE | REPO...]
-
-A repository's GitHub variables that aren't secret can live in the state file, so a
-change to one is a reviewed pull request with a history. The repository's own
-`pubkit.json` declares only their names, and may name the workflow that reads them,
-to run once one changes:
+A repository's `pubkit.json` may name the GitHub variables it reads, never their
+values, and the workflow that takes them in:
 
 ```json
 "variables": { "names": ["SOME_SETTING", "SOME_MAP"], "deploy": "deploy.yml" }
 ```
 
-The state file gives their values, under the repository:
-
-```json
-"some-tool": { "board": true, "protect": true, "govern": false,
-  "variables": { "SOME_SETTING": "a string", "SOME_MAP": { "some-key": "some-value" } } }
-```
-
-A string goes to GitHub as it is; anything else is JSON, kept structured in the state
-so that a diff shows the entry that changed, and sent compact, in the file's order. A
-JSON value matches what GitHub holds if that parses to the same thing. `state --check`
-refuses a name the repository doesn't declare, and an empty value.
-
-`--check` changes nothing: it prints how each repository's variables differ, a diff of
-the changed entries for JSON, and fails when one does, which suits a pull request's
-plan and a nightly drift report. `--apply` sets those that differ, each value on
-`gh`'s standard input, and then runs the repository's `deploy` workflow on its default
-branch, once. Both act on every repository the state gives variables, those named, or
-those a repos file lists, and neither touches a variable the state leaves out nor
-removes one. The token needs to read the repositories' contents and variables, and for
-`--apply` to write variables and run workflows (the Variables and Actions permissions,
-for a GitHub App).
+`pubkit sync --check` refuses a block of the wrong shape. The values are in the
+owner's state file, which pubfleet keeps GitHub to.
 
 ## The nightly
 
-`.github/workflows/nightly.yml` runs over the repositories its `repos` input
-marks to govern, called from a control plane's own schedule. It has no schedule of its
-own. Run by hand, it takes the same `repos` input. A caller passes the secrets `app-id`,
-`app-key`, `notify-token` and `notify-user`, and the `pubkit` input names the
-repository whose latest release supplies the wheel and the update script. It reports, in its summary, the pubkit each pins,
-whether it conforms to the latest standard, and its open exceptions
-(`pubkit freshness`). Then it keeps one pull request per repository, on its
-`pubkit-nightly` branch, with up to four commits (`pubkit nightly`):
+`pubkit nightly --pubrel V --body FILE`, run in one repository's checkout,
+moves it and its dependencies on to this pubkit, in up to four commits on the
+current branch, and writes the pull request's body. pubfleet's `nightly.yml`
+runs it in each repository a control plane governs, and keeps one pull
+request per repository on its `pubkit-nightly` branch. The commits:
 
 1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
    `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
    each tool `ci.tools` pins by tag, to the latest release of
-   its git repository, and the crates `nightly.pins.crates` names in
-   `Cargo.lock`. A workflow pin moves
+   its git repository, every other repository's reusable workflow a
+   hand-written workflow pins at a release (`OWNER/REPO/.github/workflows/...@`),
+   to that repository's latest release, except a `deploy.providers`
+   package's, which its own bump hook moves, and the crates
+   `nightly.pins.crates` names in `Cargo.lock`. A workflow pin moves
    to the commit of the new release's tag, with its version in a comment,
    and one still pinned by tag moves to its commit;
 2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
@@ -1345,18 +1226,7 @@ whether it conforms to the latest standard, and its open exceptions
 
 Each commit regenerates `SUPPLY-CHAIN.md` where there is one and records an
 `internal` pubrel row for each package it changes. An open pull request is
-updated, never a second one opened, and left alone when the night brings
-nothing new. When its CI fails, the pins are tested alone: if they pass,
-the dependency commits are dropped. Nothing merges it: the Sustenaut bot
-sends a Slack DM when it is green or fails.
-
-It pushes and opens the pull requests as the **Sustenaut nightly** GitHub
-App, which is installed on each owner whose repositories it governs. For each repository it mints a token for that repository alone,
-with contents, pull-requests and workflows write and actions read, which
-expires within the hour (`actions/create-github-app-token`). pubkit's
-repository variable `NIGHTLY_APP_ID` and secret `NIGHTLY_APP_KEY` (the
-app's private key) set it up when run by hand, and `app-id` and `app-key` when called. Without them it falls back, with a warning,
-to a `PUBKIT_BUMP_TOKEN` secret, and with neither it only reports.
+updated, never a second one opened, by pubfleet's loop.
 
 ### Update and security settings
 
@@ -1515,7 +1385,7 @@ Sync pins each one, and pubrel's release workflow, to the full commit of the rel
 
 Usually neither needs the network. pubkit's commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubkit has none, and pins by tag. pubrel's commit is the one pubkit records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
-Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/refs.py`: `Sustenaut`, since both moved there from `schryer`. Every repository moves to it on its next `pubkit sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubkit pins` (`pubkit bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubkit.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, `freshness`, the nightly, the board and the audit read a pin under any owner, so one still under the old owner keeps working.
+Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/refs.py`: `Sustenaut`, since both moved there from `schryer`. Every repository moves to it on its next `pubkit sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubkit pins` (`pubkit bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubkit.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, the nightly and the audit read a pin under any owner, so one still under the old owner keeps working.
 
 ```json
 "ci": {

@@ -32,13 +32,6 @@ Feature: The reusable workflows parse as GitHub reads them
       | job-service-checks.yml    |
       | job-service-terraform.yml |
       | job-service-tests.yml     |
-      | board.yml                 |
-
-  Scenario: board.yml grades with the caller's token, keeps board.json and deploys nothing
-    When I parse the workflow "board.yml"
-    Then it takes a required "token" secret and reads the repository's contents only
-    And it runs pubkit board with the token as GITHUB_TOKEN
-    And it uploads board.json as the "board" artifact, kept 90 days, and nothing else runs
 
   Scenario Outline: A reusable workflow ends in the one check a ruleset requires
     When I parse the workflow "<workflow>"
@@ -117,7 +110,6 @@ Feature: The reusable workflows parse as GitHub reads them
     Examples:
       | workflow       |
       | ci.yml         |
-      | nightly.yml    |
       | rust-ci.yml    |
       | python-ci.yml  |
       | service-ci.yml |

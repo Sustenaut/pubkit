@@ -605,13 +605,13 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | line                                                                                                        | readers                       | owner     | version | commit                                   |
-      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly, board | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@v0.15.1                                                  | conform, bump, nightly, board | example-org   | 0.15.1  | none                                     |
-      | uses: example-org/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform, board                | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2       | conform, bump, nightly        | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: example-org/pubkit/.github/workflows/rust-ci.yml@v0.15.1                                                  | conform, bump, nightly        | example-org   | 0.15.1  | none                                     |
+      | uses: example-org/pubkit/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2 | conform                       | example-org   | 0.15.2  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
       | uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.4        | release                       | example-org   | 0.5.4   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
       | uses: example-org/pubrel/.github/workflows/release.yml@v0.5.4                                                   | release                       | example-org   | 0.5.4   | none                                     |
-      | uses: sustenaut/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.16.0     | conform, bump, nightly, board | sustenaut | 0.16.0  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
-      | uses: Sustenaut/pubkit/.github/workflows/job-rust-test.yml@v0.16.0                                          | conform, board                | Sustenaut | 0.16.0  | none                                     |
+      | uses: sustenaut/pubkit/.github/workflows/rust-ci.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.16.0     | conform, bump, nightly        | sustenaut | 0.16.0  | 0f3574a72707a46bae149d3ed7a4644b4837795a |
+      | uses: Sustenaut/pubkit/.github/workflows/job-rust-test.yml@v0.16.0                                          | conform                       | Sustenaut | 0.16.0  | none                                     |
       | uses: sustenaut/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.5      | release                       | sustenaut | 0.5.5   | 1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 |
 
   Scenario: workflows_owner moves every pubkit and pubrel workflow to another owner

@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubkit pins moves every other repository's reusable workflow that a hand-written workflow pins at a release (OWNER/REPO/.github/workflows/...@) to that repository's latest release, by its tag's commit, except a deploy.providers package's, which its own bump hook moves"
+}

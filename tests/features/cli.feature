@@ -150,7 +150,7 @@ Feature: Keeping a repository's shared files in step
     And stderr mentions "`pubkit bump` moves the repository to this one"
     When I run pubkit "audit" "--check"
     Then the exit code is 2
-    When I run pubkit "freshness" "."
+    When I run pubkit "pins" "--no-lock"
     Then it succeeds
 
   Scenario: A moved pin rebuilds .venv before a target runs pubkit from it

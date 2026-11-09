@@ -1,23 +1,17 @@
-"""Steps for the repos file and `pubkit state --check`, against a small fake
-`gh` that answers from a JSON file and logs what it was asked."""
+"""Steps for the repos file `pubkit protect --repos` reads, against a small
+fake `gh` that answers from a JSON file and logs what it was asked."""
 
 from __future__ import annotations
 
 import base64
 import json
 import os
-import shutil
 import sys
-from pathlib import Path
 
 import pytest
-import yaml
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then
 
 scenarios("repos.feature")
-
-FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "board"
-WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 
 FAKE_GH = f"""#!{sys.executable}
 import json, os, re, sys
@@ -98,71 +92,11 @@ def repos_file(repo, github, one, two):
 @given(parsers.parse('"{slug}" has a protect block requiring "{check}"'))
 def has_block(github, slug, check):
     text = json.dumps({"kind": "utility", "protect": {"checks": [check]}})
-    has_config(github, slug, text)
 
-
-@given(parsers.parse('"{slug}" has the pubkit.json "{text}"'))
-def has_config(github, slug, text):
     def change(state):
         _exists(state, slug)
         state["files"][slug] = base64.b64encode(text.encode()).decode()
     _edit(github, change)
-
-
-def _reported(github, slug, where, kind, name):
-    _edit(github, lambda state: state.setdefault("reports", {}).setdefault(slug, {}).setdefault(where, {})
-          .setdefault(kind, []).append(name))
-
-
-@given(parsers.parse('"{slug}" has reported "{name}" on its default branch'))
-def reported_branch(github, slug, name):
-    _reported(github, slug, "branch", "runs", name)
-
-
-@given(parsers.parse('"{slug}" has reported "{name}" on a recent pull request'))
-def reported_pull(github, slug, name):
-    _reported(github, slug, "pr", "runs", name)
-
-
-@given(parsers.parse('"{slug}" has a commit status "{name}" on its default branch'))
-def reported_status(github, slug, name):
-    _reported(github, slug, "branch", "statuses", name)
-
-
-@given(parsers.parse('"{slug}" exists'))
-def exists(github, slug):
-    _edit(github, lambda state: _exists(state, slug))
-
-
-@given(parsers.parse('"{slug}" is now "{moved}"'))
-def moved_to(github, slug, moved):
-    _edit(github, lambda state: state["repos"].__setitem__(slug, {"full_name": moved}))
-
-
-@given(parsers.parse('GitHub refuses "{slug}"'))
-def refuses(github, slug):
-    _edit(github, lambda state: state.setdefault("refuse", []).append(slug))
-
-
-@given(parsers.re(r'the state of "(?P<owner>[^"]+)" has "(?P<one>[^"]+)" with protect (?P<a>on|off) '
-                  r'and "(?P<two>[^"]+)" with protect (?P<b>on|off)'))
-def state_file(repo, github, owner, one, a, two, b):
-    (repo / "state.json").write_text(json.dumps({"owner": owner, "repos": {
-        one: {"project": "pub", "board": True, "protect": a == "on", "govern": False},
-        two: {"board": True, "protect": b == "on", "govern": True}}}))
-
-
-@given("the build recording, and a repos file with projects")
-def recording_with_repos(repo):
-    shutil.copy(FIXTURES / "recorded.json", repo / "recorded.json")
-    (repo / "repos.json").write_text(json.dumps({"repositories": [
-        {"repo": "example-org/pubthing", "protect": True, "govern": True, "project": "pub"},
-        {"repo": "example-org/site-thing", "protect": False, "govern": False}]}))
-
-
-@when(parsers.parse('I parse the workflow "{name}"'), target_fixture="workflow")
-def parse_workflow(name):
-    return {"data": yaml.safe_load((WORKFLOWS / name).read_text())}
 
 
 @then("it does not succeed")
@@ -185,53 +119,6 @@ def no_warning(result):
     assert result.stderr == ""
 
 
-@then("GitHub was asked nothing")
-def asked_nothing(env):
-    assert not Path(env["FAKE_GH"] + ".log").exists()
-
-
 @pytest.fixture(autouse=True)
 def fake_github(github):
     """Every scenario here has the fake; none reaches GitHub."""
-
-
-def _row(repo, path, slug):
-    board = json.loads((repo / path).read_text())
-    return next(r for r in board["repos"] if r["repo"] == slug)
-
-
-@then(parsers.parse('"{path}" lists "{slug}" in the project "{project}"'))
-def in_project(repo, path, slug, project):
-    assert _row(repo, path, slug)["project"] == project
-
-
-@then(parsers.parse('"{path}" says "{slug}" has no protection to differ'))
-def no_protection(repo, path, slug):
-    row = _row(repo, path, slug)
-    assert row["facts"]["protection"]["value"] == {"differences": [], "limit": False}
-    assert "project" not in row
-
-
-@then(parsers.parse('"{path}" says "{slug}" is governed'))
-def governed(repo, path, slug):
-    assert _row(repo, path, slug)["facts"]["nightly"]["value"]["governed"] is True
-
-
-@then(parsers.parse('"{path}" names its calls under the connector "{name}"'))
-def connector(repo, path, name):
-    calls = json.loads((repo / path).read_text())["calls"]
-    assert [c for c in calls if c["connector"] == name and c["method"] == "listed"]
-    assert not [c for c in calls if c["connector"] == "lists"]
-
-
-@then(parsers.parse('"{path}" shows "{slug}" in the project "{project}"'))
-def shows_project(repo, path, slug, project):
-    assert f"{slug} <span class=tag>{project}</span>" in (repo / path).read_text()
-
-
-@then(parsers.parse('it passes the "{name}" input to pubkit board as a file'))
-def board_input(workflow, name):
-    assert name in workflow["data"][True]["workflow_call"]["inputs"]
-    run = next(s for s in workflow["data"]["jobs"]["board"]["steps"] if "pubkit board" in s.get("run", ""))
-    assert "--repos .pubkit-repos.json" in run["run"]
-    assert run["env"]["REPOS"] == "${{ inputs.repos }}"

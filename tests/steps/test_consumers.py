@@ -32,15 +32,11 @@ DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google
                 "rhysd", "rust-lang", "SonarSource", "tailscale"}
 
 # pub is a pubkit tool, like pubrel, so `pubkit new` names where it comes from.
-# pubkit's own CI, which it does not ship to anyone, runs the integrations scan,
-# and its nightly posts to Slack through the integrations command.
+# pubkit's own CI, which it does not ship to anyone, runs the integrations scan.
 TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
          ("src/pubkit/new.py", "Sustenaut/pubsec"),
          ("src/pubkit/new.py", "Sustenaut/pubdeploy"),
-         # The nightly installs pubdeploy, whose bump hook `pubkit pins` calls.
-         (".github/workflows/nightly.yml", "Sustenaut/pubdeploy"),
-         (".github/workflows/integrations.yml", "Sustenaut/integrations"),
-         (".github/nightly/update.sh", "Sustenaut/integrations")}
+         (".github/workflows/integrations.yml", "Sustenaut/integrations")}
 ALLOWED = TOOLS
 
 
