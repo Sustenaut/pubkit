@@ -1,4 +1,0 @@
-{
-  "category": "removed",
-  "change": "The commands a control plane runs across many repositories moved to pubfleet, with the same arguments: board, board-publish, state, variables and freshness, with the reusable board.yml and nightly.yml and .github/nightly/; pubkit keeps protect and the repos file, the variables block's shape that sync checks, bump, and the per-repository nightly (pubkit nightly, pins, crates, record)"
-}
