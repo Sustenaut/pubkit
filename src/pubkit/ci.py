@@ -71,6 +71,9 @@ test it again. It starts instead with `tested` (job-tested.yml), which
 looks for a successful merge_group run of that workflow on the commit:
 found, main skips the jobs the queue ran, and runs the scan (with the queue run's coverage,
 since SonarQube Cloud measures main from a push to it) and the release;
+the queue, running pr.yml on a tree its pull request already passed,
+skips the scan too, as that pull request's run scanned it and main's push
+scans it again;
 not found, as without a queue, every job runs as before. Every job
 is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
 """
@@ -521,14 +524,16 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             given["layout"] = ci["layout"]
         needs = [n for n in job.needs if n in names]
         # On main, a job the queue ran waits to hear whether it passed.
-        skips = shortcut and queued(ci) in ci["jobs"][name]
+        # In the queue, a tree its pull request already passed is not scanned
+        # again either: main's push scans it, with that run's coverage.
+        skips = shortcut and (queued(ci) in ci["jobs"][name] or (name == "sonar" and event != "main"))
         if skips or (shortcut and name == "sonar"):
             needs = ["tested", *needs]
         first = name == names[0] and not shortcut
         out.append(f"{'' if first else chr(10)}  {name}:\n    name: ci\n")
         if needs:
             out.append(f"    needs: [{', '.join(needs)}]\n")
-        scan = shortcut and name == "sonar"
+        scan = shortcut and name == "sonar" and event == "main"
         if scan:
             # The scan runs either way, after the tests or in their place.
             out.append("    if: ${{ !failure() && !cancelled() }}\n")

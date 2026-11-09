@@ -435,6 +435,14 @@ def skips_tested(repo, name):
         assert spec["needs"][0] == "tested", (job, spec["needs"])
 
 
+@then(parsers.parse('in "{name}" the scan runs only when it did not, as main\'s push scans the tree'))
+def scan_skips(repo, name):
+    spec = jobs(repo, name)["sonar"]
+    assert spec["if"] == UNTESTED, spec.get("if")
+    assert spec["needs"][0] == "tested", spec["needs"]
+    assert "coverage-run" not in spec.get("with", {}), spec
+
+
 @then(parsers.parse('in "{name}" the scan runs either way, reading the coverage of the queue\'s run '
                     'when it skipped the tests'))
 def scan_either_way(repo, name):
