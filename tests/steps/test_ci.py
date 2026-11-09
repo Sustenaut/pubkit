@@ -671,3 +671,45 @@ def stderr_lacks(result, text):
 @then(parsers.parse('"{path}" is not there'))
 def not_there(repo, path):
     assert not (repo / path).exists()
+
+
+def _init_step(workflow):
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    return next(s for job in data["jobs"].values() for s in job.get("steps", [])
+                if s.get("name", "").startswith("terraform init, tried three times"))
+
+
+@when(parsers.re(r'the "(?P<workflow>[^"]+)" init step runs with a terraform that fails unless given a provider '
+                 r'mirror, and (?:the mirror "(?P<url>[^"]+)"|no mirror)'), target_fixture="initialised")
+def run_init(tmp_path, workflow, url):
+    """The step's script under bash -e, in a checkout whose pubkit.json may
+    name a provider mirror, with a terraform that keeps the CLI
+    configuration of each run and passes only with one."""
+    work = tmp_path / f"run-{workflow}-{bool(url)}"
+    (work / "bin").mkdir(parents=True)
+    (work / "pubkit.json").write_text(json.dumps({"kind": "service", **({"mirror": {"terraform": url}} if url else {})}))
+    runs = work / "runs"
+    runs.mkdir()
+    (work / "bin" / "terraform").write_text(
+        '#!/bin/bash\nn=$(ls "$RUNS" | wc -l)\n'
+        'if [ -n "${TF_CLI_CONFIG_FILE:-}" ]; then cp "$TF_CLI_CONFIG_FILE" "$RUNS/$n"; exit 0; fi\n'
+        'touch "$RUNS/$n"; exit 1\n')
+    (work / "bin" / "terraform").chmod(0o755)
+    done = subprocess.run(["bash", "-e", "-c", _init_step(workflow)["run"]], capture_output=True, text=True,
+                          check=False, cwd=work,
+                          env={**os.environ, "PATH": f"{work / 'bin'}{os.pathsep}{os.environ['PATH']}",
+                               "RUNS": str(runs), "INIT_PAUSE": "0", "RUNNER_TEMP": str(work), "DIR": "infra",
+                               "TF": str(work / "bin" / "terraform")})
+    configs = [(runs / str(n)).read_text() for n in range(len(list(runs.iterdir())))]
+    return {"code": done.returncode, "configs": configs, "stderr": done.stderr}
+
+
+@then(parsers.re(r"terraform init ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
+def init_ran(initialised, times, how):
+    assert len(initialised["configs"]) == int(times), initialised
+    assert (initialised["code"] == 0) == (how == "passed"), initialised
+
+
+@then(parsers.parse('the last init\'s CLI configuration installs every provider from "{url}"'))
+def init_mirrored(initialised, url):
+    assert initialised["configs"][-1] == f'provider_installation {{\n  network_mirror {{ url = "{url}" }}\n}}\n'

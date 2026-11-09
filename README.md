@@ -1050,7 +1050,16 @@ jobs:
   request merged as that commit has the label `terraform-destroy`; either
   way the job lists what it deletes.
 - Every run starts with a fresh `terraform init` against the backend the
-  stack names.
+  stack names. A provider download can fail (GitHub's release downloads,
+  releases.hashicorp.com's SHA256SUMS), so init is tried three times, 15 s
+  apart. With a provider mirror in pubkit.json, a fourth try installs every
+  provider from it, through a CLI configuration with only its
+  `network_mirror`; the module's `.terraform.lock.hcl` still checks each
+  archive. The service CI's backend-less init does the same.
+
+  ```json
+  "mirror": {"terraform": "https://storage.sustenaut.eu/terraform"}
+  ```
 - With `secrets` (the default), each terraform command runs as
   `./pubkit secrets run -- terraform -chdir=DIR ...`, with the environment's
   secret `BWS_ACCESS_TOKEN`, so the stack gets what `./with-secrets` gives it

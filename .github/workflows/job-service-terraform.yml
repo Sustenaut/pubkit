@@ -20,7 +20,21 @@ jobs:
         with: { terraform_wrapper: false }
       - run: terraform -chdir="$DIR" fmt -check -recursive
         env: { DIR: '${{ inputs.terraform-dir }}' }
-      - run: terraform -chdir="$DIR" init -backend=false -input=false
+      - name: terraform init, tried three times, then from the provider mirror
+        run: |
+          init() { terraform -chdir="$DIR" init -backend=false -input=false; }
+          for attempt in 1 2 3; do
+            init && exit 0
+            echo "::warning::terraform init failed (attempt $attempt of 3)"
+            [ "$attempt" = 3 ] || sleep "${INIT_PAUSE:-15}"
+          done
+          # Then from pubkit.json's provider mirror (mirror.terraform), if it
+          # names one: the lock's hashes still check every archive.
+          mirror="$(jq -r '.mirror.terraform // empty' pubkit.json 2>/dev/null || true)"
+          [ -n "$mirror" ] || exit 1
+          echo "::warning::terraform init: trying the providers from $mirror"
+          printf 'provider_installation {\n  network_mirror { url = "%s/" }\n}\n' "$mirror" > "$RUNNER_TEMP/provider-mirror.tfrc"
+          TF_CLI_CONFIG_FILE="$RUNNER_TEMP/provider-mirror.tfrc" init
         env: { DIR: '${{ inputs.terraform-dir }}' }
       - run: terraform -chdir="$DIR" validate
         env: { DIR: '${{ inputs.terraform-dir }}' }
