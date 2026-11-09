@@ -83,6 +83,11 @@ class BitwardenGenerated(BitwardenSecret):
     schema = schema(with_secret({"shape": SHAPE}), ("shape",))
 
     def action(self, need: Need, ctx: Context) -> str:
+        found = ctx.results.get(need.id)
+        if found is not None and found.state == "drift":
+            # A value is there: the plan says it goes, and why, before the typed yes.
+            why = (found.details or [found.summary])[0].partition(": ")[2] or found.summary
+            return f"replace {need.name} (misshapen: {why}) with a new {need.params['shape']}, written to Bitwarden"
         return f"generate {need.name} as {need.params['shape']}, and write it to Bitwarden"
 
     def fulfil(self, need: Need, ctx: Context) -> Result:

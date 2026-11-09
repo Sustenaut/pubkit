@@ -56,12 +56,21 @@ jobs:
       - if: inputs.sync-check
         run: |
           python -m venv .venv
-          .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+          # Tried three times: a release download can time out.
+          for attempt in 1 2 3; do .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; [ "$attempt" = 3 ] && exit 1; sleep 15; done
           .venv/bin/pubkit sync --check
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
-      - run: ${{ inputs.setup }}
+      - name: Set up, tried three times (a release download can time out)
+        run: |
+          for attempt in 1 2 3; do
+            bash -ec "$SETUP" && exit 0
+            echo "::warning::setup failed (attempt $attempt of 3)"
+            [ "$attempt" = 3 ] || sleep 15
+          done
+          exit 1
+        env: { SETUP: '${{ inputs.setup }}' }
       # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
       # inputs. A scheduled run tries more, unless pubkit.json sets
       # "security": { "fuzz": { "node": false } }.
@@ -94,7 +103,15 @@ jobs:
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
-      - run: ${{ inputs.setup }}
+      - name: Set up, tried three times (a release download can time out)
+        run: |
+          for attempt in 1 2 3; do
+            bash -ec "$SETUP" && exit 0
+            echo "::warning::setup failed (attempt $attempt of 3)"
+            [ "$attempt" = 3 ] || sleep 15
+          done
+          exit 1
+        env: { SETUP: '${{ inputs.setup }}' }
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
       # Its coverage joins the test job's, as an artifact of its own.
@@ -148,7 +165,67 @@ jobs:
     if: github.event_name == 'pull_request' && !github.event.repository.private
     runs-on: ubuntu-latest
     steps:
+      # The owner's own reusable workflows and actions carry no license
+      # GitHub can read, so they are left out of the license check alone,
+      # each by name: v5.0.0 matches a purl's full name, with no wildcard.
+      # `pubkit sync` lists those the repository calls in
+      # .github/dependency-review-licenses.txt; without it, pubkit's and
+      # pubrel's are. Only the owner's are taken from the file, which a pull
+      # request may change. Advisories still apply to them, and everything
+      # else is checked as before.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with: { persist-credentials: false, sparse-checkout: .github }
+      - id: exceptions
+        run: |
+          file=.github/dependency-review-licenses.txt
+          if [ -f "$file" ]; then
+            purls=$(grep -E "^pkg:githubactions/$OWNER/[^,[:space:]]+$" "$file" | paste -sd, - || true)
+          else
+            purls=$(printf '%s' "$DEFAULT" | tr -d ' \n')
+          fi
+          echo "purls=$purls" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+          DEFAULT: >-
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/board.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/deploy-check.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-audit.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-browser.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-test.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-osv.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-audit.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-browser.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-functional.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-review.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-audit.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-cross.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-functional.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-fuzz.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-gates.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-msrv.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-test.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-toolchains.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-checks.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-terraform.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-tests.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-sonar.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-tested.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/k8s-deploy.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/nightly.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/node-ci.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
+              pkg:githubactions/Sustenaut/pubkit/.github/workflows/terraform.yml,
+              pkg:githubactions/Sustenaut/pubkit/actions/cache,
+              pkg:githubactions/Sustenaut/pubkit/actions/deploy-ssh,
+              pkg:githubactions/Sustenaut/pubkit/actions/deploy-static,
+              pkg:githubactions/Sustenaut/pubkit/actions/docker-build,
+              pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
+              pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          allow-dependencies-licenses: ${{ steps.exceptions.outputs.purls }}
 
   # SonarQube Cloud's analysis, into the project OWNER_REPO of the
   # organization OWNER, when the caller passes a SONAR_TOKEN. Without one, as

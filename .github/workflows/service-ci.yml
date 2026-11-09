@@ -38,7 +38,8 @@ jobs:
         name: pubkit's managed files are in step
         run: |
           python3 -m venv .pubkit
-          .pubkit/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+          # Tried three times: a release download can time out.
+          for attempt in 1 2 3; do .pubkit/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; [ "$attempt" = 3 ] && exit 1; sleep 15; done
           .pubkit/bin/pubkit sync --check
       - name: shell scripts pass shellcheck
         run: |
@@ -80,7 +81,15 @@ jobs:
           key: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-${{ hashFiles('**/requirements*.lock', '**/requirements*.txt', '**/uv.lock') }}
           restore-keys: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-
       - if: inputs.setup != ''
-        run: ${{ inputs.setup }}
+        name: Set up, tried three times (a release download can time out)
+        run: |
+          for attempt in 1 2 3; do
+            bash -ec "$SETUP" && exit 0
+            echo "::warning::setup failed (attempt $attempt of 3)"
+            [ "$attempt" = 3 ] || sleep 15
+          done
+          exit 1
+        env: { SETUP: '${{ inputs.setup }}' }
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

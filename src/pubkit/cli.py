@@ -191,6 +191,9 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
     written = workflows(config, root)
     if (generated := dependabot(config)) is not None:
         written.append((DEPENDABOT_PATH, generated))
+    from .ci import review_licenses  # noqa: PLC0415
+    if (licenses := review_licenses(config, root, written)) is not None:
+        written.append(licenses)
     for path, text in written:
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -268,7 +271,7 @@ def sync(root: Path, check: bool) -> int:
     every = templates(kind)
     stale = []
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
-    from .ci import INTEGRATIONS, declared, generated as workflows, leftovers  # noqa: PLC0415
+    from .ci import INTEGRATIONS, declared, generated as workflows, leftovers, review_licenses  # noqa: PLC0415
     owned = managed(kind)
     # Any repository with a with-secrets.json runs it through the managed with-secrets.
     if WITH_SECRETS not in owned and (root / f"{WITH_SECRETS}.json").is_file():
@@ -280,6 +283,8 @@ def sync(root: Path, check: bool) -> int:
         wanted.append((DEPENDABOT_PATH, generated))
     if (integrations := declared(root, wanted)) is not None:
         wanted.append(integrations)
+    if (licenses := review_licenses(config, root, wanted)) is not None:
+        wanted.append(licenses)
     replaced = leftovers(config, root)
     from .ignores import GITIGNORE, heal, missing  # noqa: PLC0415
     unignored = missing(root) if check else heal(root)

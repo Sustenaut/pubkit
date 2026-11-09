@@ -77,6 +77,9 @@ Feature: pubkit deploy walk --fulfil makes what is missing, once the plan is con
     Given Bitwarden's "example-cookie-secret" is 20 bytes
     When I run pubkit "deploy" "walk" "--fulfil" "--yes"
     Then it succeeds
+    And stderr mentions "bitwarden.generated:example-cookie-secret: replace example-cookie-secret (misshapen: "
+    And stderr mentions "with a new oauth2-proxy-cookie, written to Bitwarden"
+    And stderr does not mention "generate example-cookie-secret"
     And stderr mentions "k8s.secret:example-page-secrets: apply Secret example-page-secrets in example from bitwarden.generated:example-cookie-secret, and restart what reads it, again: bitwarden.generated:example-cookie-secret changes"
     And "bitwarden.generated:example-cookie-secret" is ready, "(fulfilled)"
     And "k8s.secret:example-page-secrets" is ready, "(fulfilled)"
