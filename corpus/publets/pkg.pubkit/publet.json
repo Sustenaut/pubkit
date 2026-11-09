@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.31.3 is released as v0.31.3 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9.",
+      "content": "pubkit 0.31.4 is released as v0.31.4 from commit fbd8fa9c6e0a7e2f926d9561cab09e5a5b67ec84.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.31.3",
+            "0.31.4",
             "pubkit --version",
-            "pubkit 0.31.3",
-            "v0.31.3",
-            "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+            "pubkit 0.31.4",
+            "v0.31.4",
+            "fbd8fa9c6e0a7e2f926d9561cab09e5a5b67ec84"
           ]
         ]
       },
-      "scope": "the published release v0.31.3 of pubkit",
+      "scope": "the published release v0.31.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+          "revision": "fbd8fa9c6e0a7e2f926d9561cab09e5a5b67ec84"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.31.3 was released on 2026-11-08 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9 with these changes.",
+      "content": "pubkit 0.31.4 was released on 2026-11-09 from commit fbd8fa9c6e0a7e2f926d9561cab09e5a5b67ec84 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,27 +58,23 @@
         "rows": [
           [
             "fixed",
-            "CI: the Terraform module job retries terraform init up to three times, caches each module's providers, and no longer cancels the other modules when one fails, so a timed-out provider checksum download from GitHub no longer fails the run"
-          ],
-          [
-            "fixed",
-            "pubkit deploy walk: the admin channel keeps one SSH connection for the walk (ControlMaster, its socket in a private directory), opened before the first check, so k8s.namespace, deploy.rollout and the Secrets no longer run out of their budgets on a new connection's second over the tailnet; k8s.namespace's budget is 4 s and deploy.rollout's 8 s, which asks for its three run listings at once; github.deploy-settings asks for its four listings at once, inside its 3 s; and a k8s.secret that is ready by its keys is made again, and its readers restarted, when the walk makes a new value of a need it is made from, so Bitwarden and the cluster no longer differ after a misshapen generated secret is replaced"
+            "CI: the reusable workflows try each setup step (make venv, npm ci, a repository's own), each hash-locked install of tests/requirements.lock and pip-audit up to three times, 15 s apart, and the managed pubkit.mk's venv target its install likewise, as pip retries no 504 and GitHub's release downloads sometimes answer one; a finding still fails pip-audit, as it fails each try. pubkit deploy walk --fulfil: a generated secret that is in Bitwarden but misshapen is planned as \"replace NAME (misshapen: why)\", not as generating a new one, so the typed yes knows a value goes. The dependency review leaves the owner's own reusable workflows and actions, which carry no license GitHub reads, out of its license check alone: pubkit sync lists those a repository's workflows call in .github/dependency-review-licenses.txt, of which the review takes only the owner's, and without the file it leaves out pubkit's and pubrel's; advisories still apply to them"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.31.3 of pubkit",
+      "scope": "the published release v0.31.4 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+          "revision": "fbd8fa9c6e0a7e2f926d9561cab09e5a5b67ec84"
         }
       ]
     }
   },
-  "created": "2026-11-08T00:00:00Z",
+  "created": "2026-11-09T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
