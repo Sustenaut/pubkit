@@ -235,7 +235,6 @@ jobs:
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/terraform.yml,
               pkg:githubactions/Sustenaut/pubkit/actions/cache,
-              pkg:githubactions/Sustenaut/pubkit/actions/deploy-ssh,
               pkg:githubactions/Sustenaut/pubkit/actions/deploy-static,
               pkg:githubactions/Sustenaut/pubkit/actions/docker-build,
               pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
