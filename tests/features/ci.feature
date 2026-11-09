@@ -37,7 +37,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync"
     Then "pr.yml" first asks whether the merge queue passed its commit in "pr.yml"
     And in "pr.yml" every job but tested, the scan, passed and release runs only when it did not
-    And in "pr.yml" the scan runs either way, reading the coverage of the queue's run when it skipped the tests
+    And in "pr.yml" the scan runs only when it did not, as main's push scans the tree
     And in "pr.yml" passed takes a job skipped for the queue's run as passed
     And in "pr.yml" the release runs whenever passed succeeded
 

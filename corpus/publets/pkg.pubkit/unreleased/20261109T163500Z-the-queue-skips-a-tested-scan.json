@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "In the merge queue, pr.yml's sonar job is skipped, like the tests, when the pull request's own run already passed on the same tree; main's push still scans it with that run's coverage. A repository whose ruleset requires SonarQube Cloud's \"SonarCloud Code Analysis\" check drops it from protect.checks and runs `pubkit protect`, or its queue runs wait for a check that never comes"
+}
