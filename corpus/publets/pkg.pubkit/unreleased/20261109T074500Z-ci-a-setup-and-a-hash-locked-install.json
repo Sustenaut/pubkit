@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "CI: the reusable workflows try each setup step (make venv, npm ci, a repository's own), each hash-locked install of tests/requirements.lock and pip-audit up to three times, 15 s apart, and the managed pubkit.mk's venv target its install likewise, as pip retries no 504 and GitHub's release downloads sometimes answer one; a finding still fails pip-audit, as it fails each try. pubkit deploy walk --fulfil: a generated secret that is in Bitwarden but misshapen is planned as \"replace NAME (misshapen: why)\", not as generating a new one, so the typed yes knows a value goes. The dependency review leaves Sustenaut's own reusable workflows and actions (pubkit's, and pubrel's release.yml), which carry no license GitHub reads, out of its license check alone; advisories still apply to them"
+}

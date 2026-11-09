@@ -34,12 +34,21 @@ jobs:
       - if: inputs.sync-check
         run: |
           python -m venv .venv
-          .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+          # Tried three times: a release download can time out.
+          for attempt in 1 2 3; do .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; [ "$attempt" = 3 ] && exit 1; sleep 15; done
           .venv/bin/pubkit sync --check
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
-      - run: ${{ inputs.setup }}
+      - name: Set up, tried three times (a release download can time out)
+        run: |
+          for attempt in 1 2 3; do
+            bash -ec "$SETUP" && exit 0
+            echo "::warning::setup failed (attempt $attempt of 3)"
+            [ "$attempt" = 3 ] || sleep 15
+          done
+          exit 1
+        env: { SETUP: '${{ inputs.setup }}' }
       # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
       # inputs. A scheduled run tries more, unless pubkit.json sets
       # "security": { "fuzz": { "node": false } }.

@@ -252,7 +252,8 @@ def audit_job(workflow, name, check):
 @then("no input turns the audit job off")
 def audit_unconditional(workflow):
     steps = workflow["data"]["jobs"]["audit"]["steps"]
-    assert not any("if" in step for step in steps)
+    # A retry's condition reads the try before it; none reads an input.
+    assert not any("inputs." in str(step.get("if", "")) for step in steps)
 
 
 @then("its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run")

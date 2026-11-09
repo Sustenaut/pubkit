@@ -300,6 +300,31 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | rust-ci.yml             |
 
 
+  Scenario Outline: A setup that fails is tried again, three times at most
+    When the "<workflow>" setup step runs a setup that fails the first time
+    Then the setup ran 2 times, and the step passed
+    When the "<workflow>" setup step runs a setup that always fails
+    Then the setup ran 3 times, and the step failed
+
+    Examples:
+      | workflow                  |
+      | python-ci.yml             |
+      | job-python-functional.yml |
+      | job-python-browser.yml    |
+      | job-service-tests.yml     |
+      | service-ci.yml            |
+      | node-ci.yml               |
+      | job-node-test.yml         |
+      | job-node-browser.yml      |
+
+  Scenario: Every hash-locked install and every pip-audit in the reusable workflows is tried three times
+    Then every step that installs tests/requirements.lock tries it three times
+    And every pip-audit is tried three times, each try after a failed one
+
+  Scenario: The dependency review leaves Sustenaut's own workflows and actions out of the license check alone
+    Then job-review.yml's license exceptions name every reusable workflow and action pubkit has, and pubrel's release workflow
+    And job-review.yml sets no other input, so advisories apply to everything
+
   Scenario: pins moves a tool to the latest release of its git repository
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli.git", "tag": "v1.2.3"}]}'
     And the latest release of "example-org/some-cli" is "v1.3.0"

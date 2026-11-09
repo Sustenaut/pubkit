@@ -11,7 +11,9 @@ help: ## Show available targets
 
 venv: ## Hash-locked environment, with this checkout installed editable
 	python3 -m venv .venv
-	.venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock
+	@# Tried three times: a release download can time out, and pip retries no 504.
+	for attempt in 1 2 3; do .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; \
+	  [ "$$attempt" = 3 ] && exit 1; sleep 15; done
 	.venv/bin/pip install --quiet --no-deps -e .
 
 # Made on first use, so `make protect` needs nothing run before it.

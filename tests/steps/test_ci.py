@@ -102,6 +102,88 @@ def step_fails(install):
     assert install["code"] != 0
 
 
+def _setup_step(workflow):
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    return next(s for job in data["jobs"].values() for s in job.get("steps", []) if "SETUP" in (s.get("env") or {}))
+
+
+@when(parsers.re(r'the "(?P<workflow>[^"]+)" setup step runs a setup that (?P<how>fails the first time|always fails)'),
+      target_fixture="setup")
+def run_setup(tmp_path, workflow, how):
+    """The step's script under bash -e, as GitHub runs it, with a setup that
+    counts its runs and a sleep that does not wait."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    (bin_dir / "sleep").write_text("#!/bin/sh\n")
+    (bin_dir / "sleep").chmod(0o755)
+    runs = tmp_path / "runs"
+    runs.write_text("")
+    first = '[ "$(wc -l < "$RUNS")" -gt 1 ]' if how == "fails the first time" else "false"
+    done = subprocess.run(["bash", "-e", "-c", _setup_step(workflow)["run"]], capture_output=True, text=True,
+                          check=False, env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+                                            "RUNS": str(runs), "SETUP": f'echo run >> "$RUNS"; {first}'})
+    return {"code": done.returncode, "runs": len(runs.read_text().splitlines())}
+
+
+@then(parsers.re(r"the setup ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
+def setup_ran(setup, times, how):
+    assert setup["runs"] == int(times), setup
+    assert (setup["code"] == 0) == (how == "passed"), setup
+
+
+@then("every step that installs tests/requirements.lock tries it three times")
+def installs_retried():
+    found = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values():
+            for step in job.get("steps") or []:
+                for line in step.get("run", "").splitlines():
+                    if "--require-hashes -r tests/requirements.lock" in line and "pip install" in line:
+                        found += 1
+                        assert line.strip().startswith("for attempt in 1 2 3; do"), f"{path.name}: {line}"
+    assert found >= 4
+
+
+@then("every pip-audit is tried three times, each try after a failed one")
+def audits_retried():
+    found = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values():
+            tries = [s for s in job.get("steps") or [] if "gh-action-pip-audit" in s.get("uses", "")]
+            if not tries:
+                continue
+            found += 1
+            assert len(tries) == 3, path.name
+            assert tries[0].get("continue-on-error") and tries[1].get("continue-on-error"), path.name
+            assert tries[1]["if"] == f"steps.{tries[0]['id']}.outcome == 'failure'", path.name
+            assert tries[2]["if"] == f"steps.{tries[1]['id']}.outcome == 'failure'", path.name
+            assert not tries[2].get("continue-on-error"), path.name
+    assert found >= 2
+
+
+def _review_step():
+    data = yaml.safe_load((WORKFLOWS / "job-review.yml").read_text())
+    (step,) = data["jobs"]["review"]["steps"]
+    return step
+
+
+@then("job-review.yml's license exceptions name every reusable workflow and action pubkit has, "
+      "and pubrel's release workflow")
+def review_exceptions():
+    listed = {p.strip() for p in _review_step()["with"]["allow-dependencies-licenses"].split(",")}
+    wanted = {f"pkg:githubactions/Sustenaut/pubkit/.github/workflows/{path.name}"
+              for path in WORKFLOWS.glob("*.yml") if "workflow_call" in (yaml.safe_load(path.read_text()).get(True) or {})}
+    wanted |= {f"pkg:githubactions/Sustenaut/pubkit/actions/{path.parent.name}"
+               for path in (WORKFLOWS.parents[1] / "actions").glob("*/action.yml")}
+    wanted |= {"pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml"}
+    assert listed == wanted, (sorted(wanted - listed), sorted(listed - wanted))
+
+
+@then("job-review.yml sets no other input, so advisories apply to everything")
+def review_only_licenses():
+    assert set(_review_step()["with"]) == {"allow-dependencies-licenses"}
+
+
 @given(parsers.parse('the latest release of "{slug}" is "{tag}"'))
 def latest_release(tmp_path, env, slug, tag):
     bin_dir = tmp_path / "bin"
