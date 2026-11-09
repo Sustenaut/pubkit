@@ -10,11 +10,11 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Node repository whose ci block is '{}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "test, audit, osv, review, sonar, passed, release"
+    And "pr.yml" runs the jobs "tested, test, audit, osv, review, sonar, passed, release"
     And "main.yml" runs the jobs "tested, test, audit, osv, sonar, passed, release"
     And no workflow is written for "nightly"
     And no workflow is written for "queue"
-    And no job in "pr.yml" has a condition but passed
+    And in "pr.yml" every job but tested, the scan, passed and release runs only when it did not
 
   Scenario Outline: Main skips the tests the merge queue already passed on its commit
     Given a <language> repository whose ci block is '{}'
@@ -32,10 +32,39 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | Rust     | queue.yml |
       | service  | pr.yml    |
 
+  Scenario Outline: The merge queue skips the tests the pull request already passed on the same tree
+    Given a <language> repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then "pr.yml" first asks whether the merge queue passed its commit in "pr.yml"
+    And in "pr.yml" every job but tested, the scan, passed and release runs only when it did not
+    And in "pr.yml" the scan runs either way, reading the coverage of the queue's run when it skipped the tests
+    And in "pr.yml" passed takes a job skipped for the queue's run as passed
+    And in "pr.yml" the release runs whenever passed succeeded
+
+    Examples:
+      | language |
+      | Node     |
+      | Python   |
+      | service  |
+
+  Scenario Outline: job-tested finds the run that tested this commit's tree
+    Given GitHub holds <runs>
+    When job-tested runs on a <event> of commit "<commit>"
+    Then it says tested "<tested>", run "<run>"
+
+    Examples:
+      | runs                                                                         | event        | commit | tested | run |
+      | a pull request run 11 of commit "pr" with tree "T"                           | pull_request | pr     | false  |     |
+      | a pull request run 11 of commit "pr" with tree "T"                           | merge_group  | queue  | true   | 11  |
+      | a pull request run 11 of commit "pr" with tree "U"                           | merge_group  | queue  | false  |     |
+      | a pull request run 11 of commit "pr" with tree "T", its artifacts expired    | merge_group  | queue  | false  |     |
+      | a pull request run 11 of commit "pr" with tree "T", and a queue run 12 of commit "queue" that took its tests from run 11 | push | queue | true | 11 |
+      | a queue run 12 of commit "queue" with tree "T" that ran its tests            | push         | queue  | true   | 12  |
+
   Scenario: Main runs a job the merge queue does not, whatever the queue passed
     Given a Node repository whose ci block is '{"jobs": {"osv": {"events": ["main"]}}}'
     When I run pubkit "sync"
-    Then "pr.yml" runs the jobs "test, audit, review, sonar, passed, release"
+    Then "pr.yml" runs the jobs "tested, test, audit, review, sonar, passed, release"
     And in "main.yml" the "osv" job runs whatever the queue passed
 
   Scenario: Without a pull request workflow there is no queue run, and main tests everything
@@ -74,7 +103,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Rust repository whose ci block is '{"events": ["pr", "main", "nightly"]}'
     When I run pubkit "sync"
     Then "pr.yml" runs on pull requests and in the merge queue
-    And "pr.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, review, sonar, passed, release"
+    And "pr.yml" runs the jobs "tested, gates, test, functional, msrv, fuzz, cross, audit, osv, review, sonar, passed, release"
     And no workflow is written for "queue"
     And "main.yml" first asks whether the merge queue passed its commit in "pr.yml"
 
@@ -91,7 +120,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I read pubkit's own ci.yml
     Then it runs on pull requests, in the merge queue and on pushes to main
     And its wheel job runs only on a push to main
-    And on a push to main it skips the tests the merge queue already passed on its commit
+    And in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree
 
   Scenario Outline: The token reaches pubkit's jobs by name, which works across owners
     Given a <language> repository whose ci block is '{}'
@@ -110,13 +139,13 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Python repository whose ci block is '{"release": false}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "functional, audit, osv, review, sonar, passed"
+    And "pr.yml" runs the jobs "tested, functional, audit, osv, review, sonar, passed"
 
   Scenario: A browser test adds the browser job, and the scan waits for its coverage
     Given a Node repository whose ci block is '{"with": {"browser-test": "npm run test:browser", "coverage-report": "coverage/"}}'
     When I run pubkit "sync"
-    Then "pr.yml" runs the jobs "test, browser, audit, osv, review, sonar, passed, release"
-    And in "pr.yml" the "sonar" job needs "test, browser"
+    Then "pr.yml" runs the jobs "tested, test, browser, audit, osv, review, sonar, passed, release"
+    And in "pr.yml" the "sonar" job needs "tested, test, browser"
     And in "pr.yml" the "browser" job is given "browser-test" "npm run test:browser"
     And in "pr.yml" the "test" job is given "coverage-report" "coverage/"
 
@@ -201,7 +230,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a service repository whose ci block is '{"with": {"terraform-dir": ".", "test": "make test"}}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "checks, terraform, tests, sonar, passed"
+    And "pr.yml" runs the jobs "tested, checks, terraform, tests, sonar, passed"
     And "pr.yml" has no release
     And in "pr.yml" the "terraform" job is given "terraform-dir" "."
 
@@ -214,12 +243,12 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a service repository whose ci block is '{"jobs": {"sonar": false}}'
     When I run pubkit "sync"
     Then it succeeds
-    And "pr.yml" runs the jobs "checks, passed"
+    And "pr.yml" runs the jobs "tested, checks, passed"
 
   Scenario: The jobs block narrows a job's events or drops it
     Given a Node repository whose ci block is '{"jobs": {"review": false, "sonar": {"events": ["main"]}}}'
     When I run pubkit "sync"
-    Then "pr.yml" runs the jobs "test, audit, osv, passed, release"
+    Then "pr.yml" runs the jobs "tested, test, audit, osv, passed, release"
     And "main.yml" runs the jobs "tested, test, audit, osv, sonar, passed, release"
 
   Scenario Outline: The release workflow gets the release app's secrets from pubrel 0.6.1

@@ -354,6 +354,70 @@ def asks_tested(repo, name, queued):
     assert "workflow" in triggers(data)["workflow_call"]["inputs"]
 
 
+GH = r"""#!/usr/bin/env python3
+import json, os, subprocess, sys
+args = sys.argv[1:]
+assert args[0] == "api", args
+path, jq = args[1], args[args.index("--jq") + 1] if "--jq" in args else None
+answers = json.load(open(os.environ["ANSWERS"]))
+body = next((v for k, v in answers.items() if path.split("?")[0].endswith(k)), None)
+if body is None:
+    sys.exit(f"no answer for {path}")
+text = json.dumps(body)
+if jq:
+    text = subprocess.run(["jq", "-r", jq], input=text, capture_output=True, text=True, check=True).stdout
+sys.stdout.write(text)
+"""
+
+
+@given(parsers.parse("GitHub holds {runs}"), target_fixture="github")
+def github_holds(runs):
+    """The answers job-tested's script gets: this commit ("queue") has tree T."""
+    answers = {"/git/commits/queue": {"tree": {"sha": "T"}}, "/runs": {"workflow_runs": []}}
+    listed = answers["/runs"]["workflow_runs"]
+    for m in re.finditer(r'(pull request|queue) run (\d+) of commit "(\w+)"(?: with tree "(\w)")?', runs):
+        kind, run, commit, tree = m.groups()
+        listed.append({"id": int(run), "head_sha": commit,
+                       "event": "pull_request" if kind == "pull request" else "merge_group"})
+        if tree:
+            answers[f"/git/commits/{commit}"] = {"tree": {"sha": tree}}
+        jobs = [{"id": 900 + int(run), "name": "ci / tested", "conclusion": "success"}]
+        answers[f"/runs/{run}/jobs"] = {"jobs": jobs}
+        answers[f"/check-runs/{900 + int(run)}/annotations"] = []
+        answers[f"/runs/{run}/artifacts"] = {"artifacts": [{"name": "coverage-test", "expired": "expired" in runs}]}
+    took = re.search(r"took its tests from run (\d+)", runs)
+    if took:
+        answers["/git/commits/queue"] = {"tree": {"sha": "T"}}
+        answers["/check-runs/912/annotations"] = [{"message": f"This commit's tree was tested in run {took[1]} of pr.yml"}]
+    # Most recent first, as GitHub lists them.
+    listed.sort(key=lambda r: -r["id"])
+    return answers
+
+
+@when(parsers.parse('job-tested runs on a {event} of commit "{commit}"'), target_fixture="tested")
+def run_job_tested(tmp_path, github, event, commit):
+    data, _ = declared("job-tested.yml")
+    (step,) = data["jobs"]["tested"]["steps"]
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "gh").write_text(GH)
+    (tmp_path / "bin" / "gh").chmod(0o755)
+    (tmp_path / "answers.json").write_text(json.dumps(github))
+    out = tmp_path / "output"
+    done = subprocess.run(["bash", "-eo", "pipefail", "-c", step["run"]], capture_output=True, text=True, check=False,
+                          env={**os.environ, "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+                               "ANSWERS": str(tmp_path / "answers.json"), "GITHUB_OUTPUT": str(out),
+                               "REPO": "Sustenaut/example", "SHA": commit, "EVENT": event, "RUN_ID": "99",
+                               "WORKFLOW": ".github/workflows/pr.yml"})
+    assert done.returncode == 0, done.stderr
+    return dict(line.split("=", 1) for line in out.read_text().splitlines())
+
+
+@then(parsers.re(r'it says tested "(?P<flag>\w+)", run "(?P<run>\d*)"'))
+def says_tested(tested, flag, run):
+    assert tested.get("tested") == flag, tested
+    assert tested.get("run-id", "") == run, tested
+
+
 @then(parsers.parse('in "{name}" the "{job}" job runs whatever the queue passed'))
 def runs_anyway(repo, name, job):
     spec = jobs(repo, name)[job]
@@ -464,12 +528,12 @@ def own_triggers(own):
     assert on["push"] == {"branches": ["main"]}
 
 
-@then("on a push to main it skips the tests the merge queue already passed on its commit")
+@then("in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree")
 def own_shortcut(own):
     jobs_ = own["jobs"]
     tested = jobs_["tested"]
     assert tested["uses"] == "./.github/workflows/job-tested.yml"
-    assert tested["if"] == "github.event_name == 'push'"
+    assert tested["if"] == "github.event_name != 'pull_request'"
     assert tested["with"] == {"workflow": ".github/workflows/ci.yml"}
     for job in ("functional", "audit", "osv", "terraform", "deploy-static", "cache-action"):
         assert jobs_[job]["needs"] == "tested", job

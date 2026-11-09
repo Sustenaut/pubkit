@@ -1,11 +1,21 @@
-# Whether the merge queue already tested this commit. The queue runs a
-# pull request's workflow (`workflow`) on the pull request merged into
-# main, and merging moves main to that same commit, so a push to main whose
-# commit has a successful merge_group run of it has nothing left to test.
-# `tested` is "true" then, and `run-id` names that run, whose coverage
-# artifacts the sonar job reads; otherwise (no queue, a commit pushed some
-# other way, a queue run that failed or never ran) `tested` is "false", and
-# every job runs as it would without this.
+# Whether an earlier run already tested exactly this code. A run of
+# `workflow` (the one the merge queue runs, which pull requests run too)
+# that passed on a commit with this commit's tree tested the same files, so
+# what it tested need not be tested again:
+#
+#   - in the merge queue, the pull request's own run, when the pull request
+#     was up to date with main, so the queue's merge of it changes nothing;
+#   - on a push to main, the queue's run of the very commit main moved to,
+#     or, where that run skipped its tests for the pull request's, that
+#     pull request's run.
+#
+# `tested` is "true" then, and `run-id` names the run that ran the tests,
+# whose coverage artifacts the sonar job reads: a run that skipped its own
+# tests says, in a notice of its tested job, which run it took them from,
+# and that run is followed. Its artifacts must not have expired. Otherwise
+# (a pull request's own run, main moved in between, several pull requests
+# merged together, a commit pushed some other way) `tested` is "false",
+# and every job runs as it would without this.
 #
 # One job of the CI `pubkit sync` writes from the ci block of pubkit.json
 # (src/pubkit/ci.py). The caller grants it actions: read.
@@ -16,29 +26,48 @@ on:
     inputs:
       workflow: { type: string, default: .github/workflows/pr.yml, description: "The workflow the merge queue runs, by its path." }
     outputs:
-      tested: { value: '${{ jobs.tested.outputs.tested }}', description: '"true" when the merge queue already passed this commit.' }
-      run-id: { value: '${{ jobs.tested.outputs.run-id }}', description: "The merge queue's run of this commit, when tested." }
+      tested: { value: '${{ jobs.tested.outputs.tested }}', description: '"true" when an earlier run passed on this commit''s tree.' }
+      run-id: { value: '${{ jobs.tested.outputs.run-id }}', description: "That run, when tested." }
 
 jobs:
   tested:
     runs-on: ubuntu-latest
     outputs:
-      tested: ${{ steps.queue.outputs.tested }}
-      run-id: ${{ steps.queue.outputs.run-id }}
+      tested: ${{ steps.earlier.outputs.tested }}
+      run-id: ${{ steps.earlier.outputs.run-id }}
     steps:
-      - id: queue
+      - id: earlier
         run: |
-          run=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=merge_group&status=success" \
-            --jq "[.workflow_runs[] | select(.path == \"$WORKFLOW\")][0].id // empty")
-          if [ -n "$run" ]; then
-            echo "::notice::The merge queue passed this commit in run $run, so main runs only what it adds: the scan, and the release."
+          untested() { echo "$1: every job runs."; echo tested=false >> "$GITHUB_OUTPUT"; exit 0; }
+          [ "$EVENT" != pull_request ] || untested "A pull request's own run"
+          tree=$(gh api "repos/$REPO/git/commits/$SHA" --jq .tree.sha)
+          # The workflow's latest successful runs on pull requests and in the queue.
+          runs=$(gh api "repos/$REPO/actions/workflows/${WORKFLOW##*/}/runs?status=success&per_page=30" \
+            --jq ".workflow_runs[] | select((.event == \"pull_request\" or .event == \"merge_group\")
+                  and .id != $RUN_ID) | \"\(.id) \(.head_sha)\"")
+          while read -r run sha; do
+            [ -n "$run" ] || continue
+            [ "$(gh api "repos/$REPO/git/commits/$sha" --jq .tree.sha)" = "$tree" ] || continue
+            # A run that took its tests from another names it; that one ran them.
+            job=$(gh api "repos/$REPO/actions/runs/$run/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.name == "ci / tested" and .conclusion == "success")][0].id // empty')
+            if [ -n "$job" ]; then
+              from=$(gh api "repos/$REPO/check-runs/$job/annotations" --jq '.[].message' \
+                | sed -n 's/.*[Ii]n run \([0-9][0-9]*\).*/\1/p;T;q')
+              run=${from:-$run}
+            fi
+            expired=$(gh api "repos/$REPO/actions/runs/$run/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select(.expired)] | length')
+            [ "$expired" = 0 ] || continue
+            echo "::notice::This commit's tree was tested in run $run of $WORKFLOW, so this run tests nothing it tested: the scan reads its coverage."
             { echo tested=true; echo "run-id=$run"; } >> "$GITHUB_OUTPUT"
-          else
-            echo "No successful merge queue run of $WORKFLOW for $SHA: every job runs."
-            echo tested=false >> "$GITHUB_OUTPUT"
-          fi
+            exit 0
+          done <<< "$runs"
+          untested "No successful run of $WORKFLOW tested this commit's tree"
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
           WORKFLOW: ${{ inputs.workflow }}
