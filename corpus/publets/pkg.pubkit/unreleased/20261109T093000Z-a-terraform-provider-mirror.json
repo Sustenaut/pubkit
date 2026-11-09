@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "A provider mirror for Terraform: terraform.yml's init and the service CI's backend-less init are tried three times, 15 s apart, and then, when pubkit.json's mirror.terraform names a Terraform provider network mirror, once more with every provider from it; the module's lock still checks each archive"
-}

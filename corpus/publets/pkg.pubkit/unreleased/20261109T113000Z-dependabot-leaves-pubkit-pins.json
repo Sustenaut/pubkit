@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "The dependabot.yml pubkit sync writes no longer opens pull requests that move the owner's pubkit or pubrel pins: every github-actions entry ignores <owner>/pubkit/* and <owner>/pubrel/*, ahead of any ignores given in security.dependabot.options. Those pins move with pubkit bump, so such a pull request always failed pubkit sync --check"
-}
