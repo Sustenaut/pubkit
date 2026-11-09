@@ -288,3 +288,39 @@ def test_the_removed_commands_are_gone():
         with pytest.raises(SystemExit) as stopped:
             cli.main(command)
         assert stopped.value.code == 2
+
+
+def test_the_nightly_runs_the_bump_hooks_and_syncs_what_they_moved(repo, capsys, hooks, monkeypatch):
+    """pins, as `pubkit bump` does: a moved provider reaches the launchers and the lock."""
+    deployed(repo, hooks, providers=both())
+    assert cli.main(["sync"]) == 0
+    newer = {"distribution": "pubdeploy", "sha256": "3" * 64,
+             "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.2.0/pubdeploy-9.2.0-py3-none-any.whl"}
+
+    def moved(root):
+        config = json.loads((root / "pubkit.json").read_text())
+        config["deploy"]["providers"] = [pin(), newer]
+        (root / "pubkit.json").write_text(json.dumps(config, indent=2) + "\n")
+        return ["updated  pubkit.json (deploy.providers pubdeploy: 9.2.0)"]
+
+    def broken(root):
+        raise OSError("no network")
+    hooks["sustenaut.bump"] = [Hook("other", broken), Hook("pubdeploy", moved)]
+    locked = []
+    monkeypatch.setattr("pubkit.cli.lock", lambda root: locked.append(root))
+    from pubkit.nightly import pins  # noqa: PLC0415
+    changes = pins(repo, "")
+    assert "pubkit.json (deploy.providers pubdeploy: 9.2.0)" in changes
+    assert "pubkit: the sustenaut.bump hook other failed (OSError)" in capsys.readouterr().err
+    assert locked == [repo]
+    assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
+
+
+def test_the_nightly_with_nothing_moved_neither_syncs_nor_locks(repo, capsys, hooks, monkeypatch):
+    deployed(repo, hooks, providers=both())
+    assert cli.main(["sync"]) == 0
+    hooks["sustenaut.bump"] = [Hook("pubdeploy", lambda root: [])]
+    monkeypatch.setattr("pubkit.cli.lock", lambda root: (_ for _ in ()).throw(AssertionError("no lock")))
+    monkeypatch.setattr("pubkit.cli.sync", lambda root, check: (_ for _ in ()).throw(AssertionError("no sync")))
+    from pubkit.nightly import pins  # noqa: PLC0415
+    assert pins(repo, "") == []

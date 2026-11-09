@@ -1,8 +1,9 @@
 Feature: The nightly keeps every pub* repository current, through a pull request
   `pubkit pins` moves every outdated pub* pin, `pubkit crates` keeps only
   the crate updates cargo vet audits and cargo deny passes, and `pubkit
-  nightly` commits each, writing the pull request's body. The nightly
-  workflow keeps one pull request per repository and never merges it.
+  nightly` commits each, writing the pull request's body, in one
+  repository's checkout. pubfleet's nightly.yml runs it in each repository it
+  governs, and keeps one pull request per repository.
 
   Background:
     Given an empty repository
@@ -85,6 +86,37 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then it succeeds
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
 
+  Scenario: pins moves another repository's workflow to its latest release, by its tag's commit
+    Given "example-org/somefleet" releases "v0.2.0"
+    And the file ".github/workflows/nightly.yml" reads "    uses: example-org/somefleet/.github/workflows/nightly.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "nightly.yml: example-org/somefleet 0.1.0 -> 0.2.0"
+    And ".github/workflows/nightly.yml" pins "example-org/somefleet" to the commit of "v0.2.0"
+
+  Scenario: pins moves another repository's current pin by tag to the tag's commit
+    Given "example-org/somefleet" releases "v0.2.0"
+    And the file ".github/workflows/board.yml" reads "    uses: example-org/somefleet/.github/workflows/board.yml@v0.2.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "board.yml: example-org/somefleet 0.2.0 pinned to"
+    And ".github/workflows/board.yml" pins "example-org/somefleet" to the commit of "v0.2.0"
+
+  Scenario: pins leaves another repository's workflow whose latest release it cannot read, and warns
+    Given "example-org/somefleet" releases "main"
+    And the file ".github/workflows/nightly.yml" reads "    uses: example-org/somefleet/.github/workflows/nightly.yml@v0.1.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And stderr mentions "no latest release of example-org/somefleet to read"
+    And ".github/workflows/nightly.yml" contains "nightly.yml@v0.1.0"
+
+  Scenario: pins leaves a deploy.providers package's workflow to the package's own bump
+    Given "example-org/somedeploy" releases "v0.2.0"
+    And pubkit.json lists "https://github.com/example-org/somedeploy/releases/download/v0.1.0/somedeploy-0.1.0-py3-none-any.whl" in deploy.providers
+    And the file ".github/workflows/deploy.yml" reads "    uses: example-org/somedeploy/.github/workflows/deploy.yml@v0.1.0"
+    When I run pubkit "pins" "--no-lock"
+    Then ".github/workflows/deploy.yml" contains "deploy.yml@v0.1.0"
+
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
@@ -157,19 +189,6 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When the nightly runs with npm moving "marked" to 18.2.0 and the lock moving "pytest" to 9.1.0
     Then it made no commits
     And its body says "takes no third-party updates" and lists no "marked"
-
-  Scenario: The nightly workflow updates one pull request and merges nothing
-    When I parse the workflow "nightly.yml"
-    Then it runs by hand and when called, with no schedule of its own
-    And neither it nor its script merges a pull request
-    And its script updates an open pull request before opening one
-    And its script re-tests the pins alone when CI fails
-
-  Scenario: The nightly pushes as its GitHub App, one repository at a time
-    When I parse the workflow "nightly.yml"
-    Then each repository's token comes from the Sustenaut nightly app, for that repository alone
-    And the token may write only contents, pull requests and workflows, and read actions
-    And without the app it falls back to PUBKIT_BUMP_TOKEN with a warning
 
   Scenario: pins moves the crates pubkit.json names, and no others
     Given the file "pubkit.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
@@ -255,35 +274,3 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When I start the package "pubfoo" without a key
     Then the repository has "Cargo.toml", "src/lib.rs", "release.json", "SECURITY.md", "TESTING.md", "SUPPLY-CHAIN.md", "fuzz/fuzz_targets/greet.rs", ".gitignore"
     And it conforms to the standard but for "RS-SUP-05"
-
-  Scenario: A control plane calls the nightly with a repos input and neutral secrets
-    When I parse the workflow "nightly.yml"
-    Then it can be called with the input "repos" and the secrets "app-id, app-key, notify-token, notify-user"
-    And run by hand it takes the same repos input
-    And a repository it can't read for the report doesn't stop the others
-    And only what the repos input governs gets a pull request
-    And it takes pubkit's script and wheel from the same latest release, whichever repository calls it
-
-  Scenario: The nightly takes pubrel's latest release when crates.io has it
-    Given crates.io has pubrel "0.6.1, 0.6.2"
-    When I ask which pubrel to use for the release "v0.6.2"
-    Then it says "0.6.2", with no warning
-
-  Scenario: A release not yet on crates.io gives way to the newest that is, with a warning
-    Given crates.io has pubrel "0.6.0, 0.6.1"
-    When I ask which pubrel to use for the release "v0.6.2"
-    Then it says "0.6.1", warning "pubrel 0.6.2 is tagged but not on crates.io"
-
-  Scenario: A yanked release gives way too
-    Given crates.io has pubrel "0.6.1, 0.6.2", with "0.6.2" yanked
-    When I ask which pubrel to use for the release "v0.6.2"
-    Then it says "0.6.1", warning "not on crates.io"
-
-  Scenario: Without crates.io it tries the latest release, saying so
-    Given crates.io doesn't answer
-    When I ask which pubrel to use for the release "v0.6.2"
-    Then it says "0.6.2", warning "crates.io didn't answer"
-
-  Scenario: The nightly asks crates.io before installing pubrel
-    When I parse the workflow "nightly.yml"
-    Then it chooses pubrel with pubrel-version.sh, and installs that version

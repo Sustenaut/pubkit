@@ -16,18 +16,14 @@
     pubkit crates [--report FILE]
     pubkit record TEXT
     pubkit nightly --pubrel V --body FILE
-    pubkit freshness [--json] (DIR... | --repos FILE [DIR])
     pubkit protect [--check] [--repos FILE | --require CHECK...] [REPO...]
-    pubkit state --check [FILE]
-    pubkit state --repos-for board|govern [FILE]
-    pubkit board-publish --url URL --tenant TENANT [--file FILE]
-    pubkit variables --check|--apply [--state FILE] [--repos FILE | REPO...]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
-    pubkit board --out DIR --repos FILE [--rules FILE]
 
 The deploy walk and the k8s checks are pubdeploy's: ./pubdeploy, which
-`pubkit sync` writes in a repository with a deploy block, runs them.
+`pubkit sync` writes in a repository with a deploy block, runs them. What a
+control plane runs across many repositories (the board, state files,
+variables, freshness) is not pubkit's: pubkit's README says where it went.
 
 Deprecated, each now ./pubsec with the same arguments, and removed in the
 next minor: secrets run, app-secrets, github-app create,
@@ -690,12 +686,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--body", required=True, type=Path)
     commands.add_parser("bump",
                         help="move this repository to this pubkit: managed files, lock, workflow pins")
-    p = commands.add_parser("freshness",
-                            help="report which pinned pubkit and standard each repository meets")
-    p.add_argument("--json", action="store_true", help="JSON rows instead of a Markdown table")
-    p.add_argument("--repos", type=Path, metavar="FILE",
-                   help="report the repositories this repos file governs, checked out in DIR")
-    p.add_argument("dirs", nargs="*", metavar="DIR", type=Path)
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
     p = commands.add_parser("protect",
@@ -716,43 +706,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME, read from its own pubkit.json on GitHub; by default "
                         "those the repos file marks, or this repository from ./pubkit.json")
-    p = commands.add_parser("board", help="grade every listed repository A to E into "
-                                          "board.json and a static index.html")
-    p.add_argument("--out", type=Path, required=True, help="the directory to write them to")
-    p.add_argument("--repos", type=Path, metavar="FILE", required=True,
-                   help="the repos file: grade what it names")
-    p.add_argument("--rules", type=Path, help="other rules than the ones pubkit ships")
-    p.add_argument("--replay", type=Path,
-                   help="read recorded responses from this file instead of the network")
-    p.add_argument("--record", type=Path,
-                   help="also keep every response in this file, for --replay")
-    p = commands.add_parser("board-publish", help="keep a new board.json in storage, if a fact or "
-                                                  "a grade changed, from a GitHub Actions job")
-    p.add_argument("--url", required=True, help="the storage service's address")
-    p.add_argument("--tenant", required=True, help="the storage tenant whose board head it moves")
-    p.add_argument("--file", type=Path, default=Path("site/board.json"), metavar="FILE",
-                   help="the board (default: site/board.json)")
-    p = commands.add_parser("state", help="check a state repository's state.json, or make a "
-                                          "repos file from it")
-    what = p.add_mutually_exclusive_group(required=True)
-    what.add_argument("--check", action="store_true",
-                      help="check its shape, that each repository exists, and each protected one's block")
-    what.add_argument("--repos-for", choices=("board", "govern"), metavar="ROLE",
-                      help="print the repos file for a role, board or govern")
-    p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
-    p = commands.add_parser("variables", help="keep repositories' GitHub variables to the values "
-                                              "a state file gives them")
-    what = p.add_mutually_exclusive_group(required=True)
-    what.add_argument("--check", action="store_true",
-                      help="change nothing: print how each differs, and fail when one does")
-    what.add_argument("--apply", action="store_true",
-                      help="set those that differ, then run each changed repository's deploy workflow")
-    p.add_argument("--state", type=Path, default=Path("state.json"), metavar="FILE",
-                   help="the state file (default: state.json)")
-    p.add_argument("--repos", dest="repos_file", type=Path, metavar="FILE",
-                   help="the repos file: act on those it lists that the state gives variables")
-    p.add_argument("repos", nargs="*", metavar="REPO",
-                   help="NAME or OWNER/NAME; by default every repository the state gives variables")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -821,11 +774,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "bump":
         from .freshness import bump
         return bump(root)
-    if args.command == "freshness":
-        from .freshness import freshness
-        from .paths import confined
-        repos_file = confined(args.repos, "the --repos file") if args.repos else None
-        return freshness(args.dirs, args.json, repos_file)
     if args.command == "protect":
         from .paths import confined
         from .protect import run as protect
@@ -834,31 +782,6 @@ def main(argv: list[str] | None = None) -> int:
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return protect(args.repos, args.check, args.require, tags=args.tags,
                        queue=args.queue, repos_file=repos_file)
-    if args.command == "variables":
-        from .paths import confined
-        from .variables import run as variables
-        if args.repos_file and args.repos:
-            sys.exit("pubkit variables: --repos takes the place of naming them")
-        repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
-        return variables(confined(args.state, "the state file"), args.repos, args.apply, repos_file)
-    if args.command == "state":
-        from .paths import confined
-        from .state import check, repos_for
-        if args.repos_for:
-            return repos_for(confined(args.file, "the state file"), args.repos_for)
-        return check(confined(args.file, "the state file"))
-    if args.command == "board-publish":
-        from .board_publish import run as publish
-        from .paths import confined
-        return publish(args.url, args.tenant, confined(args.file, "the --file file"))
-    if args.command == "board":
-        from .board import run as board
-        from .paths import confined
-        files = {name: confined(path, f"the --{name} file") if path else None
-                 for name, path in (("rules", args.rules), ("replay", args.replay),
-                                    ("record", args.record), ("repos", args.repos))}
-        return board(confined(args.out, "the --out directory"),
-                     files["rules"], files["replay"], files["record"], files["repos"])
     if args.command == "dns" and args.dns_command == "moves":
         from .dns import moves
         return moves(sys.stdin.read())

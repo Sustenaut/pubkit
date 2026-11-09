@@ -1,6 +1,5 @@
 """Steps for the nightly: `pubkit pins`, the parts of `pubkit crates` and
-`pubkit nightly` that need no network, the workflow and its script, and
-`pubkit new` without a key."""
+`pubkit nightly` that need no network, and `pubkit new` without a key."""
 
 from __future__ import annotations
 
@@ -10,7 +9,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import yaml
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -18,8 +16,6 @@ from pubkit import cbor, conform, new, nightly
 
 scenarios("nightly.feature")
 
-GITHUB = Path(__file__).resolve().parents[2] / ".github"
-SCRIPT = GITHUB / "nightly" / "update.sh"
 
 
 @then("it prints nothing")
@@ -76,76 +72,6 @@ def nothing_merges(body):
 def body_shows(body, heading, why):
     assert f"<summary>{heading}</summary>" in body
     assert why in body.split(heading, 1)[1]
-
-
-@when(parsers.parse('I parse the workflow "{name}"'), target_fixture="workflow")
-def parse(name):
-    text = (GITHUB / "workflows" / name).read_text()
-    return {"text": text, "data": yaml.safe_load(text), "script": SCRIPT.read_text()}
-
-
-@then("it runs by hand and when called, with no schedule of its own")
-def scheduled(workflow):
-    on = workflow["data"][True]
-    assert "workflow_dispatch" in on and "workflow_call" in on
-    assert "schedule" not in on
-
-
-@then("neither it nor its script merges a pull request")
-def merges_nothing(workflow):
-    for text in (workflow["text"], workflow["script"]):
-        assert not re.search(r"gh pr merge|--auto\b|automerge|enablePullRequestAutoMerge", text)
-
-
-@then("its script updates an open pull request before opening one")
-def updates_open(workflow):
-    script = workflow["script"]
-    assert script.index("gh pr list") < script.index("gh pr edit") < script.index("gh pr create")
-    assert "--force origin" in script
-
-
-@then("its script re-tests the pins alone when CI fails")
-def retests(workflow):
-    script = workflow["script"]
-    assert '"$pins:$branch"' in script and '"${commits[0]}" = pins' in script
-    assert script.index('wait_ci "$head"') < script.index('wait_ci "$pins"')
-
-
-def _steps(workflow):
-    return workflow["data"]["jobs"]["update"]["steps"]
-
-
-@then("each repository's token comes from the Sustenaut nightly app, for that repository alone")
-def app_token(workflow):
-    app = next(s for s in _steps(workflow) if s.get("id") == "app")
-    assert re.fullmatch(r"actions/create-github-app-token@[0-9a-f]{40}", app["uses"])
-    assert app["if"] == "env.APP_ID != ''"
-    update_job = workflow["data"]["jobs"]["update"]
-    assert update_job["env"]["APP_ID"] == "${{ secrets.app-id || vars.NIGHTLY_APP_ID }}"
-    given = app["with"]
-    assert given["app-id"] == "${{ env.APP_ID }}"
-    assert given["private-key"] == "${{ secrets.app-key || secrets.NIGHTLY_APP_KEY }}"
-    assert given["owner"] == "${{ steps.where.outputs.owner }}"
-    assert given["repositories"] == "${{ steps.where.outputs.name }}"
-    update = next(s for s in _steps(workflow) if "update.sh" in s.get("run", ""))
-    assert update["env"]["GH_TOKEN"] == "${{ steps.token.outputs.token }}"
-
-
-@then("the token may write only contents, pull requests and workflows, and read actions")
-def app_permissions(workflow):
-    given = next(s for s in _steps(workflow) if s.get("id") == "app")["with"]
-    asked = {k: v for k, v in given.items() if k.startswith("permission-")}
-    assert asked == {"permission-contents": "write", "permission-pull-requests": "write",
-                     "permission-workflows": "write", "permission-actions": "read"}
-
-
-@then("without the app it falls back to PUBKIT_BUMP_TOKEN with a warning")
-def fallback(workflow):
-    token = next(s for s in _steps(workflow) if s.get("id") == "token")
-    assert token["env"]["BUMP_TOKEN"] == "${{ secrets.PUBKIT_BUMP_TOKEN }}"
-    assert "::warning::No app-id or NIGHTLY_APP_ID" in token["run"]
-    assert token["run"].index("APP_TOKEN") < token["run"].index("BUMP_TOKEN")
-    assert "GH_TOKEN" not in workflow["data"]["jobs"]["update"].get("env", {})
 
 
 @when(parsers.parse("the repository's pubkit.json reads '{text}'"))
@@ -416,121 +342,45 @@ def conforms_but(repo, rule):
     assert problems and all(p.startswith(f"{rule}:") for p in problems), problems
 
 
-@then(parsers.parse('it can be called with the input "{name}" and the secrets "{secrets}"'))
-def called(workflow, name, secrets):
-    call = workflow["data"][True]["workflow_call"]
-    assert call["inputs"][name]["required"] is True
-    assert set(call["secrets"]) == set(secrets.split(", "))
-    assert "NIGHTLY_APP" not in workflow["data"]["jobs"]["update"]["env"]["REPO"]
-
-
-@then("run by hand it takes the same repos input")
-def by_hand_repos(workflow):
-    dispatch = workflow["data"][True]["workflow_dispatch"]["inputs"]
-    assert dispatch["repos"]["required"] is True
-    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
-    assert "governed.json" not in report["run"]
-
-
-@then("a repository it can't read for the report doesn't stop the others")
-def private_report(workflow):
-    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
-    assert "can't be read for the report" in report["run"]
-    assert 'if [ -n "$(ls repos)" ]' in report["run"]
-
-
-@then("only what the repos input governs gets a pull request")
-def only_governed(workflow):
-    report = next(s for s in workflow["data"]["jobs"]["report"]["steps"] if s.get("id") == "report")
-    assert "select(.govern)" in report["run"]
-    assert report["env"]["REPOS"] == "${{ inputs.repos }}"
-    assert workflow["data"]["jobs"]["update"]["if"] == "needs.report.outputs.repos != '[]'"
-
-
-@then("it takes pubkit's script and wheel from the same latest release, whichever repository calls it")
-def same_release(workflow):
-    assert workflow["data"]["env"]["PUBKIT"] == "${{ inputs.pubkit || github.repository }}"
-    checkout = next(s for s in _steps(workflow) if s.get("with", {}).get("path") == "pubkit")
-    assert checkout["with"]["repository"] == "${{ env.PUBKIT }}"
-    assert checkout["with"]["ref"] == "${{ needs.report.outputs.tag }}"
-    assert '$GITHUB_REPOSITORY' not in "".join(s.get("run", "") for s in _steps(workflow))
-
-
-# Which pubrel the nightly takes, against a crates.io answered here.
+# Another repository's releases: its tags in a git repository here, and its
+# latest release from a stand-in `gh`.
 
 @pytest.fixture
-def crates():
-    """What the fake crates.io has: version -> yanked; None when it doesn't answer."""
-    return {"versions": {}}
+def released():
+    """The commit each stand-in repository's latest tag names, by OWNER/NAME."""
+    return {}
 
 
-@given(parsers.re(r'crates\.io has pubrel "(?P<versions>[^"]+)"(?:, with "(?P<yanked>[^"]+)" yanked)?$'))
-def crates_has(crates, versions, yanked):
-    crates["versions"] = {v: v == yanked for v in versions.split(", ")}
+@given(parsers.parse('"{slug}" releases "{tag}"'))
+def releases(tmp_path, env, released, slug, tag):
+    remote = tmp_path / "remotes" / slug
+    remote.mkdir(parents=True)
+    who = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    git = ["git", "-C", str(remote), *who]
+    subprocess.run(["git", "init", "-q", str(remote)], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", tag], check=True)
+    if tag.startswith("v"):
+        subprocess.run([*git, "tag", "-a", tag, "-m", tag], check=True)
+    released[slug] = subprocess.run(
+        [*git, "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    fake = bin_dir / "gh"
+    fake.write_text(f'#!/bin/sh\n[ "$4" = "{slug}" ] || exit 1\nprintf "%s\\n" "{tag}"\n')
+    fake.chmod(0o755)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
+    env["PUBKIT_GIT_BASE"] = str(tmp_path / "remotes")
 
 
-@given("crates.io doesn't answer")
-def crates_down(crates):
-    crates["versions"] = None
+@given(parsers.parse('pubkit.json lists "{wheel}" in deploy.providers'))
+def lists_provider(repo, wheel):
+    (repo / "pubkit.json").write_text(json.dumps(
+        {"kind": "utility", "deploy": {"providers": [{"distribution": "somedeploy", "wheel": wheel,
+                                                      "sha256": "0" * 64}]}}) + "\n")
 
 
-@when(parsers.parse('I ask which pubrel to use for the release "{tag}"'), target_fixture="asked")
-def ask_pubrel(crates, tag):
-    import threading
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-    held = crates["versions"]
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_):
-            pass
-
-        def do_GET(self):
-            assert "pubkit-nightly" in self.headers["User-Agent"]
-            if held is None:
-                self.send_response(503)
-                self.end_headers()
-                return
-            path = self.path.removeprefix("/crates/pubrel")
-            if path == "":
-                stable = [v for v, yanked in held.items() if not yanked]
-                body = {"crate": {"max_stable_version": max(stable, key=lambda v: tuple(map(int, v.split("."))))}}
-            elif path[1:] in held:
-                body = {"version": {"num": path[1:], "yanked": held[path[1:]]}}
-            else:
-                self.send_response(404)
-                self.end_headers()
-                return
-            data = json.dumps(body).encode()
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    try:
-        return subprocess.run([str(GITHUB / "nightly" / "pubrel-version.sh"), tag], capture_output=True,
-                              text=True, check=False, timeout=30,
-                              env={**os.environ, "CRATES_API": f"http://127.0.0.1:{server.server_port}"})
-    finally:
-        server.shutdown()
-
-
-@then(parsers.re(r'it says "(?P<version>[^"]+)", (?:with no warning|warning "(?P<warning>[^"]+)")$'))
-def says(asked, version, warning):
-    assert asked.returncode == 0, asked.stderr
-    assert asked.stdout.strip() == version
-    if warning:
-        assert warning in asked.stderr and "::warning::" in asked.stderr
-    else:
-        assert asked.stderr == ""
-
-
-@then("it chooses pubrel with pubrel-version.sh, and installs that version")
-def chooses(workflow):
-    steps = _steps(workflow)
-    latest = next(s for s in steps if s.get("id") == "latest")
-    assert 'pubrel=$(pubkit/.github/nightly/pubrel-version.sh "$(latest Sustenaut/pubrel)")' in latest["run"]
-    install = next(s for s in steps if "cargo install --locked pubrel" in s.get("run", ""))
-    assert install["env"]["PUBREL"] == "${{ steps.latest.outputs.pubrel }}"
+@then(parsers.parse('"{path}" pins "{slug}" to the commit of "{tag}"'))
+def pins_other(repo, released, path, slug, tag):
+    text = (repo / path).read_text()
+    assert f"{slug}/.github/workflows/" in text
+    assert f"@{released[slug]} # {tag}\n" in text, text

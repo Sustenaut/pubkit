@@ -33,7 +33,6 @@
     {
       "plugin": "crates-io.publish",
       "paths": [
-        ".github/nightly/pubrel-version.sh",
         "plugins/rust-crate-quality/.claude-plugin/plugin.json",
         "src/pubkit/audit_prepare.py",
         "src/pubkit/nightly.py",
@@ -53,8 +52,7 @@
     {
       "plugin": "github.actions-oidc",
       "paths": [
-        ".github/workflows/terraform.yml",
-        "src/pubkit/board_publish.py"
+        ".github/workflows/terraform.yml"
       ],
       "mode": "required"
     },
@@ -62,25 +60,15 @@
       "plugin": "github.app-token",
       "paths": [
         ".github/workflows/ci.yml",
-        ".github/workflows/nightly.yml",
         "src/pubkit/ci.py"
-      ],
-      "mode": "required"
-    },
-    {
-      "plugin": "github.board-read",
-      "paths": [
-        "src/pubkit/board/"
       ],
       "mode": "required"
     },
     {
       "plugin": "github.repo-ops",
       "paths": [
-        ".github/nightly/update.sh",
         ".github/workflows/ci.yml",
         ".github/workflows/job-tested.yml",
-        ".github/workflows/nightly.yml",
         ".github/workflows/terraform.yml",
         "Makefile",
         "actions/pr-label/",
@@ -110,13 +98,6 @@
       "mode": "required"
     },
     {
-      "plugin": "openssf.scorecard",
-      "paths": [
-        "src/pubkit/board/connectors/scorecard.py"
-      ],
-      "mode": "required"
-    },
-    {
       "plugin": "osv.audit",
       "paths": [
         ".github/workflows/job-osv.yml",
@@ -130,21 +111,6 @@
       "plugin": "pypi.publish",
       "paths": [
         "src/pubkit/cli.py"
-      ],
-      "mode": "required"
-    },
-    {
-      "plugin": "slack.post",
-      "paths": [
-        ".github/nightly/update.sh",
-        ".github/workflows/nightly.yml"
-      ],
-      "mode": "required"
-    },
-    {
-      "plugin": "sonarcloud.read",
-      "paths": [
-        "src/pubkit/board/"
       ],
       "mode": "required"
     },
@@ -221,12 +187,6 @@
     {
       "host": "rustup.rs",
       "reason": "A link in an install hint"
-    }
-  ],
-  "other_secrets": [
-    {
-      "name": "PUBKIT_BUMP_TOKEN",
-      "reason": "The nightly's fallback GitHub token, for when no app is set up; it reaches only GitHub"
     }
   ],
   "exclude": [

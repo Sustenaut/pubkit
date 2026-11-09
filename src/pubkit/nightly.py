@@ -4,8 +4,10 @@
 release: this pubkit (managed files, lock, `rust-ci.yml`), pubrel's release
 workflow and `pubrel-version`, each
 tool `ci.tools` pins by tag, to the latest release of its git repository,
-and the crates `nightly.pins.crates` names in `Cargo.lock`, within their
-requirements.
+every other repository's reusable workflow a workflow pins at a release
+(a control plane's reusable workflow, say), to that repository's
+latest release, and the crates `nightly.pins.crates` names in `Cargo.lock`,
+within their requirements.
 
 `pubkit crates --report FILE` then tries each upgrade `cargo update` would
 make to the other crates, one at a time on top of those it kept, and keeps
@@ -28,8 +30,10 @@ and the pull request.
 from __future__ import annotations
 
 import contextlib
+import functools
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -37,8 +41,8 @@ from pathlib import Path
 
 from . import __version__
 from .paths import confined
-from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit,
-                   release_commit, repin)
+from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit, ref,
+                   release_commit, repin, tagged)
 
 # A row's text, which must not start with '-' (pubrel has no `--`, so it
 # would read that as an option) or a space.
@@ -52,6 +56,13 @@ PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)
 # Every pubkit reusable workflow a repository can call, not only rust-ci.
 CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/"
                     r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
+# Any other repository's reusable workflow at a release, the repository read
+# from the line itself, so pubkit names none of them. pubkit's and pubrel's
+# move with PUBKIT_PIN and RELEASE_PIN; a deploy.providers package's with its
+# entry, which its sustenaut.bump hook moves.
+OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)(?P<path>/\.github/workflows/[\w.-]+\.ya?ml@)"
+                       + AT + VERSION)
+RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 
 # The languages pubkit's settings name, each by the ecosystem pubkit works
 # with: crates, npm packages, and the hash-locked Python requirements.
@@ -251,16 +262,72 @@ def tools_by_config(root: Path, changes: list[str]) -> bool:
     return moved
 
 
+@functools.cache
+def latest_tag(slug: str) -> str | None:
+    """`slug`'s latest release tag, when it is vX.Y.Z; None, with a warning, when not."""
+    tag = latest_release(slug)
+    if tag and RELEASE_TAG.fullmatch(tag):
+        return tag
+    print(f"pubkit: warning: no latest release of {slug} to read, so its workflows stay where "
+          "they are pinned", file=sys.stderr)
+    return None
+
+
+def provided(root: Path) -> set[str]:
+    """The repositories deploy.providers takes wheels from, by name in lower case."""
+    from .providers import WHEEL  # noqa: PLC0415
+    path = root / "pubkit.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    deploy = config.get("deploy") if isinstance(config, dict) else None
+    given = deploy.get("providers") if isinstance(deploy, dict) else None
+    return {m["repo"].split("/", 1)[1].lower() for p in given or [] if isinstance(p, dict)
+            and isinstance(p.get("wheel"), str) and (m := WHEEL.fullmatch(p["wheel"]))}
+
+
+def others_by_release(text: str, name: str, skip: set[str], changes: list[str]) -> str:
+    """`text` with each other repository's workflow pin (OTHER_PIN) moved to that
+    repository's latest release, by the commit of its tag; the moves said in
+    `changes`. One whose latest release cannot be read stays."""
+    def move(m: re.Match[str]) -> str:
+        if m["repo"].lower() in skip:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None:
+            return m.group(0)
+        version = latest[1:]
+        commit = tagged(f"{os.environ.get('PUBKIT_GIT_BASE', 'https://github.com')}/{slug}", latest)
+        if version == m["version"] and (commit is None or commit == m["commit"]):
+            return m.group(0)
+        changes.append(f"{name}: {slug} {m['version']} -> {version}" if version != m["version"]
+                       else f"{name}: {slug} {version} pinned to {commit}")
+        return f"{slug}{m['path']}{ref(version, commit)}"
+    return OTHER_PIN.sub(move, text)
+
+
 def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
     changes = []
+    # What installed packages move, as `pubkit bump` has them do: pubdeploy's
+    # moves deploy.providers (pubsec and pubdeploy among them) and the uses of
+    # pubdeploy's workflows, before sync writes the launchers and the tests'
+    # requirements from them. A failing hook is said, and moves nothing.
+    from .hooks import bump as bump_hooks  # noqa: PLC0415
+    moved = []
+    for line in bump_hooks(root):
+        if line.startswith("updated"):
+            moved.append(line.removeprefix("updated").strip())
+        else:
+            print(line, file=sys.stderr)
+    changes += moved
     before = pinned(root)
-    if before and before != __version__:
+    if (before and before != __version__) or moved:
         from .cli import lock as lock_requirements, sync  # noqa: PLC0415
         sync(root, check=False)
         if lock:
             lock_requirements(root)
+    if before and before != __version__:
         changes.append(f"pubkit {before} -> {__version__}")
     released = bool(pubrel) and released_by_config(root, pubrel, changes)
     if tools_by_config(root, changes) or released:
@@ -268,6 +335,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         sync(root, check=False)
     from .ci import is_generated  # noqa: PLC0415
     calls = owner_of(root)
+    skip = {"pubkit", "pubrel"} | provided(root)
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
         if is_generated(text):  # pubkit sync writes these, from pubkit.json
@@ -293,6 +361,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
                 elif m["version"] == version and commit and m["commit"] != commit:
                     changes.append(f"{path.name}: {what} {version} pinned to {commit}")
             new = moved
+        new = others_by_release(new, path.name, skip, changes)
         if new != text:
             path.write_text(new, encoding="utf-8")
     old = locked(root)

@@ -206,7 +206,6 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           DEFAULT: >-
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/board.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-audit.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-browser.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-test.yml,
@@ -228,7 +227,6 @@ jobs:
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-tests.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-sonar.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-tested.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/nightly.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/node-ci.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,

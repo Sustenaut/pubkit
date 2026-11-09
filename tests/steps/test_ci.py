@@ -655,11 +655,9 @@ def recorded_pubrel(repo, name):
 @when(parsers.parse('every pin reader reads "{line}"'), target_fixture="read")
 def read_pin(line):
     from pubkit import conform, freshness, nightly  # noqa: PLC0415
-    from pubkit.board import collect  # noqa: PLC0415
 
     patterns = {"conform": conform.WORKFLOW_PIN, "bump": freshness.WORKFLOW_PIN,
-                "nightly": nightly.CI_PIN, "board": collect.PUBKIT_PIN,
-                "release": refs.RELEASE_PIN}
+                "nightly": nightly.CI_PIN, "release": refs.RELEASE_PIN}
     return {name: (m["owner"], m["version"], m["commit"]) for name, p in patterns.items()
             if (m := p.search(line))}
 

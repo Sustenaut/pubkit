@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The nightly's pins calls the sustenaut.bump hooks, as pubkit bump does, so a new pubdeploy or pubsec release reaches each repository's deploy.providers, launchers and lock without a bump by hand; the nightly installs the latest pubdeploy for its hook"
+}
