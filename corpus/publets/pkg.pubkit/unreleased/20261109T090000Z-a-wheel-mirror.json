@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "A wheel mirror for when GitHub's release downloads fail: pubkit.json's mirror.wheels names a base that serves each wheel at <base>/f/<sha256>/<file>.whl. The new managed tests/install-lock, which pubkit.mk's venv target and the reusable workflows' hash-locked installs now go through, tries a lock three times and then once more with each GitHub release wheel taken from the mirror, the hashes unchanged; pip-audit's last try reads the locks rewritten the same way, and ./pubkit fetches its own wheel and deploy.providers' wheels from the mirror when GitHub fails, each checked against its sha256. Without the setting, installs only retry and ./pubkit is unchanged"
+}

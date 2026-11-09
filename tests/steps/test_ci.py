@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__, ci, refs
+from pubkit import __version__, ci, cli, refs
 
 scenarios("ci.feature")
 
@@ -131,16 +133,16 @@ def setup_ran(setup, times, how):
     assert (setup["code"] == 0) == (how == "passed"), setup
 
 
-@then("every step that installs tests/requirements.lock tries it three times")
+@then("every step that installs tests/requirements.lock does it through tests/install-lock")
 def installs_retried():
     found = 0
     for path in sorted(WORKFLOWS.glob("*.yml")):
         for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values():
             for step in job.get("steps") or []:
                 for line in step.get("run", "").splitlines():
-                    if "--require-hashes -r tests/requirements.lock" in line and "pip install" in line:
+                    assert not ("pip install" in line and "requirements.lock" in line), f"{path.name}: {line}"
+                    if line.strip().startswith("tests/install-lock "):
                         found += 1
-                        assert line.strip().startswith("for attempt in 1 2 3; do"), f"{path.name}: {line}"
     assert found >= 4
 
 
@@ -158,6 +160,10 @@ def audits_retried():
             assert tries[1]["if"] == f"steps.{tries[0]['id']}.outcome == 'failure'", path.name
             assert tries[2]["if"] == f"steps.{tries[1]['id']}.outcome == 'failure'", path.name
             assert not tries[2].get("continue-on-error"), path.name
+            # Before the last try, each lock's release wheels move to the mirror.
+            steps = job["steps"]
+            between = steps[steps.index(tries[1]) + 1:steps.index(tries[2])]
+            assert any("tests/install-lock --rewrite" in s.get("run", "") for s in between), path.name
     assert found >= 2
 
 
@@ -671,3 +677,129 @@ def stderr_lacks(result, text):
 @then(parsers.parse('"{path}" is not there'))
 def not_there(repo, path):
     assert not (repo / path).exists()
+
+
+# tests/install-lock and the launcher's wheel mirror.
+
+PUBKIT_HASH = "a" * 64
+PUBKIT_WHEEL = f"pubkit-{__version__}-py3-none-any.whl"
+PUBKIT_URL = f"https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/{PUBKIT_WHEEL}"
+PYTEST_LINES = f"pytest==9.0.3 \\\n    --hash=sha256:{'b' * 64} \\\n    --hash=sha256:{'c' * 64}\n"
+
+
+@pytest.fixture
+def mirror():
+    return ""
+
+
+def _config(mirror):
+    return {"kind": "utility", "mirror": {"wheels": mirror}} if mirror else {"kind": "utility"}
+
+
+@given(parsers.parse('pubkit.json\'s wheel mirror is "{url}"'), target_fixture="mirror")
+def wheel_mirror(url):
+    return url
+
+
+@given('a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI', target_fixture="lock")
+def lock_file(tmp_path):
+    lock = tmp_path / "requirements.lock"
+    lock.write_text(f"pubkit @ {PUBKIT_URL} \\\n    --hash=sha256:{PUBKIT_HASH}\n{PYTEST_LINES}")
+    return lock
+
+
+@when("tests/install-lock runs with a pip that fails every install of a GitHub release URL", target_fixture="installed")
+def run_install_lock(tmp_path, lock, mirror):
+    script = tmp_path / "install-lock"
+    script.write_text(cli.render(cli.templates("utility")["tests/install-lock"], cli.values(_config(mirror))))
+    seen = tmp_path / "seen"
+    seen.mkdir()
+    pip = tmp_path / "pip"
+    # Keeps each lock it is given, and fails while one still names a GitHub release.
+    pip.write_text('#!/bin/bash\nn=$(ls "$SEEN" | wc -l)\ncp "$5" "$SEEN/$n"\n! grep -q "https://github.com/" "$5"\n')
+    pip.chmod(0o755)
+    done = subprocess.run(["bash", str(script), str(pip), str(lock)], capture_output=True, text=True, check=False,
+                          env={**os.environ, "SEEN": str(seen), "INSTALL_LOCK_PAUSE": "0"})
+    locks = [(seen / str(n)).read_text() for n in range(len(list(seen.iterdir())))]
+    return {"code": done.returncode, "locks": locks, "stderr": done.stderr}
+
+
+@then(parsers.re(r"pip was run (?P<times>\d) times, and the install (?P<how>passed|failed)"))
+def pip_ran(installed, times, how):
+    assert len(installed["locks"]) == int(times), installed
+    assert (installed["code"] == 0) == (how == "passed"), installed
+
+
+@then('the last lock pinned "pubkit" at the mirror\'s address for its sha256, with its hash')
+def mirrored_pubkit(installed, mirror):
+    assert installed["locks"][-1].startswith(
+        f"pubkit @ {mirror}/f/{PUBKIT_HASH}/{PUBKIT_WHEEL} \\\n    --hash=sha256:{PUBKIT_HASH}\n")
+
+
+@then('the last lock left "pytest" as it was')
+def pytest_kept(installed):
+    assert installed["locks"][-1].endswith(PYTEST_LINES)
+
+
+@given(parsers.parse("pubkit.json's mirror setting '{setting}'"), target_fixture="setting")
+def mirror_setting(setting):
+    return json.loads(setting)
+
+
+@then("sync stops, saying what a mirror setting is")
+def mirror_refused(setting):
+    with pytest.raises(SystemExit) as stop:
+        cli.values({"kind": "utility", "mirror": setting})
+    assert 'mirror is {"wheels": "https://host/path", "terraform": "https://host/path"}' in str(stop.value)
+
+
+@given("a lock that pins this pubkit's wheel", target_fixture="repo_dir")
+def pinned_repo(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    digest = hashlib.sha256(b"the wheel").hexdigest()
+    (repo / "tests" / "requirements.lock").write_text(
+        f"pubkit @ {PUBKIT_URL} \\\n    --hash=sha256:{digest}\n{PYTEST_LINES}")
+    return repo
+
+
+@when(parsers.parse('the launcher fetches pubkit with GitHub failing and the mirror giving "{content}"'),
+      target_fixture="launched")
+def launch(tmp_path, repo_dir, mirror, content):
+    launcher = repo_dir / "pubkit"
+    launcher.write_text(cli.render(cli.templates("utility")["pubkit"], cli.values(_config(mirror))))
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    (bin_dir / "curl").write_text(
+        '#!/bin/bash\nout=""; url=""\nwhile [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift 2;; -*) shift;; '
+        '*) url=$1; shift;; esac; done\necho "$url" >> "$ASKED"\n'
+        'case "$url" in https://github.com/*) exit 22;; esac\nprintf %s "$GIVES" > "$out"\n')
+    (bin_dir / "uvx").write_text('#!/bin/bash\necho "$@"\n')
+    for tool in ("curl", "uvx"):
+        (bin_dir / tool).chmod(0o755)
+    cache = tmp_path / f"cache-{content.replace(' ', '-')}"
+    asked = tmp_path / "asked"
+    done = subprocess.run(["bash", str(launcher), "--version"], capture_output=True, text=True, check=False,
+                          env={"PATH": f"{bin_dir}{os.pathsep}/usr/bin:/bin", "XDG_CACHE_HOME": str(cache),
+                               "GIVES": content, "ASKED": str(asked)})
+    return {"code": done.returncode, "stdout": done.stdout, "stderr": done.stderr, "cache": cache,
+            "asked": asked.read_text().split()}
+
+
+@then("uvx is given the cached wheel")
+def uvx_cached(launched, mirror):
+    digest = hashlib.sha256(b"the wheel").hexdigest()
+    held = launched["cache"] / "pubkit" / "wheels" / digest / PUBKIT_WHEEL
+    assert launched["code"] == 0 and launched["stdout"].split() == ["--from", str(held), "pubkit", "--version"], launched
+    assert launched["asked"] == [PUBKIT_URL, f"{mirror}/f/{digest}/{PUBKIT_WHEEL}"]
+
+
+@then(parsers.parse('the launcher stops with "{message}"'))
+def launcher_stops(launched, message):
+    assert launched["code"] == 1 and message in launched["stderr"], launched
+
+
+@then("the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch")
+def launcher_plain():
+    text = cli.render(cli.templates("utility")["pubkit"], cli.values({"kind": "utility"}))
+    assert f'exec uvx --from "{PUBKIT_URL}" pubkit "$@"' in text and "fetch()" not in text
