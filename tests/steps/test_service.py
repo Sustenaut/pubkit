@@ -271,3 +271,16 @@ def runs_pinned(repo, path):
     text = (repo / path).read_text()
     assert f"fetch {PUBSEC_WHEEL.format(PUBSEC_FLOOR[0])} {PUBSEC_FLOOR[1]} providers deploy.providers\n" in text, text
     assert 'exec uvx --from "$fetched" pubsec "$@"' in text, text
+
+
+@given("pubkit.json has a deploy block")
+def deploy_block(repo):
+    config = json.loads((repo / "pubkit.json").read_text())
+    config["deploy"] = {"namespace": "example"}
+    (repo / "pubkit.json").write_text(json.dumps(config, indent=2) + "\n")
+
+
+@then(parsers.parse('"{path}" lists the pubsec of deploy.providers by its wheel'))
+def lists_provider(repo, path):
+    (provider,) = json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"]
+    assert f"pubsec @ {provider['wheel']}" in (repo / path).read_text().splitlines()
