@@ -417,9 +417,8 @@ def remote_config(api: Api, repo: str) -> Any:
 
 def gh_set(kind: str, name: str, repo: str, value: str, environment: str | None = None) -> str | None:
     """Set one secret or variable in `repo` through gh, the value on its standard
-    input; what gh said if it refused, else None. The deploy walk's ctx.send,
-    with which pubsec's github.* types set what Bitwarden holds, and what
-    `pubkit variables --apply` sets a state file's values with."""
+    input; what gh said if it refused, else None. What `pubkit variables --apply`
+    sets a state file's values with (pubdeploy keeps a copy for the walk's ctx.send)."""
     done = subprocess.run(["gh", kind, "set", name, "-R", repo,
                            *(["--env", environment] if environment else [])],
                           input=value, text=True, capture_output=True, check=False)

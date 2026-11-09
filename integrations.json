@@ -10,7 +10,6 @@
     {
       "plugin": "bitwarden.secrets",
       "paths": [
-        ".github/workflows/deploy-check.yml",
         ".github/workflows/terraform.yml"
       ],
       "mode": "required"
@@ -54,11 +53,8 @@
     {
       "plugin": "github.actions-oidc",
       "paths": [
-        ".github/workflows/deploy-check.yml",
         ".github/workflows/terraform.yml",
-        "src/pubkit/board_publish.py",
-        "src/pubkit/deploy/scheduled.py",
-        "src/pubkit/deploy/store.py"
+        "src/pubkit/board_publish.py"
       ],
       "mode": "required"
     },
@@ -79,26 +75,15 @@
       "mode": "required"
     },
     {
-      "plugin": "github.ghcr",
-      "paths": [
-        ".github/workflows/k8s-deploy.yml",
-        "src/pubkit/deploy/units.py"
-      ],
-      "mode": "required"
-    },
-    {
       "plugin": "github.repo-ops",
       "paths": [
         ".github/nightly/update.sh",
         ".github/workflows/ci.yml",
-        ".github/workflows/deploy-check.yml",
         ".github/workflows/job-tested.yml",
-        ".github/workflows/k8s-deploy.yml",
         ".github/workflows/nightly.yml",
         ".github/workflows/terraform.yml",
         "Makefile",
         "actions/pr-label/",
-        "src/pubkit/deploy/",
         "src/pubkit/nightly.py",
         "src/pubkit/protect.py"
       ],
@@ -174,10 +159,7 @@
     {
       "plugin": "tailscale.tailnet",
       "paths": [
-        ".github/workflows/deploy-check.yml",
-        ".github/workflows/k8s-deploy.yml",
-        "actions/deploy-ssh/",
-        "src/pubkit/deploy/implied.py"
+        "actions/deploy-ssh/"
       ],
       "mode": "required"
     }
@@ -252,10 +234,6 @@
     {
       "name": "PUBKIT_BUMP_TOKEN",
       "reason": "The nightly's fallback GitHub token, for when no app is set up; it reaches only GitHub"
-    },
-    {
-      "name": "SUSTENAUT_DEPLOY_SSH_KEY",
-      "reason": "k8s-deploy.yml's SSH key to a caller's k3s server, which the server pins to its deploy program"
     }
   ],
   "exclude": [

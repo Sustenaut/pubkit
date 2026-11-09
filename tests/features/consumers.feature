@@ -7,36 +7,6 @@ Feature: pubkit names no repository that consumes it
     When I scan what pubkit ships for owner/repo names
     Then it finds none but those the guard allows
 
-  Scenario: pubkit deploy, its tests and its example service name no consumer
-    When I scan pubkit deploy's files for consumers' names
-    Then it finds none
-
-  Scenario Outline: The deploy guard finds a consumer's name, however it is written
-    Given a deploy file reads "<text>"
-    When I scan it for consumers' names
-    Then it finds "<found>"
-
-    Examples:
-      | text                                         | found                 |
-      | "host": "app.some-owner.eu"                  | app.some-owner.eu     |
-      | upstream at https://files.some-owner.com/x   | files.some-owner.com  |
-      | the Sustenaut storage                        | Sustenaut             |
-      | as schryer runs it                           | schryer               |
-
-  Scenario Outline: The deploy guard lets examples, tools and the deploy settings through
-    Given a deploy file reads "<text>"
-    When I scan it for consumers' names
-    Then it finds nothing
-
-    Examples:
-      | text                                                  |
-      | "host": "example.example.eu"                          |
-      | https://storage.example.eu/healthz                    |
-      | image: quay.io/oauth2-proxy/oauth2-proxy and ghcr.io  |
-      | SUSTENAUT_SERVER, SUSTENAUT_DEPLOY_SSH_KEY            |
-      | the sustenaut.needs group, and sustenaut-app          |
-      | https://github.com/Sustenaut/pubkit/blob/main/x.json  |
-
   Scenario: The allowances still have something to allow
     When I scan what pubkit ships for owner/repo names
     Then every allowance is still used

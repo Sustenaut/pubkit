@@ -7,7 +7,3 @@ pytest-xdist==3.8.0
 hypothesis==6.170.5
 PyYAML==6.0.3
 coverage==7.16.2
-# pubsec, whose need types the deploy scenarios walk, as ./pubkit walks with
-# them: the floor new.py's PUBSEC_FLOOR names, so the oldest pubsec pubkit
-# takes is the one its suite tests.
-pubsec @ https://github.com/Sustenaut/pubsec/releases/download/v0.1.2/pubsec-0.1.2-py3-none-any.whl

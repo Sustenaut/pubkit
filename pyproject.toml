@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [{ name = "David Schryer", email = "schryer@gmail.com" }]
-# PyYAML reads the manifests kustomize renders, for pubkit deploy and sync.
+# PyYAML reads the workflows sync and conform check.
 dependencies = ["pytest>=8", "pytest-bdd>=8", "PyYAML>=6"]
 
 [project.urls]
@@ -32,8 +32,6 @@ pubkit = [
     "ruleset.json",
     "tag-ruleset.json",
     "board/rules.json",
-    "deploy/schema.json",
-    "deploy/journal.json",
     # The commit of the release's tag, which the release CI writes before
     # it builds the wheel; a source tree has none (refs.py).
     "release-commit",
