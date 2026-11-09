@@ -1184,13 +1184,19 @@ request per repository on its `pubkit-nightly` branch. The commits:
 1. every outdated pub* pin (`pubkit pins`): the latest pubkit in any of its
    `*-ci.yml` workflows, pubrel's release workflow and `pubrel-version`,
    each tool `ci.tools` pins by tag, to the latest release of
-   its git repository, every other repository's reusable workflow a
-   hand-written workflow pins at a release (`OWNER/REPO/.github/workflows/...@`),
-   to that repository's latest release, except a `deploy.providers`
-   package's, which its own bump hook moves, and the crates
-   `nightly.pins.crates` names in `Cargo.lock`. A workflow pin moves
-   to the commit of the new release's tag, with its version in a comment,
-   and one still pinned by tag moves to its commit;
+   its git repository, every other repository's reusable workflow or
+   action a hand-written workflow pins at a release
+   (`OWNER/REPO/.github/workflows/...@`, `OWNER/REPO/actions/...@`) and
+   every other repository's Terraform module a `.tf` file sources at a
+   release (`source = "github.com/OWNER/REPO//PATH?ref=..."`), to that
+   repository's latest release, except a `deploy.providers` package's,
+   which its own bump hook moves, and the crates `nightly.pins.crates`
+   names in `Cargo.lock`. A pin moves to the commit of the new release's
+   tag, with its version in a comment (for a module source, after the
+   closing quote: `?ref=<commit>" # vX.Y.Z`), and one still pinned by tag
+   moves to its commit. A pin of a pubkit action, workflow or module this
+   pubkit does not ship stays where it is, and `sync --check` fails on it
+   until it is taken from the repository it moved to;
 2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
    with an audit, adding no exemption, and that `cargo deny` passes. The
    body lists each update skipped with what `cargo vet suggest` says it

@@ -110,6 +110,41 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And stderr mentions "no latest release of example-org/somefleet to read"
     And ".github/workflows/nightly.yml" contains "nightly.yml@v0.1.0"
 
+  Scenario: pins moves another repository's action to its latest release, by its tag's commit
+    Given "example-org/somehost" releases "v0.2.0"
+    And the file ".github/workflows/deploy.yml" reads "      - uses: example-org/somehost/actions/docker-build@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "deploy.yml: example-org/somehost 0.1.0 -> 0.2.0"
+    And ".github/workflows/deploy.yml" contains "example-org/somehost/actions/docker-build@"
+    And ".github/workflows/deploy.yml" pins "example-org/somehost" to the commit of "v0.2.0"
+
+  Scenario: pins moves another repository's Terraform module from its tag to its latest release's commit
+    Given "example-org/somehost" releases "v0.2.0"
+    And the file "infra/dns.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "infra/dns.tf: example-org/somehost 0.1.0 -> 0.2.0"
+    And "infra/dns.tf" sources "example-org/somehost//terraform/hosting" at the commit of "v0.2.0"
+
+  Scenario: pins moves a Terraform module pinned by commit, by the version in its comment
+    Given "example-org/somehost" releases "v0.2.0"
+    And the file "infra/dns.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" # v0.1.0"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And "infra/dns.tf" sources "example-org/somehost//terraform/hosting" at the commit of "v0.2.0"
+
+  Scenario: pins leaves pubkit's own Terraform modules and those outside .tf files
+    Given "example-org/somehost" releases "v0.2.0"
+    And the file "infra/dns.tf" reads "  source = "github.com/Sustenaut/pubkit//terraform/hosting?ref=v0.24.4""
+    And the file "infra/notes.md" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    And the file "infra/.terraform/modules/x/main.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And "infra/dns.tf" contains "pubkit//terraform/hosting?ref=v0.24.4"
+    And "infra/notes.md" contains "?ref=v0.1.0"
+    And "infra/.terraform/modules/x/main.tf" contains "?ref=v0.1.0"
+
   Scenario: pins leaves a deploy.providers package's workflow to the package's own bump
     Given "example-org/somedeploy" releases "v0.2.0"
     And pubkit.json lists "https://github.com/example-org/somedeploy/releases/download/v0.1.0/somedeploy-0.1.0-py3-none-any.whl" in deploy.providers
@@ -124,7 +159,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And it prints nothing
 
   Scenario: The crates cargo vet finds unaudited are the ones skipped
-    When cargo vet reports "  zeroize:1.9.1 missing [\"safe-to-deploy\"]" and "  syn:3.0.9 missing [\"safe-to-run\"]"
+    When cargo vet reports "  zeroize:1.9.1 missing ["safe-to-deploy"]" and "  syn:3.0.9 missing ["safe-to-run"]"
     Then the crates skipped are "syn, zeroize"
 
   Scenario: The upgrades tried are cargo's, without its downgrades

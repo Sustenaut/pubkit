@@ -382,5 +382,12 @@ def lists_provider(repo, wheel):
 @then(parsers.parse('"{path}" pins "{slug}" to the commit of "{tag}"'))
 def pins_other(repo, released, path, slug, tag):
     text = (repo / path).read_text()
-    assert f"{slug}/.github/workflows/" in text
+    assert f"{slug}/.github/workflows/" in text or f"{slug}/actions/" in text
     assert f"@{released[slug]} # {tag}\n" in text, text
+
+
+@then(parsers.parse('"{path}" sources "{module}" at the commit of "{tag}"'))
+def sources_at(repo, released, path, module, tag):
+    slug = module.split("//", 1)[0]
+    text = (repo / path).read_text()
+    assert f'"github.com/{module}?ref={released[slug]}" # {tag}' in text, text

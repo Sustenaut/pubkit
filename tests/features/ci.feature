@@ -732,6 +732,35 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | this pubkit's tag    | does not mention "deploy-static"                           |
       | main                 | mentions "Sustenaut/pubkit/actions/deploy-static@main names no pubkit version" |
 
+  Scenario: sync --check fails on a pubkit action this pubkit does not ship, and pins leaves it where it is
+    Given a Node repository whose ci block is '{}'
+    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-ssh" at "another pubkit"
+    When I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "deploy.yml: pubkit"
+    And stderr mentions "has no actions/deploy-ssh; it moved out of pubkit"
+    When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
+    Then it prints "deploy.yml: actions/deploy-ssh stays at pubkit 0.0.1"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-ssh" at "another pubkit"
+
+  Scenario: sync --check fails on a pubkit Terraform module this pubkit does not ship
+    Given a Node repository whose ci block is '{}'
+    And the file "infra/main.tf" reads "module "site" { source = "github.com/Sustenaut/pubkit//terraform/static-site?ref=v0.10.0" }"
+    When I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "infra/main.tf: pubkit"
+    And stderr mentions "has no terraform/static-site; it moved out of pubkit"
+
+  Scenario: sync --check takes a pubkit Terraform module this pubkit ships, at any release
+    Given a Node repository whose ci block is '{}'
+    And the file "infra/main.tf" reads "module "dns" { source = "github.com/Sustenaut/pubkit//terraform/hosting?ref=v0.24.4" }"
+    When I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+
   Scenario: A repository that deploys with deploy-static has its site checked on pull requests
     Given a Node repository whose ci block is '{}'
     And the workflow "deploy.yml" deploys "public" with deploy-static
