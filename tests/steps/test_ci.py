@@ -198,7 +198,7 @@ def review_only_licenses():
     assert _review_step()["with"] == {"allow-dependencies-licenses": "${{ steps.exceptions.outputs.purls }}"}
 
 
-DEPLOY = """on: push
+DEPLOY = f"""on: push
 jobs:
   scan:
     uses: Sustenaut/integrations/.github/workflows/scan.yml@0123456789abcdef0123456789abcdef01234567 # main
@@ -207,7 +207,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: ./actions/local
-      - uses: Sustenaut/pubkit/actions/cache@0123456789abcdef0123456789abcdef01234567 # v0.31.3
+      - uses: Sustenaut/pubkit/actions/cache@0123456789abcdef0123456789abcdef01234567 # v{__version__}
 """
 
 
