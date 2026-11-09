@@ -357,6 +357,18 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
   Scenario: Without a wheel mirror, the launcher is as it was
     Then the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch
+  Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror
+    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and the mirror "https://storage.example/terraform"
+    Then terraform init ran 4 times, and the step passed
+    And the last init's CLI configuration installs every provider from "https://storage.example/terraform/"
+    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and no mirror
+    Then terraform init ran 3 times, and the step failed
+
+    Examples:
+      | workflow                  |
+      | terraform.yml             |
+      | job-service-terraform.yml |
+      | service-ci.yml            |
 
   Scenario: Without a list, the review leaves pubkit's and pubrel's workflows and actions out of the license check alone
     Then job-review.yml's license exceptions name every reusable workflow and action pubkit has, and pubrel's release workflow
