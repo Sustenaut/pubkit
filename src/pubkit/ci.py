@@ -469,8 +469,8 @@ def flow(values: dict[str, Any]) -> str:
     return json.dumps(values, ensure_ascii=False)
 
 
-# The condition each testing job on main runs under: the merge queue did
-# not already pass the commit.
+# The condition each testing job runs under, on main and in the merge
+# queue: no earlier run already passed on the commit's tree.
 UNTESTED = "needs.tested.outputs.tested != 'true'"
 
 
@@ -480,8 +480,8 @@ def queued(ci: dict[str, Any]) -> str:
 
 
 def tested_job(ci: dict[str, Any]) -> str:
-    return ("  # Whether the merge queue already passed this commit: then the jobs\n"
-            "  # it ran are skipped, and nothing here tests less than the queue did.\n"
+    return ("  # Whether an earlier run already passed on this commit's tree: then the\n"
+            "  # jobs it ran are skipped, and nothing here tests less than it did.\n"
             "  tested:\n    name: ci\n"
             f"    uses: {ci['owner']}/pubkit/.github/workflows/job-tested.yml"
             f"@{ref(__version__, ci['commit'])}\n"
@@ -502,8 +502,10 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     """The text of one event's workflow."""
     table = JOBS[ci["language"]]
     names = [name for name, on in ci["jobs"].items() if event in on]
-    # Main takes the merge queue's run of pr.yml where there is one.
-    shortcut = event == "main" and "pr" in ci["events"]
+    # Main takes an earlier run of the queue's workflow on the same tree, and
+    # so does the queue, where it runs pr.yml itself: a pull request up to
+    # date with main merges as the very files its own run tested.
+    shortcut = (event == "main" and "pr" in ci["events"]) or (event == "pr" and queued(ci) == "pr")
     out = [HEADER, f"name: {event}\n\non:\n", trigger(ci, event),
            "\npermissions:\n  contents: read\n\njobs:\n"]
     if shortcut:
@@ -550,8 +552,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     if shortcut:
         out.append(
             "\n  # The one check a ruleset requires: it passes only when every job\n"
-            "  # above succeeded or, where the merge queue already passed the\n"
-            "  # commit, was skipped for it. None is skipped for not being asked for.\n"
+            "  # above succeeded or, where an earlier run already passed on the\n"
+            "  # commit's tree, was skipped for it. None is skipped for not being asked for.\n"
             "  passed:\n    name: ci / passed\n    if: always()\n"
             f"    needs: [{', '.join(['tested', *names])}]\n    runs-on: ubuntu-latest\n"
             "    steps:\n"

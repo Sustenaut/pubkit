@@ -23,13 +23,14 @@ jobs:
   # The jobs are the ones `pubkit sync` puts in a utility's generated
   # workflows (src/pubkit/ci.py), from this checkout.
   #
-  # On a push to main, tested asks whether the merge queue already passed
-  # this commit (merging moves main to the very commit the queue tested);
-  # then the jobs that only test it are skipped, and the scan reads the
-  # queue run's coverage. On a pull request or in the queue it is skipped,
-  # and everything runs.
+  # In the merge queue and on a push to main, tested asks whether an
+  # earlier run already passed on this commit's tree (a pull request up to
+  # date with main merges as the very files its own run tested, and merging
+  # moves main to the very commit the queue tested); then the jobs that only
+  # test it are skipped, and the scan reads that run's coverage. On a pull
+  # request it is skipped, and everything runs.
   tested:
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     name: ci
     uses: ./.github/workflows/job-tested.yml
     with: { workflow: .github/workflows/ci.yml }
@@ -93,8 +94,8 @@ jobs:
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push
-  # and in the merge queue, tested off a push, and every testing job on a
-  # push the queue already passed.
+  # and in the merge queue, tested on a pull request, and every testing job
+  # where an earlier run already passed on the commit's tree.
   passed:
     name: ci / passed
     if: always()
