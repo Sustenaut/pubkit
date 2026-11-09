@@ -181,6 +181,17 @@ def providers(config: dict) -> list[dict[str, str]]:
             and isinstance(p.get("sha256"), str)]
 
 
+def provider_requirements(wheels: list[dict[str, str]]) -> str:
+    """deploy.providers' wheels, as requirements: `pubkit sync --check` runs in
+    the tests' environment, and reads the need types these packages offer.
+    `pubkit lock` pins each with its hash, which is the provider's sha256."""
+    named = [p for p in wheels if isinstance(p.get("distribution"), str)]
+    if not named:
+        return ""
+    return ("# deploy.providers' packages, whose need types `pubkit sync --check` reads:\n"
+            + "".join(f"{p['distribution']} @ {p['wheel']}\n" for p in named))
+
+
 MIRRORS = {
     # tests/install-lock and ./pubkit: <base>/f/<sha256>/<file>.whl.
     "wheels": "the base its files are at as <base>/f/<sha256>/<file>.whl",
@@ -231,6 +242,7 @@ def values(config: dict[str, str]) -> dict[str, str]:
             "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
             "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
             "pypi": mirrors(config).get("pypi", ""),
+            "provider_requirements": provider_requirements(wheels),
             "pubsec": fetch + f"\nfetch {shlex.quote(wheel['wheel'])} {shlex.quote(wheel['sha256'])} providers "
                               f"deploy.providers\n"}
 

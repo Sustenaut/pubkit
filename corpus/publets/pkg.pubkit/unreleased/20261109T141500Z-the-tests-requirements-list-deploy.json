@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "tests/requirements-pubkit.txt lists deploy.providers' wheels (pubsec, and any other provider) beside pubkit, so pubkit sync --check, which runs in the tests' environment here and in CI, finds the need types they offer, and pubkit bump moves both pins at once"
+}

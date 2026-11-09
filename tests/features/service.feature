@@ -58,6 +58,17 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     When I run pubkit "sync"
     Then "integrations.json" does not contain "with-secrets.json"
 
+  Scenario: deploy.providers' wheels join the tests' requirements, where sync --check reads their need types
+    Given a repository initialised as "utility"
+    And pubkit.json has a deploy block
+    When I run pubkit "sync"
+    Then it succeeds
+    And "tests/requirements-pubkit.txt" lists the pubsec of deploy.providers by its wheel
+
+  Scenario: Without a deploy block the tests' requirements name no provider
+    Given a repository initialised as "utility"
+    Then "tests/requirements-pubkit.txt" does not contain "pubsec"
+
   Scenario: init writes ./pubsec beside ./with-secrets, which runs it
     Given an empty repository
     When I run pubkit "init" "--kind=service" "--project=infra"
