@@ -60,7 +60,7 @@ PUBSEC_FLOOR = ("0.1.2", "88a68ffd252b49289ae02d0a9f629f3e0f0832c921cb8ee0f1301f
 PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
 # The oldest pubdeploy this pubkit works with, the same way: the deploy walk,
 # whose sustenaut.sync and sustenaut.bump hooks pubkit's sync and bump call.
-PUBDEPLOY_FLOOR = ("0.1.0", "PUBDEPLOY-SHA256")
+PUBDEPLOY_FLOOR = ("0.1.0", "2748a0bd8d9f5d12e7f99dd3f9f71ce84fe7281c7df78799755890fe81ba62af")
 PUBDEPLOY_WHEEL = "https://github.com/Sustenaut/pubdeploy/releases/download/v{0}/pubdeploy-{0}-py3-none-any.whl"
 FLOORS = {"pubsec": (*PUBSEC_FLOOR, PUBSEC_WHEEL), "pubdeploy": (*PUBDEPLOY_FLOOR, PUBDEPLOY_WHEEL)}
 
