@@ -424,30 +424,8 @@ own modules, which only a repository on Google Cloud or deSEC takes.
   workflows, generated or written by hand: its actions, and its reusable
   workflows such as `service-ci.yml` or `rust-ci.yml`.
 
-- **`actions/deploy-ssh`:** deploys what is not a directory of files (a
-  service the server rebuilds, a unit of a deploy script) by running one
-  `command` on a server over SSH, with `bundle`'s paths as a gzipped tar
-  on its standard input. The `deploy-key` should be one the server pins
-  to a single program, `command="/usr/local/bin/example-deploy",restrict`
-  in authorized_keys, which reads the command from `SSH_ORIGINAL_COMMAND`
-  and checks it against the units it knows. `known-hosts` is required: a
-  command is never sent to whatever host answers. With
-  `tailscale-oauth-client-id` and `tailscale-oauth-secret` the runner
-  first joins a tailnet (tailscale/github-action, as `tailscale-tags`,
-  `tag:ci` by default), for a server whose SSH is reachable there only.
-  `input`, in place of `bundle`, sends one file as it is, such as rendered
-  manifests for a program that applies what it reads.
-  The command's exit status is the step's.
-
-  ```yaml
-  - uses: Sustenaut/pubkit/actions/deploy-ssh@<commit> # vX.Y.Z
-    with:
-      command: share-edge
-      bundle: scripts/site
-      deploy-key: ${{ secrets.DEPLOY_KEY }}
-      target: deploy@example.eu
-      known-hosts: example.eu ssh-ed25519 AAAA...
-  ```
+- **`actions/deploy-ssh`** is [pubdeploy](https://github.com/Sustenaut/pubdeploy)'s now, beside
+  `k8s-deploy.yml`, which calls it: `Sustenaut/pubdeploy/actions/deploy-ssh@<commit> # vX.Y.Z`.
 
 **Moving a zone that is already in use.** Hetzner made the apex NS rrset
 with the zone, so the first apply with Cloudflare joining it must take it
@@ -572,8 +550,7 @@ The deploy walk is [pubdeploy](https://github.com/Sustenaut/pubdeploy)'s:
 preflight` and `diagnose`, and the scheduled `deploy-check.yml`. A caller pins
 `Sustenaut/pubdeploy/.github/workflows/k8s-deploy.yml@<commit> # vX.Y.Z`;
 pubdeploy's README, "Deploying a service to k3s", says what it takes.
-`deploy-ssh` is still here, and k8s-deploy.yml calls it, until pubdeploy
-calls its own copy.
+`actions/deploy-ssh` is pubdeploy's too.
 
 ## Declaring what a service needs
 

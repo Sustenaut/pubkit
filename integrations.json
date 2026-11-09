@@ -155,13 +155,6 @@
         "src/pubkit/ci.py"
       ],
       "mode": "required"
-    },
-    {
-      "plugin": "tailscale.tailnet",
-      "paths": [
-        "actions/deploy-ssh/"
-      ],
-      "mode": "required"
     }
   ],
   "terraform": [
