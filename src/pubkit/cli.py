@@ -52,6 +52,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -69,7 +70,8 @@ RENAMED_KINDS = {"python": "utility", "python-utility": "utility"}
 MANAGED = {
     # The pinned pubkit, and a way to run exactly it.
     # The rules agents and people follow in every repository (AGENTS.md).
-    "common": ["tests/requirements-pubkit.txt", "pubkit", "AGENTS.md"],
+    # The one install of a hash-locked file, retried and mirrored.
+    "common": ["tests/requirements-pubkit.txt", "pubkit", "AGENTS.md", "tests/install-lock"],
     "rust": ["rust-toolchain.toml", "pubkit.mk"],
     "utility": [],
     # A private repository that deploys: the one secrets wrapper every
@@ -77,7 +79,7 @@ MANAGED = {
     "service": ["with-secrets"],
 }
 # Managed files that are programs, written executable.
-EXECUTABLE = {"with-secrets", "pubkit"}
+EXECUTABLE = {"with-secrets", "pubkit", "tests/install-lock"}
 WITH_SECRETS = "with-secrets"
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
@@ -126,27 +128,45 @@ def read_config(root: Path) -> dict[str, str]:
     return config
 
 
-# The launcher's part for deploy.providers: uv does not check a --with URL's
-# #sha256, so each wheel is fetched once into the user's cache and checked
-# against its pin on every run before uv is given the file.
+# The launcher's wheels, each fetched once into the user's cache and checked
+# against its sha256 on every run before uv is given the file: uv does not
+# check a --with URL's #sha256. With a wheel mirror, a wheel GitHub fails to
+# give is taken from the mirror, by its sha256; the check is the same.
+FETCH = """# A wheel, fetched once into the user's cache, checked against its sha256 on every run.
+fetch() {
+  local dir="${XDG_CACHE_HOME:-$HOME/.cache}/pubkit/$3/$2" sum
+  fetched="$dir/${1##*/}"
+  if [ ! -f "$fetched" ]; then
+    mkdir -p "$dir"
+    curl -fsSL -o "$fetched.part" "$1"{fallback} \\
+      || { rm -f "$fetched.part"; echo "pubkit: could not fetch $1" >&2; exit 1; }
+    mv "$fetched.part" "$fetched"
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then sum=$(sha256sum "$fetched"); else sum=$(shasum -a 256 "$fetched"); fi
+  if [ "${sum%% *}" != "$2" ]; then
+    rm -f "$fetched"
+    echo "pubkit: $1 is not the wheel $4 pins (sha256 $2)" >&2
+    exit 1
+  fi
+}
+"""
+FALLBACK = ' \\\n      || curl -fsSL -o "$fetched.part" "{mirror}/f/$2/${{1##*/}}"'
 PROVIDER = """# The packages pubkit.json's deploy.providers names, each wheel checked against its sha256.
 with=()
 provider() {
-  local dir="${XDG_CACHE_HOME:-$HOME/.cache}/pubkit/providers/$2" sum
-  local file="$dir/${1##*/}"
-  if [ ! -f "$file" ]; then
-    mkdir -p "$dir"
-    curl -fsSL -o "$file.part" "$1" || { echo "pubkit: could not fetch $1" >&2; exit 1; }
-    mv "$file.part" "$file"
-  fi
-  if command -v sha256sum >/dev/null 2>&1; then sum=$(sha256sum "$file"); else sum=$(shasum -a 256 "$file"); fi
-  if [ "${sum%% *}" != "$2" ]; then
-    rm -f "$file"
-    echo "pubkit: $1 is not the wheel deploy.providers pins (sha256 $2)" >&2
-    exit 1
-  fi
-  with+=(--with "$file")
+  fetch "$1" "$2" providers deploy.providers
+  with+=(--with "$fetched")
 }
+"""
+# With a wheel mirror, pubkit's own wheel too, when tests/requirements.lock
+# pins this version of it by its sha256.
+OWN = """# pubkit's own wheel, by the sha256 tests/requirements.lock pins, from the mirror when GitHub fails.
+from="https://github.com/Sustenaut/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl"
+pin=$(sed -n "\\#^pubkit @ $from#,/--hash=sha256:/s/.*--hash=sha256:\\([0-9a-f]\\{{64\\}}\\).*/\\1/p" tests/requirements.lock 2>/dev/null | head -n 1)
+if [ -n "$pin" ]; then
+  fetch "$from" "$pin" wheels tests/requirements.lock
+  from="$fetched"
+fi
 """
 
 
@@ -157,15 +177,51 @@ def providers(config: dict) -> list[dict[str, str]]:
             and isinstance(p.get("sha256"), str)]
 
 
+MIRRORS = {
+    # tests/install-lock and ./pubkit: <base>/f/<sha256>/<file>.whl.
+    "wheels": "the base its files are at as <base>/f/<sha256>/<file>.whl",
+    # The Terraform workflows' last init: a provider network mirror.
+    "terraform": "a Terraform provider network mirror",
+}
+
+
+def mirrors(config: dict) -> dict[str, str]:
+    """pubkit.json's mirror block: where installs find what GitHub's release
+    downloads (and the registries) fail to give, each checked against its
+    pinned hash, so a mirror only has to be there, never trusted."""
+    mirror = config.get("mirror")
+    if mirror is None:
+        return {}
+    known = ", ".join(f"{k}: {v}" for k, v in MIRRORS.items())
+    if not isinstance(mirror, dict) or set(mirror) - set(MIRRORS) or not all(
+            isinstance(url, str) and re.fullmatch(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~-]+)*", url)
+            for url in mirror.values()):
+        sys.exit(f'pubkit: {CONFIG}\'s mirror is {{"wheels": "https://host/path", "terraform": "https://host/path"}}, '
+                 f"each an https base with no / at its end ({known})")
+    return mirror
+
+
+def wheel_mirror(config: dict) -> str:
+    """mirror.wheels, or empty for none."""
+    return mirrors(config).get("wheels", "")
+
+
 def values(config: dict[str, str]) -> dict[str, str]:
     import shlex  # noqa: PLC0415
     from .new import PUBREL_PIN
     wheels = providers(config)
+    mirror = wheel_mirror(config)
+    fetch = FETCH.replace("{fallback}", FALLBACK.format(mirror=mirror) if mirror else "")
     launched = PROVIDER + "".join(f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n"
-                                  for p in wheels)
+                                  for p in wheels) + "\n" if wheels else ""
+    own = OWN.format(version=__version__) if mirror else ""
+    if own:
+        launch = 'exec uvx --from "$from" '
+    else:
+        launch = f'exec uvx --from "https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl" '
     return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
-            "pubrel": PUBREL_PIN, "providers": launched + "\n" if wheels else "",
-            "with": '"${with[@]}" ' if wheels else ""}
+            "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
+            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror}
 
 
 def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,

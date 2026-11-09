@@ -117,8 +117,9 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with: { python-version: '${{ inputs.python-version }}' }
       # pip-audit fetches each locked wheel, and a release download can time
-      # out (pip retries no 504), so it is tried three times. A finding
-      # fails each try, and so the job.
+      # out (pip retries no 504), so it is tried three times, the last with
+      # our release wheels from pubkit.json's wheel mirror (tests/install-lock
+      # --rewrite; the hashes stay). A finding fails each try, and so the job.
       - id: audit-1
         continue-on-error: true
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
@@ -135,7 +136,15 @@ jobs:
           inputs: ${{ inputs.audit-requirements }}
           require-hashes: true
       - if: steps.audit-2.outcome == 'failure'
-        run: sleep 15
+        run: |
+          sleep 15
+          if [ -x tests/install-lock ]; then
+            for lock in $LOCKS; do
+              tests/install-lock --rewrite "$lock" > "$RUNNER_TEMP/mirrored.lock"
+              mv "$RUNNER_TEMP/mirrored.lock" "$lock"
+            done
+          fi
+        env: { LOCKS: '${{ inputs.audit-requirements }}' }
       - if: steps.audit-2.outcome == 'failure'
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:

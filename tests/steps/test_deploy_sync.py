@@ -115,7 +115,7 @@ def test_the_launcher_runs_with_each_provider_checked_against_its_sha256(tmp_pat
     held = cache / "pubkit" / "providers" / digest / WHEEL.rsplit("/", 1)[1]
     held.parent.mkdir(parents=True)
     held.write_bytes(wheel)
-    part = text[text.index("# The packages"):text.index("exec uvx")]
+    part = text[text.index("# A wheel"):text.index("exec uvx")]
     script = f"set -euo pipefail\n{part}printf '%s\\n' \"${{with[@]}}\"\n"
     done = subprocess.run(["bash", "-c", script], env={"PATH": "/usr/bin:/bin", "XDG_CACHE_HOME": str(cache)},
                           capture_output=True, text=True)

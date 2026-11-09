@@ -12,6 +12,10 @@
 # is installed into the repository or the system. pubkit runs in the
 # repository's root, where pubkit.json is, from whichever directory this is
 # called.
+#
+# With a wheel mirror in pubkit.json (mirror.wheels), the wheel is fetched
+# here instead, checked against the sha256 tests/requirements.lock pins, and
+# taken from the mirror when GitHub's release download fails.
 set -euo pipefail
 
 if ! command -v uvx >/dev/null 2>&1; then
@@ -20,4 +24,4 @@ if ! command -v uvx >/dev/null 2>&1; then
 fi
 
 cd "$(dirname "$0")"
-{providers}exec uvx --from "https://github.com/Sustenaut/pubkit/releases/download/v{version}/pubkit-{version}-py3-none-any.whl" {with}pubkit "$@"
+{providers}{launch}{with}pubkit "$@"
