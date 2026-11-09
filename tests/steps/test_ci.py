@@ -161,16 +161,24 @@ def audits_retried():
     assert found >= 2
 
 
+def _review_steps(workflow="job-review.yml"):
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    return data["jobs"]["review"]["steps"]
+
+
 def _review_step():
-    data = yaml.safe_load((WORKFLOWS / "job-review.yml").read_text())
-    (step,) = data["jobs"]["review"]["steps"]
-    return step
+    return _review_steps()[-1]
+
+
+def _default_purls():
+    (step,) = [s for s in _review_steps() if s.get("id") == "exceptions"]
+    return step["env"]["DEFAULT"]
 
 
 @then("job-review.yml's license exceptions name every reusable workflow and action pubkit has, "
       "and pubrel's release workflow")
 def review_exceptions():
-    listed = {p.strip() for p in _review_step()["with"]["allow-dependencies-licenses"].split(",")}
+    listed = {p.strip() for p in _default_purls().split(",")}
     wanted = {f"pkg:githubactions/Sustenaut/pubkit/.github/workflows/{path.name}"
               for path in WORKFLOWS.glob("*.yml") if "workflow_call" in (yaml.safe_load(path.read_text()).get(True) or {})}
     wanted |= {f"pkg:githubactions/Sustenaut/pubkit/actions/{path.parent.name}"
@@ -181,7 +189,77 @@ def review_exceptions():
 
 @then("job-review.yml sets no other input, so advisories apply to everything")
 def review_only_licenses():
-    assert set(_review_step()["with"]) == {"allow-dependencies-licenses"}
+    assert _review_step()["with"] == {"allow-dependencies-licenses": "${{ steps.exceptions.outputs.purls }}"}
+
+
+DEPLOY = """on: push
+jobs:
+  scan:
+    uses: Sustenaut/integrations/.github/workflows/scan.yml@0123456789abcdef0123456789abcdef01234567 # main
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: ./actions/local
+      - uses: Sustenaut/pubkit/actions/cache@0123456789abcdef0123456789abcdef01234567 # v0.31.3
+"""
+
+
+@given("a deploy workflow that calls integrations' scan, pubkit's cache action, actions/checkout and a local action")
+def deploy_workflow(repo):
+    (repo / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
+    (repo / ".github" / "workflows" / "deploy.yml").write_text(DEPLOY)
+
+
+@then(parsers.parse('"{path}" lists "{purl}"'))
+def lists(repo, path, purl):
+    assert purl in (repo / path).read_text().splitlines()
+
+
+@then(parsers.parse('"{path}" names neither actions/checkout nor the local action'))
+def names_neither(repo, path):
+    text = (repo / path).read_text()
+    assert "actions/checkout" not in text and "local" not in text, text
+
+
+@then(parsers.parse('"{path}" is not there'))
+def not_there(repo, path):
+    assert not (repo / path).exists()
+
+
+@when(parsers.re(r'the "(?P<workflow>[^"]+)" review exceptions step runs (?P<how>on a list holding another owner\'s purl|without a list)'),
+      target_fixture="exceptions")
+def run_exceptions(tmp_path, workflow, how):
+    """The step's script under bash -eo pipefail, as GitHub runs it, in a checkout of its own."""
+    (step,) = [s for s in _review_steps(workflow) if s.get("id") == "exceptions"]
+    listing = tmp_path / ".github" / "dependency-review-licenses.txt"
+    listing.parent.mkdir(exist_ok=True)
+    listing.unlink(missing_ok=True)
+    if how != "without a list":
+        listing.write_text(
+            "# a comment\npkg:githubactions/Sustenaut/pubkit/actions/cache\n"
+            "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml\n"
+            "pkg:githubactions/someone-else/thing/action\npkg:npm/left-pad\n")
+    out = tmp_path / "output"
+    out.unlink(missing_ok=True)
+    done = subprocess.run(["bash", "-eo", "pipefail", "-c", step["run"]], cwd=tmp_path, capture_output=True,
+                          text=True, check=False,
+                          env={**os.environ, "OWNER": "Sustenaut", "DEFAULT": step["env"]["DEFAULT"],
+                               "GITHUB_OUTPUT": str(out)})
+    assert done.returncode == 0, done.stderr
+    (line,) = out.read_text().splitlines()
+    return line.removeprefix("purls=").split(",")
+
+
+@then("it passes the owner's purls alone")
+def owners_alone(exceptions):
+    assert exceptions == ["pkg:githubactions/Sustenaut/pubkit/actions/cache",
+                          "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml"]
+
+
+@then("it passes pubkit's and pubrel's")
+def pubkits(exceptions):
+    assert exceptions == [p.strip() for p in _default_purls().split(",")]
 
 
 @given(parsers.parse('the latest release of "{slug}" is "{tag}"'))

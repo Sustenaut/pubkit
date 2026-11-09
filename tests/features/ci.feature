@@ -321,9 +321,38 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then every step that installs tests/requirements.lock tries it three times
     And every pip-audit is tried three times, each try after a failed one
 
-  Scenario: The dependency review leaves Sustenaut's own workflows and actions out of the license check alone
+  Scenario: Without a list, the review leaves pubkit's and pubrel's workflows and actions out of the license check alone
     Then job-review.yml's license exceptions name every reusable workflow and action pubkit has, and pubrel's release workflow
     And job-review.yml sets no other input, so advisories apply to everything
+
+  Scenario: sync lists the owner's workflows and actions the repository calls, for the review's license check
+    Given a Node repository whose ci block is '{}'
+    And a deploy workflow that calls integrations' scan, pubkit's cache action, actions/checkout and a local action
+    When I run pubkit "sync"
+    Then ".github/dependency-review-licenses.txt" lists "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml"
+    And ".github/dependency-review-licenses.txt" lists "pkg:githubactions/Sustenaut/pubkit/actions/cache"
+    And ".github/dependency-review-licenses.txt" lists "pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-review.yml"
+    And ".github/dependency-review-licenses.txt" names neither actions/checkout nor the local action
+    When I run pubkit "sync" "--check"
+    Then the exit code is 0
+
+  Scenario: Without the review job there is no list
+    Given a Node repository whose ci block is '{"jobs": {"review": false}}'
+    When I run pubkit "sync"
+    Then ".github/dependency-review-licenses.txt" is not there
+
+  Scenario Outline: The review takes only the owner's purls from the list, and pubkit's and pubrel's without one
+    When the "<workflow>" review exceptions step runs on a list holding another owner's purl
+    Then it passes the owner's purls alone
+    When the "<workflow>" review exceptions step runs without a list
+    Then it passes pubkit's and pubrel's
+
+    Examples:
+      | workflow        |
+      | job-review.yml  |
+      | python-ci.yml   |
+      | node-ci.yml     |
+      | rust-ci.yml     |
 
   Scenario: pins moves a tool to the latest release of its git repository
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli.git", "tag": "v1.2.3"}]}'

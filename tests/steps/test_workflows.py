@@ -285,7 +285,7 @@ def property_runs(workflow, name, language):
 def review_job(workflow, name):
     job = workflow["data"]["jobs"][name]
     assert job["if"] == "github.event_name == 'pull_request' && !github.event.repository.private"
-    assert job["steps"][0]["uses"].startswith("actions/dependency-review-action@")
+    assert job["steps"][-1]["uses"].startswith("actions/dependency-review-action@")
     assert name in workflow["data"]["jobs"]["passed"]["needs"]
 
 

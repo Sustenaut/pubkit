@@ -1791,7 +1791,11 @@ the OSV database (RustSec, GitHub, PyPI and npm advisories), and each
 language adds its own check: cargo deny, `npm audit` of `package-lock.json`,
 or pip-audit of the hash-locked requirements. On a public repository's
 pull request, GitHub's dependency review also fails a change that brings
-in a vulnerable version. The pub* pins also always come,
+in a vulnerable version. Its license check leaves out the owner's own
+reusable workflows and actions, for which GitHub reads no license: `pubkit
+sync` lists those the repository's workflows call in
+`.github/dependency-review-licenses.txt`, and the review takes only the
+owner's from it. The pub* pins also always come,
 so a governed repository keeps up with the standard. A repository's own CI
 runs on a schedule when its `ci.yml` has a `schedule:` trigger; the
 settings say what that run does.

@@ -669,6 +669,30 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
     return INTEGRATIONS, json.dumps(data, indent=2) + "\n"
 
 
+REVIEW_LICENSES = ".github/dependency-review-licenses.txt"
+CALLED = re.compile(r"""^[ \t-]*uses:[ \t]*['"]?(?P<owner>[A-Za-z0-9-]+)/(?P<path>[^@\s'"]+)@""", re.M)
+
+
+def review_licenses(config: dict[str, Any], root: Path,
+                    wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
+    """The review job's license exceptions, where a workflow pubkit writes runs
+    job-review.yml: every reusable workflow and action of the owner's that this
+    repository's workflows call, as the purl GitHub's dependency graph gives it,
+    without its version. GitHub reads no license for them, and the action takes
+    no wildcard, so each is named; the job keeps only the owner's."""
+    bodies = {p: b for p, b in wanted if p.startswith(".github/workflows/")}
+    if not any("/job-review.yml@" in b for b in bodies.values()):
+        return None
+    for found in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        bodies.setdefault(f".github/workflows/{found.name}", found.read_text(encoding="utf-8"))
+    own = owner(config)
+    purls = sorted({f"pkg:githubactions/{m['owner']}/{m['path']}" for body in bodies.values()
+                    for m in CALLED.finditer(body) if m["owner"] == own})
+    return REVIEW_LICENSES, ("# Written by `pubkit sync` from this repository's workflows. Do not edit:\n"
+                             "# the review job leaves these out of its license check, and no other.\n"
+                             + "".join(f"{p}\n" for p in purls))
+
+
 def generated(config: dict[str, Any], root: Path) -> list[tuple[str, str]]:
     """Each workflow pubkit writes, by path: none without a ci block."""
     ci = settings(config, root)
