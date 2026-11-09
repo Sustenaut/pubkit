@@ -37,9 +37,8 @@ VENV := .venv/requirements.lock
 
 venv:: ## Python environment for the functional suite, hash-locked
 	python3 -m venv .venv
-	@# Tried three times: a release download can time out, and pip retries no 504.
-	for attempt in 1 2 3; do .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; \
-	  [ "$$attempt" = 3 ] && exit 1; sleep 15; done
+	@# Tried three times, then from pubkit.json's wheel mirror: a release download can time out.
+	tests/install-lock .venv/bin/pip
 	cp tests/requirements.lock $(VENV)
 
 $(VENV): $(wildcard tests/requirements.lock)

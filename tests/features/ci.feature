@@ -317,10 +317,46 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | job-node-test.yml         |
       | job-node-browser.yml      |
 
-  Scenario: Every hash-locked install and every pip-audit in the reusable workflows is tried three times
-    Then every step that installs tests/requirements.lock tries it three times
+  Scenario: Every hash-locked install and every pip-audit in the reusable workflows is tried three times, the last pip-audit from the wheel mirror
+    Then every step that installs tests/requirements.lock does it through tests/install-lock
     And every pip-audit is tried three times, each try after a failed one
 
+  Scenario: tests/install-lock tries the lock three times, then once more with our release wheels from the mirror
+    Given a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI
+    And pubkit.json's wheel mirror is "https://storage.example/wheels"
+    When tests/install-lock runs with a pip that fails every install of a GitHub release URL
+    Then pip was run 4 times, and the install passed
+    And the last lock pinned "pubkit" at the mirror's address for its sha256, with its hash
+    And the last lock left "pytest" as it was
+
+  Scenario: Without a wheel mirror, tests/install-lock stops after three tries
+    Given a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI
+    When tests/install-lock runs with a pip that fails every install of a GitHub release URL
+    Then pip was run 3 times, and the install failed
+
+  Scenario Outline: A wheel mirror that is not one https base stops sync with a message
+    Given pubkit.json's mirror setting '<mirror>'
+    Then sync stops, saying what a mirror setting is
+
+    Examples:
+      | mirror                                          |
+      | {"wheels": "http://storage.example/wheels"}    |
+      | {"wheels": "https://storage.example/wheels/"}  |
+      | {"wheels": 3}                                   |
+      | {"pypi": "https://storage.example/pypi"}       |
+      | {"terraform": "https://storage.example/tf/"}   |
+      | "https://storage.example/wheels"                |
+
+  Scenario: The launcher takes pubkit's own wheel from the mirror when GitHub fails, checked against the lock's sha256
+    Given pubkit.json's wheel mirror is "https://storage.example/wheels"
+    And a lock that pins this pubkit's wheel
+    When the launcher fetches pubkit with GitHub failing and the mirror giving "the wheel"
+    Then uvx is given the cached wheel
+    When the launcher fetches pubkit with GitHub failing and the mirror giving "another file"
+    Then the launcher stops with "is not the wheel tests/requirements.lock pins"
+
+  Scenario: Without a wheel mirror, the launcher is as it was
+    Then the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch
   Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror
     When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and the mirror "https://storage.example/terraform"
     Then terraform init ran 4 times, and the step passed

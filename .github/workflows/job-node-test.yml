@@ -34,8 +34,8 @@ jobs:
       - if: inputs.sync-check
         run: |
           python -m venv .venv
-          # Tried three times: a release download can time out.
-          for attempt in 1 2 3; do .venv/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; [ "$attempt" = 3 ] && exit 1; sleep 15; done
+          # Tried three times, then from the wheel mirror: a release download can time out.
+          tests/install-lock .venv/bin/pip
           .venv/bin/pubkit sync --check
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT

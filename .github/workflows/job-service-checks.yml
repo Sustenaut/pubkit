@@ -24,8 +24,8 @@ jobs:
         name: pubkit's managed files are in step
         run: |
           python3 -m venv .pubkit
-          # Tried three times: a release download can time out.
-          for attempt in 1 2 3; do .pubkit/bin/pip install --quiet --require-hashes -r tests/requirements.lock && break; [ "$attempt" = 3 ] && exit 1; sleep 15; done
+          # Tried three times, then from the wheel mirror: a release download can time out.
+          tests/install-lock .pubkit/bin/pip
           .pubkit/bin/pubkit sync --check
       - name: shell scripts pass shellcheck
         run: |

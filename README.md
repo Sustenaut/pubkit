@@ -1841,6 +1841,32 @@ A failing property prints the input that broke it; Hypothesis also prints a
 sha256: a release carries the wheel as an asset, and `pip install
 --require-hashes` verifies it.
 
+### A wheel mirror, for when GitHub's release downloads fail
+
+A wheel pinned by a GitHub release URL fails to install whenever GitHub's
+release downloads do, and pip retries no 504. `tests/install-lock`, which
+every managed install of a lock goes through (pubkit.mk's `venv`, the
+reusable workflows' `sync --check` steps), tries the install three times,
+15 s apart. With a wheel mirror in pubkit.json, a fourth try takes each
+wheel the lock pins by a GitHub release URL from the mirror instead:
+
+```json
+"mirror": {"wheels": "https://storage.sustenaut.eu/wheels"}
+```
+
+The mirror serves each file at `<base>/f/<sha256>/<file>.whl`, so a lock
+line alone gives its address, and the hashes stay as they are: pip checks
+every file, and the mirror only has to be there, never trusted.
+pip-audit's last try reads the locks rewritten the same way
+(`tests/install-lock --rewrite LOCK`), and `./pubkit` fetches its own wheel
+(by the sha256 tests/requirements.lock pins) and deploy.providers' wheels
+from the mirror when GitHub fails to give them. Without the setting, the
+installs only retry, and `./pubkit` is as before.
+
+Filling the mirror is the mirror's own job. For storage.sustenaut.eu, an
+hourly workflow in Sustenaut/storage copies every wheel attached to a
+release of Sustenaut's public repositories.
+
 ## CI
 
 ```yaml
