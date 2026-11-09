@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.32.1 is released as v0.32.1 from commit 94373cfb8a073787ddef3e8cf01ca45bf060c342.",
+      "content": "pubkit 0.33.0 is released as v0.33.0 from commit d770bafe0ec530fa70db65b9ab07ea0d121c2f9a.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.32.1",
+            "0.33.0",
             "pubkit --version",
-            "pubkit 0.32.1",
-            "v0.32.1",
-            "94373cfb8a073787ddef3e8cf01ca45bf060c342"
+            "pubkit 0.33.0",
+            "v0.33.0",
+            "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
           ]
         ]
       },
-      "scope": "the published release v0.32.1 of pubkit",
+      "scope": "the published release v0.33.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "94373cfb8a073787ddef3e8cf01ca45bf060c342"
+          "revision": "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.32.1 was released on 2026-11-09 from commit 94373cfb8a073787ddef3e8cf01ca45bf060c342 with these changes.",
+      "content": "pubkit 0.33.0 was released on 2026-11-09 from commit d770bafe0ec530fa70db65b9ab07ea0d121c2f9a with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "fixed",
-            "tests/requirements-pubkit.txt lists deploy.providers' wheels (pubsec, and any other provider) beside pubkit, so pubkit sync --check, which runs in the tests' environment here and in CI, finds the need types they offer, and pubkit bump moves both pins at once"
+            "removed",
+            "The deploy walk leaves pubkit for pubdeploy (Sustenaut/pubdeploy): pubkit deploy walk, check and types, pubkit k8s preflight and diagnose, k8s-deploy.yml, deploy-check.yml and k8s/components/app are gone, with no stubs; run ./pubdeploy, which pubkit sync writes in a repository with a deploy block, and call pubdeploy's workflows. deploy.providers now lists pubdeploy at pubkit's floor beside pubsec, ./pubkit runs with it, and sync and bump call the new sustenaut.sync and sustenaut.bump hook groups, pubdeploy's being the deploy block's offline check, the scheduled walk's caller, and moving deploy.providers and the uses of pubdeploy's workflows. deploy-ssh stays until pubdeploy calls its own copy"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.32.1 of pubkit",
+      "scope": "the published release v0.33.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "94373cfb8a073787ddef3e8cf01ca45bf060c342"
+          "revision": "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
         }
       ]
     }
