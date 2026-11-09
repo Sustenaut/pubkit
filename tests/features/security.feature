@@ -14,6 +14,18 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
     And dependabot.yml updates "pip" at "/tests" "daily"
     And every dependabot.yml entry has "open-pull-requests-limit" 3
 
+  Scenario: Dependabot leaves the pins pubkit moves to pubkit
+    Given the security settings '{"kind": "utility"}'
+    Then the "github-actions" entry ignores "Sustenaut/pubkit/*" and "Sustenaut/pubrel/*"
+    And Dependabot would not bump "Sustenaut/pubrel/.github/workflows/release.yml"
+    And Dependabot would not bump "Sustenaut/pubkit/actions/deploy-static"
+    And Dependabot would bump "actions/setup-python"
+
+  Scenario: The ignored pins follow workflows_owner, and ignores in options are kept
+    Given the security settings '{"kind": "utility", "workflows_owner": "example-org", "security": {"dependabot": {"ecosystems": ["github-actions", "npm"], "options": {"ignore": [{"dependency-name": "actions/cache"}]}}}}'
+    Then the "github-actions" entry ignores "example-org/pubkit/*", "example-org/pubrel/*" and "actions/cache"
+    And the "npm" entry ignores "actions/cache"
+
   Scenario: Dependabot set to false leaves dependabot.yml to the repository
     Given the security settings '{"kind": "utility", "security": {"dependabot": false}}'
     Then pubkit writes no dependabot.yml

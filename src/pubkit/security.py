@@ -15,6 +15,11 @@ languages, gated on CI, so Dependabot doing the same would open duplicate
 pull requests. `"dependabot": false` leaves `.github/dependabot.yml` to the
 repository.
 
+Every github-actions entry ignores the owner's pubkit and pubrel workflows
+and actions. Their pins move only with pubkit (`pubkit bump`), so
+`pubkit sync --check` fails any pull request that moves one alone. Ignores
+given in `options` are kept, after these.
+
 `security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**", "organization":
 "example-org"}`: `args` are properties every workflow's sonar job adds, after
 its `sonar-args` input, and `organization` is the SonarQube Cloud
@@ -33,9 +38,14 @@ import re
 import sys
 from typing import Any
 
+from .refs import owner
+
 DEPENDABOT_PATH = ".github/dependabot.yml"
 SCHEDULES = ("daily", "weekly", "monthly")
 DEPENDABOT = {"schedule": "weekly", "ecosystems": ["github-actions"], "options": {}}
+# The owner's repositories whose workflows and actions `pubkit sync` and
+# `pubkit bump` pin: Dependabot leaves them to pubkit.
+PINNED = ("pubkit", "pubrel")
 SONAR = ("args", "organization")
 # SonarQube Cloud's organization keys: lower-case letters, digits and dashes.
 ORGANIZATION = re.compile(r"[a-z0-9][a-z0-9-]*")
@@ -80,12 +90,16 @@ def dependabot(config: dict[str, Any]) -> str | None:
     settings = dependabot_settings(config)
     if settings is None:
         return None
+    pinned = [{"dependency-name": f"{owner(config)}/{name}/*"} for name in PINNED]
     lines = ["# Written by `pubkit sync` from security.dependabot in pubkit.json. Do not edit:",
              "# change pubkit.json and run `pubkit sync`.", "version: 2", "updates:"]
     for ecosystem in settings["ecosystems"]:
         entry = ({"package-ecosystem": ecosystem, "directory": "/"}
                  if isinstance(ecosystem, str) else {"directory": "/", **ecosystem})
         entry = {**entry, "schedule": {"interval": settings["schedule"]}, **settings["options"]}
+        if entry["package-ecosystem"] == "github-actions":
+            given = entry.get("ignore", [])
+            entry["ignore"] = pinned + (given if isinstance(given, list) else [given])
         lines.append(f"  - {json.dumps(entry)}")
     return "\n".join(lines) + "\n"
 

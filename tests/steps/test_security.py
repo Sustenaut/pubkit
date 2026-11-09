@@ -4,6 +4,7 @@ SonarQube Cloud properties, and how the workflows read them."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,33 @@ def updates(config, ecosystem, directory, interval):
 @then(parsers.parse('every dependabot.yml entry has "{key}" {value:d}'))
 def every_entry(config, key, value):
     assert all(e[key] == value for e in entries(config))
+
+
+def ignored(config, ecosystem):
+    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+    return [i["dependency-name"] for i in entry.get("ignore", [])]
+
+
+@then(parsers.re(r'the "(?P<ecosystem>[\w-]+)" entry ignores (?P<names>.+)'))
+def entry_ignores(config, ecosystem, names):
+    assert ignored(config, ecosystem) == re.findall(r'"([^"]+)"', names)
+
+
+def matched(config, dependency):
+    """Whether an ignore matches, as Dependabot reads one: `*` is any run of
+    characters, slashes included, and case does not count."""
+    return any(re.fullmatch(".*".join(map(re.escape, name.split("*"))), dependency, re.I)
+               for name in ignored(config, "github-actions"))
+
+
+@then(parsers.parse('Dependabot would not bump "{dependency}"'))
+def not_bumped(config, dependency):
+    assert matched(config, dependency)
+
+
+@then(parsers.parse('Dependabot would bump "{dependency}"'))
+def bumped(config, dependency):
+    assert not matched(config, dependency)
 
 
 @then("pubkit writes no dependabot.yml")
