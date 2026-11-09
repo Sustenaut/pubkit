@@ -216,3 +216,122 @@ def test_bump_leaves_a_provider_without_a_sha256_saying_so(repo):
     assert lines == ["left     deploy.providers example-needs: it has no sha256 to move; give it the wheel's, "
                      "as `pubkit sync --check` says"]
     assert (repo / "pubkit.json").read_text() == before
+
+
+# --- pubsec: deploy.providers, ./pubsec and the new with-secrets ----------------
+
+
+def pin():
+    from pubkit.new import PUBSEC_FLOOR, PUBSEC_WHEEL  # noqa: PLC0415
+    return {"distribution": "pubsec", "wheel": PUBSEC_WHEEL.format(PUBSEC_FLOOR[0]), "sha256": PUBSEC_FLOOR[1]}
+
+
+def deployed(repo, monkeypatch, **deploy):
+    init(repo, "service")
+    config = json.loads((repo / "pubkit.json").read_text())
+    (repo / "pubkit.json").write_text(json.dumps(config | {"deploy": deploy_repo(repo) | deploy}, indent=2) + "\n")
+    monkeypatch.setattr("pubkit.deploy.offline_lines", lambda root, config: ([], False))
+
+
+def test_sync_lists_pubsec_in_deploy_providers_and_check_fails_without_it(repo, capsys, monkeypatch):
+    deployed(repo, monkeypatch)
+    before = (repo / "pubkit.json").read_text()
+    assert cli.main(["sync", "--check"]) == 1
+    assert "pubkit: deploy.providers does not list pubsec: the types that hold a secret's value are pubsec's" \
+        in capsys.readouterr().err
+    assert (repo / "pubkit.json").read_text() == before
+    assert cli.main(["sync"]) == 0
+    after = (repo / "pubkit.json").read_text()
+    assert json.loads(after)["deploy"]["providers"] == [pin()]
+    # The entry, and nothing else of the file's layout.
+    assert after.replace(f'"providers": [{json.dumps(pin())}],\n    ', "") == before
+    assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
+
+
+def test_sync_writes_pubsec_and_with_secrets_runs_it(repo, capsys, monkeypatch):
+    deployed(repo, monkeypatch)
+    assert cli.main(["sync"]) == 0
+    launcher, wrapper = (repo / "pubsec").read_text(), (repo / "with-secrets").read_text()
+    assert f"fetch {pin()['wheel']} {pin()['sha256']} providers deploy.providers\n" in launcher
+    assert 'exec uvx --from "$fetched" pubsec "$@"' in launcher
+    assert (repo / "pubsec").stat().st_mode & 0o111
+    assert wrapper.rstrip().endswith('exec "$(cd "$(dirname "$0")" && pwd)/pubsec" run --cwd "$PWD" -- "$@"')
+    assert "secrets run" not in wrapper
+    # ./pubkit runs the walk with pubsec, so its types load.
+    assert f"provider {pin()['wheel']} {pin()['sha256']}\n" in (repo / "pubkit").read_text()
+
+
+def test_a_pubsec_below_the_floor_is_moved_up_and_a_newer_one_kept(repo, capsys, monkeypatch):
+    old = {"distribution": "pubsec", "sha256": "0" * 64,
+           "wheel": "https://github.com/example-org/pubsec/releases/download/v0.0.1/pubsec-0.0.1-py3-none-any.whl"}
+    deployed(repo, monkeypatch, providers=[old])
+    assert cli.main(["sync", "--check"]) == 1
+    assert "lists a pubsec older than this pubkit works with" in capsys.readouterr().err
+    assert cli.main(["sync"]) == 0
+    assert json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"] == [pin()]
+    newer = {"distribution": "pubsec", "sha256": "1" * 64,
+             "wheel": "https://github.com/example-org/pubsec/releases/download/v9.0.0/pubsec-9.0.0-py3-none-any.whl"}
+    config = json.loads((repo / "pubkit.json").read_text())
+    config["deploy"]["providers"] = [newer]
+    (repo / "pubkit.json").write_text(json.dumps(config, indent=2) + "\n")
+    assert cli.main(["sync"]) == 0
+    assert json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"] == [newer]
+    assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubsec").read_text()
+    assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
+
+
+def test_without_pubsec_its_types_name_it():
+    from pubkit.deploy.model import Need  # noqa: PLC0415
+    from pubkit.deploy.registry import BUILTIN, lacking  # noqa: PLC0415
+    from pubkit.deploy.schema import need_problems  # noqa: PLC0415
+    own = {kind.type: kind for kind in BUILTIN}
+    assert need_problems({"type": "bitwarden.secret", "name": "x"}, 0, own, FIXTURE) == [
+        "deploy: needs[0]: bitwarden.secret is pubsec's: list pubsec in deploy.providers, as `pubkit sync` does, "
+        "and run ./pubkit, which runs it"]
+    assert lacking([Need("k8s.secret", "x", {}), Need("github.secret", "Y", {})], own) == [
+        "deploy: github.secret, k8s.secret are pubsec's, which is not installed: list pubsec in deploy.providers, "
+        "as `pubkit sync` does, and run ./pubkit, which runs it"]
+
+
+# The Context's names a provider may use, which pubkit's README lists under
+# "Provider contract": changing one breaks pubsec and pg-backup.
+CONTRACT = {"root", "config", "block", "namespace", "unit", "channel", "kubectl", "server", "gh", "send",
+            "bitwarden_writer", "http_get", "env", "now", "rendered", "offline", "slug", "zones", "resolve",
+            "values", "types", "needs", "results", "sleep", "dispatched"}
+
+
+def test_the_provider_contract_is_on_the_context():
+    from dataclasses import fields  # noqa: PLC0415
+
+    from pubkit.deploy.model import Context  # noqa: PLC0415
+    assert CONTRACT <= {f.name for f in fields(Context)}
+
+
+def test_the_readme_lists_the_provider_contract():
+    from pathlib import Path  # noqa: PLC0415
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text()
+    section = readme.split("### Provider contract", 1)[1].split("\n## ", 1)[0]
+    import re  # noqa: PLC0415
+    missing = [name for name in CONTRACT if not re.search(rf"`{name}[`(]", section)]
+    assert not missing, missing
+
+
+def test_a_walk_hook_that_fails_is_said_and_the_walk_goes_on(capsys):
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from pubkit.deploy import prepare  # noqa: PLC0415
+    from pubkit.deploy.model import Context  # noqa: PLC0415
+    secret = "canary-7f3e"
+
+    def broken(ctx, plan, terminal):
+        raise ValueError(f"the token is {secret}")
+
+    def says(ctx, plan, terminal):
+        ctx.bitwarden_writer = "a writer"
+        return "a line"
+    points = [SimpleNamespace(name="broken", load=lambda: broken), SimpleNamespace(name="says", load=lambda: says)]
+    ctx = Context.for_tests()
+    prepare(ctx, [], True, points)
+    err = capsys.readouterr().err
+    assert "pubkit: deploy: the sustenaut.walk hook broken failed (ValueError)" in err and "a line" in err
+    assert secret not in err and ctx.bitwarden_writer == "a writer"

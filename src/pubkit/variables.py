@@ -34,8 +34,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .app_secrets import send as gh_set
-from .protect import Api, ApiError, gh, remote_config
+from .protect import Api, ApiError, gh, gh_set, remote_config
 from .repos import read
 
 BLOCK = "variables"

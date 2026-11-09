@@ -20,7 +20,6 @@ from pytest_bdd import given, parsers, then, when
 from deploy_world import CANARY, NOW, World, key_value, run, world  # noqa: F401 - the fixture
 from pubkit.deploy import load
 from pubkit.deploy.model import Result, Stop
-from pubkit.deploy.registry import BUILTIN
 from pubkit.deploy.schema import journal_schema, problems, validate
 
 
@@ -110,6 +109,7 @@ def in_step(world, capsys):
     assert main(["init", "--kind=service", "--project=example"]) == 0
     world.save()
     assert main(["sync"]) == 0
+    world.config = json.loads((world.root / "pubkit.json").read_text())  # with the pubsec sync listed
     world.outputs += capsys.readouterr()
     world.zones = None
 
@@ -152,7 +152,9 @@ def offered(monkeypatch):
     points: list[Point] = []
     module = modules.ModuleType("example_needs")
     monkeypatch.setitem(sys.modules, "example_needs", module)
-    monkeypatch.setattr("pubkit.deploy.registry.entry_points", lambda group: list(points))
+    from importlib.metadata import entry_points  # noqa: PLC0415
+    installed = list(entry_points(group="sustenaut.needs"))  # pubsec's, a test dependency
+    monkeypatch.setattr("pubkit.deploy.registry.entry_points", lambda group: installed + list(points))
     return SimpleNamespace(points=points, module=module)
 
 
@@ -632,7 +634,9 @@ def has_shape(world, need_id, shape):
 
 
 def builtin(kind: str):
-    return next(t for t in BUILTIN if t.type == kind)
+    """The type the walk loads: pubkit's own, or pubsec's."""
+    from pubkit.deploy.registry import types  # noqa: PLC0415
+    return types()[kind]
 
 
 @given(parsers.parse('the "{kind}" check\'s budget is {seconds:g} seconds'))

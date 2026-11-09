@@ -192,3 +192,82 @@ def did_not_run(fake):
 @then(parsers.parse('"{path}" is executable'))
 def executable(repo, path):
     assert (repo / path).stat().st_mode & stat.S_IXUSR, path
+
+
+FAKE_UVX = f"""#!{sys.executable}
+import json, os, sys
+json.dump({{"args": sys.argv[1:], "cwd": os.getcwd()}}, open(os.environ["FAKE_UVX"], "w"))
+"""
+
+
+@pytest.fixture
+def launcher_env(tmp_path):
+    """The environment ./with-secrets and ./pubsec run in: a cache of their own."""
+    return {"XDG_CACHE_HOME": str(tmp_path / "cache")}
+
+
+@given("uvx records how it was run")
+def fake_uvx(tmp_path, launcher_env):
+    bin_dir = tmp_path / "uvx-bin"
+    bin_dir.mkdir()
+    (bin_dir / "uvx").write_text(FAKE_UVX)
+    (bin_dir / "uvx").chmod(0o755)
+    launcher_env["FAKE_UVX"] = str(tmp_path / "uvx.json")
+    launcher_env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+@pytest.fixture
+def cached():
+    return {}
+
+
+@given(parsers.parse('deploy.providers lists a pubsec wheel in the cache, at "{version}"'))
+def cached_wheel(repo, tmp_path, cached, version):
+    """./pubsec as sync writes it for a pubkit.json whose deploy.providers lists
+    pubsec at `version`, and that wheel already fetched into the cache, so
+    nothing is downloaded."""
+    import hashlib  # noqa: PLC0415
+
+    from pubkit.cli import render, templates, values  # noqa: PLC0415
+    data = b"a stand-in for pubsec's wheel"
+    sha = hashlib.sha256(data).hexdigest()
+    wheel = f"https://github.com/example-org/pubsec/releases/download/v{version}/pubsec-{version}-py3-none-any.whl"
+    config = {"kind": "service", "deploy": {"providers": [{"distribution": "pubsec", "wheel": wheel, "sha256": sha}]}}
+    (repo / "pubsec").write_text(render(templates("service")["pubsec"], values(config)))
+    (repo / "pubsec").chmod(0o755)
+    file = tmp_path / "cache" / "pubkit" / "providers" / sha / wheel.rsplit("/", 1)[1]
+    file.parent.mkdir(parents=True)
+    file.write_bytes(data)
+    cached["file"] = file
+
+
+@given("the cached wheel has changed")
+def changed(cached):
+    cached["file"].write_bytes(b"another wheel")
+
+
+@when(parsers.re(r'I run ./with-secrets (?P<args>(?:"[^"]*" ?)+) in the directory "(?P<directory>[^"]*)"'),
+      target_fixture="result")
+def with_secrets_in(repo, run, launcher_env, args, directory):
+    (repo / directory).mkdir(exist_ok=True)
+    return run(repo / "with-secrets", *args.strip().strip('"').split('" "'), cwd=repo / directory, env=launcher_env)
+
+
+@then(parsers.parse('uvx ran pubsec from the cached wheel with "{args}"'))
+def ran_pubsec(repo, tmp_path, cached, args):
+    seen = json.loads((tmp_path / "uvx.json").read_text())
+    assert seen["args"] == ["--from", str(cached["file"]), "pubsec", *args.replace("{repo}", str(repo)).split()], seen
+    assert seen["cwd"] == str(repo), seen
+
+
+@then("uvx was not run")
+def uvx_not_run(tmp_path):
+    assert not (tmp_path / "uvx.json").exists()
+
+
+@then(parsers.parse('"{path}" runs the oldest pubsec this pubkit works with'))
+def runs_pinned(repo, path):
+    from pubkit.new import PUBSEC_FLOOR, PUBSEC_WHEEL  # noqa: PLC0415
+    text = (repo / path).read_text()
+    assert f"fetch {PUBSEC_WHEEL.format(PUBSEC_FLOOR[0])} {PUBSEC_FLOOR[1]} providers deploy.providers\n" in text, text
+    assert 'exec uvx --from "$fetched" pubsec "$@"' in text, text

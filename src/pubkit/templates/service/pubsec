@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Managed by pubkit {version}: `pubkit sync` rewrites this file, and
+# `pubkit sync --check` fails when it differs.
+#
+# Run this repository's pinned pubsec, which holds what pubkit does not: a
+# secret's value, a write token, a private key. ./with-secrets runs it, and
+# the deploy walk loads its need types.
+#
+#   ./pubsec run -- terraform plan
+#   ./pubsec --version
+#
+# The release is deploy.providers' pubsec, or the oldest pubkit {version}
+# works with where it lists none, or an older one.
+# Its wheel is fetched once into the user's cache (from the wheel mirror,
+# when pubkit.json names one and GitHub fails) and checked against its
+# sha256 on every run, and uvx runs that file; nothing is installed into the
+# repository or the system. pubsec runs in the repository's root, where
+# with-secrets.json is, from whichever directory this is called.
+set -euo pipefail
+
+if ! command -v uvx >/dev/null 2>&1; then
+  echo "pubsec: ./pubsec runs pubsec with uv, which is not installed: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+  exit 127
+fi
+
+cd "$(dirname "$0")"
+{pubsec}exec uvx --from "$fetched" pubsec "$@"

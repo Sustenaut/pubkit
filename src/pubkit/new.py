@@ -51,6 +51,13 @@ PUB_GIT = "https://github.com/Sustenaut/publet"
 # tag names, which the workflow pins (refs.py).
 PUBREL_PIN = "0.6.1"
 PUBREL_COMMIT = "5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc"
+# The oldest pubsec this pubkit works with, and its wheel's sha256: the floor.
+# A repository's deploy.providers pins its own pubsec, which `pubkit bump`
+# moves to the latest release; sync adds the floor where none is listed and
+# moves one below it up, and sync --check fails below it. It moves only when
+# pubkit needs a newer pubsec, such as for a change to the provider contract.
+PUBSEC_FLOOR = ("0.1.2", "88a68ffd252b49289ae02d0a9f629f3e0f0832c921cb8ee0f1301f958527de17")
+PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")

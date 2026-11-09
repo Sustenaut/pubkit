@@ -4,6 +4,9 @@ naming an object with what model.NeedType has: an instance, whose check and
 fulfil the walk calls, not a class. A provider need import nothing of
 pubkit's: any result with state, summary, fix and details serves.
 
+pubsec offers the seven types that hold a secret's value (PUBSEC_TYPES),
+which pubkit had built in until pubsec took them.
+
 A type is checked as it loads: its name is dotted lower-case words, its
 schema an object schema that takes no key it does not name, its budget more
 than 0 and at most 10 seconds, its grade one of auto, propose, human and
@@ -22,10 +25,8 @@ from typing import Any
 
 from .model import GRADES, NeedType
 from .types.auth import SignInClient
-from .types.bitwarden import BitwardenGenerated, BitwardenSecret
-from .types.gcp import ServiceAccountKey
-from .types.github import DeploySettings, GitHubSecret, GitHubVariable, VariableEntry
-from .types.k8s import CronJob, Manifests, Namespace, Secret, SecretsDeclared
+from .types.github import VariableEntry
+from .types.k8s import CronJob, Manifests, Namespace, SecretsDeclared
 from .types.net import Health, Site, Tenant, Upstream
 from .types.rollout import Gate, Rollout
 
@@ -33,11 +34,15 @@ GROUP = "sustenaut.needs"
 TYPE = re.compile(r"[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+")
 LONGEST = 10.0
 LONGEST_FULFIL = 900.0
-BUILTIN: tuple[NeedType, ...] = (Namespace(), Secret(), SecretsDeclared(), Manifests(), CronJob(), GitHubSecret(),
-                                 GitHubVariable(), DeploySettings(), VariableEntry(), Gate(), Upstream(), Site(),
-                                 Tenant(), Rollout(), Health(), BitwardenSecret(), BitwardenGenerated(),
-                                 ServiceAccountKey(), SignInClient())
+BUILTIN: tuple[NeedType, ...] = (Namespace(), SecretsDeclared(), Manifests(), CronJob(), VariableEntry(), Gate(),
+                                 Upstream(), Site(), Tenant(), Rollout(), Health(), SignInClient())
 PUBKIT = "pubkit"
+# The types that hold a secret's value, which pubsec offers: pubkit implies
+# several (a secret's k8s.secret, the secrets block's github.*), so a plan
+# with one needs pubsec installed, as deploy.providers lists it.
+PUBSEC = "pubsec"
+PUBSEC_TYPES = ("bitwarden.generated", "bitwarden.secret", "gcp.service-account-key", "github.deploy-settings",
+                "github.secret", "github.variable", "k8s.secret")
 
 
 @dataclass
@@ -97,6 +102,15 @@ def load(points: list[EntryPoint] | None = None) -> Registry:
         out.types[kind.type] = kind
         out.origin[kind.type] = dist
     return out
+
+
+def lacking(needs: Any, types: dict[str, NeedType]) -> list[str]:
+    """For each type of `needs` that is pubsec's and not installed, what to do: one phrase."""
+    missing = sorted({n.type for n in needs if n.type not in types and n.type in PUBSEC_TYPES})
+    if not missing:
+        return []
+    return [f"deploy: {', '.join(missing)} {'is' if len(missing) == 1 else 'are'} {PUBSEC}'s, which is not installed: "
+            f"list {PUBSEC} in deploy.providers, as `pubkit sync` does, and run ./pubkit, which runs it"]
 
 
 def types() -> dict[str, NeedType]:

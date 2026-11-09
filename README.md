@@ -75,38 +75,22 @@ the rest when a repository moves to a new pubkit.
 
 ## Services: `./with-secrets` and `service-ci.yml`
 
-A service runs every command that needs a secret through `./with-secrets`:
+A service runs every command that needs a secret through `./with-secrets`,
+which reads its Bitwarden project, as `with-secrets.json` says, and runs the
+command with the secrets in its environment only:
 
 ```sh
 ./with-secrets terraform plan
 ./with-secrets scripts/setup-backup.sh
 ```
 
-It reads a Bitwarden Secrets Manager project with the `bws` CLI, using a
-read-only machine account's token (`BWS_ACCESS_TOKEN`, or that line in the
-repository's git-ignored `.env`), and runs the command with the secrets in
-its environment only: the calling shell never holds them, and no master
-password is asked for. It stops, naming the projects the token can see, when
-it cannot see the one configured. `with-secrets.json` is the repository's:
-
-| Setting | Meaning |
-|---|---|
-| `project` | The project's name or id |
-| `terraform.dir` | Where the Terraform files are |
-| `terraform.secrets` | `declared`: a secret named like a declared variable in upper case (`HCLOUD_TOKEN` for `hcloud_token`) goes as `TF_VAR_hcloud_token` and under no other name. `map`: the names `terraform.names_from` lists go as `TF_VAR_secret_values` (declare it ephemeral) and `TF_VAR_secret_revisions` |
-| `aliases` | Optional: files (paths from the repository root), each `{"aliases": {"NAME": "secret"}}`, that also export the secret named `secret` as `NAME`, for a tool that reads a fixed name (the Tailscale Terraform provider reads `TAILSCALE_OAUTH_CLIENT_ID`). Keep each file next to the code that needs it. An alias of a secret Bitwarden does not have is reported and skipped |
-
-Every other secret goes under its name in upper case, `-` as `_`.
-
-`./with-secrets` is one line: it runs `./pubkit secrets run --cwd "$PWD" --
-COMMAND`, so the repository's pinned pubkit does the work, in the directory
-it is called from, and needs `uv` (for `./pubkit`) and `bws`. `pubkit secrets
-run` can be called directly too:
-
-```sh
-./pubkit secrets run -- terraform plan        # in the repository's root
-./pubkit secrets run --cwd "$PWD" -- make deploy
-```
+That script, managed in every repository with a `with-secrets.json`, is one
+line: `./pubsec run --cwd "$PWD" -- COMMAND`. Holding a secret's value is
+[pubsec](https://github.com/Sustenaut/pubsec)'s, not pubkit's, so `pubkit
+sync` writes `./pubsec` beside it, which runs the repository's pubsec
+(`deploy.providers`' entry, or pubkit's floor where a repository has no
+deploy block), its wheel checked against its sha256 on every run. pubsec's README, "Services:
+./with-secrets", explains `with-secrets.json` and `pubsec run`.
 
 `service-ci.yml` is a service's CI: `pubkit sync --check` and shellcheck,
 `terraform fmt`, `init -backend=false` and `validate` when `terraform-dir`
@@ -116,124 +100,26 @@ repositories on GitHub Free have no rulesets, so there it is a summary.
 
 ### Sending secrets to a repository
 
-A repository names the values it needs in its `pubkit.json`. A GitHub App has
-three, in `github_app`, which may also be a list of apps. `secrets` lists any
-others, each with a `kind` of `secret` or `variable`:
-
-```json
-"github_app": {
-  "id":              { "from": "some-app-id", "to": "SOME_APP_ID" },
-  "installation_id": { "from": "some-app-installation-id", "to": "SOME_APP_INSTALLATION_ID" },
-  "key":             { "from": "some-app-key", "to": "SOME_APP_KEY" }
-},
-"secrets": [
-  { "from": "some-token", "to": "SOME_TOKEN", "kind": "secret" },
-  { "from": "some-user", "to": "SOME_USER", "kind": "variable" },
-  { "from": "some-deploy-key", "to": "SOME_DEPLOY_KEY", "kind": "secret", "environment": "some-env" }
-]
-```
-
-`from` is the secret's name in the Bitwarden project `./with-secrets` reads, and
-`to` its name on GitHub. An app's id and installation id go as variables and its
-key as a secret, on the repository `origin` points at and no other. `environment`,
-on an entry in `secrets`, puts it in that GitHub environment, which must already
-exist, instead of the repository's own:
-
-```sh
-./with-secrets ./pubkit app-secrets --check   # checks only, sends nothing
-./with-secrets ./pubkit app-secrets
-```
-
-It writes nothing until every one is there and looks right (digits for an app's
-ids, BEGIN and END lines for its key, and not empty for the others). It prints names and lengths, never a value,
-and each value reaches `gh` on its standard input. An app installed on several
-owners has a different installation id on each, so each repository names its own
-owner's. `pubkit sync --check` checks both.
+`pubkit.json`'s `github_app` and `secrets` blocks name the values a
+repository needs from Bitwarden and where each goes on GitHub, and `pubkit
+sync --check` refuses one it can't use. Sending them is pubsec's:
+`./with-secrets ./pubsec app-secrets [--check]` (pubsec's README, "Sending
+secrets to a repository"). `pubkit app-secrets` says so, and is removed in
+the next minor.
 
 ### Creating a GitHub App
 
-`pubkit github-app create` makes an app with GitHub's
-[manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
-and puts its three values in Bitwarden, under names `pubkit app-secrets` can then
-send on. The manifest is the repository's own: GitHub's fields, and a `pubkit`
-section GitHub never sees, naming the owner (`org` or `user`), the Bitwarden
-project (its name or id) and the prefix of the secrets' names:
-
-```json
-{
-  "name": "some-app",
-  "url": "https://example.org",
-  "public": false,
-  "default_permissions": { "contents": "read" },
-  "pubkit": {
-    "org": "some-org",
-    "bitwarden_project": "some-project",
-    "secret_prefix": "some-app"
-  }
-}
-```
-
-```sh
-./pubkit github-app create --dry-run some-app.json   # shows the plan, and does nothing
-./pubkit github-app create some-app.json
-```
-
-It goes in this order, so that a refusal comes before there is an app to clean up:
-
-1. It shows the app, the project and the three names: `some-app-app-id`,
-   `some-app-app-key` and `some-app-installation-id`. `--dry-run` ends here.
-2. It asks for a Bitwarden access token with write access to the project, at a
-   hidden prompt. It is never read from `.env` or a file and never kept, and it
-   reaches `bws` only in its environment. `./with-secrets`' read-only token will
-   not do for the writes.
-3. It looks for the names in the project, and refuses if one is there. `--replace`
-   overwrites them instead.
-4. A server on 127.0.0.1 opens a page that posts the manifest to GitHub, with a
-   random `state` that must come back. You confirm the app on GitHub, which
-   redirects to the server with a code, and the code becomes the app and its key.
-5. Your browser opens the app's install page. Signing with the new key, pubkit
-   watches `GET /app/installations` until the app is installed on the owner, takes
-   the installation's id, and says which repositories it reaches: all of them, or
-   the list of those selected. Opening that page may install the app on every
-   repository straight away, with no step in which to choose. To narrow it, go to
-   the owner's settings, then GitHub Apps, then Configure beside the app, and pick
-   "Only select repositories"; the run has printed the link. The installation's id
-   stays the same, so this can wait until after the run.
-6. It shows what it will write, and writes only when you type `yes`. If a write
-   fails it offers to try the ones left with another token.
-
-The key is never printed or written to disk: it stays in memory, so if the run
-ends before it is written, it is gone, and pubkit gives the app's settings page,
-where you make a new one or delete the app. The same goes for a client secret and
-webhook secret, which GitHub also returns and pubkit does not keep. The values are
-written with Bitwarden's SDK, which takes them in memory, so the key is on no command
-line (see "Making a service account key" for how it is installed).
-
-A pull token for `ghcr.io` is no app's to give, so it stays a manual step.
-
+`./pubsec github-app create MANIFEST` makes an app with GitHub's manifest
+flow and puts its three values in Bitwarden, where `./pubsec app-secrets`
+finds them (pubsec's README, "Creating a GitHub App"). `pubkit github-app
+create` says so, and is removed in the next minor.
 
 ### Making a service account key
 
-`pubkit service-account-key create` makes a Google Cloud service account key and
-puts it in Bitwarden, so an app outside Google Cloud can have one without the key
-ever being in a file, on a command line, or in Terraform's state:
-
-```sh
-./pubkit service-account-key create --dry-run --account NAME@PROJECT.iam.gserviceaccount.com --secret some-key
-./pubkit service-account-key create --account NAME@PROJECT.iam.gserviceaccount.com --secret some-key
-```
-
-It shows the plan, and asks for a Bitwarden access token with write access to the
-project, at a hidden prompt, as `github-app create` does. The project is the one
-`with-secrets.json` names, or `--bitwarden-project`. It refuses if the secret is
-there; `--replace` overwrites it. On a typed `yes`, `gcloud` writes the key to
-pubkit's pipe, and Bitwarden's SDK writes it, base64-encoded, from memory. If that
-write fails the new key is deleted from Google. The account's other keys are left
-working, and listed, so whatever holds one can move over before it is deleted.
-
-The SDK is not a dependency of pubkit: the command installs it with `uv` for that
-run alone, by the hashes in `src/pubkit/bitwarden-sdk.lock`. Its wheels are under Bitwarden's own SDK
-licence, not pubkit's.
+`./pubsec service-account-key create` makes a Google Cloud service account
+key and writes it to Bitwarden from memory (pubsec's README, "Making a
+service account key"). `pubkit service-account-key create` says so, and is
+removed in the next minor.
 
 ## Hosting modules
 
@@ -940,22 +826,59 @@ does, type by type:
 | type | its fulfil | it needs |
 | --- | --- | --- |
 | k8s.namespace | `sustenaut-app NS` on the server | the admin channel |
-| k8s.secret | a Secret manifest from the values of the needs that fill it, on kubectl's standard input, then a restart of each Deployment the manifests show reading it | kubectl that writes |
 | k8s.manifests | `kubectl apply -f -` of the file | kubectl that writes |
 | k8s.cronjob, service.health | a Job from the CronJob, waited for; a Job made by hand, NAME-pubkit-... or NAME-now, counts as the CronJob's success, as kubectl does not make it the CronJob's | kubectl that writes |
-| github.secret, github.variable, github.deploy-settings | `gh secret set` or `gh variable set` of what the secrets and github_app blocks name, from Bitwarden, as `pubkit app-secrets` does | ./with-secrets |
 | github.gate | the gate set on, once every need before it is ready, and the workflow run | gh |
 | deploy.rollout | the workflow run on the default branch, and waited for | gh |
-| bitwarden.generated | a new value of its shape, written to Bitwarden, and kept for the Secret it fills | a write token |
-| gcp.service-account-key | a new key, written to Bitwarden, deleted from Google if that fails | gcloud, a write token |
 | auth.sign-in-client | its Secret made on the server, from the client kept there; or the approval record written into `approvals` | the admin channel |
 
-A variable the variables block declares, `dns.site`, `storage.tenant` and
-`github.variable-entry` propose; `upstream`, `bitwarden.secret` and
-`k8s.secrets-declared` have no fulfil. The write token is asked for once,
-at a hidden prompt, when the plan holds a need that wants one, and kept
-only by the process; a walk from GitHub Actions, or with `--yes` and no
-terminal, asks for none, and those needs are unknown, saying so.
+The seven types that hold a secret's value are
+[pubsec](https://github.com/Sustenaut/pubsec)'s: `k8s.secret` (a Secret made
+from the values of the needs that fill it, on kubectl's standard input),
+`github.secret`, `github.variable` and `github.deploy-settings` (set from
+Bitwarden through gh), `bitwarden.secret`, `bitwarden.generated` and
+`gcp.service-account-key`. pubsec's README, "Making what a service needs",
+says what each checks and does. A repository with a deploy block pins its
+own pubsec in `deploy.providers`, and `pubkit bump` moves it to pubsec's
+latest release, as it does every provider. pubkit keeps a floor, the oldest
+pubsec it works with (`PUBSEC_FLOOR`, which its suite tests): `pubkit sync`
+lists the floor where none is listed and moves one below it up, and `sync
+--check` fails without one or below it, so `./pubkit` always walks with
+them. The floor moves only when pubkit needs a newer pubsec, such as for a
+change to the provider contract. Where pubsec is not installed, a need of
+one of its types says so.
+
+`dns.site`, `storage.tenant` and `github.variable-entry` propose; `upstream`
+and `k8s.secrets-declared` have no fulfil. Before it fulfils a need that
+wants the Bitwarden write token, at a terminal, the walk calls each
+`sustenaut.walk` hook, `prepare(ctx, plan, terminal)`: pubsec's asks for the
+token once, at a hidden prompt, and gives the walk its writer, kept only by
+the process. pubkit itself holds no write token. A walk from GitHub Actions,
+or with `--yes` and no terminal, asks for none, and those needs are unknown,
+saying so.
+
+### Provider contract
+
+A package that offers need types under `sustenaut.needs`, such as pubsec or
+pg-backup, imports nothing of pubkit's. A check or a fulfil uses the walk's
+Context by these names, which are frozen for providers: changing one is a
+breaking change, said in pubkit's changelog, with a follow-up in each
+provider. `root`, `config`, `block`, `namespace`, `unit`, `channel`
+(`admin`, `deploy`, `plain` or `plane`), `kubectl(args, input=None)`,
+`server(args, input)`, `gh(method, path, body)`, `send(kind, name, repo,
+value, environment)`, `bitwarden_writer` (None, or `.write(name, value,
+note)`), `http_get(url, timeout)`, `env`, `now()`, `rendered()`, `offline`,
+`slug`, `zones`, `resolve(host, type)`, `values` (by Bitwarden name, bytes),
+`types`, `needs`, `results`, `sleep(seconds)` and `dispatched`.
+
+A result is any object with `state`, `summary`, `fix` and `details`, and
+optionally `fixable` and `step`. A need has `id`, `type`, `name`, `params`,
+`implied_by` and `after`. A type has `type`, `schema`, `grade`, `budget` and
+`offline`, and optionally `fulfil_budget`, `singleton`, `default_name`,
+`grade_for`, `requires`, `action`, `value`, `secret_keys`, `secret_shape`,
+`made_from`, `check` and `fulfil`. Each entry point names an instance, not a
+class. A hook under `sustenaut.walk` is a function, `prepare(ctx, plan,
+terminal)`, returning a line to print or None.
 
 The channels: with `--server HOST` (or `SUSTENAUT_SERVER`) and no
 `--kubectl`, kubectl is `ssh root@HOST k3s kubectl`, and a command can run
@@ -1061,7 +984,7 @@ jobs:
   "mirror": {"terraform": "https://storage.sustenaut.eu/terraform"}
   ```
 - With `secrets` (the default), each terraform command runs as
-  `./pubkit secrets run -- terraform -chdir=DIR ...`, with the environment's
+  `./pubsec run -- terraform -chdir=DIR ...`, with the environment's
   secret `BWS_ACCESS_TOKEN`, so the stack gets what `./with-secrets` gives it
   on a laptop. bws is the release's binary, checked against its sha256. With
   `secrets: false` terraform runs plainly and no token is read.
@@ -1448,18 +1371,10 @@ starts with `~/`: a key kept outside any repository, such as one under
 `~/.config`, is declared by the repository whose tools use it. `pubkit sync
 --check` refuses a block it can't use.
 
-    pubkit signing-key backup [--under DIR] [--dry-run]
-
-reads the declarations of this repository, or of every repository directly
-under `DIR`, and writes each declared key that is on this machine and not yet
-in its project, with Bitwarden's SDK, from memory. The access token, which
-must be able to read and write those projects, is asked for at a hidden
-prompt. A secret already there with the same value is left alone; another
-value under the same name is never overwritten and fails the run, as do two
-different keys declared under one name. A key pubkit.json does not declare,
-at `corpus/.publet/signing.key` or `.publet/signing.key`, is pointed out.
-`--dry-run` lists what it would write and asks for nothing. No key or token
-is printed or put on a command line.
+Backing them up is pubsec's: `./pubsec signing-key backup [--under DIR]
+[--dry-run]` writes each declared key on this machine that its project lacks,
+from memory, never overwriting one (pubsec's README, "Backing up signing
+keys"). `pubkit signing-key backup` says so, and is removed in the next minor.
 
 ## Protecting main and the release tags
 

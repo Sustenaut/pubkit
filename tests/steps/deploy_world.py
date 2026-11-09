@@ -314,6 +314,7 @@ class World:
         self.rendered = (root / "rendered.yaml").read_text()
         self.render_error: Stop | None = None
         self.cluster = good_cluster()
+        self.cluster["namespaces"]["example"]["deployment"] = deployments(self.rendered)
         self.github = good_github()
         self.http: dict[str, Any] = {"https://storage.example.eu/healthz": 200,
                                      "https://example.example.eu/healthz": 200}
@@ -385,6 +386,14 @@ class World:
         return [text for text in seen for value in [CANARY, *self.values, self.token] if value in text]
 
 
+def deployments(rendered: str) -> list[dict[str, Any]]:
+    """The cluster's Deployments, as the rendered manifests make them, ready:
+    pubsec's k8s.secret restarts those whose pods read the Secret it made."""
+    return [{"metadata": {"name": d["metadata"]["name"]}, "spec": {"replicas": 1, "template": d["spec"]["template"]},
+             "status": {"readyReplicas": 1}}
+            for d in yaml.safe_load_all(rendered) if isinstance(d, dict) and d.get("kind") == "Deployment"]
+
+
 @pytest.fixture
 def world(tmp_path, monkeypatch, capsys):
     """The world, and after the scenario the canary: no value reached an
@@ -401,10 +410,14 @@ def world(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("pubkit.deploy.context", context)
     monkeypatch.setattr("pubkit.deploy.ask", lambda prompt: w.outputs.append(prompt) or (w.answers.pop(0)
                                                                                          if w.answers else ""))
-    monkeypatch.setattr("pubkit.github_app.ask_hidden", lambda prompt: w.outputs.append(prompt) or w.token)
-    monkeypatch.setattr("pubkit.deploy.BitwardenWriter", lambda token, project: FakeWriter(w, token))
+    # The types that hold a secret's value, and the hook that asks for the
+    # write token, are pubsec's, a test dependency: the walk loads them as in use.
+    import pubsec.walk  # noqa: PLC0415
+    monkeypatch.setattr(pubsec.walk, "_writers", {})
+    monkeypatch.setattr(pubsec.walk, "ask_hidden", lambda prompt: w.outputs.append(prompt) or w.token)
+    monkeypatch.setattr(pubsec.walk, "BitwardenWriter", lambda token, project: FakeWriter(w, token))
     monkeypatch.setattr("sys.stdin.isatty", lambda: w.terminal, raising=False)
-    import pubkit.deploy.types.bitwarden as bitwarden  # noqa: PLC0415
+    import pubsec.needs.bitwarden as bitwarden  # noqa: PLC0415
     made = bitwarden.generate
 
     def generate(shape):
@@ -412,7 +425,7 @@ def world(tmp_path, monkeypatch, capsys):
         w.values.append(value)
         return value
     monkeypatch.setattr(bitwarden, "generate", generate)
-    monkeypatch.setattr("pubkit.deploy.types.gcp.gcloud", lambda args: fake_gcloud(w, args))
+    monkeypatch.setattr("pubsec.needs.gcp.gcloud", lambda args: fake_gcloud(w, args))
     yield w
     w.outputs += capsys.readouterr()
     assert not w.leaked(), f"a value was printed: {w.leaked()[0][:2000]}"

@@ -16,7 +16,7 @@
 # takes, in the same environment (server). Nothing it runs can write: the
 # verb reads, the job's token reads, and no Bitwarden write token is asked
 # for. With the environment's secret BWS_ACCESS_TOKEN, the read-only
-# machine account's, the walk runs through ./pubkit secrets run, which puts
+# machine account's, the walk runs through ./pubsec run, which puts
 # the Bitwarden project's names and values in the job's environment only,
 # as terraform.yml does; without it every bitwarden.* need is unknown. The
 # log prints states and names, never a value. A need the job cannot judge,
@@ -96,6 +96,7 @@ jobs:
         run: |
           fail() { echo "::error::$1"; exit 1; }
           [[ -x ./pubkit ]] || fail "this repository has no ./pubkit to walk with"
+          [[ -x ./pubsec ]] || fail "this repository has no ./pubsec, whose types the walk loads: run pubkit sync"
           [[ -n "$SERVER" ]] || fail "the variable SUSTENAUT_SERVER is not set: there is no server to walk"
           [[ -n "$KNOWN_HOSTS" ]] || fail "the variable SUSTENAUT_KNOWN_HOSTS is not set: the server is never asked unpinned"
           [[ "$HAS_KEY" == true ]] || fail "the secret SUSTENAUT_DEPLOY_SSH_KEY is not set"
@@ -155,7 +156,7 @@ jobs:
           [[ -z "$JOURNAL" ]] || args+=(--journal "$JOURNAL")
           code=0
           if [[ -n "$BWS_ACCESS_TOKEN" ]]; then
-            ./pubkit secrets run -- ./pubkit "${args[@]}" || code=$?
+            ./pubsec run -- ./pubkit "${args[@]}" || code=$?
           else
             unset BWS_ACCESS_TOKEN
             ./pubkit "${args[@]}" || code=$?
