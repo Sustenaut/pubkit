@@ -280,7 +280,9 @@ def deploy_block(repo):
     (repo / "pubkit.json").write_text(json.dumps(config, indent=2) + "\n")
 
 
-@then(parsers.parse('"{path}" lists the pubsec of deploy.providers by its wheel'))
+@then(parsers.parse('"{path}" lists the pubsec and pubdeploy of deploy.providers by their wheels'))
 def lists_provider(repo, path):
-    (provider,) = json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"]
-    assert f"pubsec @ {provider['wheel']}" in (repo / path).read_text().splitlines()
+    listed = {p["distribution"]: p for p in json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"]}
+    assert set(listed) == {"pubsec", "pubdeploy"}
+    lines = (repo / path).read_text().splitlines()
+    assert f"pubsec @ {listed['pubsec']['wheel']}" in lines and f"pubdeploy @ {listed['pubdeploy']['wheel']}" in lines

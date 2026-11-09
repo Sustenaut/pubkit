@@ -53,11 +53,16 @@ PUBREL_PIN = "0.6.1"
 PUBREL_COMMIT = "5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc"
 # The oldest pubsec this pubkit works with, and its wheel's sha256: the floor.
 # A repository's deploy.providers pins its own pubsec, which `pubkit bump`
-# moves to the latest release; sync adds the floor where none is listed and
+# (pubdeploy's hook) moves to the latest release; sync adds the floor where none is listed and
 # moves one below it up, and sync --check fails below it. It moves only when
 # pubkit needs a newer pubsec, such as for a change to the provider contract.
 PUBSEC_FLOOR = ("0.1.2", "88a68ffd252b49289ae02d0a9f629f3e0f0832c921cb8ee0f1301f958527de17")
 PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
+# The oldest pubdeploy this pubkit works with, the same way: the deploy walk,
+# whose sustenaut.sync and sustenaut.bump hooks pubkit's sync and bump call.
+PUBDEPLOY_FLOOR = ("0.1.0", "2748a0bd8d9f5d12e7f99dd3f9f71ce84fe7281c7df78799755890fe81ba62af")
+PUBDEPLOY_WHEEL = "https://github.com/Sustenaut/pubdeploy/releases/download/v{0}/pubdeploy-{0}-py3-none-any.whl"
+FLOORS = {"pubsec": (*PUBSEC_FLOOR, PUBSEC_WHEEL), "pubdeploy": (*PUBDEPLOY_FLOOR, PUBDEPLOY_WHEEL)}
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")

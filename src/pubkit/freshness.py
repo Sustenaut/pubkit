@@ -112,10 +112,10 @@ def bump(root: Path) -> int:
     """Move this repository to this pubkit: managed files, lock, workflow pins."""
     from .cli import lock, sync  # noqa: PLC0415
 
-    from .deploy.providers import bump as bump_providers  # noqa: PLC0415
-    from .deploy.units import K8S_DEPLOY, WORKFLOW_RUN, release, retrigger  # noqa: PLC0415
-
-    for line in bump_providers(root):
+    # What installed packages move (pubdeploy's: deploy.providers, and the
+    # uses of its workflows), before sync writes the launchers from them.
+    from .hooks import bump as bump_hooks  # noqa: PLC0415
+    for line in bump_hooks(root):
         print(line)
     sync(root, check=False)
     lock(root)
@@ -123,10 +123,6 @@ def bump(root: Path) -> int:
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
         new = repin(PUBKIT_PIN, text, calls, __version__, commit)
-        before, after = K8S_DEPLOY.search(text), K8S_DEPLOY.search(new)
-        if before and after and release(before["version"]) < WORKFLOW_RUN <= release(after["version"]):
-            # k8s-deploy.yml from 0.31.0 deploys what a CI run tested: started by workflow_run.
-            new = retrigger(new)
         if new != text:
             path.write_text(new, encoding="utf-8")
             print(f"updated  {path.relative_to(root)} (pubkit@{ref(__version__, commit)})")

@@ -1,8 +1,8 @@
 """What pubkit reads about secrets, never a value: pubkit.json's `github_app`
 and `secrets` blocks, which name the values a repository needs and where they
 go on GitHub, and its `signing_keys` block, which names each signing key and
-where it is backed up. `pubkit sync --check` validates them, and the deploy
-walk implies its github.* needs from them (deploy/implied.py).
+where it is backed up. `pubkit sync --check` validates them, and pubdeploy's
+walk implies its github.* needs from them, with its own copy of plan.
 
 The commands that send, write or back up those values are pubsec's (`./pubsec
 app-secrets`, `github-app create`, `signing-key backup`), which keep their

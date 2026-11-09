@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Managed by pubkit {version}: `pubkit sync` rewrites this file, and
+# `pubkit sync --check` fails when it differs.
+#
+# Run this repository's pinned pubdeploy, the deploy walk: what pubkit.json's
+# deploy block says the service needs, whether it has it, and making it.
+#
+#   ./with-secrets ./pubdeploy walk --fulfil
+#   ./pubdeploy check --offline
+#   ./pubdeploy types
+#
+# The release is deploy.providers' pubdeploy, or the oldest pubkit {version}
+# works with where it lists none, or an older one, and it runs with every
+# other deploy.providers wheel, so their need types load. Each wheel is
+# fetched once into the user's cache (from the wheel mirror, when
+# pubkit.json names one and GitHub fails) and checked against its sha256 on
+# every run, and uvx runs that file; nothing is installed into the
+# repository or the system. pubdeploy runs in the repository's root, where
+# pubkit.json is, from whichever directory this is called.
+set -euo pipefail
+
+if ! command -v uvx >/dev/null 2>&1; then
+  echo "pubdeploy: ./pubdeploy runs pubdeploy with uv, which is not installed: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+  exit 127
+fi
+
+cd "$(dirname "$0")"
+{pubdeploy}exec uvx --from "$fetched" ${with[@]+"${with[@]}"} pubdeploy "$@"
