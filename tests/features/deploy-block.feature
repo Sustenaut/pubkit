@@ -172,14 +172,22 @@ Feature: pubkit sync --check checks pubkit.json's deploy block
     When I run pubkit "deploy" "types"
     Then it succeeds
     And the listing shows "example.thing" graded "none", from "example-needs", taking "size?"
-    And the listing shows "k8s.secret" graded "auto", from "pubkit", taking "keys?, shapes?"
+    And the listing shows "k8s.secret" graded "auto", from "pubsec", taking "keys?, shapes?"
+    And the listing shows "k8s.namespace" graded "auto", from "pubkit", taking "-"
     And it prints "20 types; every need also takes type, name, after and unit"
 
   Scenario: A package offering a type pubkit has is left out, naming both
+    Given the package "example-needs" offers the need type "k8s.namespace"
+    When I run pubkit "deploy" "types"
+    Then it succeeds
+    And stderr mentions "sustenaut.needs entry point k8s.namespace (example_needs:K8S_NAMESPACE, from example-needs) offers k8s.namespace, which pubkit offers too; example-needs's is left out"
+    And it prints "19 types"
+
+  Scenario: A package offering a type pubsec has is left out, naming both
     Given the package "example-needs" offers the need type "k8s.secret"
     When I run pubkit "deploy" "types"
     Then it succeeds
-    And stderr mentions "sustenaut.needs entry point k8s.secret (example_needs:K8S_SECRET, from example-needs) offers k8s.secret, which pubkit offers too; example-needs's is left out"
+    And stderr mentions "offers k8s.secret, which pubsec offers too; example-needs's is left out"
     And it prints "19 types"
 
   Scenario Outline: A need type a package offers is checked as it loads

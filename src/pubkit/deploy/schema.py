@@ -175,6 +175,10 @@ def need_problems(entry: Any, i: int, types: dict[str, NeedType], root: Path,
     """What is wrong with one need as written."""
     kind = types.get(entry["type"])
     if kind is None:
+        from .registry import PUBSEC, PUBSEC_TYPES  # noqa: PLC0415
+        if entry["type"] in PUBSEC_TYPES and PUBSEC not in (providers or []):
+            return [f"deploy: needs[{i}]: {entry['type']} is {PUBSEC}'s: list {PUBSEC} in deploy.providers, "
+                    f"as `pubkit sync` does, and run ./pubkit, which runs it"]
         if providers:
             return [f"deploy: needs[{i}]: {entry['type']} is no type of need pubkit or an installed package "
                     f"offers; it would be {listed(providers, 'or')}'s, of deploy.providers, which ./pubkit runs "

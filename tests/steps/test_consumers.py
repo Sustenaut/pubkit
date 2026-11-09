@@ -35,6 +35,7 @@ DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google
 # pubkit's own CI, which it does not ship to anyone, runs the integrations scan,
 # and its nightly posts to Slack through the integrations command.
 TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
+         ("src/pubkit/new.py", "Sustenaut/pubsec"),
          (".github/workflows/integrations.yml", "Sustenaut/integrations"),
          (".github/nightly/update.sh", "Sustenaut/integrations")}
 ALLOWED = TOOLS
@@ -107,7 +108,7 @@ EXAMPLE_HOSTS = re.compile(r"(?:^|\.)example\.(?:eu|com|org|net)$")
 TOOL_HOSTS = {"github.com", "json-schema.org", "quay.io", "ghcr.io"}
 TOOL_DOMAINS = (".k8s.io", ".iam.gserviceaccount.com")  # Kubernetes' API groups, Google's service accounts
 OWNER = re.compile(r"(?i)\b(sustenaut|schryer)\b[-.\w]*")
-OWNER_NAMES = {"sustenaut.needs", "sustenaut-app", "Sustenaut/pubkit"}
+OWNER_NAMES = {"sustenaut.needs", "sustenaut.walk", "sustenaut-app", "Sustenaut/pubkit"}
 
 
 def consumer_names(text: str) -> set[str]:

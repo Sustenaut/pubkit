@@ -183,7 +183,7 @@ Feature: pubkit deploy check walks every need, and changes nothing
     Given GitHub holds no secret "EXAMPLE_TOKEN"
     When I run pubkit "deploy" "check"
     Then "github.secret:EXAMPLE_TOKEN" is missing
-    And it prints "put example-token in Bitwarden, then ./with-secrets ./pubkit app-secrets"
+    And it prints "put example-token in Bitwarden, then ./with-secrets ./pubsec app-secrets"
 
   Scenario: A variable that differs from Bitwarden's is drift, and neither value is shown
     Given Bitwarden's "example-user" is another value

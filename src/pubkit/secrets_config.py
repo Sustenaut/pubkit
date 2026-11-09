@@ -1,43 +1,20 @@
-"""`pubkit app-secrets`: send what this repository's pubkit.json names to it.
+"""What pubkit reads about secrets, never a value: pubkit.json's `github_app`
+and `secrets` blocks, which name the values a repository needs and where they
+go on GitHub, and its `signing_keys` block, which names each signing key and
+where it is backed up. `pubkit sync --check` validates them, and the deploy
+walk implies its github.* needs from them (deploy/implied.py).
 
-A repository names the values, so pubkit names nothing of anyone's. `github_app`
-is one GitHub App's three values, or a list of apps; `secrets` is any others:
-
-    "github_app": {
-      "id":              {"from": "some-app-id", "to": "SOME_APP_ID"},
-      "installation_id": {"from": "some-app-installation-id", "to": "SOME_APP_INSTALLATION_ID"},
-      "key":             {"from": "some-app-key", "to": "SOME_APP_KEY"}
-    },
-    "secrets": [
-      {"from": "some-token", "to": "SOME_TOKEN", "kind": "secret"},
-      {"from": "some-user", "to": "SOME_USER", "kind": "variable"},
-      {"from": "some-deploy-key", "to": "SOME_DEPLOY_KEY", "kind": "secret", "environment": "some-env"}
-    ]
-
-`from` is the secret's name in the Bitwarden project ./with-secrets reads, and
-`to` its name on GitHub. An app's id and installation id go as variables and its
-key as a secret; `kind` says for the others, and `environment`, if given, names the
-GitHub environment one goes in, which must exist. They all go to the repository
-`origin` points at and no other. Run it through with-secrets, which puts the
-project's secrets in its environment:
-
-    ./with-secrets ./pubkit app-secrets --check   # checks only, sends nothing
-    ./with-secrets ./pubkit app-secrets
-
-It writes nothing until every one is there and looks right, so a mistake never
-leaves a repository half updated. It prints names and lengths, never a value, and
-a value reaches gh on its standard input, never its command line.
+The commands that send, write or back up those values are pubsec's (`./pubsec
+app-secrets`, `github-app create`, `signing-key backup`), which keep their
+own copy of what they need of this: env_name, wrong_value and plan.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
-import subprocess
+from pathlib import Path
 from typing import Any
-
-from .protect import origin
 
 BLOCK = "github_app"
 OTHERS = "secrets"
@@ -138,59 +115,51 @@ def env_name(name: str) -> str:
     return name.upper().replace("-", "_")
 
 
-def send(kind: str, name: str, repo: str, value: str, environment: str | None = None) -> str | None:
-    """Set one secret or variable in `repo` through gh, the value on its standard
-    input; what gh said if it refused, else None."""
-    done = subprocess.run(["gh", kind, "set", name, "-R", repo,
-                           *(["--env", environment] if environment else [])],
-                          input=value, text=True, capture_output=True, check=False)
-    return done.stderr.strip() if done.returncode != 0 else None
+SIGNING_KEYS = "signing_keys"
+NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
 
-def run(config: dict, check: bool) -> int:
-    if BLOCK not in config and OTHERS not in config:
-        print(f"pubkit app-secrets: pubkit.json has no {BLOCK} block or {OTHERS} list")
-        return 1
-    if bad := config_problems(config):
-        print(f"pubkit app-secrets: pubkit.json: {'; '.join(bad)}")
-        return 1
-    items = plan(config)
-    if not items:
-        print(f"pubkit app-secrets: pubkit.json's {OTHERS} list is empty")
-        return 1
-    failed = False
-    values = {}
-    print("Names and values")
-    for item in items:
-        name = item["from"]
-        value = os.environ.get(env_name(name))
-        if value is None:
-            print(f"  MISSING  {name}")
-            failed = True
-        elif (wrong := wrong_value(item["check"], value)) is not None:
-            print(f"  BAD      {name} {wrong} ({len(value)} characters)")
-            failed = True
-        else:
-            print(f"  ok       {name} ({len(value)} characters)")
-            values[name] = value
-    if failed:
-        print("Nothing was written. Fix those in Bitwarden, or the names in pubkit.json, and run "
-              "this through ./with-secrets, which reads them.")
-        return 1
-    if check:
-        print(f"All {len(items)} look right. --check: nothing was written.")
-        return 0
-    repo = origin()
-    for item in items:
-        environment = item.get("environment")
-        where = f"{repo}, environment {environment}" if environment else repo
-        if (refused := send(item["kind"], item["to"], repo, values[item["from"]], environment)) is not None:
-            print(f"  FAILED   {item['kind']} {item['to']} in {where}: {refused}")
-            failed = True
-        else:
-            print(f"  sent     {item['kind']} {item['to']} in {where}")
-    if failed:
-        print("Fix what gh said and run this again: it only overwrites.")
-        return 1
-    print(f"Done: {len(items)} values in {repo}.")
-    return 0
+def signing_key_problems(block: object) -> list[str]:
+    """What is wrong with a pubkit.json `signing_keys` block: one phrase each."""
+    if block is None:
+        return []
+    if not isinstance(block, list):
+        return [f"{SIGNING_KEYS} must be a list"]
+    out: list[str] = []
+    names: set[tuple[str, str]] = set()
+    for i, entry in enumerate(block):
+        where = f"{SIGNING_KEYS}[{i}]"
+        if not isinstance(entry, dict):
+            out.append(f"{where} must be an object")
+            continue
+        out += [f"{where}: {key} is not a setting" for key in sorted(entry.keys() - {"path", "bitwarden"})]
+        path = entry.get("path")
+        if not (isinstance(path, str) and path.strip()):
+            out.append(f"{where} needs a path")
+        elif Path(path).is_absolute():
+            out.append(f"{where}: path is from the repository's root, or starts with ~/: {path}")
+        elif not path.startswith("~/") and ".." in Path(path).parts:
+            out.append(f"{where}: path leaves the repository: {path}")
+        bitwarden = entry.get("bitwarden")
+        if not isinstance(bitwarden, dict):
+            out.append(f"{where} needs bitwarden, with a project and a name")
+            continue
+        out += [f"{where}: bitwarden.{key} is not a setting" for key in sorted(bitwarden.keys() - {"project", "name"})]
+        project, name = bitwarden.get("project"), bitwarden.get("name")
+        if isinstance(project, dict):
+            out += [f"{where}: bitwarden.project.{key} is not a setting"
+                    for key in sorted(project.keys() - {"id", "name"})]
+            if not (isinstance(project.get("id"), str) and UUID.fullmatch(project["id"])):
+                out.append(f"{where}: bitwarden.project.id must be the project's id, a UUID")
+            if "name" in project and not (isinstance(project["name"], str) and project["name"].strip()):
+                out.append(f"{where}: bitwarden.project.name, if given, is the project's name")
+            project = project.get("id")
+        elif not (isinstance(project, str) and project.strip()):
+            out.append(f"{where} needs bitwarden.project: {{\"id\": …, \"name\": …}}, or the project's id or name")
+        if not (isinstance(name, str) and NAME.fullmatch(name)):
+            out.append(f"{where}: bitwarden.name must be a letter, then letters, digits, _ and -")
+        elif (project, name) in names:
+            out.append(f"{where}: {name} is declared twice")
+        names.add((project, name))
+    return out

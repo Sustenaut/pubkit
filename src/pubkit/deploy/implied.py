@@ -27,11 +27,16 @@ from .model import Need, NeedType
 
 # The names the server's deploy job reads (k8s-deploy.yml): one of them in the
 # secrets block means the repository deploys to the server, so it needs all.
+# pubsec's github.deploy-settings keeps the same table (pubsec/needs/github.py),
+# which checks and sets them: a change to one is made in both.
 DEPLOY_SETTINGS = {"SUSTENAUT_SERVER": "variable", "SUSTENAUT_KNOWN_HOSTS": "variable",
                    "SUSTENAUT_DEPLOY_SSH_KEY": "secret", "TS_GH_OAUTH_CLIENT_ID": "secret",
                    "TS_GH_OAUTH_SECRET": "secret"}
 SERVER_NAMES = ("SUSTENAUT_SERVER", "SUSTENAUT_KNOWN_HOSTS", "SUSTENAUT_DEPLOY_SSH_KEY")
 COMMON = ("type", "name", "after", "unit")
+# The shapes the manifests ask of a value (pubkit.k8s), by the name a
+# k8s.secret need gives the shape, which pubsec's type checks.
+SHAPE_NAMES = {k8s.COOKIE_SECRET.what: "oauth2-proxy-cookie"}
 
 
 def github_name(entry: dict[str, Any]) -> str:
@@ -43,14 +48,13 @@ def manifest_secrets(found: k8s.Found, namespace: str) -> dict[str, dict[str, An
     """Each Secret the manifests read in `namespace` and do not hold, with
     the keys and shapes its required references name. A Secret every
     reference to which is optional is left out."""
-    from .types.k8s import shape_name  # noqa: PLC0415
     out: dict[str, dict[str, Any]] = {}
     for n in found.needs:
         if n.optional or n.namespace != namespace or (n.namespace, n.secret) in found.held:
             continue
         entry = out.setdefault(n.secret, {"keys": [], "shapes": {}})
         entry["keys"] = sorted(set(entry["keys"]) | set(n.keys))
-        entry["shapes"] |= {key: name for key, shape in n.shapes.items() if (name := shape_name(shape))}
+        entry["shapes"] |= {key: name for key, shape in n.shapes.items() if (name := SHAPE_NAMES.get(shape.what))}
     return out
 
 
@@ -115,7 +119,7 @@ def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, 
     if block.get("gate"):
         out.add("github.gate", ns, {"variable": block["gate"]}, "gate")
 
-    from ..app_secrets import BLOCK as APP, OTHERS, config_problems, plan  # noqa: PLC0415
+    from ..secrets_config import BLOCK as APP, OTHERS, config_problems, plan  # noqa: PLC0415
     if (APP in config or OTHERS in config) and not config_problems(config):
         for item in plan(config):
             params = {k: item[k] for k in ("from", "to", "environment") if k in item}
@@ -141,6 +145,8 @@ def build(config: dict[str, Any], types: dict[str, NeedType], root: Any = None, 
     if found is not None:
         for name, params in manifest_secrets(found, ns).items():
             out.add("k8s.secret", name, params, "manifests")
+    from .registry import lacking  # noqa: PLC0415
+    problems += lacking(out.needs.values(), types)
     return out.needs, problems
 
 

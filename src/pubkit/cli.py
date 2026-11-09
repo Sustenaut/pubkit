@@ -21,12 +21,7 @@
     pubkit state --check [FILE]
     pubkit state --repos-for board|govern [FILE]
     pubkit board-publish --url URL --tenant TENANT [--file FILE]
-    pubkit app-secrets [--check]
     pubkit variables --check|--apply [--state FILE] [--repos FILE | REPO...]
-    pubkit secrets run [--cwd DIR] -- COMMAND [ARGS...]
-    pubkit github-app create [--replace] [--dry-run] MANIFEST
-    pubkit service-account-key create --account EMAIL --secret NAME [--bitwarden-project NAME] [--replace] [--dry-run]
-    pubkit signing-key backup [--under DIR] [--dry-run]
     pubkit dns check ZONE [--record NAME/TYPE...]
     pubkit dns moves < STATE.json
     pubkit board --out DIR --repos FILE [--rules FILE]
@@ -35,6 +30,11 @@
     pubkit deploy walk [--fulfil] [--yes] [--unit NAME] [--kubectl CMD] [--server HOST] [--zones PATH] [--journal URL] [--json]
     pubkit deploy check [--offline] [--json] [--unit NAME] [--kubectl CMD] [--server HOST] [--zones PATH] [--namespace NS]
     pubkit deploy types
+
+Deprecated, each now ./pubsec with the same arguments, and removed in the
+next minor: secrets run, app-secrets, github-app create,
+service-account-key create, signing-key backup. Each prints the line that
+says so and exits 2.
 
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
@@ -64,6 +64,8 @@ from . import __version__
 from .plugin import bin_var
 
 KINDS = ("rust", "utility", "service")
+# The commands that hold a secret, pubsec's now: each prints where it went.
+MOVED = ("app-secrets", "github-app", "service-account-key", "signing-key")
 # Kinds pubkit no longer has, and what each became. Not accepted: a
 # repository says which it is in one way only.
 RENAMED_KINDS = {"python": "utility", "python-utility": "utility"}
@@ -76,11 +78,13 @@ MANAGED = {
     "utility": [],
     # A private repository that deploys: the one secrets wrapper every
     # service runs its secret-needing commands through.
-    "service": ["with-secrets"],
+    "service": ["with-secrets", "pubsec"],
 }
 # Managed files that are programs, written executable.
-EXECUTABLE = {"with-secrets", "pubkit", "tests/install-lock"}
+EXECUTABLE = {"with-secrets", "pubkit", "pubsec", "tests/install-lock"}
 WITH_SECRETS = "with-secrets"
+# The pinned pubsec, which ./with-secrets runs and whose types the deploy walk loads.
+PUBSEC = "pubsec"
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
@@ -221,10 +225,14 @@ def values(config: dict[str, str]) -> dict[str, str]:
         launch = 'exec uvx --from "$from" '
     else:
         launch = f'exec uvx --from "https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl" '
+    from .deploy.providers import launched as pubsec  # noqa: PLC0415
+    wheel = pubsec(config)
     return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
             "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
             "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
-            "pypi": mirrors(config).get("pypi", "")}
+            "pypi": mirrors(config).get("pypi", ""),
+            "pubsec": fetch + f"\nfetch {shlex.quote(wheel['wheel'])} {shlex.quote(wheel['sha256'])} providers "
+                              f"deploy.providers\n"}
 
 
 def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,
@@ -299,11 +307,11 @@ def sync(root: Path, check: bool) -> int:
         except ValueError as e:
             sys.exit(f"pubkit: {e}")
     if "signing_keys" in config:
-        from .signing_keys import problems as key_problems  # noqa: PLC0415
+        from .secrets_config import signing_key_problems as key_problems  # noqa: PLC0415
         if bad := key_problems(config["signing_keys"]):
             sys.exit(f"pubkit: {CONFIG}: {'; '.join(bad)}")
     if "github_app" in config or "secrets" in config:
-        from .app_secrets import config_problems  # noqa: PLC0415
+        from .secrets_config import config_problems  # noqa: PLC0415
         if bad := config_problems(config):
             sys.exit(f"pubkit: {CONFIG}: {'; '.join(bad)}")
     if "variables" in config:
@@ -312,9 +320,17 @@ def sync(root: Path, check: bool) -> int:
             sys.exit(f"pubkit: {CONFIG}'s variables block: {'; '.join(bad)}")
     deploy_failed = False
     if "deploy" in config:
+        # pubsec, whose types the walk loads, in deploy.providers at this pubkit's pin.
+        from .deploy.providers import ensure  # noqa: PLC0415
+        lines, deploy_failed = ensure(root, config, check)
+        for line in lines:
+            print(line, file=sys.stderr if check else sys.stdout)
+        if lines and not check:
+            config = read_config(root)
         # The block, and the offline walk: the manifests agree with the needs.
         from .deploy import offline_lines  # noqa: PLC0415
-        lines, deploy_failed = offline_lines(root, config)
+        lines, offline_failed = offline_lines(root, config)
+        deploy_failed = deploy_failed or offline_failed
         for line in lines:
             print(line, file=sys.stderr)
         # The scheduled walk: seeded once, the repository's own from then on.
@@ -332,10 +348,14 @@ def sync(root: Path, check: bool) -> int:
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
     from .ci import INTEGRATIONS, declared, generated as workflows, leftovers, review_licenses  # noqa: PLC0415
     owned = managed(kind)
-    # Any repository with a with-secrets.json runs it through the managed with-secrets.
+    # Any repository with a with-secrets.json runs it through the managed
+    # with-secrets, and that, or a deploy block, through ./pubsec.
     if WITH_SECRETS not in owned and (root / f"{WITH_SECRETS}.json").is_file():
         owned = [*owned, WITH_SECRETS]
         every = {**every, WITH_SECRETS: templates("service", ("service",))[WITH_SECRETS]}
+    if PUBSEC not in owned and (WITH_SECRETS in owned or "deploy" in config):
+        owned = [*owned, PUBSEC]
+        every = {**every, PUBSEC: templates("service", ("service",))[PUBSEC]}
     wanted = [(path, render(every[path], values(config))) for path in owned]
     wanted += workflows(config, root)
     if (generated := dependabot(config)) is not None:
@@ -580,10 +600,11 @@ def main(argv: list[str] | None = None) -> int:
         # Its own parser: `run` passes everything after -- to the command.
         from .cache import main as cache
         return cache(given[1:])
-    if given[:1] == ["secrets"]:
-        # The same: everything after -- is the command, with its own options.
-        from .secrets import main as secrets
-        return secrets(given[1:])
+    if given[:1] in (["secrets"], *([c] for c in MOVED)):
+        # Moved to pubsec: say where, whatever the arguments.
+        print(f"pubkit: this is now ./pubsec {' '.join(given[1:] if given[0] == 'secrets' else given)}; "
+              "run pubkit sync to get the launcher", file=sys.stderr)
+        return 2
     if given[:1] == ["k8s"]:
         # Its own parser, in a file a server can run without pubkit.
         from .k8s import main as k8s
@@ -595,8 +616,8 @@ def main(argv: list[str] | None = None) -> int:
                                       "(pubkit cache --help)")
     commands.add_parser("k8s", help="check the Secrets rendered manifests read before a deploy, or show "
                                     "why a rollout failed (pubkit k8s --help)")
-    commands.add_parser("secrets", help="run one command with with-secrets.json's Bitwarden secrets in its "
-                                        "environment: secrets run [--cwd DIR] -- COMMAND")
+    for moved in ("secrets", *MOVED):
+        commands.add_parser(moved, help="deprecated: now ./pubsec, with the same arguments")
     p = commands.add_parser("init", help="write the shared files into this repository")
     p.add_argument("--kind", choices=KINDS, required=True)
     p.add_argument("--bin", help="the program under test, for <NAME>_BIN_DIR")
@@ -711,9 +732,6 @@ def main(argv: list[str] | None = None) -> int:
     what.add_argument("--repos-for", choices=("board", "govern"), metavar="ROLE",
                       help="print the repos file for a role, board or govern")
     p.add_argument("file", nargs="?", type=Path, default=Path("state.json"), metavar="FILE")
-    p = commands.add_parser("app-secrets", help="send the secrets this repository's pubkit.json "
-                                                "names to it, through ./with-secrets")
-    p.add_argument("--check", action="store_true", help="check the values, and send nothing")
     p = commands.add_parser("variables", help="keep repositories' GitHub variables to the values "
                                               "a state file gives them")
     what = p.add_mutually_exclusive_group(required=True)
@@ -727,36 +745,6 @@ def main(argv: list[str] | None = None) -> int:
                    help="the repos file: act on those it lists that the state gives variables")
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="NAME or OWNER/NAME; by default every repository the state gives variables")
-    p = commands.add_parser("github-app", help="make a GitHub App from a manifest, and put its "
-                                               "values in Bitwarden")
-    github_app = p.add_subparsers(dest="github_app_command", required=True)
-    p = github_app.add_parser("create", help="go through GitHub's app-manifest flow, in a browser, "
-                                             "then write the app's id, key and installation id")
-    p.add_argument("manifest", type=Path, metavar="MANIFEST",
-                   help="the app's manifest, with a pubkit section naming its owner, "
-                        "Bitwarden project and secret prefix")
-    p.add_argument("--replace", action="store_true",
-                   help="overwrite secrets that already have those names, instead of refusing")
-    p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
-    p = commands.add_parser("service-account-key", help="make a Google Cloud service account key, and put it "
-                                                        "in Bitwarden, with no file or command line holding it")
-    service_account_key = p.add_subparsers(dest="service_account_key_command", required=True)
-    p = service_account_key.add_parser("create", help="make a new key beside the account's others, and write it "
-                                                      "to a secret")
-    p.add_argument("--account", required=True, metavar="EMAIL", help="the service account")
-    p.add_argument("--secret", required=True, metavar="NAME", help="the secret to write")
-    p.add_argument("--bitwarden-project", metavar="NAME",
-                   help="the Bitwarden project; by default, the one with-secrets.json names")
-    p.add_argument("--replace", action="store_true",
-                   help="overwrite a secret that already has that name, instead of refusing")
-    p.add_argument("--dry-run", action="store_true", help="show the plan, and do nothing")
-    p = commands.add_parser("signing-key", help="back up the signing keys pubkit.json declares to Bitwarden")
-    signing_key = p.add_subparsers(dest="signing_key_command", required=True)
-    p = signing_key.add_parser("backup", help="write each declared key on this machine that its Bitwarden "
-                                              "project lacks, never overwriting one")
-    p.add_argument("--under", type=Path, metavar="DIR",
-                   help="every repository directly under DIR, not this one")
-    p.add_argument("--dry-run", action="store_true", help="say what would be written, and ask for nothing")
     p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
     dns = p.add_subparsers(dest="dns_command", required=True)
     p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
@@ -867,9 +855,6 @@ def main(argv: list[str] | None = None) -> int:
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return protect(args.repos, args.check, args.require, tags=args.tags,
                        queue=args.queue, repos_file=repos_file)
-    if args.command == "app-secrets":
-        from .app_secrets import run as app_secrets
-        return app_secrets(read_config(root), args.check)
     if args.command == "variables":
         from .paths import confined
         from .variables import run as variables
@@ -877,14 +862,6 @@ def main(argv: list[str] | None = None) -> int:
             sys.exit("pubkit variables: --repos takes the place of naming them")
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return variables(confined(args.state, "the state file"), args.repos, args.apply, repos_file)
-    if args.command == "github-app":
-        from .github_app import run as github_app_run
-        from .paths import confined
-        return github_app_run(confined(args.manifest, "the manifest"), args.replace, args.dry_run)
-    if args.command == "service-account-key":
-        from .service_account_key import run as service_account_key_run
-        return service_account_key_run(Path.cwd(), args.account, args.secret, args.bitwarden_project,
-                                       args.replace, args.dry_run)
     if args.command == "state":
         from .paths import confined
         from .state import check, repos_for
@@ -903,9 +880,6 @@ def main(argv: list[str] | None = None) -> int:
                                     ("record", args.record), ("repos", args.repos))}
         return board(confined(args.out, "the --out directory"),
                      files["rules"], files["replay"], files["record"], files["repos"])
-    if args.command == "signing-key":
-        from .signing_keys import run as signing_key_backup
-        return signing_key_backup(args.under.expanduser() if args.under else None, args.dry_run)
     if args.command == "deploy" and args.deploy_command == "types":
         from .deploy import run_types
         return run_types()

@@ -1,17 +1,14 @@
-"""k8s.namespace, k8s.secret, k8s.secrets-declared, k8s.manifests and
-k8s.cronjob: what the cluster must hold, read through kubectl, and what the
-rendered manifests read, which needs no cluster. They use pubkit.k8s, which
-needs nothing of this package's.
+"""k8s.namespace, k8s.secrets-declared, k8s.manifests and k8s.cronjob:
+what the cluster must hold, read through kubectl, and what the rendered
+manifests read, which needs no cluster. They use pubkit.k8s, which needs
+nothing of this package's. k8s.secret, which reads a Secret's values and
+makes one from Bitwarden's, is pubsec's.
 
 A fulfil writes through the kubectl channel or runs on the server, so each
-needs the admin channel or the plane: a value reaches kubectl as a Secret
-manifest on its standard input, never in argv or a file."""
+needs the admin channel or the plane."""
 
 from __future__ import annotations
 
-import base64
-import binascii
-import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -20,38 +17,8 @@ from typing import Any
 import yaml
 
 from ... import k8s
-from ..model import Context, Need, Ran, Result, Stop
-from . import Base, failed, kubectl_json, kubectl_refused, last_success, not_found, restart, run_job, schema, secret_of
-
-KEYS = {"type": "array", "items": {"type": "string", "pattern": r"^[-._a-zA-Z0-9]{1,253}$"},
-        "x-phrase": "must list the Secret's keys"}
-
-
-def hex_32(value: bytes) -> str | None:
-    if re.fullmatch(rb"[0-9a-f]{64}", value):
-        return None
-    return f"{len(value)} bytes; it must be 64 lower-case hex digits, 32 bytes"
-
-
-def base64_32(value: bytes) -> str | None:
-    try:
-        decoded = base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError):
-        return f"{len(value)} bytes, not base64; it must be base64 of 32 bytes"
-    if len(decoded) != 32:
-        return f"{len(value)} bytes, base64 of {len(decoded)} bytes; it must be base64 of 32 bytes"
-    return None
-
-
-# The shapes a value may be required to have, by the name a need gives.
-SHAPES = {"oauth2-proxy-cookie": k8s.COOKIE_SECRET,
-          "hex-32": k8s.Shape("32 bytes as hex", hex_32),
-          "base64-32": k8s.Shape("32 bytes as base64", base64_32)}
-SHAPE = {"enum": sorted(SHAPES)}
-
-
-def shape_name(shape: k8s.Shape) -> str | None:
-    return next((name for name, s in SHAPES.items() if s is shape), None)
+from ..model import Context, Need, Result, Stop
+from . import Base, failed, kubectl_json, kubectl_refused, last_success, not_found, run_job, schema
 
 
 class Namespace(Base):
@@ -98,128 +65,6 @@ class Namespace(Base):
         if missing:
             return Result("missing", f"namespace {ns} has no {', '.join(missing)}", fix=fix)
         return Result("ready", f"namespace {ns} is there, with the deploy service account and its role")
-
-
-class Secret(Base):
-    """A Secret in the namespace, with its keys, and values of a known shape having it."""
-    type = "k8s.secret"
-    grade = "auto"
-    budget = 5.0
-    fulfil_budget = 60.0
-    needs_of_context = ("kubectl-write",)
-    schema = schema({"keys": KEYS, "shapes": {"type": "object", "additionalProperties": SHAPE,
-                                              "x-phrase": "must give a shape by key"}})
-
-    def fillers(self, need: Need, ctx: Context) -> list[Need]:
-        """The needs whose secret fills this Secret, in the plan."""
-        return [n for n in ctx.needs.values() if (secret_of(n) or {}).get("name") == need.name]
-
-    def made_from(self, need: Need, ctx: Context) -> list[str]:
-        """The needs it is made from: when a fulfil changes one's value, the walk makes it again."""
-        return [n.id for n in self.fillers(need, ctx)]
-
-    def action(self, need: Need, ctx: Context) -> str:
-        sources = ", ".join(n.id for n in self.fillers(need, ctx))
-        return f"apply Secret {need.name} in {ctx.namespace} from {sources}, and restart what reads it"
-
-    def check(self, need: Need, ctx: Context) -> Result:
-        result = self.found(need, ctx)
-        # Made only from the needs that fill it, and only when each gives its value.
-        fillers = self.fillers(need, ctx)
-        result.fixable = bool(fillers) and all(callable(getattr(ctx.types.get(n.type), "value", None))
-                                               for n in fillers)
-        return result
-
-    def exists(self, need: Need, ctx: Context, source: str) -> Result:
-        """Over the deploy channel, which shows no Secret's data: its key names,
-        as the server's `secret-keys` verb lists them, or, where the server has
-        no such verb yet, whether it is there by name alone."""
-        ns, name = ctx.namespace, need.name
-        missing = Result("missing", f"Secret {name} is not in {ns}", fix=f"make it in {ns}, from what fills it ({source})")
-        ran = ctx.kubectl(["-n", ns, "secret-keys", name])
-        if ran.returncode == 0:
-            try:
-                keys = json.loads(ran.stdout)
-            except ValueError:
-                keys = None
-            if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
-                return Result("unknown", f"the server's secret-keys did not list Secret {name}'s keys",
-                              fix="see the server's deploy program")
-            lacking = [k for k in need.params.get("keys", []) if k not in keys]
-            if lacking:
-                return Result("drift", f"Secret {name} has no key {lacking[0]}, which need {need.id} reads",
-                              fix=f"put the right value in Secret {name} in {ns}, from what fills it ({source})",
-                              details=[f"Secret {name} has no key {k}" for k in lacking])
-            return Result("ready", f"Secret {name} in {ns} has keys {', '.join(sorted(keys))}; their values "
-                                   f"are not checked over the deploy channel")
-        if not_found(ran):
-            return missing
-        if ran.returncode != 2:
-            return kubectl_refused(Ran(ran.returncode, "", ran.stderr), ns, "Secrets")
-        ran = ctx.kubectl(["-n", ns, "get", "secret", name, "-o", "name"])
-        if ran.returncode == 0 and ran.stdout.strip() == f"secret/{name}":
-            return Result("ready", f"Secret {name} is in {ns}",
-                          details=["keys not checked on this channel: the server has no secret-keys verb"])
-        if not_found(ran):
-            return missing
-        return kubectl_refused(Ran(ran.returncode, "", ran.stderr), ns, "Secrets")
-
-    def fulfil(self, need: Need, ctx: Context) -> Result:
-        ns, name = ctx.namespace, need.name
-        data: dict[str, bytes] = {}
-        sources = []
-        for filler in self.fillers(need, ctx):
-            secret = secret_of(filler) or {}
-            if not secret.get("key"):
-                return Result("missing", f"{filler.id} names no key of Secret {name} to fill",
-                              fix=f"give {filler.id}'s secret a key")
-            value = ctx.types[filler.type].value(filler, ctx)
-            if value is None:
-                return Result("missing", f"{filler.id}'s value is not in this walk",
-                              fix="run the walk through ./with-secrets, which reads Bitwarden")
-            if secret.get("decode") == "base64":
-                try:
-                    value = base64.b64decode(value, validate=True)
-                except (binascii.Error, ValueError):
-                    return Result("drift", f"{filler.id}'s value is not base64, as its secret's decode says",
-                                  fix=f"make {filler.name} again")
-            data[secret["key"]] = value
-            sources.append(filler.id.replace("bitwarden.generated:", "Bitwarden ")
-                           .replace("bitwarden.secret:", "Bitwarden "))
-        if lacking := [k for k in need.params.get("keys", []) if k not in data]:
-            return Result("missing", f"no need fills key {lacking[0]} of Secret {name}",
-                          fix=f"add a need whose secret fills {name} key {lacking[0]}")
-        manifest = json.dumps({"apiVersion": "v1", "kind": "Secret", "type": "Opaque",
-                               "metadata": {"name": name, "namespace": ns},
-                               "data": {k: base64.b64encode(v).decode() for k, v in sorted(data.items())}})
-        ran = ctx.kubectl(["-n", ns, "apply", "-f", "-"], input=manifest.encode())
-        if ran.returncode != 0:
-            return failed(f"kubectl apply of Secret {name} in {ns} failed", ran, tuple(data.values()))
-        size = sum(len(v) for v in data.values())
-        return Result("ready", f"made Secret {name} in {ns} from {', '.join(sources)}, {size} bytes",
-                      details=restart(ctx, name))
-
-    def found(self, need: Need, ctx: Context) -> Result:
-        ns, name = ctx.namespace, need.name
-        source = need.implied_by or "deploy.needs"
-        if ctx.channel == "deploy":
-            return self.exists(need, ctx, source)
-        data = k8s.Cluster([], run=ctx.kubectl).secret(ns, name)
-        if data is None:
-            return Result("missing", f"Secret {name} is not in {ns}",
-                          fix=f"make it in {ns}, from what fills it ({source})")
-        if isinstance(data, str):
-            if "may not read Secrets" in data:
-                return Result("unknown", f"kubectl may not read Secret {name} in {ns}", fix=data)
-            return Result("unknown", f"Secret {name} in {ns} could not be read", fix=data)
-        keys = tuple(need.params.get("keys", []))
-        shapes = {k: SHAPES[s] for k, s in need.params.get("shapes", {}).items()}
-        bad = k8s.check_keys(name, [k8s.Need(ns, name, f"need {need.id}", keys, shapes=shapes)], data)
-        if bad:
-            return Result("drift", bad[0], fix=f"put the right value in Secret {name} in {ns}, "
-                                                f"from what fills it ({source})", details=bad)
-        listed = f" has keys {', '.join(keys)}" if keys else " is there"
-        return Result("ready", f"Secret {name} in {ns}{listed}")
 
 
 class SecretsDeclared(Base):

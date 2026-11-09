@@ -18,7 +18,8 @@ manifest files, and the host against the hosting block. `pubkit sync
 
 `walk --fulfil` then acts (walk.py): it prints the plan, a line per need
 it will act on, waits for a typed `yes` (--yes skips that), asks for a
-Bitwarden write token at a hidden prompt when a need wants one, and visits
+Bitwarden write token when a need wants one (the sustenaut.walk hook,
+pubsec's, asks for it at a hidden prompt), and visits
 the needs again, making each auto one that is missing. A walk from GitHub
 Actions, or with --yes and no terminal, asks for no token, so the needs that
 want one are unknown. The channels kubectl and the server are reached by are
@@ -201,8 +202,7 @@ def context(root: Path, config: dict[str, Any], offline: bool, kubectl_command: 
             zones_file: Path | None = None, namespace: str | None = None, server: str | None = None,
             unit: str | None = None) -> Context:
     """The context `pubkit deploy walk` runs a unit in: the real tools."""
-    from ..app_secrets import send  # noqa: PLC0415
-    from ..protect import gh  # noqa: PLC0415
+    from ..protect import gh, gh_set as send  # noqa: PLC0415
     from .channels import channels  # noqa: PLC0415
     from .units import unit_block  # noqa: PLC0415
     unit = unit or config[BLOCK]["namespace"]
@@ -251,42 +251,31 @@ def offline_lines(root: Path, config: dict[str, Any], ctx: Context | None = None
     return lines, failed
 
 
-class BitwardenWriter:
-    """Writes to the Bitwarden project with a write token, which it keeps
-    only for this process: Bitwarden's SDK takes the value in memory."""
-
-    def __init__(self, token: str, project: str) -> None:
-        self._token, self.project = token, project
-        self._ids: tuple[str, str] | None = None
-
-    def write(self, name: str, value: str, note: str) -> None:
-        from ..bitwarden import ensure, write  # noqa: PLC0415
-        from ..github_app import _listed, bws  # noqa: PLC0415
-        from ..service_account_key import find_project  # noqa: PLC0415
-        if why := ensure():
-            raise RuntimeError(why)
-        if self._ids is None:
-            self._ids = find_project(self._token, self.project)
-        project, organization = self._ids
-        listed = _listed(bws(self._token, "secret", "list", project, "--output", "json", "--color", "no"))
-        found = [s["id"] for s in listed if s.get("key") == name]
-        if len(found) > 1:
-            raise RuntimeError(f"{len(found)} secrets in {self.project} are named {name}: delete all but one")
-        write(self._token, organization, project, name, value, note, found[0] if found else None)
-
-
 def ask(prompt: str) -> str:
     """A typed answer, the prompt on standard error, so --json's output is the document alone."""
     print(prompt, end="", file=sys.stderr, flush=True)
     return sys.stdin.readline().strip()
 
 
-def project_of(root: Path, env: Any) -> str | None:
-    from ..service_account_key import Stop, bitwarden_project  # noqa: PLC0415
-    try:
-        return bitwarden_project(root, env.get("PUBKIT_SECRETS_PROJECT"))
-    except Stop:
-        return None
+# The entry-point group of the hooks a walk calls before it fulfils, such as
+# pubsec's, which asks for the Bitwarden write token and gives the walk its
+# writer: pubkit holds no write token itself.
+WALK_HOOKS = "sustenaut.walk"
+
+
+def prepare(ctx: Context, plan: list[tuple[str, str]], terminal: bool, points: Any = None) -> None:
+    """Call each hook's prepare(ctx, plan, terminal), printing the line it
+    returns. A hook that fails is said, by its name and the error's type
+    alone, and the walk goes on without what it would have given."""
+    from importlib.metadata import entry_points  # noqa: PLC0415
+    for point in sorted(entry_points(group=WALK_HOOKS) if points is None else points, key=lambda p: p.name):
+        try:
+            said = point.load()(ctx, plan, terminal)
+        except Exception as e:  # noqa: BLE001 - a hook's failure is said, not fatal, and holds no value
+            print(f"pubkit: deploy: the {WALK_HOOKS} hook {point.name} failed ({type(e).__name__})", file=sys.stderr)
+            continue
+        if isinstance(said, str) and said:
+            print(said, file=sys.stderr)
 
 
 def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | None, zones: Path | None,
@@ -340,14 +329,11 @@ def run_walk(root: Path, offline: bool, as_json: bool, kubectl_command: str | No
             else:
                 declined = True
                 print("deploy: nothing was fulfilled", file=sys.stderr)
-        writer = None
-        if approved and terminal and any(wants_token(plan, loaded.types, ctx) for ctx, plan in acts):
-            from ..github_app import ask_hidden  # noqa: PLC0415
-            project = project_of(root, env)
-            token = ask_hidden(f"Bitwarden access token with write access to {project} (hidden, and not kept): ")
-            writer = BitwardenWriter(token, project) if token and project else None
+        if approved and terminal:
+            for ctx, plan in acts:
+                if wants_token(plan, loaded.types, ctx):
+                    prepare(ctx, plan, terminal)
         for ctx, journal in walks:
-            ctx.bitwarden_writer = ctx.bitwarden_writer or writer
             unable(journal, loaded.types, ctx, declined)
             act(journal, loaded.types, ctx, {i for u, i in approved if u == ctx.unit})
     documents = [journal.document() for _, journal in walks]

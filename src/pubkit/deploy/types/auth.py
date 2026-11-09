@@ -117,8 +117,12 @@ class SignInClient(Base):
                           fix=f"the approval record is waiting: add it to {approvals or 'the approvals file'} and apply",
                           details=[f"record {record.get('name', '?')} TXT"],
                           fixable=bool(approvals) and (Path(ctx.root) / approvals).is_file(), step="record")
-        from .k8s import Secret  # noqa: PLC0415
-        held = Secret().found(Need("k8s.secret", secret, {"keys": KEYS}), ctx)
+        # The Secret is read by k8s.secret, pubsec's, which alone reads a Secret's values.
+        reader = ctx.types.get("k8s.secret")
+        if reader is None:
+            return Result("unknown", f"Secret {secret} is not looked at without k8s.secret",
+                          fix="list pubsec in deploy.providers, as `pubkit sync` does")
+        held = reader.check(Need("k8s.secret", secret, {"keys": KEYS}), ctx)
         if held.state == "ready":
             return Result("ready", f"the {domain} client is registered, and Secret {secret} has its keys")
         if held.state == "missing":

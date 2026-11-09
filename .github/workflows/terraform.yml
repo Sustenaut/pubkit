@@ -41,7 +41,7 @@
 # that subject alone.
 #
 # With `secrets` (the default), every terraform command runs through the
-# repository's ./pubkit secrets run, which reads its Bitwarden project with the
+# repository's ./pubsec run, which reads its Bitwarden project with the
 # environment's secret BWS_ACCESS_TOKEN (pubkit's README, "Services"); bws is
 # the release's binary, checked against its sha256. Without, terraform runs
 # plainly, and no token is read.
@@ -63,7 +63,7 @@ on:
         type: string
         required: true
       secrets:
-        description: Run terraform through ./pubkit secrets run, with the secret BWS_ACCESS_TOKEN.
+        description: Run terraform through ./pubsec run, with the secret BWS_ACCESS_TOKEN.
         type: boolean
         default: true
       environment:
@@ -130,13 +130,13 @@ jobs:
           fail() { echo "::error::$1"; exit 1; }
           [[ -d "$DIR" ]] || fail "terraform-dir: $DIR is not a directory"
           if [[ "$SECRETS" == true ]]; then
-            [[ -x ./pubkit ]] || fail "secrets: this repository has no ./pubkit to run terraform through"
+            [[ -x ./pubsec ]] || fail "secrets: this repository has no ./pubsec to run terraform through: run pubkit sync"
             [[ "$HAS_TOKEN" == true ]] || fail "secrets: the environment has no secret BWS_ACCESS_TOKEN"
           fi
-          # One command for every terraform call: through ./pubkit secrets
-          # run, or plainly.
+          # One command for every terraform call: through ./pubsec run, or
+          # plainly.
           if [[ "$SECRETS" == true ]]; then
-            run='./pubkit secrets run -- terraform'
+            run='./pubsec run -- terraform'
           else
             run=terraform
           fi

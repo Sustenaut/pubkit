@@ -628,7 +628,7 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
     already listed, by name or by a pattern, leaves the file as it is, byte for byte;
     nothing else is taken out, since something else may need it.
 
-    The one path moved: the with-secrets pubkit writes runs `pubkit secrets run` and
+    The one path moved: the with-secrets pubkit writes runs `./pubsec run` and
     no longer calls bws, so the scan calls a Bitwarden use declared on it stale. Where
     pubkit writes it, such a use names with-secrets.json, which the scan reads, instead."""
     path = root / INTEGRATIONS
