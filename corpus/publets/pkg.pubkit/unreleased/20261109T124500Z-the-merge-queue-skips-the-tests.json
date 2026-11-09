@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "The merge queue skips the tests a pull request's own run already passed on the same files: job-tested, in the queue and on main, looks for a successful run of the queue's workflow (on a pull request or in the queue) whose commit has this commit's tree, following a run that skipped its tests to the run it took them from, and its coverage when not expired. pr.yml starts with tested where the queue runs it, as main.yml does; a pull request's own run, a moved main or a batch of pull requests still tests everything, and a Rust crate's queue.yml is unchanged"
-}

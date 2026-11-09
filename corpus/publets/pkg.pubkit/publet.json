@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.31.3 is released as v0.31.3 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9.",
+      "content": "pubkit 0.32.0 is released as v0.32.0 from commit 0a436c5d805f0f0d296c4ab2130644f9f056412d.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.31.3",
+            "0.32.0",
             "pubkit --version",
-            "pubkit 0.31.3",
-            "v0.31.3",
-            "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+            "pubkit 0.32.0",
+            "v0.32.0",
+            "0a436c5d805f0f0d296c4ab2130644f9f056412d"
           ]
         ]
       },
-      "scope": "the published release v0.31.3 of pubkit",
+      "scope": "the published release v0.32.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+          "revision": "0a436c5d805f0f0d296c4ab2130644f9f056412d"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.31.3 was released on 2026-11-08 from commit 32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9 with these changes.",
+      "content": "pubkit 0.32.0 was released on 2026-11-09 from commit 0a436c5d805f0f0d296c4ab2130644f9f056412d with these changes.",
       "data": {
         "columns": [
           {
@@ -58,27 +58,47 @@
         "rows": [
           [
             "fixed",
-            "CI: the Terraform module job retries terraform init up to three times, caches each module's providers, and no longer cancels the other modules when one fails, so a timed-out provider checksum download from GitHub no longer fails the run"
+            "CI: the reusable workflows try each setup step (make venv, npm ci, a repository's own), each hash-locked install of tests/requirements.lock and pip-audit up to three times, 15 s apart, and the managed pubkit.mk's venv target its install likewise, as pip retries no 504 and GitHub's release downloads sometimes answer one; a finding still fails pip-audit, as it fails each try. pubkit deploy walk --fulfil: a generated secret that is in Bitwarden but misshapen is planned as \"replace NAME (misshapen: why)\", not as generating a new one, so the typed yes knows a value goes. The dependency review leaves the owner's own reusable workflows and actions, which carry no license GitHub reads, out of its license check alone: pubkit sync lists those a repository's workflows call in .github/dependency-review-licenses.txt, of which the review takes only the owner's, and without the file it leaves out pubkit's and pubrel's; advisories still apply to them"
+          ],
+          [
+            "removed",
+            "The commands and need types that hold a secret's value, a write token or a private key are pubsec's (Sustenaut/pubsec): pubkit secrets run, app-secrets, github-app create, service-account-key create and signing-key backup now print the ./pubsec command that replaces each and exit 2, and go in the next minor; bitwarden.secret, bitwarden.generated, gcp.service-account-key, github.secret, github.variable, github.deploy-settings and k8s.secret are no longer built in. pubkit sync writes ./pubsec, which runs the pinned pubsec release, its wheel checked against its sha256, beside ./with-secrets, which now runs ./pubsec run, and lists pubsec in deploy.providers of every repository with a deploy block (sync --check fails without it); deploy-check.yml and terraform.yml run ./pubsec run. The walk asks for no write token itself: it calls each sustenaut.walk hook, prepare(ctx, plan, terminal), and pubsec's asks for it. The provider contract, the Context names a provider's types use, is frozen from this release, as the README's Provider contract section lists it: changing one is a breaking change"
+          ],
+          [
+            "added",
+            "A wheel mirror for when GitHub's release downloads fail: pubkit.json's mirror.wheels names a base that serves each wheel at <base>/f/<sha256>/<file>.whl. The new managed tests/install-lock, which pubkit.mk's venv target and the reusable workflows' hash-locked installs now go through, tries a lock three times and then once more with each GitHub release wheel taken from the mirror, the hashes unchanged; pip-audit's last try reads the locks rewritten the same way, and ./pubkit fetches its own wheel and deploy.providers' wheels from the mirror when GitHub fails, each checked against its sha256. Without the setting, installs only retry and ./pubkit is unchanged"
+          ],
+          [
+            "added",
+            "A provider mirror for Terraform: terraform.yml's init and the service CI's backend-less init are tried three times, 15 s apart, and then, when pubkit.json's mirror.terraform names a Terraform provider network mirror, once more with every provider from it; the module's lock still checks each archive"
+          ],
+          [
+            "added",
+            "tests/install-lock's last try takes every package not pinned by a GitHub release URL from pubkit.json's mirror.pypi, a simple repository index (PEP 503) at <base>/simple/, instead of PyPI, the lock's hashes unchanged; the mirror block takes pypi beside wheels and terraform"
           ],
           [
             "fixed",
-            "pubkit deploy walk: the admin channel keeps one SSH connection for the walk (ControlMaster, its socket in a private directory), opened before the first check, so k8s.namespace, deploy.rollout and the Secrets no longer run out of their budgets on a new connection's second over the tailnet; k8s.namespace's budget is 4 s and deploy.rollout's 8 s, which asks for its three run listings at once; github.deploy-settings asks for its four listings at once, inside its 3 s; and a k8s.secret that is ready by its keys is made again, and its readers restarted, when the walk makes a new value of a need it is made from, so Bitwarden and the cluster no longer differ after a misshapen generated secret is replaced"
+            "The dependabot.yml pubkit sync writes no longer opens pull requests that move the owner's pubkit or pubrel pins: every github-actions entry ignores <owner>/pubkit/* and <owner>/pubrel/*, ahead of any ignores given in security.dependabot.options. Those pins move with pubkit bump, so such a pull request always failed pubkit sync --check"
+          ],
+          [
+            "changed",
+            "The merge queue skips the tests a pull request's own run already passed on the same files: job-tested, in the queue and on main, looks for a successful run of the queue's workflow (on a pull request or in the queue) whose commit has this commit's tree, following a run that skipped its tests to the run it took them from, and its coverage when not expired. pr.yml starts with tested where the queue runs it, as main.yml does; a pull request's own run, a moved main or a batch of pull requests still tests everything, and a Rust crate's queue.yml is unchanged"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.31.3 of pubkit",
+      "scope": "the published release v0.32.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "32deb2d21f8cc4bff2dc0eaf85db89ee071abdd9"
+          "revision": "0a436c5d805f0f0d296c4ab2130644f9f056412d"
         }
       ]
     }
   },
-  "created": "2026-11-08T00:00:00Z",
+  "created": "2026-11-09T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
