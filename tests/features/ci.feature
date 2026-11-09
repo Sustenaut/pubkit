@@ -329,6 +329,15 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And the last lock pinned "pubkit" at the mirror's address for its sha256, with its hash
     And the last lock left "pytest" as it was
 
+  Scenario: With a PyPI mirror, tests/install-lock's last try takes the other packages from its simple index
+    Given a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI
+    And pubkit.json's wheel mirror is "https://storage.example/wheels"
+    And pubkit.json's PyPI mirror is "https://storage.example/pypi"
+    When tests/install-lock runs with a pip that fails every install without an index of its own
+    Then pip was run 4 times, and the install passed
+    And the last install took its packages from "https://storage.example/pypi/simple/"
+    And the last lock pinned "pubkit" at the mirror's address for its sha256, with its hash
+
   Scenario: Without a wheel mirror, tests/install-lock stops after three tries
     Given a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI
     When tests/install-lock runs with a pip that fails every install of a GitHub release URL
@@ -343,7 +352,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | {"wheels": "http://storage.example/wheels"}    |
       | {"wheels": "https://storage.example/wheels/"}  |
       | {"wheels": 3}                                   |
-      | {"pypi": "https://storage.example/pypi"}       |
+      | {"npm": "https://storage.example/npm"}         |
+      | {"pypi": "https://storage.example/pypi/"}      |
       | {"terraform": "https://storage.example/tf/"}   |
       | "https://storage.example/wheels"                |
 

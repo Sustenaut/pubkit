@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "tests/install-lock's last try takes every package not pinned by a GitHub release URL from pubkit.json's mirror.pypi, a simple repository index (PEP 503) at <base>/simple/, instead of PyPI, the lock's hashes unchanged; the mirror block takes pypi beside wheels and terraform"
+}
