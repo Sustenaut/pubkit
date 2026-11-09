@@ -1,4 +1,0 @@
-{
-  "category": "removed",
-  "change": "actions/deploy-ssh leaves pubkit: it is pubdeploy's, whose k8s-deploy.yml calls its own copy from pubdeploy 0.2.0; a workflow of a repository's own that uses Sustenaut/pubkit/actions/deploy-ssh moves to Sustenaut/pubdeploy/actions/deploy-ssh"
-}

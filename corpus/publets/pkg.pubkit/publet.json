@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.33.0 is released as v0.33.0 from commit d770bafe0ec530fa70db65b9ab07ea0d121c2f9a.",
+      "content": "pubkit 0.34.0 is released as v0.34.0 from commit ad3b30b986df0117da0cc4a418c6f5f7ceefa36b.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.33.0",
+            "0.34.0",
             "pubkit --version",
-            "pubkit 0.33.0",
-            "v0.33.0",
-            "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
+            "pubkit 0.34.0",
+            "v0.34.0",
+            "ad3b30b986df0117da0cc4a418c6f5f7ceefa36b"
           ]
         ]
       },
-      "scope": "the published release v0.33.0 of pubkit",
+      "scope": "the published release v0.34.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
+          "revision": "ad3b30b986df0117da0cc4a418c6f5f7ceefa36b"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.33.0 was released on 2026-11-09 from commit d770bafe0ec530fa70db65b9ab07ea0d121c2f9a with these changes.",
+      "content": "pubkit 0.34.0 was released on 2026-11-09 from commit ad3b30b986df0117da0cc4a418c6f5f7ceefa36b with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,35 @@
         ],
         "rows": [
           [
+            "changed",
+            "The nightly's pins calls the sustenaut.bump hooks, as pubkit bump does, so a new pubdeploy or pubsec release reaches each repository's deploy.providers, launchers and lock without a bump by hand; the nightly installs the latest pubdeploy for its hook"
+          ],
+          [
             "removed",
-            "The deploy walk leaves pubkit for pubdeploy (Sustenaut/pubdeploy): pubkit deploy walk, check and types, pubkit k8s preflight and diagnose, k8s-deploy.yml, deploy-check.yml and k8s/components/app are gone, with no stubs; run ./pubdeploy, which pubkit sync writes in a repository with a deploy block, and call pubdeploy's workflows. deploy.providers now lists pubdeploy at pubkit's floor beside pubsec, ./pubkit runs with it, and sync and bump call the new sustenaut.sync and sustenaut.bump hook groups, pubdeploy's being the deploy block's offline check, the scheduled walk's caller, and moving deploy.providers and the uses of pubdeploy's workflows. deploy-ssh stays until pubdeploy calls its own copy"
+            "actions/deploy-ssh leaves pubkit: it is pubdeploy's, whose k8s-deploy.yml calls its own copy from pubdeploy 0.2.0; a workflow of a repository's own that uses Sustenaut/pubkit/actions/deploy-ssh moves to Sustenaut/pubdeploy/actions/deploy-ssh"
+          ],
+          [
+            "changed",
+            "In the merge queue, pr.yml's sonar job is skipped, like the tests, when the pull request's own run already passed on the same tree; main's push still scans it with that run's coverage. A repository whose ruleset requires SonarQube Cloud's \"SonarCloud Code Analysis\" check drops it from protect.checks and runs `pubkit protect`, or its queue runs wait for a check that never comes"
+          ],
+          [
+            "changed",
+            "pubkit pins moves every other repository's reusable workflow that a hand-written workflow pins at a release (OWNER/REPO/.github/workflows/...@) to that repository's latest release, by its tag's commit, except a deploy.providers package's, which its own bump hook moves"
+          ],
+          [
+            "removed",
+            "The commands a control plane runs across many repositories moved to pubfleet, with the same arguments: board, board-publish, state, variables and freshness, with the reusable board.yml and nightly.yml and .github/nightly/; pubkit keeps protect and the repos file, the variables block's shape that sync checks, bump, and the per-repository nightly (pubkit nightly, pins, crates, record)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.33.0 of pubkit",
+      "scope": "the published release v0.34.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "d770bafe0ec530fa70db65b9ab07ea0d121c2f9a"
+          "revision": "ad3b30b986df0117da0cc4a418c6f5f7ceefa36b"
         }
       ]
     }
