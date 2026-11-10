@@ -44,6 +44,18 @@ def ignored(config, ecosystem):
     return [i["dependency-name"] for i in entry.get("ignore", [])]
 
 
+@then(parsers.parse('the "{ecosystem}" entry has "{key}" {value:d}'))
+def entry_has(config, ecosystem, key, value):
+    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+    assert entry[key] == value, entry
+
+
+@then(parsers.parse('the "{ecosystem}" entry has no "{key}"'))
+def entry_lacks(config, ecosystem, key):
+    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+    assert key not in entry, entry
+
+
 @then(parsers.re(r'the "(?P<ecosystem>[\w-]+)" entry ignores (?P<names>.+)'))
 def entry_ignores(config, ecosystem, names):
     assert ignored(config, ecosystem) == re.findall(r'"([^"]+)"', names)

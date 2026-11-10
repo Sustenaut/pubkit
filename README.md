@@ -727,7 +727,7 @@ owner's state file, which pubfleet keeps GitHub to.
 ## The nightly
 
 `pubkit nightly --pubrel V --body FILE`, run in one repository's checkout,
-moves it and its dependencies on to this pubkit, in up to four commits on the
+moves it and its dependencies on to this pubkit, in up to five commits on the
 current branch, and writes the pull request's body. pubfleet's `nightly.yml`
 runs it in each repository a control plane governs, and keeps one pull
 request per repository on its `pubkit-nightly` branch. The commits:
@@ -748,14 +748,26 @@ request per repository on its `pubkit-nightly` branch. The commits:
    moves to its commit. A pin of a pubkit action, workflow or module this
    pubkit does not ship stays where it is, and `sync --check` fails on it
    until it is taken from the repository it moved to;
-2. the other crates' updates (`pubkit crates`) that `cargo vet` covers
+2. every third-party GitHub Action (`pubkit actions`) a hand-written
+   workflow or one of the repository's own composite actions (`action.yml`,
+   outside `node_modules` and `target`) pins by commit with its version in
+   a comment, as `uses: actions/checkout@<commit> # v5.1.0`, moved forward
+   to its repository's latest release, by the commit of its tag. This
+   replaces Dependabot's version updates, whose pull requests can add no
+   pubrel row and get no SonarQube Cloud token, so they failed `pubrel
+   check` and the sonar job. Major releases come too, gated on CI like
+   everything else here. A pin by tag, to a branch (`# main`) or of a
+   pre-release stays, as does one whose latest release or tag cannot be
+   read, with a warning. The workflows `pubkit sync` writes move with
+   pubkit;
+3. the other crates' updates (`pubkit crates`) that `cargo vet` covers
    with an audit, adding no exemption, and that `cargo deny` passes. The
    body lists each update skipped with what `cargo vet suggest` says it
    needs;
-3. the npm packages, each to the newest version its range in
+4. the npm packages, each to the newest version its range in
    `package.json` allows (`npm update --package-lock-only
    --ignore-scripts`);
-4. `tests/requirements.lock`, re-resolved from `requirements.txt` (`pubkit
+5. `tests/requirements.lock`, re-resolved from `requirements.txt` (`pubkit
    lock`).
 
 Each commit regenerates `SUPPLY-CHAIN.md` where there is one and records an
@@ -766,7 +778,7 @@ updated, never a second one opened, by pubfleet's loop.
 
 A repository chooses what its nightly does in `pubkit.json`, per language
 (`rust`, `node`, `python`; each applies where the repository has that
-ecosystem's lock):
+ecosystem's lock), and for the third-party GitHub Actions (`actions`):
 
 ```json
 {
@@ -783,10 +795,11 @@ ecosystem's lock):
 
 | Setting | Default | Off means |
 |---|---|---|
-| `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, leaving the pub* pins alone |
+| `update.<language>` | `true` | the nightly pull request leaves that language's dependencies alone; `"update": false` turns every language off, and the actions, leaving the pub* pins alone |
+| `update.actions` | `true` | the nightly leaves the third-party GitHub Actions alone, and the managed `dependabot.yml` keeps Dependabot's version updates of them |
 | `nightly.pins.crates` | three crates, with a warning | the crates the nightly moves with the pins, whatever `cargo vet` says, rather than one at a time; `[]` is none. `pubkit sync --check` refuses any other key in `nightly` or `nightly.pins` |
 | `security.fuzz.<language>` | `true` | a scheduled run fuzzes as briefly as any other: `rust-ci.yml` runs cargo-fuzz for `fuzz-seconds` instead of `fuzz-seconds-scheduled`, and `python-ci.yml` and `node-ci.yml` give each property test `fuzz-runs` inputs instead of `fuzz-runs-scheduled` (see [Property tests](#property-tests)) |
-| `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out. Every `github-actions` entry ignores the owner's `pubkit/*` and `pubrel/*` workflows and actions, whose pins move with `pubkit bump` alone; ignores in `options` are kept |
+| `security.dependabot` | weekly, `github-actions` | `pubkit sync` writes `.github/dependabot.yml` from `schedule` (`daily`, `weekly` or `monthly`), `ecosystems` (names, at the root, or Dependabot's own `{"package-ecosystem", "directory"}`) and `options` (any other Dependabot setting, on every entry). `false` leaves the file to the repository. The languages are the nightly's to update, so the default leaves them out. Every `github-actions` entry ignores the owner's `pubkit/*` and `pubrel/*` workflows and actions, whose pins move with `pubkit bump` alone; ignores in `options` are kept. While the nightly moves the actions (`update.actions`), every `github-actions` entry also sets `open-pull-requests-limit` to 0: Dependabot opens no version updates of them, and its security updates still come |
 | `security.sonar` | none | `args` adds SonarQube Cloud properties to every sonar job's scan, after the `sonar-args` input; `organization` is the SonarQube Cloud organization key, by default the GitHub owner in lower case |
 
 A setting pubkit does not know stops the nightly with a message, rather

@@ -14,6 +14,20 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
     And dependabot.yml updates "pip" at "/tests" "daily"
     And every dependabot.yml entry has "open-pull-requests-limit" 3
 
+  Scenario: Dependabot opens no version updates of the actions the nightly moves
+    Given the security settings '{"kind": "utility", "security": {"dependabot": {"ecosystems": ["github-actions", "npm"], "options": {"open-pull-requests-limit": 3}}}}'
+    Then the "github-actions" entry has "open-pull-requests-limit" 0
+    And the "npm" entry has "open-pull-requests-limit" 3
+
+  Scenario Outline: A repository that takes no nightly action updates keeps Dependabot's
+    Given the security settings '<config>'
+    Then the "github-actions" entry has no "open-pull-requests-limit"
+
+    Examples:
+      | config                                                  |
+      | {"kind": "utility", "update": {"actions": false}}       |
+      | {"kind": "utility", "update": false}                    |
+
   Scenario: Dependabot leaves the pins pubkit moves to pubkit
     Given the security settings '{"kind": "utility"}'
     Then the "github-actions" entry ignores "Sustenaut/pubkit/*" and "Sustenaut/pubrel/*"

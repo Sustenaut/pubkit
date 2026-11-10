@@ -13,6 +13,7 @@
     pubkit audit draft --package NAME [--report FILE] [--model ID]
     pubkit bump
     pubkit pins --pubrel V [--no-lock]
+    pubkit actions
     pubkit crates [--report FILE]
     pubkit record TEXT
     pubkit nightly --pubrel V --body FILE
@@ -690,6 +691,8 @@ def main(argv: list[str] | None = None) -> int:
     p = commands.add_parser("pins", help="move every outdated pub* pin to its latest release")
     p.add_argument("--pubrel", default="", help="pubrel's latest release, for its workflow pins")
     p.add_argument("--no-lock", action="store_true", help="do not relock (it needs the network)")
+    commands.add_parser("actions",
+                        help="move each third-party GitHub Action pinned by commit to its latest release")
     p = commands.add_parser("crates",
                             help="update other crates, keeping only what cargo vet audits and cargo deny passes")
     p.add_argument("--report", type=Path, help="write what was updated and skipped, as JSON")
@@ -697,7 +700,7 @@ def main(argv: list[str] | None = None) -> int:
                             help="add an internal pubrel row for each package the last commit needs one for")
     p.add_argument("text", help="what changed")
     p = commands.add_parser("nightly",
-                            help="commit the pins, then the audited crate updates, and write the PR body")
+                            help="commit the pins, the actions, then the audited crate updates, and write the PR body")
     p.add_argument("--pubrel", required=True)
     p.add_argument("--body", required=True, type=Path)
     commands.add_parser("bump",
@@ -759,6 +762,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "pins":
         from .nightly import pins
         for line in pins(root, args.pubrel, lock=not args.no_lock):
+            print(line)
+        return 0
+    if args.command == "actions":
+        from .nightly import actions
+        for line in actions(root):
             print(line)
         return 0
     if args.command == "crates":

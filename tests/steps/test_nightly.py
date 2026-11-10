@@ -391,3 +391,45 @@ def sources_at(repo, released, path, module, tag):
     slug = module.split("//", 1)[0]
     text = (repo / path).read_text()
     assert f'"github.com/{module}?ref={released[slug]}" # {tag}' in text, text
+
+
+# Third-party actions: `pubkit actions`.
+
+@given(parsers.parse('the workflow "{name}" uses "{first}" and "{second}" at "{pin}"'))
+def workflow_uses_both(repo, name, first, second, pin):
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(f"      - uses: {action}@{pin}\n" for action in (first, second)))
+
+
+@given(parsers.parse('the generated workflow "{name}" uses "{pin}"'))
+def generated_uses(repo, name, pin):
+    from pubkit.ci import HEADER
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{HEADER}      - uses: {pin}\n")
+
+
+@then(parsers.parse('it prints "{line}" once'))
+def prints_once(result, line):
+    out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
+    assert out.splitlines().count(line) == 1, out
+
+
+@then(parsers.parse('"{path}" uses "{action}" at the commit of "{tag}"'))
+def uses_at(repo, released, path, action, tag):
+    slug = "/".join(action.split("/")[:2])
+    text = (repo / path).read_text()
+    assert f"{action}@{released[slug]} # {tag}" in text, text
+
+
+@given(parsers.parse('a committed workflow pins "{slug}" at v{old}, whose latest release is v{latest}'))
+def committed_action(repo, monkeypatch, slug, old, latest):
+    path = repo / ".github" / "workflows" / "ci.yml"
+    path.parent.mkdir(parents=True)
+    path.write_text(f"      - uses: {slug}@{'1' * 40} # v{old}\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "ci"],
+                   cwd=repo, check=True)
+    monkeypatch.setattr(nightly, "latest_tag", lambda s: f"v{latest}" if s == slug else None)
+    monkeypatch.setattr(nightly, "tag_commit", lambda s, tag: "2" * 40)
