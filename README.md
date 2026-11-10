@@ -1102,6 +1102,19 @@ The repositories come from one of:
   anything else, or a pubkit.json that is not JSON, is refused before GitHub is asked, and `pubkit
   sync --check` refuses it too.
 
+`pubkit sync` also holds `checks` to what the repository's workflows report
+where the ruleset waits for them: on the merge queue's commit (`merge_group`),
+or, with `"queue": false`, on the pull request's. A required check nothing
+reports there is never passed, so the queue waits for it forever, and sync
+fails, naming it. A check counts as reported when a job of a workflow that runs
+on that event has it as its name (or id), or, for a check `PREFIX / job`, when
+such a job named `PREFIX` calls a reusable workflow (whose own job names sync
+does not read). `SonarCloud Code Analysis`, which SonarQube Cloud's app posts,
+counts only when such a workflow scans on every run: the generated `pr.yml`
+skips the queue's scan of a tree its pull request already passed, so a
+repository whose queue runs `pr.yml` drops it from `checks`. `ci / sonar`
+still fails `ci / passed` on the quality gate, on the pull request.
+
 It also turns on secret scanning and push protection on each public repository, unless
 its block says `"secret_scanning": false`. It never turns them off, and leaves a private
 repository alone, since they need GitHub Advanced Security there. Reading them needs

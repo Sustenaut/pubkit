@@ -941,3 +941,28 @@ def init_ran(initialised, times, how):
 @then(parsers.parse('the last init\'s CLI configuration installs every provider from "{url}"'))
 def init_mirrored(initialised, url):
     assert initialised["configs"][-1] == f'provider_installation {{\n  network_mirror {{ url = "{url}" }}\n}}\n'
+
+
+@given(parsers.parse("pubkit.json's protect block is {block}"))
+def protect_block(repo, block):
+    path = repo / "pubkit.json"
+    config = json.loads(path.read_text())
+    config["protect"] = json.loads(block)
+    path.write_text(json.dumps(config))
+
+
+@given(parsers.parse('the workflow "{name}" has the job "{job}" on "{events}"'))
+def plain_job(repo, name, job, events):
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    on = ", ".join(e.strip() for e in events.split(","))
+    path.write_text(f"on: [{on}]\njobs:\n  passed:\n    name: {job}\n    runs-on: ubuntu-latest\n"
+                    "    steps:\n      - run: true\n")
+
+
+@given(parsers.parse('the workflow "{name}" calls "{uses}" as "{job}" on "{events}"'))
+def calling_job(repo, name, uses, job, events):
+    path = repo / ".github" / "workflows" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    on = ", ".join(e.strip() for e in events.split(","))
+    path.write_text(f"on: [{on}]\njobs:\n  {job}:\n    uses: {uses}\n")
