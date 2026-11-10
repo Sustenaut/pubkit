@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The nightly moves third-party GitHub Actions in place of Dependabot: pubkit actions (and a nightly commit of its own) moves each action a hand-written workflow or composite action pins by commit to its latest release, by its tag's commit, and the managed dependabot.yml sets open-pull-requests-limit 0 on github-actions, so Dependabot opens only security updates; update.actions false keeps Dependabot's version updates"
+}

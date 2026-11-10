@@ -16,6 +16,11 @@ publisher, without adding an exemption, and `cargo deny` passes with it.
 Each update it drops is listed in the report with the audits cargo vet
 recommends for it, as `cargo vet suggest` prints them.
 
+`pubkit actions` moves each third-party GitHub Action the hand-written
+workflows and composite actions pin by commit to its latest release, by
+the commit of its tag, in place of Dependabot's version updates, whose pull
+requests can add no pubrel row and get no SonarQube Cloud token.
+
 `pubkit nightly` then updates the npm packages within their ranges and
 re-locks the Python requirements, when the repository has them. A
 repository turns each language's updates off with `update`, and the long
@@ -65,15 +70,26 @@ OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
                        r"(?P<path>/(?:\.github/workflows/[\w.-]+\.ya?ml|actions/[\w.-]+)@)"
                        + AT + VERSION)
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
+# A third-party action in a `uses:` line, pinned as Dependabot pins one: by
+# the commit of a release's tag, with the version in a comment. OWNER/REPO,
+# then any path inside it (actions/cache/restore), then `@COMMIT # vX.Y.Z`.
+# A pin by tag, or to a branch (`# main`), or of a pre-release, is left.
+ACTION_PIN = re.compile(r"(?P<lead>uses:[ \t]*['\"]?)" + ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
+                        r"(?P<path>(?:/[\w.-]+)*)@(?P<commit>[0-9a-f]{40})(?P<gap>[ \t]+#[ \t]*)"
+                        r"v(?P<version>[0-9]+(?:\.[0-9]+)*)(?=[\s'\"]|$)", re.M)
+# Directories a repository's own composite actions are never in.
+NOT_OWN = ("node_modules", "target")
 
 # The languages pubkit's settings name, each by the ecosystem pubkit works
 # with: crates, npm packages, and the hash-locked Python requirements.
 LANGUAGES = ("rust", "node", "python")
 
 # What `update` and `security.fuzz` default to for each language: all on.
+# `update` also takes `actions`, the third-party GitHub Actions the
+# repository's workflows and composite actions use (see `actions`).
 # Fuzzing is cargo-fuzz for Rust, and the property tests (Hypothesis,
 # fast-check) for Python and Node; on, a scheduled run fuzzes for longer.
-UPDATES = dict.fromkeys(LANGUAGES, True)
+UPDATES = dict.fromkeys((*LANGUAGES, "actions"), True)
 FUZZ = dict.fromkeys(LANGUAGES, True)
 
 # The keys `security` takes (security.py reads dependabot and sonar). The
@@ -270,8 +286,8 @@ def latest_tag(slug: str) -> str | None:
     tag = latest_release(slug)
     if tag and RELEASE_TAG.fullmatch(tag):
         return tag
-    print(f"pubkit: warning: no latest release of {slug} to read, so its workflows stay where "
-          "they are pinned", file=sys.stderr)
+    print(f"pubkit: warning: no latest release of {slug} to read, so its workflows and actions "
+          "stay where they are pinned", file=sys.stderr)
     return None
 
 
@@ -338,6 +354,73 @@ def modules_by_release(root: Path, skip: set[str], changes: list[str]) -> None:
         new = TF_SOURCE.sub(lambda m, rel=rel: move(m, rel), text)
         if new != text:
             path.write_text(new, encoding="utf-8")
+
+
+def action_files(root: Path) -> list[Path]:
+    """The repository's hand-written workflows and its own composite actions
+    (action.yml anywhere outside dot-directories other than .github, and
+    outside node_modules and target)."""
+    workflows = sorted((root / ".github" / "workflows").glob("*.y*ml"))
+    own = sorted(p for p in root.rglob("action.y*ml")
+                 if not any((part.startswith(".") and part != ".github") or part in NOT_OWN
+                            for part in p.relative_to(root).parts[:-1]))
+    return workflows + [p for p in own if p not in workflows]
+
+
+def release_key(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in version.split("."))
+
+
+@functools.cache
+def tag_commit(slug: str, tag: str) -> str | None:
+    """The commit `slug`'s tag names, or None. `tagged` would warn that it
+    pins by tag; `actions` never does, and says so itself."""
+    with contextlib.redirect_stderr(io.StringIO()):
+        return tagged(f"{os.environ.get('PUBKIT_GIT_BASE', 'https://github.com')}/{slug}", tag)
+
+
+def actions(root: Path) -> list[str]:
+    """Each third-party action (ACTION_PIN) in the repository's hand-written
+    workflows and composite actions moved to its repository's latest
+    release, by the commit of its tag, with the version in a comment: what
+    Dependabot's version updates did, but on the nightly's branch, with a
+    pubrel row and the nightly's token. One line per file and repository
+    moved. pubkit's and pubrel's pins, and a deploy.providers package's,
+    move with `pins`, as does any OWNER/REPO/actions/NAME or reusable
+    workflow (OTHER_PIN). An action only moves forward, and one whose
+    latest release or tag's commit cannot be read stays, with a warning.
+    Workflows `pubkit sync` writes move with pubkit."""
+    from .ci import is_generated  # noqa: PLC0415
+
+    skip = {"pubkit", "pubrel"} | provided(root)
+    changes: list[str] = []
+    for path in action_files(root):
+        text = path.read_text(encoding="utf-8")
+        if is_generated(text):
+            continue
+        rel = path.relative_to(root).as_posix()
+
+        def move(m: re.Match[str], rel: str = rel) -> str:
+            if m["repo"].lower() in skip or m["path"].startswith(("/actions/", "/.github/workflows/")):
+                return m.group(0)
+            slug = f"{m['owner']}/{m['repo']}"
+            latest = latest_tag(slug)
+            if latest is None or release_key(latest[1:]) <= release_key(m["version"]):
+                return m.group(0)
+            commit = tag_commit(slug, latest)
+            if commit is None:
+                print(f"pubkit: warning: could not read the commit of {slug}'s {latest}, so "
+                      f"{rel} stays at {m['version']}", file=sys.stderr)
+                return m.group(0)
+            line = f"{rel}: {slug} {m['version']} -> {latest[1:]}"
+            if line not in changes:
+                changes.append(line)
+            return f"{m['lead']}{slug}{m['path']}@{commit}{m['gap']}{latest}"
+
+        new = ACTION_PIN.sub(move, text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+    return changes
 
 
 def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
@@ -683,7 +766,7 @@ def body(pinned: list[str], updated: list[str], skipped: list[dict],
 def nightly(root: Path, pubrel: str, body_path: Path) -> int:
     """The nightly's commits on the current branch, and the pull request's
     body. Prints the commits it made, in order: `pins` first when it made
-    that one, then any of `crates`, `npm` and `python`, or nothing."""
+    that one, then any of `actions`, `crates`, `npm` and `python`, or nothing."""
     import tempfile  # noqa: PLC0415
 
     body_path = confined(body_path, "the --body file")
@@ -692,6 +775,11 @@ def nightly(root: Path, pubrel: str, body_path: Path) -> int:
     made = ["pins"] if commit(root, "Move to the latest pub* releases", pinned) else []
     result: dict = {"updated": [], "skipped": []}
     others: dict[str, list[str]] = {}
+    if update["actions"]:
+        heading = "GitHub Actions, to their latest releases"
+        others[heading] = actions(root)
+        if commit(root, "Move GitHub Actions to their latest releases", others[heading]):
+            made.append("actions")
     if update["rust"]:
         with tempfile.TemporaryDirectory() as tmp:
             report = Path(tmp) / "crates.json"

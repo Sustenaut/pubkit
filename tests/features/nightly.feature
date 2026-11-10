@@ -119,6 +119,49 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And ".github/workflows/deploy.yml" contains "example-org/somehost/actions/docker-build@"
     And ".github/workflows/deploy.yml" pins "example-org/somehost" to the commit of "v0.2.0"
 
+  Scenario: actions moves a third-party action to its latest release, by its tag's commit
+    Given "example-org/setup-thing" releases "v2.1.0"
+    And the workflow "ci.yml" uses "example-org/setup-thing" and "example-org/setup-thing/restore" at "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
+    When I run pubkit "actions"
+    Then it succeeds
+    And it prints ".github/workflows/ci.yml: example-org/setup-thing 1.4.0 -> 2.1.0" once
+    And ".github/workflows/ci.yml" uses "example-org/setup-thing" at the commit of "v2.1.0"
+    And ".github/workflows/ci.yml" uses "example-org/setup-thing/restore" at the commit of "v2.1.0"
+
+  Scenario: actions moves the pins in the repository's own composite actions
+    Given "example-org/setup-thing" releases "v2.1.0"
+    And the file "actions/build/action.yml" reads "    - uses: 'example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0'"
+    And the file "node_modules/dep/action.yml" reads "    - uses: example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
+    When I run pubkit "actions"
+    Then it succeeds
+    And it prints "actions/build/action.yml: example-org/setup-thing 1.4.0 -> 2.1.0"
+    And "actions/build/action.yml" uses "example-org/setup-thing" at the commit of "v2.1.0"
+    And "node_modules/dep/action.yml" contains "# v1.4.0"
+
+  Scenario Outline: actions leaves an action it does not move
+    Given "example-org/setup-thing" releases "<latest>"
+    And the file ".github/workflows/ci.yml" reads "      - uses: <pin>"
+    When I run pubkit "actions"
+    Then it succeeds
+    And ".github/workflows/ci.yml" contains "<pin>"
+
+    Examples:
+      | latest | pin                                                                            |
+      | v1.4.0 | example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0      |
+      | v1.3.0 | example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0      |
+      | main   | example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0      |
+      | v2.1.0 | example-org/setup-thing@v1.4.0                                                 |
+      | v2.1.0 | example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # main        |
+      | v2.1.0 | example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0-rc.1 |
+      | v2.1.0 | example-org/pubkit@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0           |
+
+  Scenario: actions leaves the workflows pubkit sync writes
+    Given "example-org/setup-thing" releases "v2.1.0"
+    And the generated workflow "pr.yml" uses "example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
+    When I run pubkit "actions"
+    Then it succeeds
+    And ".github/workflows/pr.yml" contains "# v1.4.0"
+
   Scenario: pins moves another repository's Terraform module from its tag to its latest release's commit
     Given "example-org/somehost" releases "v0.2.0"
     And the file "infra/dns.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
@@ -176,9 +219,11 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And the body shows "zeroize 1.9.0 -> 1.9.1" with "cargo vet diff zeroize 1.8.2 1.9.1"
 
   Scenario: A repository takes every language's updates and fuzzing unless it says otherwise
-    Then the settings are update "rust, node, python" and fuzz "rust, node, python"
+    Then the settings are update "rust, node, python, actions" and fuzz "rust, node, python"
     When the repository's pubkit.json reads '{"kind": "utility", "update": {"node": false}, "security": {"fuzz": {"rust": false}}}'
-    Then the settings are update "rust, python" and fuzz "node, python"
+    Then the settings are update "rust, python, actions" and fuzz "node, python"
+    When the repository's pubkit.json reads '{"update": {"actions": false}}'
+    Then the settings are update "rust, node, python" and fuzz "rust, node, python"
     When the repository's pubkit.json reads '{"update": false, "security": {"fuzz": false}}'
     Then the settings are update "none" and fuzz "none"
 
@@ -217,6 +262,13 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When the nightly runs with npm moving "marked" to 18.2.0 and the lock moving "pytest" to 9.1.0
     Then it made the commits "npm python"
     And the body lists "marked 18.1.0 -> 18.2.0" and "pytest 9.0.0 -> 9.1.0"
+
+  Scenario: The nightly commits the GitHub Actions it moves on their own, before the crates
+    Given a git repository with a package-lock.json and a Python lock
+    And a committed workflow pins "example-org/setup-thing" at v1.4.0, whose latest release is v2.1.0
+    When the nightly runs with npm moving "marked" to 18.2.0 and the lock moving "pytest" to 9.1.0
+    Then it made the commits "actions npm python"
+    And the body lists ".github/workflows/ci.yml: example-org/setup-thing 1.4.0 -> 2.1.0" and "marked 18.1.0 -> 18.2.0"
 
   Scenario: A repository that turns updates off gets no dependency commits
     Given a git repository with a package-lock.json and a Python lock

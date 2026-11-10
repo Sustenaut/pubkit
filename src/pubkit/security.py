@@ -20,6 +20,14 @@ and actions. Their pins move only with pubkit (`pubkit bump`), so
 `pubkit sync --check` fails any pull request that moves one alone. Ignores
 given in `options` are kept, after these.
 
+Every github-actions entry also sets `open-pull-requests-limit` to 0, which
+turns Dependabot's version updates off and leaves its security updates on:
+the nightly moves the other actions (`pubkit actions`), on a branch that
+can carry a pubrel row and gets a SonarQube Cloud token, which a Dependabot
+pull request cannot. A repository whose pubkit.json sets `update.actions`
+(or `update`) to false takes no nightly action updates, so Dependabot's
+version updates stay on there, with any limit `options` gives.
+
 `security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**", "organization":
 "example-org"}`: `args` are properties every workflow's sonar job adds, after
 its `sonar-args` input, and `organization` is the SonarQube Cloud
@@ -90,6 +98,8 @@ def dependabot(config: dict[str, Any]) -> str | None:
     settings = dependabot_settings(config)
     if settings is None:
         return None
+    from .nightly import UPDATES, by_language  # noqa: PLC0415
+    nightly_moves = by_language("update", config.get("update", {}), UPDATES)["actions"]
     pinned = [{"dependency-name": f"{owner(config)}/{name}/*"} for name in PINNED]
     lines = ["# Written by `pubkit sync` from security.dependabot in pubkit.json. Do not edit:",
              "# change pubkit.json and run `pubkit sync`.", "version: 2", "updates:"]
@@ -100,6 +110,8 @@ def dependabot(config: dict[str, Any]) -> str | None:
         if entry["package-ecosystem"] == "github-actions":
             given = entry.get("ignore", [])
             entry["ignore"] = pinned + (given if isinstance(given, list) else [given])
+            if nightly_moves:
+                entry["open-pull-requests-limit"] = 0
         lines.append(f"  - {json.dumps(entry)}")
     return "\n".join(lines) + "\n"
 
