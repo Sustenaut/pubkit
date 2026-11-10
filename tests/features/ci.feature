@@ -109,7 +109,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
   Scenario: The merge queue checks the site a pull request checks
     Given a Rust repository whose ci block is '{}'
-    And pubkit.json's site block is '{"check_dir": "public"}'
+    And the workflow "deploy.yml" deploys "public" with deploy-static
     When I run pubkit "sync"
     Then it succeeds
     And "pr.yml" checks the site in "public" after running "nothing", deploying nothing
@@ -405,7 +405,6 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | workflow                  |
-      | terraform.yml             |
       | job-service-terraform.yml |
       | service-ci.yml            |
 
@@ -662,7 +661,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario Outline: sync --check fails on a pubkit action pinned to another pubkit or commit
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
+    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "cache" at "<pin>"
     When I run pubkit "sync"
     Then it succeeds
     When I run pubkit "sync" "--check"
@@ -671,9 +670,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | owner     | pin            | message                                           |
-      | Sustenaut | another pubkit | deploy-static@v0.0.1 is not pubkit                |
-      | example-org   | another pubkit | deploy-static@v0.0.1 is not pubkit                |
-      | Sustenaut | another commit | deploy-static@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
+      | Sustenaut | another pubkit | cache@v0.0.1 is not pubkit                        |
+      | example-org   | another pubkit | cache@v0.0.1 is not pubkit                        |
+      | Sustenaut | another commit | cache@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit |
 
   Scenario Outline: sync --check fails on a hand-written call of a pubkit workflow at another pubkit
     Given a service repository whose ci block is '{}'
@@ -703,23 +702,24 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then it succeeds
     And ".github/workflows/ci-extra.yml" calls "Sustenaut"'s pubkit workflow "service-ci.yml" at "this pubkit's commit"
 
-  Scenario: A stale deploy-static pin fails sync --check until it is moved, then passes
+  Scenario: A stale pubkit action pin fails sync --check until it is moved, then passes
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "example-org"'s pubkit action "deploy-static" at "another pubkit"
+    And the workflow "deploy.yml" uses "example-org"'s pubkit action "cache" at "another pubkit"
     When I run pubkit "sync"
     Then it succeeds
     When I run pubkit "sync" "--check"
     Then it fails
     When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
+    And I run pubkit "sync"
     And I run pubkit "sync" "--check"
     Then it succeeds
-    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "this pubkit's commit"
 
   Scenario Outline: sync --check takes this pubkit's pin of an action, and reports one with no version
     Given a Node repository whose ci block is '{}'
     And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "<pin>"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "<pin>"
     When I run pubkit "sync"
     Then it succeeds
     When I run pubkit "sync" "--check"
@@ -728,9 +728,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | pin                  | reports                                                    |
-      | this pubkit's commit | does not mention "deploy-static"                           |
-      | this pubkit's tag    | does not mention "deploy-static"                           |
-      | main                 | mentions "Sustenaut/pubkit/actions/deploy-static@main names no pubkit version" |
+      | this pubkit's commit | does not mention "cache@"                                  |
+      | this pubkit's tag    | does not mention "cache@"                                  |
+      | main                 | mentions "Sustenaut/pubkit/actions/cache@main names no pubkit version" |
 
   Scenario: sync --check fails on a pubkit action this pubkit does not ship, and pins leaves it where it is
     Given a Node repository whose ci block is '{}'
@@ -745,21 +745,14 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then it prints "deploy.yml: actions/deploy-ssh stays at pubkit 0.0.1"
     And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-ssh" at "another pubkit"
 
-  Scenario: sync --check fails on a pubkit Terraform module this pubkit does not ship
-    Given a Node repository whose ci block is '{}'
-    And the file "infra/main.tf" reads "module "site" { source = "github.com/Sustenaut/pubkit//terraform/static-site?ref=v0.10.0" }"
-    When I run pubkit "sync"
-    And I run pubkit "sync" "--check"
-    Then it fails
-    And stderr mentions "infra/main.tf: pubkit"
-    And stderr mentions "has no terraform/static-site; it moved out of pubkit"
-
-  Scenario: sync --check takes a pubkit Terraform module this pubkit ships, at any release
+  Scenario: sync --check fails on a pubkit Terraform module, which pubkit no longer ships
     Given a Node repository whose ci block is '{}'
     And the file "infra/main.tf" reads "module "dns" { source = "github.com/Sustenaut/pubkit//terraform/hosting?ref=v0.24.4" }"
     When I run pubkit "sync"
     And I run pubkit "sync" "--check"
-    Then it succeeds
+    Then it fails
+    And stderr mentions "infra/main.tf: pubkit"
+    And stderr mentions "has no terraform/hosting; it moved out of pubkit"
 
   Scenario: A repository that deploys with deploy-static has its site checked on pull requests
     Given a Node repository whose ci block is '{}'
@@ -783,13 +776,21 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | {"build": "make site"}                                                 | public | make site   |
       | {"check_dir": "site"}                                                  | site   | nothing     |
 
-  Scenario: A site block alone, without a deploy workflow, has the site checked too
+  Scenario: A site block gives the site check its address
     Given a Node repository whose ci block is '{}'
+    And the workflow "deploy.yml" deploys "public" with deploy-static
     And pubkit.json's site block is '{"check_dir": "public", "url": "https://example.eu/"}'
     When I run pubkit "sync"
     Then it succeeds
     And "pr.yml" checks the site in "public" after running "nothing", deploying nothing
     And in "pr.yml" the site check is given "site-url" "https://example.eu/"
+
+  Scenario: A site block without a deploy workflow stops sync: the check runs the deploy's own deploy-static
+    Given a Node repository whose ci block is '{}'
+    And pubkit.json's site block is '{"check_dir": "public"}'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "no workflow of the repository's own uses deploy-static"
 
   Scenario: A repository that deploys no site has no site job
     Given a Node repository whose ci block is '{}'

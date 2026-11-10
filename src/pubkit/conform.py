@@ -74,8 +74,8 @@ def exceptions(config: dict, known: set[str],
                family=lambda rule: not str(rule).startswith("WEB-")) -> tuple[set[str], list[str], list[str]]:
     """The rule IDs waived, a description of each open exception, and the
     problems with the declarations. Only the exceptions whose rule is in
-    `family` are read: the Rust crate standard's by default, and the site
-    rules' (WEB-) when `pubkit site check` asks."""
+    `family` are read: the Rust crate standard's by default. The site rules
+    (WEB-) are another package's, which reads them with its own copy."""
     waived, open_, problems = set(), [], []
     for i, e in enumerate(config.get("exceptions", [])):
         where = f"pubkit.json exceptions[{i}]"

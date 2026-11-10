@@ -104,10 +104,10 @@ Feature: A Rust repository conforms to the standard, or says why not
 
   Scenario: A pubkit action pinned to another pubkit fails
     Given a Rust crate that meets the standard
-    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "another pubkit"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "another pubkit"
     When I run pubkit "conform"
     Then it fails
-    And stderr mentions "deploy-static@v0.0.1 is not pubkit"
+    And stderr mentions "cache@v0.0.1 is not pubkit"
 
   Scenario: A hand-written call of another pubkit's workflow fails
     Given a Rust crate that meets the standard

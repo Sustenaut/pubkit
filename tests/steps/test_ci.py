@@ -543,7 +543,7 @@ def own_shortcut(own):
     assert tested["uses"] == "./.github/workflows/job-tested.yml"
     assert tested["if"] == "github.event_name != 'pull_request'"
     assert tested["with"] == {"workflow": ".github/workflows/ci.yml"}
-    for job in ("functional", "audit", "osv", "terraform", "deploy-static", "cache-action"):
+    for job in ("functional", "audit", "osv", "cache-action"):
         assert jobs_[job]["needs"] == "tested", job
         assert jobs_[job]["if"] == "${{ !cancelled() && needs.tested.outputs.tested != 'true' }}", job
     assert jobs_["sonar"]["with"]["coverage-run"] == "${{ needs.tested.outputs.run-id }}"
@@ -572,7 +572,7 @@ def deploys(repo, name, folder):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("on: { push: { branches: [main] } }\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n"
                     "    steps:\n      - run: make site\n"
-                    "      - uses: Sustenaut/pubkit/actions/deploy-static@v0.17.1\n"
+                    "      - uses: Sustenaut/pubhost/actions/deploy-static@2196c741d3de6c92c6035c42435c6e517c8ba0ce # v0.1.0\n"
                     f"        with:\n          dir: {folder}\n          deploy-key: ${{{{ secrets.KEY }}}}\n")
 
 
@@ -594,8 +594,10 @@ def site_checked(repo, name, folder, build):
     runs = [s["run"] for s in steps if "run" in s]
     assert runs == ([] if build == "nothing" else [build]), runs
     action = steps[-1]
-    assert re.fullmatch(rf"{refs.OWNER}/pubkit/actions/deploy-static@(v{re.escape(__version__)}|[0-9a-f]{{40}})",
-                        action["uses"]), action["uses"]
+    # The deploy-static the repository's deploy workflow pins, as it pins it.
+    assert action["uses"] == "Sustenaut/pubhost/actions/deploy-static@2196c741d3de6c92c6035c42435c6e517c8ba0ce", action["uses"]
+    assert "deploy-static@2196c741d3de6c92c6035c42435c6e517c8ba0ce # v0.1.0\n" in (
+        repo / ".github" / "workflows" / f"{name}").read_text()
     assert action["with"]["dir"] == folder
     assert action["with"]["check-only"] == "true"
     assert not set(action["with"]) & {"deploy-key", "cloudflare-api-token"}

@@ -401,10 +401,7 @@ jobs:
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,
               pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/terraform.yml,
               pkg:githubactions/Sustenaut/pubkit/actions/cache,
-              pkg:githubactions/Sustenaut/pubkit/actions/deploy-static,
-              pkg:githubactions/Sustenaut/pubkit/actions/docker-build,
               pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
               pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

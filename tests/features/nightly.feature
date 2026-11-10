@@ -54,10 +54,10 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario Outline: pins moves a pubkit action to this pubkit's commit, under the current owner
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "deploy-static" at "<pin>"
+    And the workflow "deploy.yml" uses "<owner>"'s pubkit action "cache" at "<pin>"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "this pubkit's commit"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "this pubkit's commit"
 
     Examples:
       | owner     | pin               |
@@ -81,10 +81,10 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins leaves a pubkit action that names no version
     Given pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "main"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "deploy-static" at "main"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "main"
 
   Scenario: pins moves another repository's workflow to its latest release, by its tag's commit
     Given "example-org/somefleet" releases "v0.2.0"

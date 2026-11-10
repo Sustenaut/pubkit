@@ -1,0 +1,4 @@
+{
+  "category": "removed",
+  "change": "The hosting half of pubkit is pubhost's (Sustenaut/pubhost 0.1.0): the Terraform modules (terraform/), terraform.yml, the deploy-static and docker-build actions, pubkit dns check and pubkit site check (dns moves, the 0.12.6 key migration, is dropped). pubkit keeps the hosting block's shape, which sync checks, and the ci / site job, which now runs the deploy-static the repository's own deploy workflow pins"
+}

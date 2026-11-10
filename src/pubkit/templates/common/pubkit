@@ -6,7 +6,6 @@
 # tests/requirements.lock pin, whichever pubkit is installed, if any.
 #
 #   ./pubkit sync --check
-#   ./pubkit dns check example.eu
 #
 # uvx fetches that release's wheel once and keeps it in uv's cache; nothing
 # is installed into the repository or the system. pubkit runs in the

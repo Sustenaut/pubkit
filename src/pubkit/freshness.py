@@ -5,7 +5,7 @@ repository pins; `pinned` here is what it, and the version guard, read.)
 `pubkit bump`, run in a repository, moves it to this pubkit: the managed
 files (`pubkit sync`), the lock (`pubkit lock`), and every workflow's pin of
 pubkit's reusable workflows (rust-ci.yml, service-ci.yml...) and actions
-(deploy-static), to the commit of this pubkit's tag (refs.py). The nightly
+(cache), to the commit of this pubkit's tag (refs.py). The nightly
 workflow does this, and more, through `pubkit nightly` (nightly.py).
 """
 

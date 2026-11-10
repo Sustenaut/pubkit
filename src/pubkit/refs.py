@@ -49,7 +49,7 @@ VERSION = r"(?P<version>[0-9][^\s'\"]*)"
 RELEASE_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrel/\.github/workflows/release\.yml@)"
                          + AT + VERSION)
 # Any use of pubkit at a release: one of its actions (actions/<name>, such
-# as deploy-static) or of its reusable workflows (.github/workflows/<name>,
+# as cache) or of its reusable workflows (.github/workflows/<name>,
 # such as service-ci.yml or job-sonar.yml), by commit with the version in a
 # comment, or by tag. It runs that pubkit's code, so it moves with the
 # pubkit the lock pins, written by sync or by hand.
@@ -67,7 +67,7 @@ PUBKIT_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/(?:actions/[\w.-]+|"
 # to the repository's tree. A pin of a name not listed is to a pubkit that
 # lacks it, which `pins` never moves to and `sync --check` refuses.
 SHIPPED = {
-    "actions": ("cache", "deploy-static", "docker-build", "pr-label"),
+    "actions": ("cache", "pr-label"),
     "workflows": (
         "job-node-audit.yml", "job-node-browser.yml", "job-node-test.yml", "job-osv.yml",
         "job-python-audit.yml", "job-python-browser.yml", "job-python-functional.yml",
@@ -75,10 +75,9 @@ SHIPPED = {
         "job-rust-fuzz.yml", "job-rust-gates.yml", "job-rust-msrv.yml", "job-rust-test.yml",
         "job-rust-toolchains.yml", "job-service-checks.yml", "job-service-terraform.yml",
         "job-service-tests.yml", "job-sonar.yml", "job-tested.yml", "node-ci.yml",
-        "python-ci.yml", "rust-ci.yml", "service-ci.yml", "terraform.yml",
+        "python-ci.yml", "rust-ci.yml", "service-ci.yml",
     ),
-    "terraform": ("backup-bucket", "cloud-run-access", "cloud-run-service", "cloud-run-sites",
-                  "desec-zones", "dns-zone", "hosting"),
+    "terraform": (),
 }
 
 # A Terraform module source in another repository at a release: a

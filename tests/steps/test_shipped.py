@@ -20,7 +20,7 @@ def tree():
         "actions": sorted(p.name for p in (ROOT / "actions").iterdir() if (p / "action.yml").is_file()),
         "workflows": sorted(p.name for p in workflows.glob("*.yml")
                             if "workflow_call:" in p.read_text(encoding="utf-8")),
-        "terraform": sorted(p.name for p in (ROOT / "terraform").iterdir()
+        "terraform": sorted(p.name for p in (ROOT / "terraform").glob("*")
                             if p.is_dir() and (p / "main.tf").is_file()),
     }
 
