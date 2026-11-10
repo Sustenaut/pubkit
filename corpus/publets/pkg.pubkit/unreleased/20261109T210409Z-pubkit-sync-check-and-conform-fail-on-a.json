@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pubkit sync --check and conform fail on a pin of a pubkit action, reusable workflow or Terraform module this pubkit does not ship (refs.SHIPPED, held to the tree by a test), and pins leaves such a pin where it is instead of moving it to a pubkit that lacks it"
+}

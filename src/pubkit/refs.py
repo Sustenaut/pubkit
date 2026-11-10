@@ -29,6 +29,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,48 @@ PUBKIT_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/(?:actions/[\w.-]+|"
                         r"\.github/workflows/[\w.-]+\.ya?ml)@[^\s'\"]+")
 
 
+# What this pubkit ships for other repositories to use by commit: its
+# actions (actions/<name>), its reusable workflows (.github/workflows/<name>)
+# and its Terraform modules (terraform/<name>). The installed wheel carries
+# none of these files, so the names are listed here; a test holds the list
+# to the repository's tree. A pin of a name not listed is to a pubkit that
+# lacks it, which `pins` never moves to and `sync --check` refuses.
+SHIPPED = {
+    "actions": ("cache", "deploy-static", "docker-build", "pr-label"),
+    "workflows": (
+        "job-node-audit.yml", "job-node-browser.yml", "job-node-test.yml", "job-osv.yml",
+        "job-python-audit.yml", "job-python-browser.yml", "job-python-functional.yml",
+        "job-review.yml", "job-rust-audit.yml", "job-rust-cross.yml", "job-rust-functional.yml",
+        "job-rust-fuzz.yml", "job-rust-gates.yml", "job-rust-msrv.yml", "job-rust-test.yml",
+        "job-rust-toolchains.yml", "job-service-checks.yml", "job-service-terraform.yml",
+        "job-service-tests.yml", "job-sonar.yml", "job-tested.yml", "node-ci.yml",
+        "python-ci.yml", "rust-ci.yml", "service-ci.yml", "terraform.yml",
+    ),
+    "terraform": ("backup-bucket", "cloud-run-access", "cloud-run-service", "cloud-run-sites",
+                  "desec-zones", "dns-zone", "hosting"),
+}
+
+# A Terraform module source in another repository at a release: a
+# `source` naming github.com, the owner and the repository, then `//` and
+# the path, with `?ref=`: by tag (`?ref=vX.Y.Z`), or by commit with the
+# version in a comment after the closing quote.
+TF_SOURCE = re.compile(
+    r'(?P<lead>source\s*=\s*)"github\.com/' + ANY_OWNER + r'(?P<repo>[A-Za-z0-9_.-]+)//(?P<path>[^"?\s]+)'
+    r'\?ref=(?:v(?P<tag>[0-9][^"\s]*)|(?P<commit>[0-9a-f]{40}))"(?:[ \t]*#[ \t]*v(?P<version>[0-9][^\s]*))?')
+
+
+def shipped(name: str) -> bool:
+    """Whether a pubkit pin's name (actions/<a> or .github/workflows/<w>) is one this pubkit ships."""
+    kind, _, base = name.rpartition("/")
+    return base in SHIPPED["actions" if kind == "actions" else "workflows"]
+
+
+def tf_files(root: Path) -> list[Path]:
+    """The repository's own .tf files, outside Terraform's working directories."""
+    return sorted(p for p in root.rglob("*.tf")
+                  if not any(part.startswith(".") for part in p.relative_to(root).parts[:-1]))
+
+
 def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str], list[str]]:
     """(the uses of pubkit's actions and reusable workflows in the
     repository's workflows that pin another pubkit than `version`, or
@@ -70,7 +113,10 @@ def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str],
         pinned = {m.start() for m in PUBKIT_PIN.finditer(text)}
         for m in PUBKIT_PIN.finditer(text):
             name = m["name"].rsplit("/", 1)[-1]
-            if m["version"] != version:
+            if not shipped(m["name"]):
+                stale.append(f"{rel}: pubkit {version} has no {m['name']}; it moved out of "
+                             f"pubkit (pubkit's README says where), so pin it from there")
+            elif m["version"] != version:
                 stale.append(f"{rel}: {name}@v{m['version']} is not pubkit {version}, which "
                              f"tests/requirements.lock pins; run `pubkit bump`, or pin it "
                              f"@{ref(version, commit)}")
@@ -79,6 +125,14 @@ def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str],
                              f"{version}'s tag; pin it @{ref(version, commit)}")
         unversioned += [f"{rel}: {m[0]}" for m in PUBKIT_USE.finditer(text)
                         if m.start() not in pinned]
+    for path in tf_files(root):
+        rel = path.relative_to(root).as_posix()
+        for m in TF_SOURCE.finditer(path.read_text(encoding="utf-8")):
+            module = m["path"].split("/")
+            if m["repo"].lower() == "pubkit" and not (
+                    len(module) == 2 and module[0] == "terraform" and module[1] in SHIPPED["terraform"]):
+                stale.append(f"{rel}: pubkit {version} has no {m['path']}; it moved out of pubkit "
+                             f"(pubkit's README says where), so take the module from there")
     return stale, unversioned
 
 
@@ -104,10 +158,12 @@ def ref(version: str, commit: str | None) -> str:
 
 
 def repin(pattern: re.Pattern[str], text: str, owner: str, version: str,
-          commit: str | None) -> str:
+          commit: str | None, keep: Callable[[re.Match[str]], bool] | None = None) -> str:
     """`text` with every pin `pattern` matches (its `path`, after the
-    owner, through `@`) moved to `owner`'s, at `version`."""
-    return pattern.sub(lambda m: f"{owner}/{m['path']}{ref(version, commit)}", text)
+    owner, through `@`) moved to `owner`'s, at `version`; one `keep` says
+    stays as it is."""
+    return pattern.sub(lambda m: m.group(0) if keep and keep(m)
+                       else f"{owner}/{m['path']}{ref(version, commit)}", text)
 
 
 def release_commit() -> str | None:

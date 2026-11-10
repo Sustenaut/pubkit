@@ -41,8 +41,8 @@ from pathlib import Path
 
 from . import __version__
 from .paths import confined
-from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, VERSION, owner_of, pubrel_commit, ref,
-                   release_commit, repin, tagged)
+from .refs import (ANY_OWNER, AT, PUBKIT_PIN, RELEASE_PIN, TF_SOURCE, VERSION, owner_of, pubrel_commit, ref,
+                   release_commit, repin, shipped, tagged)
 
 # A row's text, which must not start with '-' (pubrel has no `--`, so it
 # would read that as an option) or a space.
@@ -56,11 +56,13 @@ PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)
 # Every pubkit reusable workflow a repository can call, not only rust-ci.
 CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubkit/\.github/workflows/"
                     r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
-# Any other repository's reusable workflow at a release, the repository read
-# from the line itself, so pubkit names none of them. pubkit's and pubrel's
-# move with PUBKIT_PIN and RELEASE_PIN; a deploy.providers package's with its
-# entry, which its sustenaut.bump hook moves.
-OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)(?P<path>/\.github/workflows/[\w.-]+\.ya?ml@)"
+# Any other repository's reusable workflow (.github/workflows/<name>) or
+# action (actions/<name>) at a release, the repository read from the line
+# itself, so pubkit names none of them. pubkit's and pubrel's move with
+# PUBKIT_PIN and RELEASE_PIN; a deploy.providers package's with its entry,
+# which its sustenaut.bump hook moves.
+OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
+                       r"(?P<path>/(?:\.github/workflows/[\w.-]+\.ya?ml|actions/[\w.-]+)@)"
                        + AT + VERSION)
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 
@@ -305,6 +307,39 @@ def others_by_release(text: str, name: str, skip: set[str], changes: list[str]) 
     return OTHER_PIN.sub(move, text)
 
 
+def modules_by_release(root: Path, skip: set[str], changes: list[str]) -> None:
+    """Each other repository's Terraform module source (TF_SOURCE) in the
+    repository's .tf files, moved to that repository's latest release by the
+    commit of its tag, with the version in a comment after the closing
+    quote; the moves said in `changes`. A source pinned by commit with no
+    version comment, or whose latest release cannot be read, stays."""
+    from .refs import tf_files  # noqa: PLC0415
+
+    def move(m: re.Match[str], name: str) -> str:
+        current = m["tag"] or m["version"]
+        if m["repo"].lower() in skip or current is None:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None:
+            return m.group(0)
+        version = latest[1:]
+        commit = tagged(f"{os.environ.get('PUBKIT_GIT_BASE', 'https://github.com')}/{slug}", latest)
+        if version == current and (commit is None or commit == m["commit"]):
+            return m.group(0)
+        changes.append(f"{name}: {slug} {current} -> {version}" if version != current
+                       else f"{name}: {slug} {version} pinned to {commit}")
+        at = f'{commit}" # v{version}' if commit else f'v{version}"'
+        return f'{m["lead"]}"github.com/{slug}//{m["path"]}?ref={at}'
+
+    for path in tf_files(root):
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        new = TF_SOURCE.sub(lambda m, rel=rel: move(m, rel), text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+
+
 def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     from .freshness import pinned  # noqa: PLC0415
 
@@ -350,11 +385,18 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
                 commit = None
                 moved = pattern.sub(rf"\g<1>{version}", new)
             else:
-                # A workflow's pin: the commit moves with the version.
+                # A workflow's pin: the commit moves with the version. A pin
+                # of a pubkit action or workflow this pubkit does not ship
+                # stays on the commit that has it; sync --check says so.
                 commit = (pubrel_commit(version, new, calls) if pattern is RELEASE_PIN
                           else release_commit())
-                moved = repin(pattern, new, calls, version, commit)
+                moved = repin(pattern, new, calls, version, commit,
+                              keep=(lambda m: not shipped(m["name"])) if pattern is PUBKIT_PIN else None)
             for m in pattern.finditer(new):
+                if pattern is PUBKIT_PIN and not shipped(m["name"]):
+                    changes.append(f"{path.name}: {m['name']} stays at pubkit {m['version']}: "
+                                   f"pubkit {version} has no {m['name']}")
+                    continue
                 # "pubkit A -> B" already says that pubkit's own pins moved.
                 if m["version"] != version and pattern is not PUBKIT_PIN:
                     changes.append(f"{path.name}: {what} {m['version']} -> {version}")
@@ -364,6 +406,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         new = others_by_release(new, path.name, skip, changes)
         if new != text:
             path.write_text(new, encoding="utf-8")
+    modules_by_release(root, skip, changes)
     old = locked(root)
     moving = pin_crates(root)
     for crate in moving:
