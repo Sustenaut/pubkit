@@ -8,25 +8,9 @@
       "mode": "required"
     },
     {
-      "plugin": "bitwarden.secrets",
-      "paths": [
-        ".github/workflows/terraform.yml"
-      ],
-      "mode": "required"
-    },
-    {
-      "plugin": "cloudflare.dns",
-      "paths": [
-        "actions/deploy-static/action.yml"
-      ],
-      "mode": "required"
-    },
-    {
       "plugin": "cloudflare.pages",
       "paths": [
-        "actions/deploy-static/",
-        "src/pubkit/hosting.py",
-        "terraform/testdata/pubkit.json"
+        "src/pubkit/hosting.py"
       ],
       "mode": "required"
     },
@@ -43,16 +27,7 @@
     {
       "plugin": "desec.dns",
       "paths": [
-        "src/pubkit/hosting.py",
-        "terraform/dns-zone/variables.tf",
-        "terraform/testdata/pubkit.json"
-      ],
-      "mode": "required"
-    },
-    {
-      "plugin": "github.actions-oidc",
-      "paths": [
-        ".github/workflows/terraform.yml"
+        "src/pubkit/hosting.py"
       ],
       "mode": "required"
     },
@@ -69,7 +44,6 @@
       "paths": [
         ".github/workflows/ci.yml",
         ".github/workflows/job-tested.yml",
-        ".github/workflows/terraform.yml",
         "Makefile",
         "actions/pr-label/",
         "src/pubkit/nightly.py",
@@ -78,22 +52,9 @@
       "mode": "required"
     },
     {
-      "plugin": "google.cloud",
-      "paths": [
-        ".github/workflows/terraform.yml",
-        "terraform/cloud-run-access/",
-        "terraform/cloud-run-service/",
-        "terraform/cloud-run-sites/"
-      ],
-      "mode": "required"
-    },
-    {
       "plugin": "mailbox.smtp",
       "paths": [
-        "src/pubkit/dns.py",
-        "src/pubkit/hosting.py",
-        "terraform/hosting/variables.tf",
-        "terraform/testdata/pubkit.json"
+        "src/pubkit/hosting.py"
       ],
       "mode": "required"
     },
@@ -120,66 +81,6 @@
         ".github/workflows/**",
         "src/pubkit/ci.py"
       ],
-      "mode": "required"
-    }
-  ],
-  "terraform": [
-    {
-      "dir": "terraform/backup-bucket",
-      "plugins": [
-        "terraform.google"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/cloud-run-access",
-      "plugins": [
-        "terraform.google"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/cloud-run-service",
-      "plugins": [
-        "terraform.google"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/cloud-run-sites",
-      "plugins": [
-        "terraform.google"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/desec-zones",
-      "plugins": [
-        "terraform.desec"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/dns-zone",
-      "plugins": [
-        "terraform.cloudflare",
-        "terraform.hetzner"
-      ],
-      "runs": [],
-      "mode": "required"
-    },
-    {
-      "dir": "terraform/hosting",
-      "plugins": [
-        "terraform.cloudflare",
-        "terraform.hetzner"
-      ],
-      "runs": [],
       "mode": "required"
     }
   ],

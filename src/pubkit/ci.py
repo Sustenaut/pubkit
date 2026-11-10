@@ -52,12 +52,12 @@ a change to its release workflow is tested before it ships.
 is installed from its git repository at its tag, by `cargo install --locked`,
 and the nightly moves each tag to the latest release of that repository.
 
-A repository that deploys a static site with pubkit's deploy-static (a
-workflow of its own uses it, or pubkit.json has a `site` block) gets a
-`site` job in pr.yml (and queue.yml): it builds the site (`site.pr_build`, else
-`site.build`, else nothing) and runs deploy-static, at this pubkit, with
-check-only, on `site.check_dir` (else the `dir` its deploy workflow gives
-deploy-static). A site that would fail to deploy fails the pull request.
+A repository that deploys a static site with a deploy-static action (a
+workflow of its own uses it, or pubkit.json has a `site` block) gets a `site` job in pr.yml (and queue.yml): it builds the site
+(`site.pr_build`, else `site.build`, else nothing) and runs the
+deploy-static its deploy workflow pins, with check-only, on
+`site.check_dir` (else the `dir` that workflow gives it). A site that would
+fail to deploy fails the pull request.
 
     "site": {"check_dir": "public", "pr_build": "npm run build:sample",
              "url": "https://example.eu/"}
@@ -227,7 +227,11 @@ GITHUB_REPO = re.compile(r"https://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0
 # The checkout the site job runs, pinned as pubkit's own workflows pin it.
 CHECKOUT = "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0"
 SITE = ("check_dir", "pr_build", "build", "url")
-DEPLOY_STATIC = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubkit/actions/deploy-static@")
+# A use of a deploy-static action, from whichever repository ships it,
+# with what follows `@` up to the end of the line: the site job runs that
+# same pin, so pubkit holds no pin of its own for it.
+DEPLOY_STATIC = re.compile(r"(?P<uses>[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+/actions/deploy-static@[^\s#]+"
+                           r"(?:[ \t]+#[ \t]*v[0-9][^\s]*)?)")
 # deploy-static's `dir`, in the lines of the step that uses it.
 DEPLOY_DIR = re.compile(r"""^\s*(?:with:\s*\{[^}\n]*?\b)?dir:\s*['"]?([^'"\s,}]+)""", re.M)
 
@@ -425,8 +429,9 @@ def layout(language: str, root: Path) -> str:
 
 def site(config: dict[str, Any], root: Path) -> dict[str, str] | None:
     """The site job's settings: pubkit.json's site block, checked, filled
-    in from the workflow that runs deploy-static; None when the repository
-    deploys no static site with it."""
+    in from the workflow that runs deploy-static, and the deploy-static
+    that workflow pins (`uses`); None when the repository deploys no static
+    site with it."""
     given = config.get("site")
     deploys = [p for p in sorted((root / ".github" / "workflows").glob("*.y*ml"))
                if not is_generated(text := p.read_text(encoding="utf-8"))
@@ -464,6 +469,14 @@ def site(config: dict[str, Any], root: Path) -> dict[str, str] | None:
     rel = Path(out["check_dir"])
     if rel.is_absolute() or ".." in rel.parts:
         refuse("check_dir must be a directory inside the repository")
+    pins = sorted({m["uses"] for path in deploys
+                   for m in DEPLOY_STATIC.finditer(path.read_text(encoding="utf-8"))})
+    if len(pins) != 1:
+        refuse("block needs the deploy-static its deploy workflow pins, for the pull request's "
+               "check to run the same one: "
+               + (f"the workflows pin {', '.join(pins)}; pin one" if pins
+                  else "no workflow of the repository's own uses deploy-static"))
+    out["uses"] = pins[0]
     return out
 
 
@@ -606,7 +619,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
 
 def site_job(ci: dict[str, Any]) -> str:
     """The pull request's site job: the site built as it is for a deploy,
-    and checked by deploy-static at this pubkit, which deploys nothing."""
+    and checked by the deploy-static its deploy workflow pins, which deploys nothing."""
     s = ci["site"]
     build = s.get("pr_build") or s.get("build")
     given = {"dir": s["check_dir"], "check-only": "true", **({"site-url": s["url"]} if "url" in s else {})}
@@ -615,7 +628,7 @@ def site_job(ci: dict[str, Any]) -> str:
             "  site:\n    name: ci / site\n    runs-on: ubuntu-latest\n    steps:\n"
             f"      - uses: {CHECKOUT}\n"
             + (f"      - run: {json.dumps(build)}\n" if build else "")
-            + f"      - uses: {ci['owner']}/pubkit/actions/deploy-static@{ref(__version__, ci['commit'])}\n"
+            + f"      - uses: {s['uses']}\n"
             f"        with: {flow(given)}\n")
 
 

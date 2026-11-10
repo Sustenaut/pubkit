@@ -34,10 +34,8 @@
     ".github/workflows/job-service-checks.yml",
     ".github/workflows/job-service-terraform.yml",
     ".github/workflows/job-service-tests.yml",
-    ".github/workflows/terraform.yml",
     "plugins/",
     ".claude-plugin/",
-    "terraform/",
     "actions/"
   ],
   "command": {

@@ -1,5 +1,5 @@
 """The `hosting` block of pubkit.json: the hosting providers a repository
-uses and what each of its zones has at them, which terraform/hosting reads.
+uses and what each of its zones has at them, which the hosting modules read.
 Everything provider-specific is here, in the repository, not in pubkit:
 
     "hosting": {
@@ -41,7 +41,7 @@ the others' (multi-signer), so a provider that cannot sign cannot serve it. `ttl
 defaults (TTL_KINDS: a day for the apex NS rrset, an hour for email, five
 minutes for sites); the nearest wins. A type is what pubkit supports: its settings, whether it serves
 DNS, mail, and which kind of site it hosts. A new type needs pubkit to
-learn it, here and in terraform/hosting; a new provider of a known type
+learn it, here and in the hosting modules; a new provider of a known type
 needs only pubkit.json.
 
 Terraform drops a setting its types do not name without a word, so

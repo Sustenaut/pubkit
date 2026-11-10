@@ -17,13 +17,13 @@
     pubkit record TEXT
     pubkit nightly --pubrel V --body FILE
     pubkit protect [--check] [--repos FILE | --require CHECK...] [REPO...]
-    pubkit dns check ZONE [--record NAME/TYPE...]
-    pubkit dns moves < STATE.json
 
 The deploy walk and the k8s checks are pubdeploy's: ./pubdeploy, which
 `pubkit sync` writes in a repository with a deploy block, runs them. What a
 control plane runs across many repositories (the board, state files,
-variables, freshness) is not pubkit's: pubkit's README says where it went.
+variables, freshness), and a repository's hosting (the Terraform modules,
+terraform.yml, deploy-static, docker-build, dns check and site check), are
+not pubkit's: pubkit's README says where each went.
 
 Deprecated, each now ./pubsec with the same arguments, and removed in the
 next minor: secrets run, app-secrets, github-app create,
@@ -722,21 +722,6 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("repos", nargs="*", metavar="REPO",
                    help="OWNER/NAME, read from its own pubkit.json on GitHub; by default "
                         "those the repos file marks, or this repository from ./pubkit.json")
-    p = commands.add_parser("dns", help="check a zone in pubkit.json's hosting block, live")
-    dns = p.add_subparsers(dest="dns_command", required=True)
-    p = dns.add_parser("check", help="every nameserver gives the same answers and, with dnssec, "
-                                     "validates alone against the pinned keys")
-    p.add_argument("zone", help="a zone in pubkit.json's hosting block, such as example.eu")
-    p.add_argument("--record", action="append", default=[], metavar="NAME/TYPE",
-                   help="another rrset to compare, such as www/A; repeat it")
-    dns.add_parser("moves", help="moved blocks taking Cloudflare records to keys by value, "
-                                 "from `terraform show -json` on stdin")
-    p = commands.add_parser("site", help="check a public site's built pages")
-    site = p.add_subparsers(dest="site_command", required=True)
-    p = site.add_parser("check", help="every page names itself, has an Open Graph card with a "
-                                      "large enough image, and robots.txt lets preview bots in")
-    p.add_argument("dir", type=Path, help="the built site, such as _site")
-    p.add_argument("--url", help="the site's https:// address, to find og:image files in DIR")
     p = commands.add_parser("required",
                             help="the make targets each rust-ci.yml job must run, from the standard")
     p.add_argument("--github-output", action="store_true",
@@ -798,16 +783,6 @@ def main(argv: list[str] | None = None) -> int:
         repos_file = confined(args.repos_file, "the --repos file") if args.repos_file else None
         return protect(args.repos, args.check, args.require, tags=args.tags,
                        queue=args.queue, repos_file=repos_file)
-    if args.command == "dns" and args.dns_command == "moves":
-        from .dns import moves
-        return moves(sys.stdin.read())
-    if args.command == "dns":
-        from .dns import check
-        return check(root, args.zone, args.record)
-    if args.command == "site":
-        from .paths import confined
-        from .site import run as site
-        return site(root, confined(args.dir, "the site directory"), args.url)
     if args.command == "audit" and args.step:
         if not args.package:
             sys.exit(f"pubkit: audit {args.step} needs --package NAME")

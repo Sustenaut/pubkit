@@ -1,5 +1,6 @@
-"""Steps for hosting.py: the hosting block of pubkit.json that
-terraform/hosting reads."""
+"""Steps for hosting.py: the hosting block of pubkit.json that the hosting
+modules read. fixtures/hosting/pubkit.json is a copy of the block the
+modules are tested with, in the package that ships them."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from pubkit import hosting
 
 scenarios("hosting.feature")
 
-TESTDATA = Path(__file__).resolve().parents[2] / "terraform" / "testdata" / "pubkit.json"
+TESTDATA = Path(__file__).resolve().parents[1] / "fixtures" / "hosting" / "pubkit.json"
 
 
 @given("the pubkit.json the Terraform modules are tested with", target_fixture="config")

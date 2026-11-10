@@ -1,5 +1,5 @@
 Feature: pubkit.json's hosting block holds the providers and the zones
-  terraform/hosting reads the hosting block: the providers a repository
+  The hosting modules read the hosting block: the providers a repository
   uses, each with its type and its own facts, and the zones, each naming
   the providers that serve its DNS, its email and its sites. Terraform
   ignores a setting it does not know, so pubkit sync checks the block first

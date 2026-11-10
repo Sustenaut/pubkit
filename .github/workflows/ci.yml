@@ -109,93 +109,6 @@ jobs:
               and (.key == "review" or .key == "tested" or $tested == "true")))' > /dev/null
         env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}' }
 
-  # The hosting modules (terraform/) and the deploy actions
-  # (actions/deploy-static), which consumers take by tag from this repository. Each
-  # module's tests mock its providers, so nothing here needs credentials.
-  # Terraform is the oldest version the modules allow, 1.11.
-  terraform:
-    needs: tested
-    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
-    runs-on: ubuntu-latest
-    # One module's flaky provider download does not cancel the others.
-    strategy:
-      fail-fast: false
-      matrix:
-        module: [dns-zone, hosting, cloud-run-sites, desec-zones, cloud-run-service, backup-bucket, cloud-run-access]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-        with: { terraform_version: 1.11.4, terraform_wrapper: false }
-      - run: terraform -chdir="terraform/$MODULE" fmt -check -recursive
-        env: { MODULE: '${{ matrix.module }}' }
-      # The modules keep no lock file, so the providers' cache is keyed on
-      # the module's .tf files, which constrain their versions. init fetches
-      # each provider's SHA256SUMS from GitHub even from the cache, and that
-      # fetch sometimes times out, so it is tried three times.
-      - run: |
-          mkdir -p ~/.terraform.d/plugin-cache
-          echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >> "$GITHUB_ENV"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.terraform.d/plugin-cache
-          key: terraform-providers-${{ matrix.module }}-${{ hashFiles(format('terraform/{0}/**/*.tf', matrix.module)) }}
-      - run: |
-          for attempt in 1 2 3; do
-            terraform -chdir="terraform/$MODULE" init -backend=false -input=false && exit 0
-            echo "::warning::terraform init failed (attempt $attempt of 3)"
-            [ "$attempt" = 3 ] || sleep 10
-          done
-          exit 1
-        env: { MODULE: '${{ matrix.module }}' }
-      - run: terraform -chdir="terraform/$MODULE" validate
-        env: { MODULE: '${{ matrix.module }}' }
-      - run: terraform -chdir="terraform/$MODULE" test
-        env: { MODULE: '${{ matrix.module }}' }
-
-  deploy-static:
-    needs: tested
-    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - run: shellcheck actions/deploy-static/*.sh
-      - run: actions/deploy-static/test.sh
-      # terraform.yml, as GitHub and shellcheck read it. actionlint is the release's binary, checked
-      # against its sha256.
-      - name: actionlint terraform.yml
-        run: |
-          curl -fsSLo "$RUNNER_TEMP/actionlint.tgz" \
-            "https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_linux_amd64.tar.gz"
-          echo "${SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c
-          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" .github/workflows/terraform.yml
-        env:
-          VERSION: 1.7.12
-          SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-
-  # Builds one image twice under one scope: the second must come from the cache.
-  docker-build-action:
-    needs: tested
-    if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: ./actions/docker-build
-        with:
-          tags: docker-build-test:first
-          scope: docker-build-test-${{ github.run_id }}-${{ github.run_attempt }}
-          context: actions/docker-build/test
-      - uses: ./actions/docker-build
-        with:
-          tags: docker-build-test:second
-          scope: docker-build-test-${{ github.run_id }}-${{ github.run_attempt }}
-          context: actions/docker-build/test
-      - run: |
-          first=$(docker run --rm docker-build-test:first cat /built)
-          second=$(docker run --rm docker-build-test:second cat /built)
-          echo "first $first, second $second"
-          [ -n "$first" ] && [ "$first" = "$second" ]
-
   cache-action:
     needs: tested
     if: ${{ !cancelled() && needs.tested.outputs.tested != 'true' }}
@@ -213,13 +126,10 @@ jobs:
   # pubrel tags from a push to main alone, as the wheel is built. Where
   # the queue already passed the commit, its run of these jobs counts.
   release:
-    needs: [passed, tested, terraform, deploy-static, cache-action, docker-build-action]
+    needs: [passed, tested, cache-action]
     if: >-
       !cancelled() && needs.passed.result == 'success'
-      && (needs.tested.outputs.tested == 'true'
-          || (needs.terraform.result == 'success' && needs.deploy-static.result == 'success'
-              && needs.cache-action.result == 'success'
-              && needs.docker-build-action.result == 'success'))
+      && (needs.tested.outputs.tested == 'true' || needs.cache-action.result == 'success')
     uses: Sustenaut/pubrel/.github/workflows/release.yml@5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc # v0.6.1
     with: { pubrel-version: v0.6.1 }
     # The release app's token tags the release: the tag ruleset lets only
