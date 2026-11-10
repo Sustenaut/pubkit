@@ -945,6 +945,40 @@ def init_mirrored(initialised, url):
     assert initialised["configs"][-1] == f'provider_installation {{\n  network_mirror {{ url = "{url}" }}\n}}\n'
 
 
+def _steps(workflow):
+    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+    return [s for job in data["jobs"].values() for s in job.get("steps", [])]
+
+
+@then("every use of pubkit's actions in pubkit's workflows pins one commit, at a release no later than this pubkit")
+def self_pins_released():
+    """No self-pin at all passes too: the workflows may carry their own steps."""
+    pins = set()
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        text = path.read_text()
+        uses = [u for u in refs.PUBKIT_USE.findall(text) if "/pubkit/actions/" in u]
+        pinned = [m for m in refs.PUBKIT_PIN.finditer(text) if m["name"].startswith("actions/")]
+        assert len(pinned) == len(uses) and all(m["commit"] for m in pinned), \
+            f"{path.name}: pin pubkit's actions by a release's commit, with its version: {uses}"
+        pins |= {(m["commit"], m["version"]) for m in pinned}
+    assert len(pins) <= 1, f"pubkit's workflows pin its actions at more than one commit: {sorted(pins)}"
+    for _, version in pins:
+        assert tuple(map(int, version.split("."))) <= tuple(map(int, __version__.split("."))), \
+            f"pubkit's workflows pin its actions at v{version}, later than this pubkit ({__version__})"
+
+
+@then("no reusable workflow of pubkit's uses an action by a local path")
+def no_local_actions():
+    reusable = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        data = yaml.safe_load(path.read_text())
+        on = data.get("on", data.get(True))  # YAML 1.1 reads a bare `on` as true
+        if "workflow_call" in (on if isinstance(on, (dict, list)) else [on]):
+            reusable += 1
+            assert not [s for s in _steps(path.name) if s.get("uses", "").startswith("./")], path.name
+    assert reusable, "no reusable workflow found"
+
+
 @given(parsers.parse("pubkit.json's protect block is {block}"))
 def protect_block(repo, block):
     path = repo / "pubkit.json"

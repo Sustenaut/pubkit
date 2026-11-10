@@ -162,6 +162,23 @@ here first, then by pubhost's modules. pubkit also keeps
     - uses: Sustenaut/pubkit/actions/cache@<commit> # vX.Y.Z
       with: { step: restore, refresh: "${{ steps.refresh.outputs.present }}" }
   ```
+- **`actions/retry`:** runs a bash script (`run`) with `bash -ec` up to
+  `tries` times (3), for a step a flaky download can fail. After each
+  failed try but the last it warns "`<what>` failed (attempt N of T)"
+  (`what` is `setup` by default) and waits `pause` seconds (15); it fails
+  when every try did. The inputs reach the script through its
+  environment, so the script runs exactly as given.
+- **`actions/terraform-init`:** `terraform -chdir=<dir> init <args>`
+  (`dir` `.`, `args` `-input=false`, `terraform` the binary), tried as
+  retry tries a script, then once more with every provider from
+  pubkit.json's `mirror.terraform`, when it names one (see "A wheel
+  mirror"); the lock's hashes still check what the mirror gives.
+
+  ```yaml
+  - uses: hashicorp/setup-terraform@<commit> # vX.Y.Z
+  - uses: Sustenaut/pubkit/actions/terraform-init@<commit> # vX.Y.Z
+    with: { dir: infra, args: -backend=false -input=false }
+  ```
 
 ## Deploying a service to k3s
 
