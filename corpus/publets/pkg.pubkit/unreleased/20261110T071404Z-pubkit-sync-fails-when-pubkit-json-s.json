@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "pubkit sync fails when pubkit.json's protect.checks requires a check that none of the repository's workflows reports where the ruleset waits for it (the merge queue's commit, or with no queue the pull request's), naming it; SonarCloud Code Analysis counts only where a workflow scans on every such run, which the generated pr.yml does not do in the queue"
-}

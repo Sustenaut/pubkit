@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "pubkit pins, and the nightly, also move another repository's action (OWNER/REPO/actions/NAME@) and its Terraform module sources in .tf files (source = \"github.com/OWNER/REPO//PATH?ref=...\") to that repository's latest release, by its tag's commit with the version in a comment; a module pinned by tag moves to the commit form"
-}
