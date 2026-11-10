@@ -368,6 +368,74 @@ def problems(block: Any) -> list[str]:
     return out
 
 
+# The workflow a job calls to scan with SonarQube Cloud, whose app then
+# reports SonarCloud Code Analysis on the commit.
+SONAR_SCAN = re.compile(r"/job-sonar\.ya?ml(?:@|$)|SonarSource/sonarqube-scan-action@|SonarSource/sonarcloud-github-action@")
+
+
+def _on(workflow: dict) -> set[str]:
+    """The events a workflow runs on (YAML reads a bare `on` as True)."""
+    given = workflow.get("on", workflow.get(True))
+    if isinstance(given, str):
+        return {given}
+    return set(given) if isinstance(given, (list, dict)) else set()
+
+
+def reported(root: Path, event: str) -> tuple[set[str], set[str], bool]:
+    """What the repository's workflows that run on `event` report: the
+    checks of its plain jobs (each job's name, else its id), the prefixes of
+    the checks of its jobs that call a reusable workflow (`PREFIX / job`),
+    and whether one of them always scans with SonarQube Cloud. A job that
+    may be skipped in the merge queue (its `if` reads whether the tree was
+    already tested, as the generated pr.yml's sonar job does) does not
+    count as always scanning there. A reusable workflow's own job names are
+    not read: any check under a caller's prefix counts as reported."""
+    import yaml  # noqa: PLC0415
+
+    plain, prefixes, sonar = set(), set(), False
+    for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        try:
+            workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            continue
+        if not isinstance(workflow, dict) or event not in _on(workflow):
+            continue
+        for job_id, job in (workflow.get("jobs") or {}).items():
+            if not isinstance(job, dict):
+                continue
+            name = str(job.get("name") or job_id)
+            uses = str(job.get("uses") or "")
+            steps = " ".join(str(s.get("uses", "")) for s in job.get("steps") or [] if isinstance(s, dict))
+            (prefixes if uses else plain).add(name)
+            skippable = event == "merge_group" and "tested" in str(job.get("if", ""))
+            if SONAR_SCAN.search(uses or steps) and not skippable:
+                sonar = True
+    return plain, prefixes, sonar
+
+
+def unreported(root: Path, checks: list[str], queue: bool) -> list[str]:
+    """The required checks that no workflow of the repository reports on the
+    commit the ruleset waits on: the merge queue's (`merge_group`), or, with
+    no queue, the pull request's. A check nothing reports is never passed,
+    so the queue, or the pull request, waits for it forever."""
+    if not (root / ".github" / "workflows").is_dir():
+        return []
+    event = "merge_group" if queue else "pull_request"
+    plain, prefixes, sonar = reported(root, event)
+    out = []
+    for check in checks:
+        if check in APPS:
+            if not sonar:
+                out.append(f"{check}: no workflow scans with SonarQube Cloud on every {event} run, "
+                           "so SonarCloud never reports it there (the generated pr.yml skips the "
+                           "queue's scan of a tree its pull request passed); ci / sonar already "
+                           "fails ci / passed on the quality gate, so drop it from protect.checks")
+        elif check not in plain and check.split(" / ", 1)[0] not in prefixes:
+            out.append(f"{check}: no workflow that runs on {event} reports it, so "
+                       f"{'the merge queue' if queue else 'a pull request'} would wait for it forever")
+    return out
+
+
 def entry(repo: str, config: Any, where: str) -> dict:
     """A repository's entry from its pubkit.json's protect block."""
     if not isinstance(config, dict) or "protect" not in config:

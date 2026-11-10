@@ -426,7 +426,8 @@ def sync(root: Path, check: bool) -> int:
         for use in unversioned:
             print(f"pubkit: {use} names no pubkit version, so `pubkit bump` leaves it as it is",
                   file=sys.stderr)
-        if stale or lock_stale or replaced or actions or unignored or deploy_failed:
+        unreported = unreported_checks(root, config)
+        if stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":
@@ -435,11 +436,26 @@ def sync(root: Path, check: bool) -> int:
                 return 0
             return conform(root)
         return 0
-    if not stale and not unignored:
+    unreported = unreported_checks(root, config)
+    if not stale and not unignored and not unreported:
         print(f"already in step with pubkit {__version__}")
     if lock_stale:
         print(f"now run `pubkit lock`: {LOCK} pins another pubkit")
-    return 0
+    return 1 if unreported else 0
+
+
+def unreported_checks(root: Path, config: dict) -> list[str]:
+    """The checks pubkit.json's protect block requires that none of the
+    repository's workflows, as sync leaves them, reports where the ruleset
+    waits for them; each is printed."""
+    if "protect" not in config:
+        return []
+    from .protect import entry, unreported  # noqa: PLC0415
+    protected = entry("", config, CONFIG)
+    missing = unreported(root, protected["checks"], protected["queue"])
+    for problem in missing:
+        print(f"pubkit: {CONFIG}'s protect.checks: {problem}", file=sys.stderr)
+    return missing
 
 
 def sha256_of(url: str) -> str:

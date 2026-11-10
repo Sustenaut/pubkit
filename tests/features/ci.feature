@@ -852,3 +852,95 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And the file "integrations.json" reads "{"uses": []}"
     When I run pubkit "sync"
     Then "integrations.json" does not contain "sonarcloud"
+
+  # The checks a ruleset requires are only passed if something reports them
+  # on the commit it waits on: the merge queue's, or with no queue the pull
+  # request's. sync holds pubkit.json's protect.checks to what the
+  # repository's workflows report there. (The second sync writes what the
+  # first one's tests/ directory changes.)
+
+  Scenario Outline: sync --check takes the checks the generated CI reports in the merge queue
+    Given a <language> repository whose ci block is '<ci>'
+    And pubkit.json's protect block is {"checks": [<checks>]}
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it prints "in step with pubkit"
+    And stderr does not mention "protect.checks"
+
+    Examples:
+      | language | ci              | checks                             |
+      | Python   | {"release": {}} | "ci / passed", "release / release" |
+      | Node     | {}              | "ci / passed"                      |
+      | Rust     | {"release": {}} | "ci / passed", "release / release" |
+      | service  | {}              | "ci / passed"                      |
+
+  Scenario Outline: sync --check refuses SonarCloud Code Analysis where the merge queue skips the scan
+    Given a <language> repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "SonarCloud Code Analysis"]}
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "protect.checks: SonarCloud Code Analysis: no workflow scans with SonarQube Cloud on every merge_group run"
+    And stderr mentions "so drop it from protect.checks"
+
+    Examples:
+      | language |
+      | Python   |
+      | Node     |
+      | service  |
+
+  Scenario: sync --check takes SonarCloud Code Analysis for a crate, whose queue run always scans
+    Given a Rust repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "SonarCloud Code Analysis"]}
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it prints "in step with pubkit"
+    And stderr does not mention "protect.checks"
+
+  Scenario: sync --check takes SonarCloud Code Analysis with no merge queue, where the pull request's run scans
+    Given a Python repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "SonarCloud Code Analysis"], "queue": false}
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: sync --check refuses a check no workflow reports
+    Given a Python repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "build"]}
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "protect.checks: build: no workflow that runs on merge_group reports it, so the merge queue would wait for it forever"
+    When I run pubkit "sync" "--check"
+    Then it fails
+
+  Scenario: sync --check takes a hand-written workflow's check when it runs in the merge queue
+    Given a Python repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "hosting / passed"]}
+    And the workflow "hosting.yml" has the job "hosting / passed" on "pull_request, merge_group"
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
+
+  Scenario: sync --check refuses a hand-written workflow's check when it does not run in the merge queue
+    Given a Python repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "hosting / passed"]}
+    And the workflow "hosting.yml" has the job "hosting / passed" on "pull_request"
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it fails
+    And stderr mentions "hosting / passed: no workflow that runs on merge_group reports it"
+
+  Scenario: sync --check takes a check under the prefix of a job that calls a reusable workflow
+    Given a Python repository whose ci block is '{}'
+    And pubkit.json's protect block is {"checks": ["ci / passed", "integrations / scan"]}
+    And the workflow "integrations.yml" calls "example-org/integrations/.github/workflows/scan.yml@v1" as "integrations" on "pull_request, merge_group"
+    When I run pubkit "sync"
+    And I run pubkit "sync"
+    And I run pubkit "sync" "--check"
+    Then it succeeds
