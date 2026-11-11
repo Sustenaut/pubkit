@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "actions/retry runs a bash script up to tries times (3), warning \"<what> failed (attempt N of T)\" and waiting pause seconds (15) after each failed try but the last, and actions/terraform-init runs terraform init the same way, then once more from pubkit.json's mirror.terraform when it names one; their inputs reach the script through its environment"
-}
