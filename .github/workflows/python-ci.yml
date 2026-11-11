@@ -47,14 +47,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        run: |
-          for attempt in 1 2 3; do
-            bash -ec "$SETUP" && exit 0
-            echo "::warning::setup failed (attempt $attempt of 3)"
-            [ "$attempt" = 3 ] || sleep 15
-          done
-          exit 1
-        env: { SETUP: '${{ inputs.setup }}' }
+        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        with: { run: '${{ inputs.setup }}' }
       - if: inputs.sync-check
         run: .venv/bin/pubkit sync --check
       # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
@@ -90,14 +84,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        run: |
-          for attempt in 1 2 3; do
-            bash -ec "$SETUP" && exit 0
-            echo "::warning::setup failed (attempt $attempt of 3)"
-            [ "$attempt" = 3 ] || sleep 15
-          done
-          exit 1
-        env: { SETUP: '${{ inputs.setup }}' }
+        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
       # Its coverage joins the test job's, as an artifact of its own.
