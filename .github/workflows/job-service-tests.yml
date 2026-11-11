@@ -10,6 +10,7 @@ name: job-service-tests
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       setup: { type: string, default: '', description: 'Prepares the tests, for example make venv. Empty skips it.' }
       test: { type: string, required: true, description: Runs the tests. }
@@ -17,7 +18,7 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0

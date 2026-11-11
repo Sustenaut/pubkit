@@ -24,6 +24,7 @@ name: job-tested
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       workflow: { type: string, default: .github/workflows/pr.yml, description: "The workflow the merge queue runs, by its path." }
     outputs:
       tested: { value: '${{ jobs.tested.outputs.tested }}', description: '"true" when an earlier run passed on this commit''s tree.' }
@@ -31,7 +32,7 @@ on:
 
 jobs:
   tested:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     outputs:
       tested: ${{ steps.earlier.outputs.tested }}
       run-id: ${{ steps.earlier.outputs.run-id }}

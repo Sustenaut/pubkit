@@ -52,6 +52,14 @@ a change to its release workflow is tested before it ships.
 is installed from its git repository at its tag, by `cargo install --locked`,
 and the nightly moves each tag to the latest release of that repository.
 
+`runs-on` names the runners: a label, such as a self-hosted runner scale
+set's, for every job, or an object of labels by job name with "default" for
+the rest, such as {"default": "my-runners", "review": "ubuntu-latest"}. It
+goes to each job pubkit calls as its `runs-on` input, and into the jobs
+pubkit writes itself (tested, passed, site). Rust's test job runs on its
+os-matrix instead, and pubrel's release workflow on GitHub's runners.
+Without it nothing is written, and every job runs on ubuntu-latest.
+
 A repository that deploys a static site with a deploy-static action (a
 workflow of its own uses it, or pubkit.json has a `site` block) gets a `site` job in pr.yml (and queue.yml): it builds the site
 (`site.pr_build`, else `site.build`, else nothing) and runs the
@@ -109,7 +117,7 @@ TRIGGERS = {
 RELEASE_EVENTS = ("pr", "queue", "main")
 # The events the site is checked on, before anything deploys it.
 SITE_EVENTS = ("pr", "queue")
-SETTINGS = ("language", "events", "cron", "with", "jobs", "release", "tools")
+SETTINGS = ("language", "events", "cron", "with", "jobs", "release", "tools", "runs-on")
 HEADER = ("# Written by `pubkit sync` from the ci block of pubkit.json. Do not edit:\n"
           "# change pubkit.json and run `pubkit sync`.\n")
 
@@ -132,6 +140,9 @@ class Job:
     # targets, if it has any, go in the input `required`; with none, or a
     # workflow job the standard does not turn on, the job is left out.
     standard: str | None = None
+    # Its runners come from an input of its own (os-matrix), so `runs-on`
+    # does not reach it.
+    matrix: bool = False
 
 
 NODE_TEST = ("node-version", "python-version", "apt-packages", "setup", "test", "sync-check",
@@ -169,7 +180,7 @@ JOBS: dict[str, dict[str, Job]] = {
         "gates": Job("job-rust-gates.yml", ("python-version", "gates"), internal=RUST_REQUIRED,
                      standard="gates"),
         "test": Job("job-rust-test.yml", ("os-matrix", "test-args"), needs=("gates",),
-                    standard="test"),
+                    standard="test", matrix=True),
         "functional": Job("job-rust-functional.yml",
                           ("python-version", "apt-packages", "functional",
                            "cargo-llvm-cov-version"), needs=("gates",), secrets=True,
@@ -333,6 +344,7 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
     listed = tools(given)
     if listed and language != "rust":
         stop(f"tools is for a Rust repository's functional job; {language} has none")
+    runners = runs_on(given, table)
     rules = plan(config, root) if language == "rust" else None
     jobs: dict[str, tuple[str, ...]] = {}
     for name, job in table.items():
@@ -385,8 +397,47 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
     return {"language": language, "events": [e for e in EVENTS if e in events], "cron": cron,
             "with": inputs, "jobs": jobs, "release": release, "layout": layout(language, root),
-            "site": site(config, root), "tools": listed,
+            "site": site(config, root), "tools": listed, "runs-on": runners,
             "targets": rules["targets"] if rules else {}}
+
+
+# A runner label: GitHub's, such as ubuntu-latest, or a self-hosted runner
+# scale set's name.
+LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+# The jobs pubkit writes into the workflow itself, besides the table's.
+OWN_JOBS = ("tested", "passed", "site")
+
+
+def runs_on(given: dict[str, Any], table: dict[str, Job]) -> dict[str, str]:
+    """The ci block's `runs-on`, checked: the runner label of each job that
+    has one, by job name, under "default" for every other. Empty without
+    it, so nothing is written and every job runs on ubuntu-latest."""
+    value = given.get("runs-on")
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        value = {"default": value}
+    if not isinstance(value, dict) or not value:
+        stop('runs-on must be a runner label, such as "my-runners", or an object of them '
+             'by job, such as {"default": "my-runners", "review": "ubuntu-latest"}')
+    named = [n for n, job in table.items() if not job.matrix]
+    allowed = ("default", *named, *OWN_JOBS)
+    unknown = sorted(set(value) - set(allowed))
+    if unknown:
+        matrix = sorted(n for n in unknown if n in table)
+        if matrix:
+            stop(f"runs-on names {', '.join(matrix)}, whose runners its os-matrix input gives")
+        stop(f"runs-on names {', '.join(unknown)}; it takes {', '.join(allowed)}")
+    for name, label in value.items():
+        if not isinstance(label, str) or not LABEL.fullmatch(label):
+            stop(f"runs-on.{name} must be a runner label, such as \"ubuntu-latest\", "
+                 f"not {json.dumps(label)}")
+    return value
+
+
+def runner(ci: dict[str, Any], name: str) -> str | None:
+    """The label job `name` runs on where the ci block gives one."""
+    return ci["runs-on"].get(name, ci["runs-on"].get("default"))
 
 
 def tools(given: dict[str, Any]) -> list[dict[str, str]]:
@@ -501,8 +552,15 @@ def tested_job(ci: dict[str, Any]) -> str:
             "  tested:\n    name: ci\n"
             f"    uses: {ci['owner']}/pubkit/.github/workflows/job-tested.yml"
             f"@{ref(__version__, ci['commit'])}\n"
-            f"    with: {flow({'workflow': path(queued(ci))})}\n"
+            f"    with: {flow({'workflow': path(queued(ci)), **runs_with(ci, 'tested')})}\n"
             "    permissions:\n      actions: read\n      contents: read\n")
+
+
+def runs_with(ci: dict[str, Any], name: str) -> dict[str, str]:
+    """The `runs-on` input of a job pubkit calls, where the ci block gives
+    it a runner; nothing else, so the job keeps its default."""
+    label = runner(ci, name)
+    return {"runs-on": label} if label else {}
 
 
 def trigger(ci: dict[str, Any], event: str) -> str:
@@ -535,6 +593,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             given["tools"] = json.dumps(ci["tools"])
         if "layout" in job.internal and ci["layout"]:
             given["layout"] = ci["layout"]
+        if not job.matrix:
+            given.update(runs_with(ci, name))
         needs = [n for n in job.needs if n in names]
         # On main, a job the queue ran waits to hear whether it passed.
         # In the queue, a tree its pull request already passed is not scanned
@@ -573,7 +633,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "  # above succeeded or, where an earlier run already passed on the\n"
             "  # commit's tree, was skipped for it. None is skipped for not being asked for.\n"
             "  passed:\n    name: ci / passed\n    if: always()\n"
-            f"    needs: [{', '.join(['tested', *names])}]\n    runs-on: ubuntu-latest\n"
+            f"    needs: [{', '.join(['tested', *names])}]\n    runs-on: {runner(ci, 'passed') or 'ubuntu-latest'}\n"
             "    steps:\n"
             "      - run: |\n          echo \"$RESULTS\"\n"
             "          echo \"$RESULTS\" | jq -e --arg tested \"$TESTED\" '.tested.result == \"success\"\n"
@@ -585,7 +645,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "\n  # The one check a ruleset requires: it passes only when every job\n"
             "  # above succeeded. None of them is ever skipped for not being asked for.\n"
             "  passed:\n    name: ci / passed\n    if: always()\n"
-            f"    needs: [{', '.join(names)}]\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"    needs: [{', '.join(names)}]\n    runs-on: {runner(ci, 'passed') or 'ubuntu-latest'}\n    steps:\n"
             "      - run: |\n          echo \"$RESULTS\"\n"
             "          echo \"$RESULTS\" | jq -e 'all(.[]; .result == \"success\")' > /dev/null\n"
             "        env: { RESULTS: '${{ toJSON(needs) }}' }\n")
@@ -625,7 +685,7 @@ def site_job(ci: dict[str, Any]) -> str:
     given = {"dir": s["check_dir"], "check-only": "true", **({"site-url": s["url"]} if "url" in s else {})}
     return ("\n  # The site as deploy-static checks it before a deploy, so a site that\n"
             "  # would fail to deploy fails the pull request. It deploys nothing.\n"
-            "  site:\n    name: ci / site\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"  site:\n    name: ci / site\n    runs-on: {runner(ci, 'site') or 'ubuntu-latest'}\n    steps:\n"
             f"      - uses: {CHECKOUT}\n"
             + (f"      - run: {json.dumps(build)}\n" if build else "")
             + f"      - uses: {s['uses']}\n"

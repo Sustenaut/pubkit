@@ -9,13 +9,15 @@ name: job-review
 
 on:
   workflow_call:
+    inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
 
 jobs:
   # A pull request that adds or moves a dependency to a version with a
   # known vulnerability fails here, before it merges. GitHub's dependency
   # graph serves it for public repositories only.
   review:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       # The owner's own reusable workflows and actions carry no license
       # GitHub can read, so they are left out of the license check alone,

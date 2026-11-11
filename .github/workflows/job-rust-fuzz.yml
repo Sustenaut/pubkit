@@ -15,6 +15,7 @@ name: job-rust-fuzz
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
       fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
@@ -25,7 +26,7 @@ env:
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 2 }

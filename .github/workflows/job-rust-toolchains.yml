@@ -10,6 +10,7 @@ name: job-rust-toolchains
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       scheduled-toolchains: { type: string, default: '["stable", "beta"]', description: JSON list of toolchains a scheduled run tests on. }
       test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
 
@@ -22,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         toolchain: ${{ fromJSON(inputs.scheduled-toolchains) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     env:
       RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
     steps:

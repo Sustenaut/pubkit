@@ -17,6 +17,7 @@ name: job-rust-cross
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
@@ -30,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         target: ${{ fromJSON(inputs.cross-targets) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 2 }

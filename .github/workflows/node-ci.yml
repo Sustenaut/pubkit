@@ -24,6 +24,7 @@ name: node-ci
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       node-version: { type: string, default: '22' }
       python-version: { type: string, default: '3.14', description: For pubkit sync --check. }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
@@ -45,7 +46,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -95,7 +96,7 @@ jobs:
 
   browser:
     if: inputs.browser-test != ''
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -125,7 +126,7 @@ jobs:
   # Every package in package-lock.json against npm's advisory database,
   # without installing anything.
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -138,7 +139,7 @@ jobs:
   # has no switch. The lockfiles are named rather than found by a recursive
   # scan, which would read a requirements.txt's lower bounds as pins.
   osv:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - id: locks
@@ -163,7 +164,7 @@ jobs:
   # graph serves it for public repositories only.
   review:
     if: github.event_name == 'pull_request' && !github.event.repository.private
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       # The owner's own reusable workflows and actions carry no license
       # GitHub can read, so they are left out of the license check alone,
@@ -233,7 +234,7 @@ jobs:
     # It waits for the browser job too, so the browser tests' coverage
     # counts; when no browser-test was asked for, that job is skipped.
     if: always() && needs.test.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.browser.result)
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -291,7 +292,7 @@ jobs:
   passed:
     if: always()
     needs: [test, browser, audit, osv, review, sonar]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - run: |
           echo "$RESULTS"
