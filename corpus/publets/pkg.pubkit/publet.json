@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.35.0 is released as v0.35.0 from commit 1d4ed6bf0f9f6f7c800975f004efcd1576f5c0d2.",
+      "content": "pubkit 0.35.1 is released as v0.35.1 from commit 83a221a19dcc23af9de2533a7f7a1d84f40d91dc.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.35.0",
+            "0.35.1",
             "pubkit --version",
-            "pubkit 0.35.0",
-            "v0.35.0",
-            "1d4ed6bf0f9f6f7c800975f004efcd1576f5c0d2"
+            "pubkit 0.35.1",
+            "v0.35.1",
+            "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
           ]
         ]
       },
-      "scope": "the published release v0.35.0 of pubkit",
+      "scope": "the published release v0.35.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1d4ed6bf0f9f6f7c800975f004efcd1576f5c0d2"
+          "revision": "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.35.0 was released on 2026-11-10 from commit 1d4ed6bf0f9f6f7c800975f004efcd1576f5c0d2 with these changes.",
+      "content": "pubkit 0.35.1 was released on 2026-11-11 from commit 83a221a19dcc23af9de2533a7f7a1d84f40d91dc with these changes.",
       "data": {
         "columns": [
           {
@@ -58,39 +58,23 @@
         "rows": [
           [
             "added",
-            "pubkit pins, and the nightly, also move another repository's action (OWNER/REPO/actions/NAME@) and its Terraform module sources in .tf files (source = \"github.com/OWNER/REPO//PATH?ref=...\") to that repository's latest release, by its tag's commit with the version in a comment; a module pinned by tag moves to the commit form"
-          ],
-          [
-            "added",
-            "pubkit sync --check and conform fail on a pin of a pubkit action, reusable workflow or Terraform module this pubkit does not ship (refs.SHIPPED, held to the tree by a test), and pins leaves such a pin where it is instead of moving it to a pubkit that lacks it"
-          ],
-          [
-            "changed",
-            "The nightly moves third-party GitHub Actions in place of Dependabot: pubkit actions (and a nightly commit of its own) moves each action a hand-written workflow or composite action pins by commit to its latest release, by its tag's commit, and the managed dependabot.yml sets open-pull-requests-limit 0 on github-actions, so Dependabot opens only security updates; update.actions false keeps Dependabot's version updates"
-          ],
-          [
-            "added",
-            "pubkit sync fails when pubkit.json's protect.checks requires a check that none of the repository's workflows reports where the ruleset waits for it (the merge queue's commit, or with no queue the pull request's), naming it; SonarCloud Code Analysis counts only where a workflow scans on every such run, which the generated pr.yml does not do in the queue"
-          ],
-          [
-            "removed",
-            "The hosting half of pubkit is pubhost's (Sustenaut/pubhost 0.1.0): the Terraform modules (terraform/), terraform.yml, the deploy-static and docker-build actions, pubkit dns check and pubkit site check (dns moves, the 0.12.6 key migration, is dropped). pubkit keeps the hosting block's shape, which sync checks, and the ci / site job, which now runs the deploy-static the repository's own deploy workflow pins"
+            "actions/retry runs a bash script up to tries times (3), warning \"<what> failed (attempt N of T)\" and waiting pause seconds (15) after each failed try but the last, and actions/terraform-init runs terraform init the same way, then once more from pubkit.json's mirror.terraform when it names one; their inputs reach the script through its environment"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.35.0 of pubkit",
+      "scope": "the published release v0.35.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1d4ed6bf0f9f6f7c800975f004efcd1576f5c0d2"
+          "revision": "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
         }
       ]
     }
   },
-  "created": "2026-11-10T00:00:00Z",
+  "created": "2026-11-11T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
