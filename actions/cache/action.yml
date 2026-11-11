@@ -45,6 +45,7 @@ runs:
     - name: Restore cache entry 1
       if: inputs.step == 'restore' && steps.plan.outputs.restore-1 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-1 }}
         key: ${{ steps.plan.outputs.key-1 }}
@@ -53,6 +54,7 @@ runs:
     - name: Restore cache entry 2
       if: inputs.step == 'restore' && steps.plan.outputs.restore-2 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-2 }}
         key: ${{ steps.plan.outputs.key-2 }}
@@ -61,6 +63,7 @@ runs:
     - name: Restore cache entry 3
       if: inputs.step == 'restore' && steps.plan.outputs.restore-3 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-3 }}
         key: ${{ steps.plan.outputs.key-3 }}
@@ -69,6 +72,7 @@ runs:
     - name: Restore cache entry 4
       if: inputs.step == 'restore' && steps.plan.outputs.restore-4 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-4 }}
         key: ${{ steps.plan.outputs.key-4 }}
@@ -77,6 +81,7 @@ runs:
     - name: Restore cache entry 5
       if: inputs.step == 'restore' && steps.plan.outputs.restore-5 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-5 }}
         key: ${{ steps.plan.outputs.key-5 }}
@@ -85,6 +90,7 @@ runs:
     - name: Restore cache entry 6
       if: inputs.step == 'restore' && steps.plan.outputs.restore-6 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-6 }}
         key: ${{ steps.plan.outputs.key-6 }}
@@ -93,6 +99,7 @@ runs:
     - name: Restore cache entry 7
       if: inputs.step == 'restore' && steps.plan.outputs.restore-7 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-7 }}
         key: ${{ steps.plan.outputs.key-7 }}
@@ -101,6 +108,7 @@ runs:
     - name: Restore cache entry 8
       if: inputs.step == 'restore' && steps.plan.outputs.restore-8 == 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      continue-on-error: true
       with:
         path: ${{ steps.plan.outputs.path-8 }}
         key: ${{ steps.plan.outputs.key-8 }}

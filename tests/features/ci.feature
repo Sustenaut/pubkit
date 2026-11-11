@@ -945,3 +945,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And I run pubkit "sync"
     And I run pubkit "sync" "--check"
     Then it succeeds
+
+  Scenario: A refused report upload or cache never fails a job, and a failing test still does
+    Then every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes
+    And every cache restore and save in pubkit's cache action continues on error
+    And no step that runs a test command continues on error

@@ -969,3 +969,41 @@ def calling_job(repo, name, uses, job, events):
     path.parent.mkdir(parents=True, exist_ok=True)
     on = ", ".join(e.strip() for e in events.split(","))
     path.write_text(f"on: [{on}]\njobs:\n  {job}:\n    uses: {uses}\n")
+
+
+PUBKIT_ACTIONS = WORKFLOWS.parents[1] / "actions"
+
+
+def _all_steps(data):
+    for job in (data.get("jobs") or {}).values():
+        yield from job.get("steps") or []
+    yield from ((data.get("runs") or {}).get("steps") or [])
+
+
+@then("every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes")
+def uploads_non_fatal():
+    found = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            if re.match(r"actions/(upload-artifact|cache)@", step.get("uses", "")):
+                found += 1
+                assert step.get("continue-on-error") is True, (path.name, step)
+                assert step.get("timeout-minutes") == 5, (path.name, step)
+    assert found
+
+
+@then("every cache restore and save in pubkit's cache action continues on error")
+def cache_action_non_fatal():
+    steps = [s for s in _all_steps(yaml.safe_load((PUBKIT_ACTIONS / "cache" / "action.yml").read_text()))
+             if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]
+    assert len(steps) == 16
+    assert all(s.get("continue-on-error") is True for s in steps)
+
+
+@then("no step that runs a test command continues on error")
+def tests_fatal():
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            run = step.get("run", "")
+            if "inputs.test" in run or "inputs.browser-test" in run or "make check" in run:
+                assert not step.get("continue-on-error"), (path.name, step)
