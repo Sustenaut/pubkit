@@ -35,14 +35,8 @@ jobs:
           restore-keys: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-
       - if: inputs.setup != ''
         name: Set up, tried three times (a release download can time out)
-        run: |
-          for attempt in 1 2 3; do
-            bash -ec "$SETUP" && exit 0
-            echo "::warning::setup failed (attempt $attempt of 3)"
-            [ "$attempt" = 3 ] || sleep 15
-          done
-          exit 1
-        env: { SETUP: '${{ inputs.setup }}' }
+        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

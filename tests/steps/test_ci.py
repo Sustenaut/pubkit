@@ -104,35 +104,6 @@ def step_fails(install):
     assert install["code"] != 0
 
 
-def _setup_step(workflow):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
-    return next(s for job in data["jobs"].values() for s in job.get("steps", []) if "SETUP" in (s.get("env") or {}))
-
-
-@when(parsers.re(r'the "(?P<workflow>[^"]+)" setup step runs a setup that (?P<how>fails the first time|always fails)'),
-      target_fixture="setup")
-def run_setup(tmp_path, workflow, how):
-    """The step's script under bash -e, as GitHub runs it, with a setup that
-    counts its runs and a sleep that does not wait."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir(exist_ok=True)
-    (bin_dir / "sleep").write_text("#!/bin/sh\n")
-    (bin_dir / "sleep").chmod(0o755)
-    runs = tmp_path / "runs"
-    runs.write_text("")
-    first = '[ "$(wc -l < "$RUNS")" -gt 1 ]' if how == "fails the first time" else "false"
-    done = subprocess.run(["bash", "-e", "-c", _setup_step(workflow)["run"]], capture_output=True, text=True,
-                          check=False, env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
-                                            "RUNS": str(runs), "SETUP": f'echo run >> "$RUNS"; {first}'})
-    return {"code": done.returncode, "runs": len(runs.read_text().splitlines())}
-
-
-@then(parsers.re(r"the setup ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
-def setup_ran(setup, times, how):
-    assert setup["runs"] == int(times), setup
-    assert (setup["code"] == 0) == (how == "passed"), setup
-
-
 @then("every step that installs tests/requirements.lock does it through tests/install-lock")
 def installs_retried():
     found = 0
@@ -903,51 +874,47 @@ def launcher_plain():
     assert f'exec uvx --from "{PUBKIT_URL}" pubkit "$@"' in text and "fetch()" not in text
 
 
-def _init_step(workflow):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
-    return next(s for job in data["jobs"].values() for s in job.get("steps", [])
-                if s.get("name", "").startswith("terraform init, tried three times"))
-
-
-@when(parsers.re(r'the "(?P<workflow>[^"]+)" init step runs with a terraform that fails unless given a provider '
-                 r'mirror, and (?:the mirror "(?P<url>[^"]+)"|no mirror)'), target_fixture="initialised")
-def run_init(tmp_path, workflow, url):
-    """The step's script under bash -e, in a checkout whose pubkit.json may
-    name a provider mirror, with a terraform that keeps the CLI
-    configuration of each run and passes only with one."""
-    work = tmp_path / f"run-{workflow}-{bool(url)}"
-    (work / "bin").mkdir(parents=True)
-    (work / "pubkit.json").write_text(json.dumps({"kind": "service", **({"mirror": {"terraform": url}} if url else {})}))
-    runs = work / "runs"
-    runs.mkdir()
-    (work / "bin" / "terraform").write_text(
-        '#!/bin/bash\nn=$(ls "$RUNS" | wc -l)\n'
-        'if [ -n "${TF_CLI_CONFIG_FILE:-}" ]; then cp "$TF_CLI_CONFIG_FILE" "$RUNS/$n"; exit 0; fi\n'
-        'touch "$RUNS/$n"; exit 1\n')
-    (work / "bin" / "terraform").chmod(0o755)
-    done = subprocess.run(["bash", "-e", "-c", _init_step(workflow)["run"]], capture_output=True, text=True,
-                          check=False, cwd=work,
-                          env={**os.environ, "PATH": f"{work / 'bin'}{os.pathsep}{os.environ['PATH']}",
-                               "RUNS": str(runs), "INIT_PAUSE": "0", "RUNNER_TEMP": str(work), "DIR": "infra",
-                               "TF": str(work / "bin" / "terraform")})
-    configs = [(runs / str(n)).read_text() for n in range(len(list(runs.iterdir())))]
-    return {"code": done.returncode, "configs": configs, "stderr": done.stderr}
-
-
-@then(parsers.re(r"terraform init ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
-def init_ran(initialised, times, how):
-    assert len(initialised["configs"]) == int(times), initialised
-    assert (initialised["code"] == 0) == (how == "passed"), initialised
-
-
-@then(parsers.parse('the last init\'s CLI configuration installs every provider from "{url}"'))
-def init_mirrored(initialised, url):
-    assert initialised["configs"][-1] == f'provider_installation {{\n  network_mirror {{ url = "{url}" }}\n}}\n'
-
-
 def _steps(workflow):
     data = yaml.safe_load((WORKFLOWS / workflow).read_text())
     return [s for job in data["jobs"].values() for s in job.get("steps", [])]
+
+
+# pubkit's own actions, as its reusable workflows pin them: by a release's commit.
+SELF_PIN = re.compile(r"^Sustenaut/pubkit/actions/(?P<name>[\w-]+)@(?P<commit>[0-9a-f]{40})$")
+
+
+def _self_pinned(step, name):
+    m = SELF_PIN.match(step.get("uses", ""))
+    assert m and m["name"] == name, step
+    return m["commit"]
+
+
+def _action_inputs(name):
+    return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())["inputs"]
+
+
+@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubkit's "
+                    "own pin, three times with 15 seconds between"))
+def setup_retried(workflow):
+    steps = [s for s in _steps(workflow) if s.get("name", "").startswith("Set up, tried three times")]
+    assert steps, workflow
+    retry = _action_inputs("retry")
+    assert (retry["what"]["default"], retry["tries"]["default"], retry["pause"]["default"]) == ("setup", "3", "15")
+    for step in steps:
+        _self_pinned(step, "retry")
+        assert step["with"] == {"run": "${{ inputs.setup }}"}, step
+        assert "run" not in step and "env" not in step, step
+
+
+@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubkit's own pin in the "
+                    "terraform-dir input, with \"{args}\" and the action's default pause"))
+def init_by_action(workflow, args):
+    (step,) = [s for s in _steps(workflow) if s.get("name", "").startswith("terraform init, tried three times")]
+    _self_pinned(step, "terraform-init")
+    init = _action_inputs("terraform-init")
+    assert (init["tries"]["default"], init["pause"]["default"]) == ("3", "15")
+    assert step["with"] == {"dir": "${{ inputs.terraform-dir }}", "args": args}, step
+    assert "run" not in step and "env" not in step, step
 
 
 @then("every use of pubkit's actions in pubkit's workflows pins one commit, at a release no later than this pubkit")

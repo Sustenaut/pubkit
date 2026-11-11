@@ -329,11 +329,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | rust-ci.yml             |
 
 
-  Scenario Outline: A setup that fails is tried again, three times at most
-    When the "<workflow>" setup step runs a setup that fails the first time
-    Then the setup ran 2 times, and the step passed
-    When the "<workflow>" setup step runs a setup that always fails
-    Then the setup ran 3 times, and the step failed
+  Scenario Outline: A setup that fails is tried again, three times at most, by pubkit's retry action
+    Then every setup step of "<workflow>" runs its setup input through actions/retry at pubkit's own pin, three times with 15 seconds between
 
     Examples:
       | workflow                  |
@@ -396,12 +393,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
   Scenario: Without a wheel mirror, the launcher is as it was
     Then the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch
-  Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror
-    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and the mirror "https://storage.example/terraform"
-    Then terraform init ran 4 times, and the step passed
-    And the last init's CLI configuration installs every provider from "https://storage.example/terraform/"
-    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and no mirror
-    Then terraform init ran 3 times, and the step failed
+  Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror, by pubkit's terraform-init action
+    Then the "<workflow>" init step runs actions/terraform-init at pubkit's own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause
 
     Examples:
       | workflow                  |

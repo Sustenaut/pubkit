@@ -180,6 +180,12 @@ here first, then by pubhost's modules. pubkit also keeps
     with: { dir: infra, args: -backend=false -input=false }
   ```
 
+pubkit's own reusable workflows run their setup and terraform init through
+these two, pinned by a release's commit as any caller pins them: a reusable
+workflow runs in the caller's checkout, where `./actions/` is the caller's.
+So a change to either action reaches the workflows one release later, when
+their pins move to the release that has it.
+
 ## Deploying a service to k3s
 
 The deploy walk is [pubdeploy](https://github.com/Sustenaut/pubdeploy)'s:
