@@ -408,6 +408,13 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | job-service-terraform.yml |
       | service-ci.yml            |
 
+  Scenario: pubkit's workflows use pubkit's actions at one released commit, never by a local path
+    A reusable workflow runs in the caller's repository, where ./actions/ is
+    the caller's own, so pubkit's workflows name pubkit's actions as any
+    other repository does: by a release's commit, no later than this pubkit.
+    Then every use of pubkit's actions in pubkit's workflows pins one commit, at a release no later than this pubkit
+    And no reusable workflow of pubkit's uses an action by a local path
+
   Scenario: Without a list, the review leaves pubkit's and pubrel's workflows and actions out of the license check alone
     Then job-review.yml's license exceptions name every reusable workflow and action pubkit has, and pubrel's release workflow
     And job-review.yml sets no other input, so advisories apply to everything

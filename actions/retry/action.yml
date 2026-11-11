@@ -1,0 +1,38 @@
+# Runs a bash script, trying it again when it fails, for the steps a
+# flaky download can fail: a release download can time out, and pip
+# retries no 504. Each try runs the script under `bash -e`; after a
+# failed one it warns and waits, except after the last.
+#
+#   - name: Set up, tried three times (a release download can time out)
+#     uses: Sustenaut/pubkit/actions/retry@<commit> # vX.Y.Z
+#     with: { run: '${{ inputs.setup }}' }
+#
+# The inputs reach the script through its environment, never in its text,
+# so a script is run as given, whatever it holds.
+name: retry
+description: Run a bash script up to a number of times, waiting between failed tries.
+
+inputs:
+  run:
+    description: The bash script, run with `bash -ec` on each try.
+    required: true
+  what:
+    description: What the warnings call the script ("<what> failed (attempt N of T)").
+    default: setup
+  tries:
+    description: How many times to try it at most, a whole number above 0.
+    default: '3'
+  pause:
+    description: Seconds to wait after a failed try before the next.
+    default: '15'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        RUN: ${{ inputs.run }}
+        WHAT: ${{ inputs.what }}
+        TRIES: ${{ inputs.tries }}
+        PAUSE: ${{ inputs.pause }}
+      run: '"$GITHUB_ACTION_PATH/retry.sh"'

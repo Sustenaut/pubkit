@@ -1,0 +1,40 @@
+# terraform init, tried again when it fails, then once from pubkit.json's
+# provider mirror (mirror.terraform), if it names one: a provider
+# download can time out. The lock's hashes still check every archive the
+# mirror gives. Run it after hashicorp/setup-terraform, in the checkout's
+# root, where pubkit.json is.
+#
+#   - name: terraform init, tried three times, then from the provider mirror
+#     uses: Sustenaut/pubkit/actions/terraform-init@<commit> # vX.Y.Z
+#     with: { dir: infra, args: -backend=false -input=false }
+name: terraform-init
+description: terraform init, tried up to a number of times, then once from pubkit.json's provider mirror.
+
+inputs:
+  terraform:
+    description: The terraform binary.
+    default: terraform
+  dir:
+    description: The directory to initialise, given to terraform as -chdir.
+    default: .
+  args:
+    description: init's arguments, split on spaces.
+    default: -input=false
+  tries:
+    description: How many times to try init before the mirror, a whole number above 0.
+    default: '3'
+  pause:
+    description: Seconds to wait after a failed try before the next.
+    default: '15'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TF: ${{ inputs.terraform }}
+        DIR: ${{ inputs.dir }}
+        ARGS: ${{ inputs.args }}
+        TRIES: ${{ inputs.tries }}
+        PAUSE: ${{ inputs.pause }}
+      run: '"$GITHUB_ACTION_PATH/init.sh"'
