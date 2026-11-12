@@ -77,6 +77,8 @@ jobs:
       # kept, never a venv, so a new Python patch release never meets an old
       # environment.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           path: |
             ~/.cache/pip
@@ -90,6 +92,8 @@ jobs:
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           name: coverage
           path: ${{ inputs.coverage-report }}

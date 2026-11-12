@@ -70,10 +70,15 @@ jobs:
   # cachecmd: `pubkit cache run ... -- COMMAND` exists to run the command
   # its caller typed, as make runs a recipe; S8705 reads that as injection.
   # The ignore names the rule and cache.py only.
+  #
+  # Not in the merge queue: SonarQube Cloud analyses pull requests and main,
+  # and refuses the queue's gh-readonly-queue branch ("not allowed to access
+  # data from non main branches"). The pull request's run scanned its
+  # changes, and main's push scans the merge.
   sonar:
     name: ci
     needs: [tested, functional]
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ github.event_name != 'merge_group' && !failure() && !cancelled() }}
     uses: ./.github/workflows/job-sonar.yml
     permissions:
       actions: read
@@ -94,8 +99,9 @@ jobs:
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
   # The one check pubkit's ruleset requires. review is skipped on a push
-  # and in the merge queue, tested on a pull request, and every testing job
-  # where an earlier run already passed on the commit's tree.
+  # and in the merge queue, sonar in the merge queue, tested on a pull
+  # request, and every testing job where an earlier run already passed on
+  # the commit's tree.
   passed:
     name: ci / passed
     if: always()
@@ -104,10 +110,11 @@ jobs:
     steps:
       - run: |
           echo "$RESULTS"
-          echo "$RESULTS" | jq -e --arg tested "$TESTED" 'all(to_entries[];
+          echo "$RESULTS" | jq -e --arg tested "$TESTED" --arg event "$EVENT" 'all(to_entries[];
             .value.result == "success" or (.value.result == "skipped"
-              and (.key == "review" or .key == "tested" or $tested == "true")))' > /dev/null
-        env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}' }
+              and (.key == "review" or .key == "tested" or $tested == "true"
+                or (.key == "sonar" and $event == "merge_group"))))' > /dev/null
+        env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}', EVENT: '${{ github.event_name }}' }
 
   cache-action:
     needs: tested
