@@ -48,6 +48,8 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
       - if: steps.changes.outputs.slow != 'false'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           path: ~/.cargo/bin/cargo-fuzz
           key: cargo-fuzz-${{ inputs.cargo-fuzz-version }}-${{ runner.os }}

@@ -37,7 +37,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync"
     Then "pr.yml" first asks whether the merge queue passed its commit in "pr.yml"
     And in "pr.yml" every job but tested, the scan, passed and release runs only when it did not
-    And in "pr.yml" the scan runs only when it did not, as main's push scans the tree
+    And in "pr.yml" the scan never runs in the merge queue, and on a pull request runs only when it did not
     And in "pr.yml" passed takes a job skipped for the queue's run as passed
     And in "pr.yml" the release runs whenever passed succeeded
 
@@ -96,7 +96,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then "pr.yml" runs on pull requests alone
     And "queue.yml" runs in the merge queue alone
     And "pr.yml" runs the jobs "gates, test, functional, audit, osv, review, sonar, passed, release"
-    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
+    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, passed, release"
     And no job in "queue.yml" has a condition but passed
 
   Scenario: Without the queue event, a Rust crate's pull requests run the heavy jobs, in the queue too
@@ -121,6 +121,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then it runs on pull requests, in the merge queue and on pushes to main
     And its wheel job runs only on a push to main
     And in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree
+    And it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip
 
   Scenario Outline: The token reaches pubkit's jobs by name, which works across owners
     Given a <language> repository whose ci block is '{}'
@@ -194,7 +195,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     When I run pubkit "sync"
     Then it succeeds
     And "pr.yml" runs the jobs "gates, test, functional, audit, osv, review, sonar, passed, release"
-    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
+    And "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, passed, release"
     And "main.yml" runs the jobs "tested, gates, test, functional, msrv, fuzz, cross, audit, osv, sonar, passed, release"
     And "nightly.yml" runs the jobs "gates, test, functional, msrv, fuzz, cross, audit, osv, toolchains, sonar, passed"
     And no job in "pr.yml" has a condition but passed
@@ -212,12 +213,12 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Given a Rust repository whose ci block is '{}'
     And pubkit.json excepts "RS-VER-02"
     When I run pubkit "sync"
-    Then "queue.yml" runs the jobs "gates, test, functional, fuzz, cross, audit, osv, sonar, passed, release"
+    Then "queue.yml" runs the jobs "gates, test, functional, fuzz, cross, audit, osv, passed, release"
 
   Scenario: No cross-targets drops the cross job
     Given a Rust repository whose ci block is '{"with": {"cross-targets": "[]"}}'
     When I run pubkit "sync"
-    Then "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, sonar, passed, release"
+    Then "queue.yml" runs the jobs "gates, test, functional, msrv, fuzz, audit, osv, passed, release"
 
   Scenario: pubrel's own CI calls its release workflow from the checkout
     Given a Rust repository whose ci block is '{"release": {"uses": "local"}}'
@@ -329,11 +330,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | rust-ci.yml             |
 
 
-  Scenario Outline: A setup that fails is tried again, three times at most
-    When the "<workflow>" setup step runs a setup that fails the first time
-    Then the setup ran 2 times, and the step passed
-    When the "<workflow>" setup step runs a setup that always fails
-    Then the setup ran 3 times, and the step failed
+  Scenario Outline: A setup that fails is tried again, three times at most, by pubkit's retry action
+    Then every setup step of "<workflow>" runs its setup input through actions/retry at pubkit's own pin, three times with 15 seconds between
 
     Examples:
       | workflow                  |
@@ -396,12 +394,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
   Scenario: Without a wheel mirror, the launcher is as it was
     Then the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch
-  Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror
-    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and the mirror "https://storage.example/terraform"
-    Then terraform init ran 4 times, and the step passed
-    And the last init's CLI configuration installs every provider from "https://storage.example/terraform/"
-    When the "<workflow>" init step runs with a terraform that fails unless given a provider mirror, and no mirror
-    Then terraform init ran 3 times, and the step failed
+  Scenario Outline: A Terraform init that fails is tried three times, then once from pubkit.json's provider mirror, by pubkit's terraform-init action
+    Then the "<workflow>" init step runs actions/terraform-init at pubkit's own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause
 
     Examples:
       | workflow                  |
@@ -899,14 +893,26 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | Node     |
       | service  |
 
-  Scenario: sync --check takes SonarCloud Code Analysis for a crate, whose queue run always scans
+  Scenario: sync --check refuses SonarCloud Code Analysis for a crate too, whose queue never scans
     Given a Rust repository whose ci block is '{}'
     And pubkit.json's protect block is {"checks": ["ci / passed", "SonarCloud Code Analysis"]}
     When I run pubkit "sync"
     And I run pubkit "sync"
     And I run pubkit "sync" "--check"
-    Then it prints "in step with pubkit"
-    And stderr does not mention "protect.checks"
+    Then it fails
+    And stderr mentions "protect.checks: SonarCloud Code Analysis: no workflow scans with SonarQube Cloud on every merge_group run"
+
+  Scenario Outline: No workflow sync writes scans in the merge queue, which SonarQube Cloud refuses
+    Given a <language> repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then no workflow that runs in the merge queue scans there
+
+    Examples:
+      | language |
+      | Node     |
+      | Python   |
+      | Rust     |
+      | service  |
 
   Scenario: sync --check takes SonarCloud Code Analysis with no merge queue, where the pull request's run scans
     Given a Python repository whose ci block is '{}'
@@ -1012,3 +1018,8 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
   Scenario: Every reusable workflow a job calls takes its runner as an input
     Then every job workflow pubkit calls, but Rust's test, takes runs-on, ubuntu-latest by default
     And python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default
+
+  Scenario: A refused report upload or cache never fails a job, and a failing test still does
+    Then every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes
+    And every cache restore and save in pubkit's cache action continues on error
+    And no step that runs a test command continues on error

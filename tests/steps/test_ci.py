@@ -104,35 +104,6 @@ def step_fails(install):
     assert install["code"] != 0
 
 
-def _setup_step(workflow):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
-    return next(s for job in data["jobs"].values() for s in job.get("steps", []) if "SETUP" in (s.get("env") or {}))
-
-
-@when(parsers.re(r'the "(?P<workflow>[^"]+)" setup step runs a setup that (?P<how>fails the first time|always fails)'),
-      target_fixture="setup")
-def run_setup(tmp_path, workflow, how):
-    """The step's script under bash -e, as GitHub runs it, with a setup that
-    counts its runs and a sleep that does not wait."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir(exist_ok=True)
-    (bin_dir / "sleep").write_text("#!/bin/sh\n")
-    (bin_dir / "sleep").chmod(0o755)
-    runs = tmp_path / "runs"
-    runs.write_text("")
-    first = '[ "$(wc -l < "$RUNS")" -gt 1 ]' if how == "fails the first time" else "false"
-    done = subprocess.run(["bash", "-e", "-c", _setup_step(workflow)["run"]], capture_output=True, text=True,
-                          check=False, env={**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
-                                            "RUNS": str(runs), "SETUP": f'echo run >> "$RUNS"; {first}'})
-    return {"code": done.returncode, "runs": len(runs.read_text().splitlines())}
-
-
-@then(parsers.re(r"the setup ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
-def setup_ran(setup, times, how):
-    assert setup["runs"] == int(times), setup
-    assert (setup["code"] == 0) == (how == "passed"), setup
-
-
 @then("every step that installs tests/requirements.lock does it through tests/install-lock")
 def installs_retried():
     found = 0
@@ -435,10 +406,12 @@ def skips_tested(repo, name):
         assert spec["needs"][0] == "tested", (job, spec["needs"])
 
 
-@then(parsers.parse('in "{name}" the scan runs only when it did not, as main\'s push scans the tree'))
+@then(parsers.parse('in "{name}" the scan never runs in the merge queue, and on a pull request runs only when it did not'))
 def scan_skips(repo, name):
-    spec = jobs(repo, name)["sonar"]
-    assert spec["if"] == UNTESTED, spec.get("if")
+    spec = jobs(repo, name).get("sonar")
+    if spec is None:  # a private service drops its scan
+        return
+    assert spec["if"] == f"${{{{ {ci.NO_QUEUE} && {ci.UNTESTED} }}}}", spec.get("if")
     assert spec["needs"][0] == "tested", spec["needs"]
     assert "coverage-run" not in spec.get("with", {}), spec
 
@@ -460,10 +433,10 @@ def passed_takes_skipped(repo, name):
     spec = jobs(repo, name)["passed"]
     assert spec["needs"] == list(jobs(repo, name))[:len(spec["needs"])]
     run = spec["steps"][0]["run"]
-    check = re.search(r"jq -e --arg tested \"\$TESTED\" '(.*)'", run, re.S).group(1)
+    check = re.search(r"jq -e --arg tested \"\$TESTED\"(?: --arg event \"\$EVENT\")? '(.*)'", run, re.S).group(1)
 
-    def verdict(results, tested):
-        proc = subprocess.run(["jq", "-e", "--arg", "tested", tested, check],
+    def verdict(results, tested, event="pull_request"):
+        proc = subprocess.run(["jq", "-e", "--arg", "tested", tested, "--arg", "event", event, check],
                               input=json.dumps(results), capture_output=True, text=True)
         return proc.returncode == 0
 
@@ -476,6 +449,13 @@ def passed_takes_skipped(repo, name):
     assert not verdict(failed, "true")
     assert not verdict({**every, "tested": {"result": "failure"}}, "false")
     assert spec["steps"][0]["env"]["TESTED"] == "${{ needs.tested.outputs.tested }}"
+    if "sonar" in names and "merge_group" in triggers(generated(repo, name)):
+        # The scan never runs in the queue: skipped there, and only there, it passes.
+        scanless = {**every, "sonar": {"result": "skipped"}}
+        assert verdict(scanless, "false", "merge_group")
+        assert not verdict(scanless, "false", "pull_request")
+        assert not verdict({**every, "sonar": {"result": "failure"}}, "false", "merge_group")
+        assert spec["steps"][0]["env"]["EVENT"] == "${{ github.event_name }}"
 
 
 @then(parsers.parse('in "{name}" the release runs whenever passed succeeded'))
@@ -548,6 +528,26 @@ def own_shortcut(own):
         assert jobs_[job]["if"] == "${{ !cancelled() && needs.tested.outputs.tested != 'true' }}", job
     assert jobs_["sonar"]["with"]["coverage-run"] == "${{ needs.tested.outputs.run-id }}"
     assert "needs.tested.outputs.tested == 'true'" in jobs_["release"]["if"]
+
+
+@then("it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip")
+def own_scan(own):
+    assert own["jobs"]["sonar"]["if"].startswith("${{ github.event_name != 'merge_group' && ")
+    step = own["jobs"]["passed"]["steps"][0]
+    assert step["env"]["EVENT"] == "${{ github.event_name }}"
+
+    def passes(event, sonar, tested="false"):
+        results = {"tested": {"result": "success"}, "functional": {"result": "success"},
+                   "sonar": {"result": sonar}, "review": {"result": "skipped"}}
+        return subprocess.run(["bash", "-c", step["run"]], env={
+            **os.environ, "RESULTS": json.dumps(results), "TESTED": tested, "EVENT": event},
+            capture_output=True).returncode == 0
+
+    assert passes("merge_group", "skipped")
+    assert not passes("pull_request", "skipped")
+    assert not passes("push", "skipped")
+    assert not passes("merge_group", "failure")
+    assert passes("push", "success")
 
 
 @then("its wheel job runs only on a push to main")
@@ -907,51 +907,47 @@ def launcher_plain():
     assert f'exec uvx --from "{PUBKIT_URL}" pubkit "$@"' in text and "fetch()" not in text
 
 
-def _init_step(workflow):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
-    return next(s for job in data["jobs"].values() for s in job.get("steps", [])
-                if s.get("name", "").startswith("terraform init, tried three times"))
-
-
-@when(parsers.re(r'the "(?P<workflow>[^"]+)" init step runs with a terraform that fails unless given a provider '
-                 r'mirror, and (?:the mirror "(?P<url>[^"]+)"|no mirror)'), target_fixture="initialised")
-def run_init(tmp_path, workflow, url):
-    """The step's script under bash -e, in a checkout whose pubkit.json may
-    name a provider mirror, with a terraform that keeps the CLI
-    configuration of each run and passes only with one."""
-    work = tmp_path / f"run-{workflow}-{bool(url)}"
-    (work / "bin").mkdir(parents=True)
-    (work / "pubkit.json").write_text(json.dumps({"kind": "service", **({"mirror": {"terraform": url}} if url else {})}))
-    runs = work / "runs"
-    runs.mkdir()
-    (work / "bin" / "terraform").write_text(
-        '#!/bin/bash\nn=$(ls "$RUNS" | wc -l)\n'
-        'if [ -n "${TF_CLI_CONFIG_FILE:-}" ]; then cp "$TF_CLI_CONFIG_FILE" "$RUNS/$n"; exit 0; fi\n'
-        'touch "$RUNS/$n"; exit 1\n')
-    (work / "bin" / "terraform").chmod(0o755)
-    done = subprocess.run(["bash", "-e", "-c", _init_step(workflow)["run"]], capture_output=True, text=True,
-                          check=False, cwd=work,
-                          env={**os.environ, "PATH": f"{work / 'bin'}{os.pathsep}{os.environ['PATH']}",
-                               "RUNS": str(runs), "INIT_PAUSE": "0", "RUNNER_TEMP": str(work), "DIR": "infra",
-                               "TF": str(work / "bin" / "terraform")})
-    configs = [(runs / str(n)).read_text() for n in range(len(list(runs.iterdir())))]
-    return {"code": done.returncode, "configs": configs, "stderr": done.stderr}
-
-
-@then(parsers.re(r"terraform init ran (?P<times>\d) times, and the step (?P<how>passed|failed)"))
-def init_ran(initialised, times, how):
-    assert len(initialised["configs"]) == int(times), initialised
-    assert (initialised["code"] == 0) == (how == "passed"), initialised
-
-
-@then(parsers.parse('the last init\'s CLI configuration installs every provider from "{url}"'))
-def init_mirrored(initialised, url):
-    assert initialised["configs"][-1] == f'provider_installation {{\n  network_mirror {{ url = "{url}" }}\n}}\n'
-
-
 def _steps(workflow):
     data = yaml.safe_load((WORKFLOWS / workflow).read_text())
     return [s for job in data["jobs"].values() for s in job.get("steps", [])]
+
+
+# pubkit's own actions, as its reusable workflows pin them: by a release's commit.
+SELF_PIN = re.compile(r"^Sustenaut/pubkit/actions/(?P<name>[\w-]+)@(?P<commit>[0-9a-f]{40})$")
+
+
+def _self_pinned(step, name):
+    m = SELF_PIN.match(step.get("uses", ""))
+    assert m and m["name"] == name, step
+    return m["commit"]
+
+
+def _action_inputs(name):
+    return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())["inputs"]
+
+
+@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubkit's "
+                    "own pin, three times with 15 seconds between"))
+def setup_retried(workflow):
+    steps = [s for s in _steps(workflow) if s.get("name", "").startswith("Set up, tried three times")]
+    assert steps, workflow
+    retry = _action_inputs("retry")
+    assert (retry["what"]["default"], retry["tries"]["default"], retry["pause"]["default"]) == ("setup", "3", "15")
+    for step in steps:
+        _self_pinned(step, "retry")
+        assert step["with"] == {"run": "${{ inputs.setup }}"}, step
+        assert "run" not in step and "env" not in step, step
+
+
+@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubkit's own pin in the "
+                    "terraform-dir input, with \"{args}\" and the action's default pause"))
+def init_by_action(workflow, args):
+    (step,) = [s for s in _steps(workflow) if s.get("name", "").startswith("terraform init, tried three times")]
+    _self_pinned(step, "terraform-init")
+    init = _action_inputs("terraform-init")
+    assert (init["tries"]["default"], init["pause"]["default"]) == ("3", "15")
+    assert step["with"] == {"dir": "${{ inputs.terraform-dir }}", "args": args}, step
+    assert "run" not in step and "env" not in step, step
 
 
 @then("every use of pubkit's actions in pubkit's workflows pins one commit, at a release no later than this pubkit")
@@ -1063,3 +1059,54 @@ def job_workflows_take_runs_on():
 def whole_workflows_take_runs_on():
     for name in ("python-ci.yml", "node-ci.yml", "rust-ci.yml", "service-ci.yml"):
         _takes_runs_on(name)
+
+
+@then("no workflow that runs in the merge queue scans there")
+def no_queue_scan(repo):
+    from pubkit import protect  # noqa: PLC0415
+    for path in sorted((repo / ".github" / "workflows").glob("*.yml")):
+        data = yaml.safe_load(path.read_text())
+        if "merge_group" not in triggers(data):
+            continue
+        for job_id, job in data["jobs"].items():
+            if protect.SONAR_SCAN.search(str(job.get("uses", ""))):
+                assert ci.NO_QUEUE in str(job.get("if", "")), (path.name, job_id)
+    assert not protect.reported(repo, "merge_group")[2]
+
+
+PUBKIT_ACTIONS = WORKFLOWS.parents[1] / "actions"
+
+
+def _all_steps(data):
+    for job in (data.get("jobs") or {}).values():
+        yield from job.get("steps") or []
+    yield from ((data.get("runs") or {}).get("steps") or [])
+
+
+@then("every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes")
+def uploads_non_fatal():
+    found = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            if re.match(r"actions/(upload-artifact|cache)@", step.get("uses", "")):
+                found += 1
+                assert step.get("continue-on-error") is True, (path.name, step)
+                assert step.get("timeout-minutes") == 5, (path.name, step)
+    assert found
+
+
+@then("every cache restore and save in pubkit's cache action continues on error")
+def cache_action_non_fatal():
+    steps = [s for s in _all_steps(yaml.safe_load((PUBKIT_ACTIONS / "cache" / "action.yml").read_text()))
+             if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]
+    assert len(steps) == 16
+    assert all(s.get("continue-on-error") is True for s in steps)
+
+
+@then("no step that runs a test command continues on error")
+def tests_fatal():
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            run = step.get("run", "")
+            if "inputs.test" in run or "inputs.browser-test" in run or "make check" in run:
+                assert not step.get("continue-on-error"), (path.name, step)

@@ -49,6 +49,8 @@ jobs:
       - if: inputs.tools != ''
         id: tools-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           path: ~/.cargo-tools
           key: tools-${{ steps.tools.outputs.key }}-${{ runner.os }}
@@ -60,6 +62,8 @@ jobs:
         env: { TOOLS: '${{ inputs.tools }}' }
       - if: env.COVERAGE == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           path: ~/.cargo/bin/cargo-llvm-cov
           key: cargo-llvm-cov-${{ inputs.cargo-llvm-cov-version }}-${{ runner.os }}
@@ -81,6 +85,8 @@ jobs:
       # wrote in coverage/, such as the coverage of a repository's Python.
       - if: env.COVERAGE == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           name: coverage
           path: |
