@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "The merge queue never scans with SonarQube Cloud, which refuses its gh-readonly-queue branch: the generated pr.yml runs sonar on pull requests only and its ci / passed takes the skip on merge_group, a Rust queue.yml has no sonar job, and sync refuses SonarCloud Code Analysis in protect.checks wherever a merge queue waits for it, Rust crates included"
-}
