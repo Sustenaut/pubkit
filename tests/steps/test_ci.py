@@ -521,6 +521,26 @@ def own_shortcut(own):
     assert "needs.tested.outputs.tested == 'true'" in jobs_["release"]["if"]
 
 
+@then("it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip")
+def own_scan(own):
+    assert own["jobs"]["sonar"]["if"].startswith("${{ github.event_name != 'merge_group' && ")
+    step = own["jobs"]["passed"]["steps"][0]
+    assert step["env"]["EVENT"] == "${{ github.event_name }}"
+
+    def passes(event, sonar, tested="false"):
+        results = {"tested": {"result": "success"}, "functional": {"result": "success"},
+                   "sonar": {"result": sonar}, "review": {"result": "skipped"}}
+        return subprocess.run(["bash", "-c", step["run"]], env={
+            **os.environ, "RESULTS": json.dumps(results), "TESTED": tested, "EVENT": event},
+            capture_output=True).returncode == 0
+
+    assert passes("merge_group", "skipped")
+    assert not passes("pull_request", "skipped")
+    assert not passes("push", "skipped")
+    assert not passes("merge_group", "failure")
+    assert passes("push", "success")
+
+
 @then("its wheel job runs only on a push to main")
 def own_wheel(own):
     # The release itself tags from a push to main alone: pubrel's

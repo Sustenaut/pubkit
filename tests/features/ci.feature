@@ -121,6 +121,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     Then it runs on pull requests, in the merge queue and on pushes to main
     And its wheel job runs only on a push to main
     And in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree
+    And it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip
 
   Scenario Outline: The token reaches pubkit's jobs by name, which works across owners
     Given a <language> repository whose ci block is '{}'
