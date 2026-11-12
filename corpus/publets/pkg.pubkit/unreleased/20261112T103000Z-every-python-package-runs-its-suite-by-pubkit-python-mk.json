@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "A Python package's make targets are pubkit's: sync manages pubkit-python.mk (venv, functional, lock, sync-check, wheel, clean, help; the suite on every core, PYTEST_ARGS ?= -n auto, its coverage combined into coverage/coverage.xml; FUNCTIONAL_ENV and EDITABLE for what differs) and seeds a Makefile that includes it, and sync --check fails until the Makefile includes it and pyproject.toml's [tool.coverage.run] sets patch = [\"subprocess\"] and parallel = true"
-}
