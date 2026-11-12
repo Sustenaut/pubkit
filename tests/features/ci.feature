@@ -959,6 +959,66 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
     And I run pubkit "sync" "--check"
     Then it succeeds
 
+  Scenario: Without runs-on no job is given a runner, and each runs on ubuntu-latest
+    Given a Node repository whose ci block is '{}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And no job in "pr.yml" is given a runner, and passed runs on ubuntu-latest
+    And no job in "main.yml" is given a runner, and passed runs on ubuntu-latest
+
+  Scenario Outline: A runs-on label runs every job on those runners
+    Given a <language> repository whose ci block is '{"runs-on": "my-runners"}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And every job in "pr.yml" but <exempt> runs on "my-runners"
+    And every job in "main.yml" but <exempt> runs on "my-runners"
+
+    Examples:
+      | language | exempt                |
+      | Node     | release               |
+      | Python   | release               |
+      | Rust     | release and test      |
+      | service  | none                  |
+
+  Scenario: runs-on by job places each job, the rest on the default
+    Given a Node repository whose ci block is '{"runs-on": {"default": "my-runners", "review": "ubuntu-latest", "passed": "other-runners"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "test" job is given "runs-on" "my-runners"
+    And in "pr.yml" the "tested" job is given "runs-on" "my-runners"
+    And in "pr.yml" the "review" job is given "runs-on" "ubuntu-latest"
+    And in "pr.yml" the "passed" job runs on "other-runners"
+
+  Scenario: runs-on by job without a default leaves the other jobs on ubuntu-latest
+    Given a Node repository whose ci block is '{"runs-on": {"test": "my-runners"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "test" job is given "runs-on" "my-runners"
+    And in "pr.yml" the "audit" job is given no runner
+    And in "pr.yml" the "passed" job runs on "ubuntu-latest"
+
+  Scenario Outline: A runs-on that is not runner labels stops sync, saying what it takes
+    Given a <language> repository whose ci block is '{"runs-on": <runs-on>}'
+    When I run pubkit "sync"
+    Then it fails
+    And stderr mentions "<says>"
+
+    Examples:
+      | language | runs-on                         | says                                      |
+      | Node     | ""                              | runs-on.default must be a runner label    |
+      | Node     | 3                               | runs-on must be a runner label            |
+      | Node     | {}                              | runs-on must be a runner label            |
+      | Node     | ["my-runners"]                  | runs-on must be a runner label            |
+      | Node     | "my runners"                    | runs-on.default must be a runner label    |
+      | Node     | {"test": 3}                     | runs-on.test must be a runner label       |
+      | Node     | {"gates": "my-runners"}         | runs-on names gates; it takes default     |
+      | Node     | {"release": "my-runners"}       | runs-on names release; it takes default   |
+      | Rust     | {"test": "my-runners"}          | whose runners its os-matrix input gives   |
+
+  Scenario: Every reusable workflow a job calls takes its runner as an input
+    Then every job workflow pubkit calls, but Rust's test, takes runs-on, ubuntu-latest by default
+    And python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default
+
   Scenario: A refused report upload or cache never fails a job, and a failing test still does
     Then every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes
     And every cache restore and save in pubkit's cache action continues on error

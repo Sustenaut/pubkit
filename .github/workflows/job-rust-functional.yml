@@ -13,6 +13,7 @@ name: job-rust-functional
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages for the functional job. }
       tools: { type: string, default: '', description: 'JSON list of the tools the functional suite drives, each {"crate", "git", "tag"}, which pubkit sync gives from ci.tools; empty installs none.' }
@@ -27,7 +28,7 @@ env:
 
 jobs:
   functional:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     env:
       # Measure coverage only when there is a scan to send it to; the token
       # itself stays out of this job.

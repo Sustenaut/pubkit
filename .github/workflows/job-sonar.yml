@@ -20,6 +20,7 @@ name: job-sonar
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
       layout: { type: string, default: '', description: "Where the code and its tests are, as SonarQube Cloud properties, such as -Dsonar.sources=src -Dsonar.tests=tests; pubkit sync gives it from the directories the repository has. sonar-args comes after it, so the repository's own wins." }
       coverage-run: { type: string, default: '', description: "Another run of this commit whose coverage artifacts to read, such as the merge queue's that a push to main skipped its tests for; the caller grants actions: read. Empty reads this run's." }
@@ -29,7 +30,7 @@ on:
 
 jobs:
   sonar:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:

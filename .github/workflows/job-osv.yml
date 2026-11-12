@@ -7,6 +7,8 @@ name: job-osv
 
 on:
   workflow_call:
+    inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
 
 jobs:
   # Every lockfile the repository commits (Cargo.lock, package-lock.json,
@@ -15,7 +17,7 @@ jobs:
   # has no switch. The lockfiles are named rather than found by a recursive
   # scan, which would read a requirements.txt's lower bounds as pins.
   osv:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - id: locks

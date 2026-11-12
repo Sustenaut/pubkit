@@ -10,6 +10,7 @@ name: job-rust-audit
 on:
   workflow_call:
     inputs:
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       cargo-deny-version: { type: string, default: 0.20.2 }
       cargo-vet-version: { type: string, default: 0.10.2 }
       required: { type: string, default: '', description: "The make targets the standard requires, which pubkit sync gives." }
@@ -19,7 +20,7 @@ env:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

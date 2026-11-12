@@ -697,7 +697,11 @@ def inputs_match(table):
         passed = set(job.inputs) | set(job.fixed)
         # Every input but those pubkit gives itself is the repository's.
         assert set(job.fixed) <= set(job.internal), name
-        assert set(job.inputs) == inputs - set(job.internal), (name, inputs)
+        # runs-on is pubkit's too, from the ci block's runs-on, for every job
+        # but one whose os-matrix gives its runners.
+        own = {*job.internal, *(() if job.matrix else ("runs-on",))}
+        assert job.matrix or "runs-on" in inputs, name
+        assert set(job.inputs) == inputs - own, (name, inputs)
         required = {i for i, spec in triggers(data)["workflow_call"]["inputs"].items()
                     if spec.get("required")} if inputs else set()
         assert required <= passed | ({job.when} if job.when else set()), (name, required)
@@ -998,6 +1002,63 @@ def calling_job(repo, name, uses, job, events):
     path.parent.mkdir(parents=True, exist_ok=True)
     on = ", ".join(e.strip() for e in events.split(","))
     path.write_text(f"on: [{on}]\njobs:\n  {job}:\n    uses: {uses}\n")
+
+
+@then(parsers.parse('no job in "{name}" is given a runner, and passed runs on ubuntu-latest'))
+def no_runner(repo, name):
+    found = jobs(repo, name)
+    assert all("runs-on" not in (job.get("with") or {}) for job in found.values())
+    assert found["passed"]["runs-on"] == "ubuntu-latest"
+    assert "runs-on" not in (repo / ".github" / "workflows" / name).read_text().replace(
+        "    runs-on: ubuntu-latest\n", "")
+
+
+@then(parsers.re(r'every job in "(?P<name>[^"]+)" but (?P<exempt>.+) runs on "(?P<label>[^"]+)"'))
+def every_job_runs_on(repo, name, exempt, label):
+    skipped = set() if exempt == "none" else set(exempt.split(" and "))
+    found = jobs(repo, name)
+    assert set(found) & {"tested", "passed"}, found
+    for job_name, job in found.items():
+        given = (job.get("with") or {}).get("runs-on")
+        where = given if "uses" in job else job["runs-on"]
+        if job_name in skipped:
+            assert where is None, (job_name, job)
+        else:
+            assert where == label, (job_name, job)
+
+
+@then(parsers.parse('in "{name}" the "{job}" job runs on "{label}"'))
+def job_runs_on(repo, name, job, label):
+    assert jobs(repo, name)[job]["runs-on"] == label
+
+
+@then(parsers.parse('in "{name}" the "{job}" job is given no runner'))
+def given_no_runner(repo, name, job):
+    assert "runs-on" not in (jobs(repo, name)[job].get("with") or {})
+
+
+def _takes_runs_on(name):
+    data = yaml.safe_load((WORKFLOWS / name).read_text())
+    spec = triggers(data)["workflow_call"]["inputs"]["runs-on"]
+    assert spec["type"] == "string" and spec["default"] == "ubuntu-latest", name
+    for job_name, job in data["jobs"].items():
+        assert job["runs-on"] in ("${{ inputs.runs-on }}", "${{ matrix.os }}"), (name, job_name)
+
+
+@then("every job workflow pubkit calls, but Rust's test, takes runs-on, ubuntu-latest by default")
+def job_workflows_take_runs_on():
+    called = {job.workflow for table in ci.JOBS.values() for job in table.values()
+              if not job.matrix} | {"job-tested.yml"}
+    for name in sorted(called):
+        _takes_runs_on(name)
+    assert all(job.workflow == "job-rust-test.yml"
+               for table in ci.JOBS.values() for job in table.values() if job.matrix)
+
+
+@then("python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default")
+def whole_workflows_take_runs_on():
+    for name in ("python-ci.yml", "node-ci.yml", "rust-ci.yml", "service-ci.yml"):
+        _takes_runs_on(name)
 
 
 @then("no workflow that runs in the merge queue scans there")
