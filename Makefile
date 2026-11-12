@@ -2,6 +2,8 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
+# The suite runs on every core (pytest-xdist); PYTEST_ARGS= runs it on one.
+PYTEST_ARGS ?= -n auto
 
 .PHONY: help venv lock standard standard-check functional check wheel protect protect-check clean
 
@@ -32,7 +34,7 @@ standard-check: ## Fail if src/pubkit/standard.json differs from the standard's 
 functional: ## The Gherkin suite, with its coverage in coverage/coverage.xml
 	rm -rf coverage && mkdir coverage
 	cd tests && COVERAGE_RCFILE=$(CURDIR)/pyproject.toml COVERAGE_FILE=$(CURDIR)/coverage/.coverage \
-	  coverage run -m pytest -q
+	  coverage run -m pytest -q $(PYTEST_ARGS)
 	COVERAGE_FILE=coverage/.coverage coverage combine -q
 	COVERAGE_FILE=coverage/.coverage coverage xml -q
 
