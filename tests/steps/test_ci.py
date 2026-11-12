@@ -521,6 +521,26 @@ def own_shortcut(own):
     assert "needs.tested.outputs.tested == 'true'" in jobs_["release"]["if"]
 
 
+@then("it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip")
+def own_scan(own):
+    assert own["jobs"]["sonar"]["if"].startswith("${{ github.event_name != 'merge_group' && ")
+    step = own["jobs"]["passed"]["steps"][0]
+    assert step["env"]["EVENT"] == "${{ github.event_name }}"
+
+    def passes(event, sonar, tested="false"):
+        results = {"tested": {"result": "success"}, "functional": {"result": "success"},
+                   "sonar": {"result": sonar}, "review": {"result": "skipped"}}
+        return subprocess.run(["bash", "-c", step["run"]], env={
+            **os.environ, "RESULTS": json.dumps(results), "TESTED": tested, "EVENT": event},
+            capture_output=True).returncode == 0
+
+    assert passes("merge_group", "skipped")
+    assert not passes("pull_request", "skipped")
+    assert not passes("push", "skipped")
+    assert not passes("merge_group", "failure")
+    assert passes("push", "success")
+
+
 @then("its wheel job runs only on a push to main")
 def own_wheel(own):
     # The release itself tags from a push to main alone: pubrel's
@@ -969,3 +989,41 @@ def calling_job(repo, name, uses, job, events):
     path.parent.mkdir(parents=True, exist_ok=True)
     on = ", ".join(e.strip() for e in events.split(","))
     path.write_text(f"on: [{on}]\njobs:\n  {job}:\n    uses: {uses}\n")
+
+
+PUBKIT_ACTIONS = WORKFLOWS.parents[1] / "actions"
+
+
+def _all_steps(data):
+    for job in (data.get("jobs") or {}).values():
+        yield from job.get("steps") or []
+    yield from ((data.get("runs") or {}).get("steps") or [])
+
+
+@then("every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes")
+def uploads_non_fatal():
+    found = 0
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            if re.match(r"actions/(upload-artifact|cache)@", step.get("uses", "")):
+                found += 1
+                assert step.get("continue-on-error") is True, (path.name, step)
+                assert step.get("timeout-minutes") == 5, (path.name, step)
+    assert found
+
+
+@then("every cache restore and save in pubkit's cache action continues on error")
+def cache_action_non_fatal():
+    steps = [s for s in _all_steps(yaml.safe_load((PUBKIT_ACTIONS / "cache" / "action.yml").read_text()))
+             if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]
+    assert len(steps) == 16
+    assert all(s.get("continue-on-error") is True for s in steps)
+
+
+@then("no step that runs a test command continues on error")
+def tests_fatal():
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        for step in _all_steps(yaml.safe_load(path.read_text())):
+            run = step.get("run", "")
+            if "inputs.test" in run or "inputs.browser-test" in run or "make check" in run:
+                assert not step.get("continue-on-error"), (path.name, step)

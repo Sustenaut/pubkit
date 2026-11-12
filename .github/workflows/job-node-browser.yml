@@ -35,6 +35,8 @@ jobs:
       - run: ${{ inputs.browser-test }}
       # Its coverage joins the test job's, as an artifact of its own.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           name: coverage-browser
           path: ${{ inputs.browser-coverage-report }}
