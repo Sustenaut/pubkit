@@ -34,7 +34,7 @@ says so and exits 2.
 Files are either *managed* -- owned by pubkit, rewritten by `sync`, and
 compared by `sync --check`, so they cannot drift -- or *seeded*: written once
 by `init` and the repository's own from then on. Extensions go in seeded
-files (the Makefile includes `pubkit.mk`; requirements.txt includes
+files (the Makefile includes `pubkit.mk`, or a Python package's `pubkit-python.mk`; requirements.txt includes
 requirements-pubkit.txt), so nothing managed is ever edited by hand. One
 file is neither: .gitignore is the repository's own, but `init` and `sync`
 add `.env` to it when it's missing (ignores.py), and `sync --check` fails
@@ -82,6 +82,9 @@ WITH_SECRETS = "with-secrets"
 PUBSEC = "pubsec"
 # The pinned pubdeploy, the deploy walk, in a repository with a deploy block.
 PUBDEPLOY = "pubdeploy"
+# A Python package's shared make targets (templates/python/): managed, and
+# included by its seeded Makefile.
+PYTHON_MK = "pubkit-python.mk"
 CONFIG = "pubkit.json"
 LOCK = Path("tests/requirements.lock")
 REQUIREMENTS = Path("tests/requirements.txt")
@@ -114,6 +117,48 @@ def render(text: str, values: dict[str, str]) -> str:
 
 def managed(kind: str) -> list[str]:
     return MANAGED["common"] + MANAGED[kind]
+
+
+def is_python(config: dict, root: Path) -> bool:
+    """A Python package: a utility whose CI is Python's (its ci block says
+    so, or it has no package.json without a pyproject.toml beside it)."""
+    if config.get("kind") != "utility":
+        return False
+    from .ci import is_node  # noqa: PLC0415
+    given = (config.get("ci") or {}).get("language") if isinstance(config.get("ci"), dict) else None
+    return given == "python" if given else not is_node(root)
+
+
+# The Makefile's line that takes pubkit-python.mk in.
+INCLUDES_PYTHON_MK = re.compile(r"^[ \t]*-?include[ \t]+(?:\$\(CURDIR\)/)?pubkit-python\.mk[ \t]*$", re.M)
+
+
+def python_problems(root: Path) -> list[str]:
+    """What keeps a Python package's suite from following the shared rules:
+    a Makefile that does not include pubkit-python.mk, and coverage.py
+    settings that would lose what xdist's workers and the programs the suite
+    starts run ([tool.coverage.run] patch = ["subprocess"], parallel = true)."""
+    out = []
+    makefile = root / "Makefile"
+    if not makefile.is_file():
+        out.append(f"there is no Makefile; `pubkit sync` seeds one that includes {PYTHON_MK}")
+    elif not INCLUDES_PYTHON_MK.search(makefile.read_text(encoding="utf-8")):
+        out.append(f"the Makefile does not include {PYTHON_MK}: put `include {PYTHON_MK}` at its top, "
+                   f"and drop the targets it defines (venv, functional, lock, sync-check, wheel, clean, help)")
+    pyproject = root / "pyproject.toml"
+    if pyproject.is_file():
+        import tomllib  # noqa: PLC0415
+        try:
+            run = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("tool", {}).get(
+                "coverage", {}).get("run", {})
+        except tomllib.TOMLDecodeError as e:
+            return [*out, f"pyproject.toml is not TOML ({e})"]
+        patch = run.get("patch", [])
+        if not isinstance(patch, list) or "subprocess" not in patch or run.get("parallel") is not True:
+            out.append('pyproject.toml\'s [tool.coverage.run] must set patch = ["subprocess"] and '
+                       "parallel = true, so the coverage of xdist's workers and of the programs the "
+                       "suite starts is combined")
+    return out
 
 
 def read_config(root: Path) -> dict[str, str]:
@@ -256,7 +301,7 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
     seeded ones unless already present."""
     kind = config["kind"]
     (root / CONFIG).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    owned = set(managed(kind))
+    owned = set(managed(kind)) | ({PYTHON_MK} if is_python(config, root) else set())
     fill = {**values(config), **(extra or {})}
     for path, text in sorted(templates(kind, layers).items()):
         target = root / path
@@ -295,7 +340,8 @@ def init(root: Path, kind: str, binary: str | None, project: str | None = None) 
     # The CI is generated from the ci block (ci.py): a utility's is Node's
     # for a package.json without a pyproject.toml, Python's otherwise.
     config["ci"] = {}
-    init_files(root, config, extra={"project": project or ""})
+    layers = ("common", kind, "python") if is_python(config, root) else None
+    init_files(root, config, layers, extra={"project": project or ""})
     print("next: add your requirements to tests/requirements.txt, then `pubkit lock`")
     return 0
 
@@ -367,6 +413,14 @@ def sync(root: Path, check: bool) -> int:
     if "deploy" in config:
         owned = [*owned, PUBDEPLOY]
         every = {**every, PUBDEPLOY: templates("deploy", ("deploy",))[PUBDEPLOY]}
+    python = is_python(config, root)
+    if python:
+        python_templates = templates("utility", ("python",))
+        owned = [*owned, PYTHON_MK]
+        every = {**every, PYTHON_MK: python_templates[PYTHON_MK]}
+        if not check and not (root / "Makefile").exists():
+            (root / "Makefile").write_text(python_templates["Makefile"], encoding="utf-8")
+            print("seeded   Makefile")
     wanted = [(path, render(every[path], values(config))) for path in owned]
     wanted += workflows(config, root)
     if (generated := dependabot(config)) is not None:
@@ -428,7 +482,8 @@ def sync(root: Path, check: bool) -> int:
             print(f"pubkit: {use} names no pubkit version, so `pubkit bump` leaves it as it is",
                   file=sys.stderr)
         unreported = unreported_checks(root, config)
-        if stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported:
+        python_bad = python_checks(root) if python else []
+        if stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported or python_bad:
             return 1
         print(f"in step with pubkit {__version__}")
         if kind == "rust":
@@ -438,11 +493,20 @@ def sync(root: Path, check: bool) -> int:
             return conform(root)
         return 0
     unreported = unreported_checks(root, config)
-    if not stale and not unignored and not unreported:
+    python_bad = python_checks(root) if python else []
+    if not stale and not unignored and not unreported and not python_bad:
         print(f"already in step with pubkit {__version__}")
     if lock_stale:
         print(f"now run `pubkit lock`: {LOCK} pins another pubkit")
-    return 1 if unreported else 0
+    return 1 if unreported or python_bad else 0
+
+
+def python_checks(root: Path) -> list[str]:
+    """python_problems, each printed."""
+    problems = python_problems(root)
+    for problem in problems:
+        print(f"pubkit: {problem}", file=sys.stderr)
+    return problems
 
 
 def unreported_checks(root: Path, config: dict) -> list[str]:
