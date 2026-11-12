@@ -65,6 +65,10 @@ it is the newer one, `pubkit bump`. `PUBKIT_ANY_VERSION=1` runs it anyway.
 In a Rust repository, each `pubkit.mk` target that runs a tool from `.venv`
 rebuilds `.venv` first when the lock has changed since `make venv` last
 ran, so a moved pin never runs the old pubkit.
+Its `functional` and `coverage` run the Gherkin suite on every core
+(`PYTEST_ARGS ?= -n auto`, pytest-xdist, which the shared requirements
+pin); `PYTEST_ARGS =` in the Makefile runs it on one. pubkit's own
+`make functional` does the same.
 
 **`./pubkit`** runs the pubkit this repository pins, whichever (if any) is
 installed: `./pubkit sync --check`. It

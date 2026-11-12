@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The Gherkin suite runs on every core: pubkit's own make functional and a Rust crate's pubkit.mk run pytest with -n auto (pytest-xdist, which the shared tests requirements already pin) by default, coverage combining the workers' data as before; PYTEST_ARGS= in the Makefile runs it on one core"
+}

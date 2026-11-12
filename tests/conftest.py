@@ -16,6 +16,33 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, then, when
 
+@pytest.fixture(scope="session", autouse=True)
+def rust_toolchain(tmp_path_factory):
+    """The Rust toolchain pubkit's rust-toolchain.toml pins, installed once
+    before any test runs cargo. rustup installs it on first use, but under
+    pytest-xdist several workers' first cargo runs at once, and rustup's
+    concurrent installs of one toolchain fail; each worker takes a lock in
+    the run's shared base directory, and only the first installs."""
+    rustup = shutil.which("rustup")
+    if rustup is None:
+        return
+    import fcntl  # noqa: PLC0415
+    import tomllib  # noqa: PLC0415
+    from importlib import resources  # noqa: PLC0415
+    pinned = tomllib.loads((resources.files("pubkit") / "templates" / "rust" / "rust-toolchain.toml")
+                           .read_text(encoding="utf-8"))["toolchain"]
+    shared = tmp_path_factory.getbasetemp().parent
+    with open(shared / "rust-toolchain.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        done = shared / f"rust-toolchain-{pinned['channel']}"
+        if not done.exists():
+            subprocess.run([rustup, "toolchain", "install", pinned["channel"], "--profile",
+                            pinned.get("profile", "minimal"),
+                            *(f"--component={c}" for c in pinned.get("components", []))],
+                           check=True, capture_output=True)
+            done.touch()
+
+
 @pytest.fixture(autouse=True)
 def offline_pubrel(tmp_path, monkeypatch):
     """No scenario reads pubrel's tags from GitHub: its repository is one
