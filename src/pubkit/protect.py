@@ -427,8 +427,8 @@ def unreported(root: Path, checks: list[str], queue: bool) -> list[str]:
         if check in APPS:
             if not sonar:
                 out.append(f"{check}: no workflow scans with SonarQube Cloud on every {event} run, "
-                           "so SonarCloud never reports it there (the generated pr.yml skips the "
-                           "queue's scan of a tree its pull request passed); ci / sonar already "
+                           "so SonarCloud never reports it there (the generated workflows never scan in "
+                           "the merge queue, which SonarQube Cloud refuses); ci / sonar already "
                            "fails ci / passed on the quality gate, so drop it from protect.checks")
         elif check not in plain and check.split(" / ", 1)[0] not in prefixes:
             out.append(f"{check}: no workflow that runs on {event} reports it, so "

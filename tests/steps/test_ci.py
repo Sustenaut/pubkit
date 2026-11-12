@@ -406,10 +406,12 @@ def skips_tested(repo, name):
         assert spec["needs"][0] == "tested", (job, spec["needs"])
 
 
-@then(parsers.parse('in "{name}" the scan runs only when it did not, as main\'s push scans the tree'))
+@then(parsers.parse('in "{name}" the scan never runs in the merge queue, and on a pull request runs only when it did not'))
 def scan_skips(repo, name):
-    spec = jobs(repo, name)["sonar"]
-    assert spec["if"] == UNTESTED, spec.get("if")
+    spec = jobs(repo, name).get("sonar")
+    if spec is None:  # a private service drops its scan
+        return
+    assert spec["if"] == f"${{{{ {ci.NO_QUEUE} && {ci.UNTESTED} }}}}", spec.get("if")
     assert spec["needs"][0] == "tested", spec["needs"]
     assert "coverage-run" not in spec.get("with", {}), spec
 
@@ -431,10 +433,10 @@ def passed_takes_skipped(repo, name):
     spec = jobs(repo, name)["passed"]
     assert spec["needs"] == list(jobs(repo, name))[:len(spec["needs"])]
     run = spec["steps"][0]["run"]
-    check = re.search(r"jq -e --arg tested \"\$TESTED\" '(.*)'", run, re.S).group(1)
+    check = re.search(r"jq -e --arg tested \"\$TESTED\"(?: --arg event \"\$EVENT\")? '(.*)'", run, re.S).group(1)
 
-    def verdict(results, tested):
-        proc = subprocess.run(["jq", "-e", "--arg", "tested", tested, check],
+    def verdict(results, tested, event="pull_request"):
+        proc = subprocess.run(["jq", "-e", "--arg", "tested", tested, "--arg", "event", event, check],
                               input=json.dumps(results), capture_output=True, text=True)
         return proc.returncode == 0
 
@@ -447,6 +449,13 @@ def passed_takes_skipped(repo, name):
     assert not verdict(failed, "true")
     assert not verdict({**every, "tested": {"result": "failure"}}, "false")
     assert spec["steps"][0]["env"]["TESTED"] == "${{ needs.tested.outputs.tested }}"
+    if "sonar" in names and "merge_group" in triggers(generated(repo, name)):
+        # The scan never runs in the queue: skipped there, and only there, it passes.
+        scanless = {**every, "sonar": {"result": "skipped"}}
+        assert verdict(scanless, "false", "merge_group")
+        assert not verdict(scanless, "false", "pull_request")
+        assert not verdict({**every, "sonar": {"result": "failure"}}, "false", "merge_group")
+        assert spec["steps"][0]["env"]["EVENT"] == "${{ github.event_name }}"
 
 
 @then(parsers.parse('in "{name}" the release runs whenever passed succeeded'))
@@ -969,3 +978,16 @@ def calling_job(repo, name, uses, job, events):
     path.parent.mkdir(parents=True, exist_ok=True)
     on = ", ".join(e.strip() for e in events.split(","))
     path.write_text(f"on: [{on}]\njobs:\n  {job}:\n    uses: {uses}\n")
+
+
+@then("no workflow that runs in the merge queue scans there")
+def no_queue_scan(repo):
+    from pubkit import protect  # noqa: PLC0415
+    for path in sorted((repo / ".github" / "workflows").glob("*.yml")):
+        data = yaml.safe_load(path.read_text())
+        if "merge_group" not in triggers(data):
+            continue
+        for job_id, job in data["jobs"].items():
+            if protect.SONAR_SCAN.search(str(job.get("uses", ""))):
+                assert ci.NO_QUEUE in str(job.get("if", "")), (path.name, job_id)
+    assert not protect.reported(repo, "merge_group")[2]
