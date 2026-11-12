@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "pubkit.json's ci.runs-on names the runners the generated CI runs on: a label for every job, or an object of labels by job name with \"default\" for the rest; sync passes it as the new runs-on input every reusable workflow takes (ubuntu-latest by default; Rust's test keeps its os-matrix) and writes it into tested, passed and site, and without it writes nothing new"
-}

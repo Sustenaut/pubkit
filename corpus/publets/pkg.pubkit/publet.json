@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.35.1 is released as v0.35.1 from commit 83a221a19dcc23af9de2533a7f7a1d84f40d91dc.",
+      "content": "pubkit 0.36.0 is released as v0.36.0 from commit eacd7c38ad4723d89b246a518540ce433072b3ea.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.35.1",
+            "0.36.0",
             "pubkit --version",
-            "pubkit 0.35.1",
-            "v0.35.1",
-            "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
+            "pubkit 0.36.0",
+            "v0.36.0",
+            "eacd7c38ad4723d89b246a518540ce433072b3ea"
           ]
         ]
       },
-      "scope": "the published release v0.35.1 of pubkit",
+      "scope": "the published release v0.36.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
+          "revision": "eacd7c38ad4723d89b246a518540ce433072b3ea"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.35.1 was released on 2026-11-11 from commit 83a221a19dcc23af9de2533a7f7a1d84f40d91dc with these changes.",
+      "content": "pubkit 0.36.0 was released on 2026-11-12 from commit eacd7c38ad4723d89b246a518540ce433072b3ea with these changes.",
       "data": {
         "columns": [
           {
@@ -57,24 +57,36 @@
         ],
         "rows": [
           [
+            "changed",
+            "The reusable workflows' setup steps (python-ci, node-ci, service-ci and the job-* workflows that run a setup) and service-ci's and job-service-terraform's terraform init run through actions/retry and actions/terraform-init at pubkit 0.35.1, with the same tries, pauses, warnings and provider-mirror fallback as before"
+          ],
+          [
             "added",
-            "actions/retry runs a bash script up to tries times (3), warning \"<what> failed (attempt N of T)\" and waiting pause seconds (15) after each failed try but the last, and actions/terraform-init runs terraform init the same way, then once more from pubkit.json's mirror.terraform when it names one; their inputs reach the script through its environment"
+            "pubkit.json's ci.runs-on names the runners the generated CI runs on: a label for every job, or an object of labels by job name with \"default\" for the rest; sync passes it as the new runs-on input every reusable workflow takes (ubuntu-latest by default; Rust's test keeps its os-matrix) and writes it into tested, passed and site, and without it writes nothing new"
+          ],
+          [
+            "changed",
+            "A refused coverage upload or cache step never fails a job: every upload-artifact of a report and every actions/cache step in pubkit's workflows runs with continue-on-error and a five-minute timeout, and actions/cache's restores run with continue-on-error as its saves did, so a run whose artifact and cache services answer with an error page (a blocked Actions billing, on self-hosted runners too) still reports its tests"
+          ],
+          [
+            "changed",
+            "The merge queue never scans with SonarQube Cloud, which refuses its gh-readonly-queue branch: the generated pr.yml runs sonar on pull requests only and its ci / passed takes the skip on merge_group, a Rust queue.yml has no sonar job, and sync refuses SonarCloud Code Analysis in protect.checks wherever a merge queue waits for it, Rust crates included"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.35.1 of pubkit",
+      "scope": "the published release v0.36.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "83a221a19dcc23af9de2533a7f7a1d84f40d91dc"
+          "revision": "eacd7c38ad4723d89b246a518540ce433072b3ea"
         }
       ]
     }
   },
-  "created": "2026-11-11T00:00:00Z",
+  "created": "2026-11-12T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
