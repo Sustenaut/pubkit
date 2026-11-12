@@ -4,7 +4,6 @@
     "checks": [
       "ci / passed",
       "release / release",
-      "SonarCloud Code Analysis",
       "integrations / scan"
     ],
     "release_app": 5529889

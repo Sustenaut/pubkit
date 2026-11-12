@@ -71,10 +71,12 @@ test it again. It starts instead with `tested` (job-tested.yml), which
 looks for a successful merge_group run of that workflow on the commit:
 found, main skips the jobs the queue ran, and runs the scan (with the queue run's coverage,
 since SonarQube Cloud measures main from a push to it) and the release;
-the queue, running pr.yml on a tree its pull request already passed,
-skips the scan too, as that pull request's run scanned it and main's push
-scans it again;
-not found, as without a queue, every job runs as before. Every job
+not found, as without a queue, every job runs as before. The merge queue
+never scans: SonarQube Cloud analyses pull requests and main and refuses
+the queue's gh-readonly-queue branch, the pull request's run scanned the
+change, and main's push scans the merge. A Rust queue.yml has no sonar
+job, and in pr.yml, which the queue runs too, it does not run on
+merge_group, which `passed` takes. Every job
 is named `ci`, so its checks read `ci / test`, `ci / sonar` and so on.
 """
 
@@ -109,6 +111,10 @@ TRIGGERS = {
 RELEASE_EVENTS = ("pr", "queue", "main")
 # The events the site is checked on, before anything deploys it.
 SITE_EVENTS = ("pr", "queue")
+# Jobs the merge queue never runs: SonarQube Cloud analyses pull requests
+# and main, and refuses the queue's gh-readonly-queue branch. The pull
+# request's run scanned the change, and main's push scans the merge.
+NOT_QUEUED = ("sonar",)
 SETTINGS = ("language", "events", "cron", "with", "jobs", "release", "tools")
 HEADER = ("# Written by `pubkit sync` from the ci block of pubkit.json. Do not edit:\n"
           "# change pubkit.json and run `pubkit sync`.\n")
@@ -348,7 +354,8 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             continue
         if not planned(job, rules) or (name == "cross" and inputs.get("cross-targets") == "[]"):
             continue
-        jobs[name] = tuple(e for e in EVENTS if e in on and (e in events or e == "queue"))
+        jobs[name] = tuple(e for e in EVENTS if e in on and (e in events or e == "queue")
+                           and not (name in NOT_QUEUED and e == "queue"))
     unknown = sorted(set(overrides) - set(table))
     if unknown:
         stop(f"jobs names {', '.join(unknown)}, which {language} has not; it has {', '.join(table)}")
@@ -488,6 +495,7 @@ def flow(values: dict[str, Any]) -> str:
 # The condition each testing job runs under, on main and in the merge
 # queue: no earlier run already passed on the commit's tree.
 UNTESTED = "needs.tested.outputs.tested != 'true'"
+NO_QUEUE = "github.event_name != 'merge_group'"
 
 
 def queued(ci: dict[str, Any]) -> str:
@@ -551,6 +559,9 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             # The scan runs either way, after the tests or in their place.
             out.append("    if: ${{ !failure() && !cancelled() }}\n")
             given["coverage-run"] = "${{ needs.tested.outputs.run-id }}"
+        elif skips and name in NOT_QUEUED and event == "pr":
+            # pr.yml runs in the merge queue too: there, never.
+            out.append(f"    if: ${{{{ {NO_QUEUE} && {UNTESTED} }}}}\n")
         elif skips:
             out.append(f"    if: ${{{{ {UNTESTED} }}}}\n")
         out.append(f"    uses: {ci['owner']}/pubkit/.github/workflows/{job.workflow}"
@@ -567,7 +578,23 @@ def workflow(ci: dict[str, Any], event: str) -> str:
     if ci["site"] and event in SITE_EVENTS:
         names = [*names, "site"]
         out.append(site_job(ci))
-    if shortcut:
+    if shortcut and event == "pr" and any(n in NOT_QUEUED for n in names):
+        out.append(
+            "\n  # The one check a ruleset requires: it passes only when every job\n"
+            "  # above succeeded or, where an earlier run already passed on the\n"
+            "  # commit's tree, was skipped for it, or is the scan, which the merge\n"
+            "  # queue never runs. None is skipped for not being asked for.\n"
+            "  passed:\n    name: ci / passed\n    if: always()\n"
+            f"    needs: [{', '.join(['tested', *names])}]\n    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - run: |\n          echo \"$RESULTS\"\n"
+            "          echo \"$RESULTS\" | jq -e --arg tested \"$TESTED\" --arg event \"$EVENT\" '.tested.result == \"success\"\n"
+            "            and all(to_entries[]; .value.result == \"success\" or (.value.result == \"skipped\"\n"
+            f"              and ($tested == \"true\" or (.key == \"{NOT_QUEUED[0]}\" and $event == \"merge_group\"))))'"
+            " > /dev/null\n"
+            "        env: { RESULTS: '${{ toJSON(needs) }}', TESTED: '${{ needs.tested.outputs.tested }}', "
+            "EVENT: '${{ github.event_name }}' }\n")
+    elif shortcut:
         out.append(
             "\n  # The one check a ruleset requires: it passes only when every job\n"
             "  # above succeeded or, where an earlier run already passed on the\n"
