@@ -135,7 +135,10 @@ its own tooling's, never pubkit's or pubrel's. What that looks like depends
 on the content: one body of content with no versions, or a monorepo of
 content projects, each versioned on its own (as publets are, each a version
 of its project). pubkit sees one repository either way, and its CI runs
-whatever checks the content's tooling gives it. `pubkit init --kind=content`
+whatever checks the content's tooling gives it. The line between them:
+pubkit, the packages split off it and pubrel converge and version code,
+configuration and state; the content's own publet packages manage the
+content itself, its versioning, publication and state. `pubkit init --kind=content`
 writes the common managed files only (`./pubkit`, `AGENTS.md`,
 `tests/requirements-pubkit.txt`, `tests/install-lock`) and the seeded test
 files, and needs no `--project`.
