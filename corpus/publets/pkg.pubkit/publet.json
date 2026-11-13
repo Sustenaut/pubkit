@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.37.0 is released as v0.37.0 from commit 1f6e250a5353a6a68b719d45377a1d47a5063aa9.",
+      "content": "pubkit 0.37.1 is released as v0.37.1 from commit 965da1e331e49cbda1e9ed94ce15b85c3c5f6bd2.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.37.0",
+            "0.37.1",
             "pubkit --version",
-            "pubkit 0.37.0",
-            "v0.37.0",
-            "1f6e250a5353a6a68b719d45377a1d47a5063aa9"
+            "pubkit 0.37.1",
+            "v0.37.1",
+            "965da1e331e49cbda1e9ed94ce15b85c3c5f6bd2"
           ]
         ]
       },
-      "scope": "the published release v0.37.0 of pubkit",
+      "scope": "the published release v0.37.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1f6e250a5353a6a68b719d45377a1d47a5063aa9"
+          "revision": "965da1e331e49cbda1e9ed94ce15b85c3c5f6bd2"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.37.0 was released on 2026-11-12 from commit 1f6e250a5353a6a68b719d45377a1d47a5063aa9 with these changes.",
+      "content": "pubkit 0.37.1 was released on 2026-11-13 from commit 965da1e331e49cbda1e9ed94ce15b85c3c5f6bd2 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,28 @@
         ],
         "rows": [
           [
-            "changed",
-            "The Gherkin suite runs on every core: pubkit's own make functional and a Rust crate's pubkit.mk run pytest with -n auto (pytest-xdist, which the shared tests requirements already pin) by default, coverage combining the workers' data as before; PYTEST_ARGS= in the Makefile runs it on one core"
+            "added",
+            "pins moves each Python package a requirements file or pyproject.toml pins by another repository's release wheel to that repository's latest release, forward only, and compiles again each uv pip compile lock made from a moved file"
           ],
           [
-            "added",
-            "A Python package's make targets are pubkit's: sync manages pubkit-python.mk (venv, functional, lock, sync-check, wheel, clean, help; the suite on every core, PYTEST_ARGS ?= -n auto, its coverage combined into coverage/coverage.xml; FUNCTIONAL_ENV and EDITABLE for what differs) and seeds a Makefile that includes it, and sync --check fails until the Makefile includes it and pyproject.toml's [tool.coverage.run] sets patch = [\"subprocess\"] and parallel = true"
+            "fixed",
+            "pins run by an older pubkit than a repository already runs leaves pubkit's managed files and lock as they are, rather than moving the repository back"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.37.0 of pubkit",
+      "scope": "the published release v0.37.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1f6e250a5353a6a68b719d45377a1d47a5063aa9"
+          "revision": "965da1e331e49cbda1e9ed94ce15b85c3c5f6bd2"
         }
       ]
     }
   },
-  "created": "2026-11-12T00:00:00Z",
+  "created": "2026-11-13T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
