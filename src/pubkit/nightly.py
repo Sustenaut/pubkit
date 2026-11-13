@@ -6,8 +6,12 @@ workflow and `pubrel-version`, each
 tool `ci.tools` pins by tag, to the latest release of its git repository,
 every other repository's reusable workflow a workflow pins at a release
 (a control plane's reusable workflow, say), to that repository's
-latest release, and the crates `nightly.pins.crates` names in `Cargo.lock`,
-within their requirements.
+latest release, every Python package a requirements file or pyproject.toml
+pins by another repository's release wheel (`name @ https://github.com/OWNER/
+REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`) to that repository's
+latest release, forward only, with each `uv pip compile` lock made from a
+moved file compiled again, and the crates `nightly.pins.crates` names in
+`Cargo.lock`, within their requirements.
 
 `pubkit crates --report FILE` then tries each upgrade `cargo update` would
 make to the other crates, one at a time on top of those it kept, and keeps
@@ -70,6 +74,13 @@ OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
                        r"(?P<path>/(?:\.github/workflows/[\w.-]+\.ya?ml|actions/[\w.-]+)@)"
                        + AT + VERSION)
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
+# A Python package pinned by another repository's release wheel, in a requirements
+# file or pyproject.toml: the version is in the tag and in the file's name.
+WHEEL_PIN = re.compile(r"(?P<lead>[A-Za-z0-9][A-Za-z0-9_.-]*(?:\[[^\]]*\])?\s*@\s*)https://github\.com/"
+                       r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]*)/(?P<repo>[A-Za-z0-9_.-]+)/releases/download/"
+                       r"v(?P<version>[0-9]+\.[0-9]+\.[0-9]+)/(?P<file>[A-Za-z0-9_.+-]+\.whl)")
+# The command a `uv pip compile` lock was made with, in its header.
+UV_COMPILE = re.compile(r"^#\s+(uv pip compile .*)$", re.M)
 # A third-party action in a `uses:` line, pinned as Dependabot pins one: by
 # the commit of a release's tag, with the version in a comment. OWNER/REPO,
 # then any path inside it (actions/cache/restore), then `@COMMIT # vX.Y.Z`.
@@ -323,6 +334,82 @@ def others_by_release(text: str, name: str, skip: set[str], changes: list[str]) 
     return OTHER_PIN.sub(move, text)
 
 
+def wheel_files(root: Path) -> list[Path]:
+    """The files that can pin a release wheel: requirements files (*.txt, *.in
+    with "requirements" in the name) and pyproject.toml, outside dot-directories,
+    node_modules and target; never a lock, which follows its input, nor the
+    requirements pubkit sync writes."""
+    out = []
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root)
+        if any(part.startswith(".") or part in NOT_OWN for part in rel.parts[:-1]) or not path.is_file():
+            continue
+        base = path.name
+        if base == "pyproject.toml" or ("requirements" in base and base.endswith((".txt", ".in"))
+                                        and base != "requirements-pubkit.txt"):
+            out.append(path)
+    return out
+
+
+def wheels_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Path]:
+    """Each release wheel pin (WHEEL_PIN) of another repository moved to that
+    repository's latest release, when that release is newer: the tag and the
+    file's version both. The moves said in `changes`; the files moved returned.
+    One whose latest release cannot be read, or is not newer, stays."""
+    moved_files = []
+
+    def move(m: re.Match[str], rel: str) -> str:
+        if m["repo"].lower() in skip or m["version"] not in m["file"]:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None or release_key(latest[1:]) <= release_key(m["version"]):
+            return m.group(0)
+        version = latest[1:]
+        line = f"{rel}: {slug} {m['version']} -> {version}"
+        if line not in changes:
+            changes.append(line)
+        file = m["file"].replace(m["version"], version, 1)
+        return f"{m['lead']}https://github.com/{slug}/releases/download/v{version}/{file}"
+
+    for path in wheel_files(root):
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        new = WHEEL_PIN.sub(lambda m, rel=rel: move(m, rel), text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+            moved_files.append(path)
+    return moved_files
+
+
+def recompile(root: Path, moved: list[Path], changes: list[str]) -> None:
+    """Each `uv pip compile` lock (its header names the command) whose input
+    moved, compiled again with that command, so its hashes are the new wheels'.
+    One that fails is said, and left for the pull request's CI to show."""
+    import shlex  # noqa: PLC0415
+    names = {p.relative_to(root).as_posix() for p in moved}
+    for lock in sorted(root.rglob("*.lock")):
+        if any(part.startswith(".") or part in NOT_OWN for part in lock.relative_to(root).parts[:-1]):
+            continue
+        try:
+            found = UV_COMPILE.search(lock.read_text(encoding="utf-8")[:2000])
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not found:
+            continue
+        argv = shlex.split(found.group(1))
+        here = lock.parent.relative_to(root)
+        if not any((here / a).as_posix() in names for a in argv if a.endswith((".in", ".txt", ".toml"))):
+            continue
+        done = subprocess.run(argv, cwd=lock.parent, capture_output=True, text=True, check=False)
+        rel = lock.relative_to(root).as_posix()
+        if done.returncode != 0:
+            print(f"pubkit: warning: {rel} could not be compiled again: "
+                  f"{(done.stderr.strip().splitlines() or ['uv failed'])[-1]}", file=sys.stderr)
+            continue
+        changes.append(f"{rel}: compiled again")
+
+
 def modules_by_release(root: Path, skip: set[str], changes: list[str]) -> None:
     """Each other repository's Terraform module source (TF_SOURCE) in the
     repository's .tf files, moved to that repository's latest release by the
@@ -440,6 +527,11 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
             print(line, file=sys.stderr)
     changes += moved
     before = pinned(root)
+    if before and RELEASE_TAG.fullmatch(f"v{before}") and release_key(before) > release_key(__version__):
+        # Never backwards: sync would write this older pubkit's managed files.
+        print(f"pubkit: warning: this repository runs pubkit {before}, newer than this {__version__}, "
+              "so pubkit's managed files and lock stay", file=sys.stderr)
+        before, moved = __version__, []
     if (before and before != __version__) or moved:
         from .cli import lock as lock_requirements, sync  # noqa: PLC0415
         sync(root, check=False)
@@ -490,6 +582,15 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         if new != text:
             path.write_text(new, encoding="utf-8")
     modules_by_release(root, skip, changes)
+    # deploy.providers' wheels too: a hand-written requirement of one keeps up with
+    # the providers entry its package's hook moved. pubkit's are sync's to write.
+    wheels = wheels_by_release(root, {"pubkit"}, changes)
+    if wheels and lock:
+        from .cli import REQUIREMENTS, lock as lock_requirements  # noqa: PLC0415
+        if (root / REQUIREMENTS).is_file():
+            with contextlib.redirect_stdout(io.StringIO()):
+                lock_requirements(root)
+        recompile(root, wheels, changes)
     old = locked(root)
     moving = pin_crates(root)
     for crate in moving:

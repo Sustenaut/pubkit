@@ -195,6 +195,32 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When I run pubkit "pins" "--no-lock"
     Then ".github/workflows/deploy.yml" contains "deploy.yml@v0.1.0"
 
+  Scenario: pins moves another repository's release wheel in a requirements file and pyproject.toml
+    Given "example-org/somelib" releases "v0.3.0"
+    And the file "requirements.in" reads "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    And the file "pyproject.toml" reads "dependencies = ["somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"]"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "requirements.in: example-org/somelib 0.2.1 -> 0.3.0"
+    And "requirements.in" contains "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+    And "pyproject.toml" contains "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+
+  Scenario: pins never moves a release wheel back, and leaves files that are not requirements
+    Given "example-org/somelib" releases "v0.2.0"
+    And the file "tests/requirements.txt" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    And the file "README.md" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.1.0/somelib-0.1.0-py3-none-any.whl"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And "tests/requirements.txt" contains "v0.2.1/somelib-0.2.1"
+    And "README.md" contains "v0.1.0/somelib-0.1.0"
+
+  Scenario: pins run by an older pubkit than the repository's leaves pubkit's files alone
+    Given the file "tests/requirements.lock" reads "pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v99.0.0/pubkit-99.0.0-py3-none-any.whl"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And "tests/requirements.lock" contains "v99.0.0/pubkit-99.0.0"
+    And it does not print "pubkit 99.0.0 ->"
+
   Scenario: pins on a repository already current changes nothing
     Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubkit "pins" "--pubrel" "0.5.3" "--no-lock"

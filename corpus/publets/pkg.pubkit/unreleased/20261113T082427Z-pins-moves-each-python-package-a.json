@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "pins moves each Python package a requirements file or pyproject.toml pins by another repository's release wheel to that repository's latest release, forward only, and compiles again each uv pip compile lock made from a moved file"
+}
