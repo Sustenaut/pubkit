@@ -61,8 +61,10 @@ set's, for every job, or an object of labels by job name with "default" for
 the rest, such as {"default": "my-runners", "review": "ubuntu-latest"}. It
 goes to each job pubkit calls as its `runs-on` input, and into the jobs
 pubkit writes itself (tested, passed, site). Rust's test job runs on its
-os-matrix instead, and pubrel's release workflow on GitHub's runners.
-Without it nothing is written, and every job runs on ubuntu-latest.
+os-matrix instead. pubrel's release workflow takes it from pubrel 0.7.0,
+which installs Rust on a runner without it; an older pubrel's runs on
+GitHub's runners. Without it nothing is written, and every job runs on
+ubuntu-latest.
 
 A repository that deploys a static site with a deploy-static action (a
 workflow of its own uses it, or pubkit.json has a `site` block) gets a `site` job in pr.yml (and queue.yml): it builds the site
@@ -281,14 +283,23 @@ RELEASE_SECRETS = ("    secrets: { RELEASE_APP_ID: '${{ secrets.RELEASE_APP_ID }
                    "RELEASE_APP_KEY: '${{ secrets.RELEASE_APP_KEY }}' }\n")
 
 
-def takes_app(pubrel: str) -> bool:
-    """Whether pubrel `pubrel`'s release workflow takes the app's secrets."""
+def pubrel_from(pubrel: str, first: tuple[int, int, int]) -> bool:
+    """Whether pubrel `pubrel` is release `first` or later."""
     parts = []
     for part in pubrel.split("-", 1)[0].split(".")[:3]:
         if not part.isdigit():
             return False
         parts.append(int(part))
-    return tuple(parts) >= RELEASE_APP_FROM
+    return tuple(parts) >= first
+
+
+def takes_app(pubrel: str) -> bool:
+    """Whether pubrel `pubrel`'s release workflow takes the app's secrets."""
+    return pubrel_from(pubrel, RELEASE_APP_FROM)
+
+
+# The first pubrel whose release workflow takes runs-on.
+RELEASE_RUNS_ON_FROM = (0, 7, 0)
 
 
 # Inputs the release workflow takes besides pubrel-version, by language.
@@ -434,7 +445,7 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
 # scale set's name.
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 # The jobs pubkit writes into the workflow itself, besides the table's.
-OWN_JOBS = ("tested", "passed", "site")
+OWN_JOBS = ("tested", "passed", "site", "release")
 
 
 def runs_on(given: dict[str, Any], table: dict[str, Job]) -> dict[str, str]:
@@ -721,10 +732,17 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             "  release:\n    needs: passed\n" + after +
             f"    uses: {ci['owner']}/pubrel/.github/workflows/release.yml"
             f"@{ref(pubrel, release['commit'])}\n"
-            f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with']})}\n"
+            f"    with: {flow({'pubrel-version': f'v{pubrel}', **release['with'], **release_runner(ci, pubrel)})}\n"
             + (RELEASE_SECRETS if takes_app(pubrel) else "")
             + "    permissions:\n      contents: write\n")
     return "".join(out)
+
+
+def release_runner(ci: dict[str, Any], pubrel: str) -> dict[str, str]:
+    """The release job's runs-on input: the ci block's runner for it, where
+    that pubrel's release workflow takes one (0.7.0 on); before that it
+    always runs on ubuntu-latest."""
+    return runs_with(ci, "release") if pubrel_from(pubrel, RELEASE_RUNS_ON_FROM) else {}
 
 
 def site_job(ci: dict[str, Any]) -> str:

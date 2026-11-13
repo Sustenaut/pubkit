@@ -49,8 +49,8 @@ MIN_PUB = (0, 2, 1)
 PUB_GIT = "https://github.com/Sustenaut/publet"
 # The pubrel release workflow a new package's CI calls, and the commit its
 # tag names, which the workflow pins (refs.py).
-PUBREL_PIN = "0.6.1"
-PUBREL_COMMIT = "5395ddd816d9530b649b92ed0b8b3cfdfe87d7dc"
+PUBREL_PIN = "0.7.0"
+PUBREL_COMMIT = "931f3016d6fec63315e413060cde079d77730b52"
 # The oldest pubsec this pubkit works with, and its wheel's sha256: the floor.
 # A repository's deploy.providers pins its own pubsec, which `pubkit bump`
 # (pubdeploy's hook) moves to the latest release; sync adds the floor where none is listed and
