@@ -205,6 +205,19 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And "requirements.in" contains "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
     And "pyproject.toml" contains "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
 
+  Scenario: A content repository is governed like any other: pins moves its pubkit and its release wheels
+    Given a repository initialised as "content"
+    And "example-org/somelib" releases "v0.3.0"
+    And the file "tests/requirements.lock" reads "pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v0.0.1/pubkit-0.0.1-py3-none-any.whl"
+    And the file "tests/requirements.txt" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    When I run pubkit "pins" "--no-lock"
+    Then it succeeds
+    And it prints "pubkit 0.0.1 ->"
+    And it prints "tests/requirements.txt: example-org/somelib 0.2.1 -> 0.3.0"
+    And "tests/requirements.txt" contains "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+    And the repository has no "with-secrets"
+    And the repository has no "pubsec"
+
   Scenario: pins never moves a release wheel back, and leaves files that are not requirements
     Given "example-org/somelib" releases "v0.2.0"
     And the file "tests/requirements.txt" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"

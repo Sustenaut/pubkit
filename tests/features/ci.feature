@@ -530,6 +530,9 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | kind    | ci                          | message                                   |
       | service | {"release": true}           | release is not for a service              |
       | service | {"with": {"browser-test": "x"}} | with gives browser-test, which no service job takes |
+      | content | {"release": true}           | release is not for a content repository, which pubkit neither releases nor deploys |
+      | content | {"with": {"terraform-dir": "."}} | with gives terraform-dir, which no content job takes |
+      | content | {"language": "python"}      | language is for a utility                 |
       | Rust    | {"language": "node"}        | language is for a utility                 |
 
   Scenario Outline: The job table passes each job exactly the inputs its workflow takes
@@ -543,6 +546,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | python   |
       | rust     |
       | service  |
+      | content  |
 
   Scenario Outline: A job's workflow runs the same steps as the job in the shared workflow
     Then "<job>" runs the steps of the "<name>" job in "<shared>"

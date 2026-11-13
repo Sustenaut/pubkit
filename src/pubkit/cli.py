@@ -1,6 +1,6 @@
 """`pubkit`: keep a repository's shared testing files in step.
 
-    pubkit init --kind=rust|utility|service [--bin=NAME]
+    pubkit init --kind=rust|utility|service|content [--bin=NAME]
     pubkit new --name=NAME --tag=PKG-XXXXXX-MM-YYYY [--owner=OWNER] [--description=TEXT]
     pubkit sync [--check]
     pubkit lock
@@ -58,7 +58,7 @@ from pathlib import Path
 from . import __version__
 from .plugin import bin_var
 
-KINDS = ("rust", "utility", "service")
+KINDS = ("rust", "utility", "service", "content")
 # The commands that hold a secret, pubsec's now: each prints where it went.
 MOVED = ("app-secrets", "github-app", "service-account-key", "signing-key")
 # Kinds pubkit no longer has, and what each became. Not accepted: a
@@ -74,6 +74,10 @@ MANAGED = {
     # A private repository that deploys: the one secrets wrapper every
     # service runs its secret-needing commands through.
     "service": ["with-secrets", "pubsec"],
+    # A private repository of authored content (documents, data) that pubkit
+    # neither releases nor deploys: its own tooling builds and checks it, and
+    # versions it, if anything does. The common files only.
+    "content": [],
 }
 # Managed files that are programs, written executable.
 EXECUTABLE = {"with-secrets", "pubkit", "pubsec", "pubdeploy", "tests/install-lock"}
