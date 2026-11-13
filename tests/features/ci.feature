@@ -979,10 +979,17 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
 
     Examples:
       | language | exempt                |
-      | Node     | release               |
-      | Python   | release               |
-      | Rust     | release and test      |
+      | Node     | none                  |
+      | Python   | none                  |
+      | Rust     | test                  |
       | service  | none                  |
+
+  Scenario: The release job takes runs-on only from the pubrel whose release workflow has it
+    Given a Node repository whose ci block is '{"runs-on": {"default": "my-runners", "release": "release-runners"}, "release": {"pubrel": "0.6.2"}}'
+    When I run pubkit "sync"
+    Then it succeeds
+    And in "pr.yml" the "release" job is given no runner
+    And in "pr.yml" the "test" job is given "runs-on" "my-runners"
 
   Scenario: runs-on by job places each job, the rest on the default
     Given a Node repository whose ci block is '{"runs-on": {"default": "my-runners", "review": "ubuntu-latest", "passed": "other-runners"}}'
@@ -1016,7 +1023,6 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | Node     | "my runners"                    | runs-on.default must be a runner label    |
       | Node     | {"test": 3}                     | runs-on.test must be a runner label       |
       | Node     | {"gates": "my-runners"}         | runs-on names gates; it takes default     |
-      | Node     | {"release": "my-runners"}       | runs-on names release; it takes default   |
       | Rust     | {"test": "my-runners"}          | whose runners its os-matrix input gives   |
 
   Scenario: Every reusable workflow a job calls takes its runner as an input
