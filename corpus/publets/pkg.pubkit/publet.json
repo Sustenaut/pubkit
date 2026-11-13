@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.37.2 is released as v0.37.2 from commit 3cd45678c6cc95742bd7136ee7bc14b20ee99797.",
+      "content": "pubkit 0.38.0 is released as v0.38.0 from commit e8405810cb20abbc2bdda0865113a53bb688c742.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.37.2",
+            "0.38.0",
             "pubkit --version",
-            "pubkit 0.37.2",
-            "v0.37.2",
-            "3cd45678c6cc95742bd7136ee7bc14b20ee99797"
+            "pubkit 0.38.0",
+            "v0.38.0",
+            "e8405810cb20abbc2bdda0865113a53bb688c742"
           ]
         ]
       },
-      "scope": "the published release v0.37.2 of pubkit",
+      "scope": "the published release v0.38.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "3cd45678c6cc95742bd7136ee7bc14b20ee99797"
+          "revision": "e8405810cb20abbc2bdda0865113a53bb688c742"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.37.2 was released on 2026-11-13 from commit 3cd45678c6cc95742bd7136ee7bc14b20ee99797 with these changes.",
+      "content": "pubkit 0.38.0 was released on 2026-11-13 from commit e8405810cb20abbc2bdda0865113a53bb688c742 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "added",
-            "The content kind, for a private repository of authored content (documents, data) that pubkit neither releases nor deploys: init --kind=content writes the common managed files only and needs no --project; its CI runs checks (the managed files in step, and shellcheck on **/*.sh unless with gives shellcheck) and, when with gives a test, tests, which runs its own tooling's checks, with no scan; a release in its ci block stops sync; its protect block's tags defaults to false and refuses tags true and release_app; the nightly governs it like any other repository"
+            "changed",
+            "pubrel's release workflow runs where pubkit.json's ci.runs-on says (its default, or runs-on.release): new packages pin pubrel 0.7.0, whose release workflow takes runs-on and installs Rust on a runner without it; with an older pubrel the release job stays on GitHub's runners"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.37.2 of pubkit",
+      "scope": "the published release v0.38.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "3cd45678c6cc95742bd7136ee7bc14b20ee99797"
+          "revision": "e8405810cb20abbc2bdda0865113a53bb688c742"
         }
       ]
     }

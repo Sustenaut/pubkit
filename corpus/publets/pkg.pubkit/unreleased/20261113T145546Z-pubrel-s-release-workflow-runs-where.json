@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "pubrel's release workflow runs where pubkit.json's ci.runs-on says (its default, or runs-on.release): new packages pin pubrel 0.7.0, whose release workflow takes runs-on and installs Rust on a runner without it; with an older pubrel the release job stays on GitHub's runners"
-}
