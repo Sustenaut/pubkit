@@ -131,7 +131,11 @@ removed in the next minor.
 A content repository holds authored information, documents or data, and is
 private. pubkit neither releases nor deploys it: it has no release, no
 release tags and no secrets wrapper, and any versioning of what it holds is
-its own tooling's, never pubkit's or pubrel's. `pubkit init --kind=content`
+its own tooling's, never pubkit's or pubrel's. What that looks like depends
+on the content: one body of content with no versions, or a monorepo of
+content projects, each versioned on its own (as publets are, each a version
+of its project). pubkit sees one repository either way, and its CI runs
+whatever checks the content's tooling gives it. `pubkit init --kind=content`
 writes the common managed files only (`./pubkit`, `AGENTS.md`,
 `tests/requirements-pubkit.txt`, `tests/install-lock`) and the seeded test
 files, and needs no `--project`.
