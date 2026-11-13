@@ -26,7 +26,8 @@ bypass actor, so an organization's repository names its release app with
 `"release_app": ID` in its protect block, and its tags let that app through instead,
 whose token `pubrel tag` uses there. A hand-pushed tag cannot release code that CI did
 not pass. A repository that releases no tags goes without it: `"tags": false` in its
-block, or `--no-tags`.
+block, or `--no-tags`; a content repository's protect block defaults to
+`"tags": false`, and refuses `"tags": true` and `release_app`.
 
 A repository says how it is protected in its own pubkit.json:
 `"protect": {"checks": [...], "tags": false, "queue": false, "auto_merge": true,
@@ -446,9 +447,16 @@ def entry(repo: str, config: Any, where: str) -> dict:
     if isinstance(block, dict) and block.keys() - KEYS:
         bad.append(f"{', '.join(sorted(block.keys() - KEYS))} is not a protect setting; "
                    f"it takes checks, tags, queue, auto_merge, release_app and secret_scanning")
+    # A content repository releases nothing, so it has no release tags to keep
+    # and no release app to let through.
+    content = config.get("kind") == "content"
+    if content and block.get("tags") is True:
+        bad.append('"tags" is not for a content repository, which has no release tags')
+    if content and "release_app" in block:
+        bad.append('"release_app" is not for a content repository, which releases nothing')
     if bad:
         raise ValueError(f"{where}'s protect block: {'; '.join(bad)}")
-    return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", True),
+    return {"repo": repo, "checks": block["checks"], "tags": block.get("tags", not content),
             "queue": block.get("queue", True), "auto_merge": block.get("auto_merge"),
             "release_app": block.get("release_app"),
             "secret_scanning": block.get("secret_scanning", True)}

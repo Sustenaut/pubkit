@@ -28,19 +28,20 @@ A suite's own step with the same text wins over the plugin's.
 ## Keeping the files in step
 
 ```sh
-pubkit init --kind=rust --bin=pub   # or --kind=utility, or --kind=service --project=NAME
+pubkit init --kind=rust --bin=pub   # or --kind=utility, --kind=service --project=NAME, or --kind=content
 pubkit lock                         # pin tests/requirements.txt, with hashes
 pubkit sync --check                 # CI: fail if a managed file drifted
 pubkit sync                         # after bumping pubkit: rewrite them
 ```
 
-A repository is one of three kinds, named in `pubkit.json`:
+A repository is one of four kinds, named in `pubkit.json`:
 
 | Kind | What it is |
 |---|---|
 | `rust` | A released Rust package, held to the Rust crate standard (below) |
 | `utility` | A released tool or library in any language, or several, without the Rust package's extra checks |
 | `service` | A repository that deploys rather than releases, and runs its secret-needing commands through `./with-secrets` (below) |
+| `content` | An authored-content repository, private: pubkit neither releases nor deploys it; its own tooling builds and checks it through the ci tests job (below) |
 
 The kind `python` (before 0.10.0) and `python-utility` (0.10.0) are now
 `utility`: a package's language doesn't decide its kind. `sync` says so
@@ -49,7 +50,7 @@ when `pubkit.json` still names an old one.
 Files are **managed**, owned by pubkit and rewritten by `sync`, or
 **seeded**, written once by `init` and the repository's own after that.
 
-- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel), `pubkit` (below), and `AGENTS.md`, the working rules agents and people follow in every repository, starting with when a pull request is draft (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a Python package (a utility whose CI is Python's), `pubkit-python.mk`: the make targets every Python package shares (`venv`, `functional`, `lock`, `sync-check`, `wheel`, `clean`, `help`), with the suite on every core (`PYTEST_ARGS ?= -n auto`) and its coverage in `coverage/coverage.xml`. Set `PYTEST_ARGS`, `FUNCTIONAL_ENV` (variables the suite needs, such as `PYTHONPATH=$(CURDIR)/src`) or `EDITABLE` (what `venv` installs editable; empty for nothing) in the Makefile, before the include. `sync --check` fails until the Makefile includes it and `pyproject.toml`'s `[tool.coverage.run]` sets `patch = ["subprocess"]` and `parallel = true`, so the coverage of xdist's workers and of the programs the suite starts is combined. For a service, `with-secrets`.
+- **Managed:** `tests/requirements-pubkit.txt` (the shared pins and the pubkit wheel), `pubkit` (below), and `AGENTS.md`, the working rules agents and people follow in every repository, starting with when a pull request is draft (below). For a Rust package, also `pubkit.mk`, `rust-toolchain.toml`, and the crate standard with its agent (below). For a Python package (a utility whose CI is Python's), `pubkit-python.mk`: the make targets every Python package shares (`venv`, `functional`, `lock`, `sync-check`, `wheel`, `clean`, `help`), with the suite on every core (`PYTEST_ARGS ?= -n auto`) and its coverage in `coverage/coverage.xml`. Set `PYTEST_ARGS`, `FUNCTIONAL_ENV` (variables the suite needs, such as `PYTHONPATH=$(CURDIR)/src`) or `EDITABLE` (what `venv` installs editable; empty for nothing) in the Makefile, before the include. `sync --check` fails until the Makefile includes it and `pyproject.toml`'s `[tool.coverage.run]` sets `patch = ["subprocess"]` and `parallel = true`, so the coverage of xdist's workers and of the programs the suite starts is combined. For a service, `with-secrets`. A content repository has the common files only.
 - **Seeded:** `tests/requirements.txt` (includes the managed one), `tests/pytest.ini`, `.github/workflows/ci.yml`, for a Rust package a `Makefile` that includes `pubkit.mk` (for a Python package, one that includes `pubkit-python.mk` and adds `check`), and for a service `with-secrets.json`.
 - **Healed:** `.gitignore` is the repository's own, but it must ignore `.env`, where local tools read secrets (`./with-secrets` its Bitwarden token). `init` and `sync` append `.env` when it's missing, with a comment above it, and leave the rest of the file as it is; `sync --check` fails until it's there. A pattern that already covers it, such as `/.env` or `.env*`, counts, and a later `!.env` takes it back.
 
@@ -124,6 +125,29 @@ create` says so, and is removed in the next minor.
 key and writes it to Bitwarden from memory (pubsec's README, "Making a
 service account key"). `pubkit service-account-key create` says so, and is
 removed in the next minor.
+
+## Content repositories
+
+A content repository holds authored information, documents or data, and is
+private. pubkit neither releases nor deploys it: it has no release, no
+release tags and no secrets wrapper, and any versioning of what it holds is
+its own tooling's, never pubkit's or pubrel's. `pubkit init --kind=content`
+writes the common managed files only (`./pubkit`, `AGENTS.md`,
+`tests/requirements-pubkit.txt`, `tests/install-lock`) and the seeded test
+files, and needs no `--project`.
+
+- **CI:** `checks` (the managed files in step, and shellcheck on the
+  repository's `**/*.sh` unless `with` gives `shellcheck`) and, when `with`
+  gives a `test`, `tests`, which runs the checks the repository's own tooling
+  makes, after `setup`. There is no scan: SonarQube Cloud has no code to
+  analyse, and does not analyse a private repository for free. A `release`
+  in the ci block stops sync.
+- **Protect:** main's ruleset as for any repository; its protect block's
+  `tags` defaults to false, since there are no release tags to keep, and
+  `"tags": true` or a `release_app` stops sync.
+- **Nightly:** governed like any other repository: the nightly moves its
+  pubkit, its lock, the workflows' and actions' pins and any release wheel
+  its requirements files pin.
 
 ## Hosting
 
@@ -978,8 +1002,8 @@ Whose pubkit and pubrel these are is set in one place, `OWNER` in `src/pubkit/re
 - **`jobs`:** narrows the events a job runs on, or drops it with `false` (a private repository drops `review`, since GitHub's dependency graph serves only public ones). By default every job runs on every event, except `review`, which runs on pull requests only, and Rust's `msrv`, `fuzz` and `cross`, which run everywhere but on pull requests. `browser` runs only when `with` gives a `browser-test`.
 - **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release.
 - **`runs-on`:** the runners, for a repository with self-hosted ones. A label (`"runs-on": "my-runners"`) runs every job there; an object of labels by job name, with `default` for the rest (`{"default": "my-runners", "review": "ubuntu-latest"}`), places them one by one. Sync passes it to each job as its `runs-on` input (every reusable workflow, `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` too, takes one, `ubuntu-latest` by default) and writes it into `tested`, `passed` and `site`. Rust's `test` runs on its `os-matrix` instead, and pubrel's release workflow on GitHub's runners. Without it nothing is written, and every job runs on `ubuntu-latest`. The runner must have what `ubuntu-latest` gives these jobs (git, curl, jq, python3 with venv, gh, shellcheck, unzip, a C toolchain, Docker).
-- **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust or service repository's CI is its kind's.
-- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
+- **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust, service or content repository's CI is its kind's.
+- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubkit's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none, and a content repository, which pubkit neither releases nor deploys, has none either. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubkit.json, then runs `pubkit sync`.
 
 Neither the merge queue nor `main.yml` tests again what an earlier run already tested. A pull request up to date with main merges as the very files its own run tested, and merging moves main to the very commit the queue tested. So `main.yml`, and `pr.yml` where the queue runs it (there is no `queue.yml`), start with `tested` (`job-tested.yml`, `ci / tested`). In the queue and on main, it looks for a successful run of that workflow, on a pull request or in the queue, whose commit has this commit's tree. A run that skipped its own tests names, in a notice, the run it took them from, and that run counts, so long as its artifacts have not expired. When there is one, every job that run ran is skipped (a job only main runs still runs), and `passed` and the release follow. On main, `sonar` still runs, reading the coverage that run uploaded, because SonarQube Cloud measures main from a push to it. The merge queue never scans: SonarQube Cloud analyses pull requests and main, and refuses the queue's `gh-readonly-queue` branch. The pull request's run scanned the change, and main's push scans the merge, so `sonar` does not run on `merge_group` in `pr.yml`, `passed` takes that skip, and a Rust `queue.yml` has no `sonar` at all. So a ruleset with a merge queue must not require SonarQube Cloud's own check, `SonarCloud Code Analysis` (sync refuses it), or the queue waits for that check forever; `ci / sonar` still fails `ci / passed` on a pull request's quality gate. `ci / passed` already takes the skip. When there is none (a pull request's own run, main moved on in between, several pull requests merged together, a repository without the queue, or a commit that reached main some other way) every job runs as it would without `tested`. A Rust crate's `queue.yml` runs jobs its pull requests do not, so its queue tests everything. The nightly always runs everything.
 
@@ -987,7 +1011,7 @@ A Rust repository runs the jobs the Rust crate standard asks for here, worked ou
 
 Uploading a coverage report and restoring or saving a cache only help a run: none of them fails a job. GitHub's artifact and cache services can refuse a run (when the account's Actions billing is blocked they answer with an HTML page, on self-hosted runners too), so every `upload-artifact` of a report and every `actions/cache` step in pubkit's workflows, and every restore and save in `actions/cache`, runs with `continue-on-error`, and the workflow steps stop trying after five minutes. A test that fails still fails its job; a refused upload only leaves the scan without that coverage.
 
-A service runs `checks` (the sync check and shellcheck) and `sonar`, and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`. Its tests hand `sonar` the coverage they write to `coverage-report` (by default `coverage/`, Cobertura XML or LCOV `lcov.info`). A private service drops the scan with `"jobs": {"sonar": false}`.
+A service runs `checks` (the sync check and shellcheck) and `sonar`, and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`. Its tests hand `sonar` the coverage they write to `coverage-report` (by default `coverage/`, Cobertura XML or LCOV `lcov.info`). A private service drops the scan with `"jobs": {"sonar": false}`. A content repository runs `checks` (shellcheck on `**/*.sh` unless `with` gives `shellcheck`) and, when `with` gives a `test`, `tests`, and has no `sonar`.
 
 A repository that deploys a static site with pubhost's `deploy-static` also gets a `site` job in `pr.yml` (`ci / site`, part of `ci / passed`), so a site that would fail to deploy fails the pull request instead of the deploy after merge. It checks the repository out, builds the site, and runs the `deploy-static` the repository's own deploy workflow pins, as it pins it, with `check-only: 'true'`, which runs its site check and deploys nothing, so it needs no secret. The job comes when any workflow of the repository's own uses `deploy-static`, or pubkit.json has a `site` block, which then needs such a workflow to take the pin from:
 
@@ -1006,7 +1030,7 @@ The checks keep the names a ruleset requires: each job is named `ci`, so its che
 
 ### SonarQube Cloud
 
-Public code integrates with SonarQube Cloud, whatever its kind: `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` and `service-ci.yml` each run a `sonar` job, part of `passed`, and so does the CI `pubkit sync` writes for every kind. Only a private repository, which SonarQube Cloud does not analyse for free, leaves it out (`"jobs": {"sonar": false}`). Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubkit's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+Public code integrates with SonarQube Cloud, whatever its kind: `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` and `service-ci.yml` each run a `sonar` job, part of `passed`, and so does the CI `pubkit sync` writes for every kind but content, which holds no code. Only a private repository, which SonarQube Cloud does not analyse for free, leaves it out (`"jobs": {"sonar": false}`). Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubkit's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubkit.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
 
 1. In SonarQube Cloud, analyse the repository as a new project in the organization whose key is its GitHub owner in lower case (or the one `security.sonar.organization` names), keeping the key `OWNER_REPO`.
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.

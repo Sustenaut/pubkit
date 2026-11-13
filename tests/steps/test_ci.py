@@ -13,9 +13,10 @@ import pytest
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__, ci, cli, refs
+from pubkit import __version__, ci, cli, protect, refs
 
 scenarios("ci.feature")
+scenarios("content.feature")
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 
@@ -35,7 +36,8 @@ def triggers(data):
     return data.get("on", data.get(True))
 
 
-KINDS = {"Node": "utility", "Python": "utility", "Rust": "rust", "service": "service"}
+KINDS = {"Node": "utility", "Python": "utility", "Rust": "rust", "service": "service",
+         "content": "content"}
 
 
 @then(parsers.parse('"{name}"\'s job "{job}" is given the tools "{text}"'))
@@ -1110,3 +1112,46 @@ def tests_fatal():
             run = step.get("run", "")
             if "inputs.test" in run or "inputs.browser-test" in run or "make check" in run:
                 assert not step.get("continue-on-error"), (path.name, step)
+
+
+# A content repository (content.feature): the steps above, and these.
+
+@then(parsers.parse('the repository has no {paths}'))
+def has_none(repo, paths):
+    for path in paths.split(", "):
+        assert not (repo / path.strip('"')).exists(), path
+
+
+@then(parsers.parse("pubkit.json reads {text}"))
+def config_reads(repo, text):
+    assert json.loads((repo / "pubkit.json").read_text()) == json.loads(text)
+
+
+@then(parsers.parse('in "{name}" the "{job}" job calls "{workflow}" with "{key}" "{value}"'))
+def job_calls_with(repo, name, job, workflow, key, value):
+    spec = jobs(repo, name)[job]
+    assert f"/pubkit/.github/workflows/{workflow}@" in spec["uses"], spec
+    assert spec["with"][key] == value, spec
+
+
+@then("no workflow pubkit writes scans with SonarQube Cloud")
+def no_scan(repo):
+    for path in sorted((repo / ".github" / "workflows").glob("*.yml")):
+        assert "job-sonar.yml" not in path.read_text(), path
+        assert "SONAR_TOKEN" not in path.read_text(), path
+
+
+@given(parsers.parse("a {kind} repository whose protect block is {block}"))
+def protected(repo, kind, block):
+    (repo / "pubkit.json").write_text(json.dumps({"kind": kind, "protect": json.loads(block)}))
+
+
+@when("I read its protect entry", target_fixture="entry")
+def read_entry(repo):
+    return protect.entry("", json.loads((repo / "pubkit.json").read_text()), "pubkit.json")
+
+
+@then(parsers.parse("its entry has tags {tags} and no release app"))
+def entry_tags(entry, tags):
+    assert entry["tags"] is (tags == "true"), entry
+    assert entry["release_app"] is None, entry

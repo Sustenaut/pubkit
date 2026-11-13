@@ -19,7 +19,7 @@ version in a comment (refs.py).
     }
 
 `language` is a utility's, node or python; without it, a package.json
-with no pyproject.toml beside it makes it node. A rust or service
+with no pyproject.toml beside it makes it node. A rust, service or content
 repository's CI is its kind's. `events` are the workflows written: pr.yml
 (pull requests), queue.yml (the merge queue's runs of them, `merge_group`,
 so the checks a ruleset requires report on the queue's merge too),
@@ -44,7 +44,11 @@ queue.yml and main.yml, at this pubkit's pubrel unless it names one, passing it 
 release app's RELEASE_APP_ID and RELEASE_APP_KEY from pubrel 0.6.1, the
 first to take them, so `pubrel tag` tags with the app the tag ruleset lets
 through; `false` leaves it
-out, and a service, which deploys, has none. `{"uses": "local"}` calls the
+out, and a service, which deploys, has none, nor has a content repository,
+which pubkit neither releases nor deploys. A content repository's CI is
+its checks (the managed files in step, and shellcheck on its **/*.sh
+unless `with` gives shellcheck) and, when `with` gives a test, the tests
+job, which runs the checks its own tooling makes; it has no scan. `{"uses": "local"}` calls the
 repository's own .github/workflows/release.yml instead, as pubrel does, so
 a change to its release workflow is tested before it ships.
 
@@ -142,6 +146,9 @@ class Job:
     # Inputs that are pubkit's to give, whether or not this language gives
     # them, never the repository's.
     internal: tuple[str, ...] = ()
+    # Inputs this kind gives unless the ci block's `with` does: the
+    # workflow's own default suits another kind.
+    defaults: dict[str, str] = field(default_factory=dict)
     # Rust: the job of the Rust crate standard this one runs. Its required
     # targets, if it has any, go in the input `required`; with none, or a
     # workflow job the standard does not turn on, the job is left out.
@@ -221,8 +228,23 @@ JOBS: dict[str, dict[str, Job]] = {
                                        "sonar.javascript.lcov.reportPaths=lcov.info"},
                      internal=SONAR_INTERNAL),
     },
+    # Authored content, private, that pubkit neither releases nor deploys:
+    # the managed files in step and its shell scripts checked, and its own
+    # tooling's checks as the tests job, when it names a test. No scan: there
+    # is no code for SonarQube Cloud to analyse, and it would not analyse a
+    # private repository for free.
+    "content": {
+        "checks": Job("job-service-checks.yml", ("python-version", "shellcheck", "sync-check"),
+                      defaults={"shellcheck": "**/*.sh"}),
+        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test", "coverage-report"),
+                     when="test"),
+    },
 }
-# The languages a utility can be; a rust or service repository is its kind.
+# Kinds that never release: a service deploys, and content is versioned, if
+# at all, by its own tooling.
+UNRELEASED = {"service": "a service, which deploys rather than releases",
+              "content": "a content repository, which pubkit neither releases nor deploys"}
+# The languages a utility can be; a rust, service or content repository is its kind.
 UTILITY = ("node", "python")
 # Where SonarQube Cloud finds the code and its tests, by language: the
 # directories that hold code, in the order tried, and those that hold
@@ -380,9 +402,9 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
         jobs = {name: tuple(e for e in EVENTS if e in events and (
                     e in on or (e == "pr" and "queue" in on))) for name, on in jobs.items()}
     from .new import PUBREL_PIN  # noqa: PLC0415
-    release = given.get("release", language != "service")
-    if language == "service" and release is not False:
-        stop("release is not for a service, which deploys rather than releases")
+    release = given.get("release", language not in UNRELEASED)
+    if language in UNRELEASED and release is not False:
+        stop(f"release is not for {UNRELEASED[language]}")
     if release is True:
         release = {}
     if release is not False:
@@ -594,7 +616,8 @@ def workflow(ci: dict[str, Any], event: str) -> str:
         out.append(tested_job(ci))
     for name in names:
         job = table[name]
-        given = {**{i: ci["with"][i] for i in job.inputs if i in ci["with"]}, **job.fixed}
+        given = {**job.defaults, **{i: ci["with"][i] for i in job.inputs if i in ci["with"]},
+                 **job.fixed}
         if "required" in job.internal:
             given["required"] = " ".join(ci["targets"][job.standard])
         if "tools" in job.internal and ci["tools"]:
