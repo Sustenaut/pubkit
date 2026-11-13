@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pins run by an older pubkit than a repository already runs leaves pubkit's managed files and lock as they are, rather than moving the repository back"
-}
