@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.38.0 is released as v0.38.0 from commit e8405810cb20abbc2bdda0865113a53bb688c742.",
+      "content": "pubkit 0.39.0 is released as v0.39.0 from commit 95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.38.0",
+            "0.39.0",
             "pubkit --version",
-            "pubkit 0.38.0",
-            "v0.38.0",
-            "e8405810cb20abbc2bdda0865113a53bb688c742"
+            "pubkit 0.39.0",
+            "v0.39.0",
+            "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
           ]
         ]
       },
-      "scope": "the published release v0.38.0 of pubkit",
+      "scope": "the published release v0.39.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e8405810cb20abbc2bdda0865113a53bb688c742"
+          "revision": "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.38.0 was released on 2026-11-13 from commit e8405810cb20abbc2bdda0865113a53bb688c742 with these changes.",
+      "content": "pubkit 0.39.0 was released on 2026-11-14 from commit 95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,23 @@
         "rows": [
           [
             "changed",
-            "pubrel's release workflow runs where pubkit.json's ci.runs-on says (its default, or runs-on.release): new packages pin pubrel 0.7.0, whose release workflow takes runs-on and installs Rust on a runner without it; with an older pubrel the release job stays on GitHub's runners"
+            "The reusable workflows and actions pin the Node 24 majors of GitHub's actions: setup-python 7.1.0, setup-node 7.1.0, upload-artifact 7.0.2, download-artifact 8.0.2 and cache 6.1.0 (with save and restore), so no job warns that Node 20 is deprecated; a self-hosted runner needs Actions Runner 2.327.1 or later"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.38.0 of pubkit",
+      "scope": "the published release v0.39.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "e8405810cb20abbc2bdda0865113a53bb688c742"
+          "revision": "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
         }
       ]
     }
   },
-  "created": "2026-11-13T00:00:00Z",
+  "created": "2026-11-14T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
