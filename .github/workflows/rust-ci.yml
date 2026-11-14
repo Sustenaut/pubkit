@@ -54,7 +54,7 @@ on:
       functional: { type: string, default: '', description: "Extra make targets the functional job runs after the required ones." }
       msrv: { type: boolean, default: true, description: "Ignored: the msrv job runs whenever the standard requires it (RS-VER-02). Kept so callers that pass it keep working." }
       fuzz: { type: boolean, default: true, description: "Ignored: the fuzz job runs whenever the standard requires it (RS-FUZZ-01, RS-FUZZ-02). Kept so callers that pass it keep working." }
-      fuzz-seconds: { type: number, default: 60, description: Seconds per fuzz target on a pull request or push. }
+      fuzz-seconds: { type: number, default: 5, description: "Seconds per fuzz target in the merge queue or on a push: a smoke run, after the replay of fuzz/regressions/; the nightly searches for longer." }
       fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }

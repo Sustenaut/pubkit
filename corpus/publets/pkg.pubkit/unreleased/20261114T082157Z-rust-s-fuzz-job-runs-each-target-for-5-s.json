@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "Rust's fuzz job runs each target for 5 s in the merge queue and on a push (fuzz-seconds, was 60 s), after replaying fuzz/regressions/, so a merge waits about a minute for it as for the other jobs; the nightly still fuzzes each for 900 s"
+}

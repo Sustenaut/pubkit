@@ -967,7 +967,7 @@ Pin each one to the full commit its release's tag names, with the version in a c
   - `test` runs `cargo test` on Linux, macOS and Windows (`test-args` adds arguments);
   - `functional` runs the required functional targets, then any the `functional` input adds, optionally with extra apt packages and a released `pub`;
   - `msrv` runs `make msrv MSRV=<the lowest rust-version stated>` on that toolchain;
-  - `fuzz` runs `make fuzz-smoke` on nightly (`fuzz-seconds`, and `fuzz-seconds-scheduled` on a schedule unless `pubkit.json` sets `"security": { "fuzz": { "rust": false } }`);
+  - `fuzz` runs `make fuzz-smoke` on nightly: the inputs that once found a bug, then each target for `fuzz-seconds` (5 s, so the merge queue waits about a minute, as for the other jobs), and for `fuzz-seconds-scheduled` (900 s) on a schedule unless `pubkit.json` sets `"security": { "fuzz": { "rust": false } }`;
   - `cross` runs `cargo test` under qemu on `cross-targets`: i686 and s390x by default, or aarch64 `-unknown-linux-gnu`, with `cross-test-args`;
   - `audit` runs `make deny` and `make vet`, with `cargo-deny-version` and `cargo-vet-version`;
   - when the caller also runs on a `schedule`, those runs test on the latest stable and beta Rust (`scheduled-toolchains`).
