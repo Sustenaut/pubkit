@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The reusable workflows and actions pin the Node 24 majors of GitHub's actions: setup-python 7.1.0, setup-node 7.1.0, upload-artifact 7.0.2, download-artifact 8.0.2 and cache 6.1.0 (with save and restore), so no job warns that Node 20 is deprecated; a self-hosted runner needs Actions Runner 2.327.1 or later"
+}
