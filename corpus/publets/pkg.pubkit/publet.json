@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.39.0 is released as v0.39.0 from commit 95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3.",
+      "content": "pubkit 0.40.0 is released as v0.40.0 from commit 8475143eeef3ef7f51587a2434891cb162121128.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.39.0",
+            "0.40.0",
             "pubkit --version",
-            "pubkit 0.39.0",
-            "v0.39.0",
-            "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
+            "pubkit 0.40.0",
+            "v0.40.0",
+            "8475143eeef3ef7f51587a2434891cb162121128"
           ]
         ]
       },
-      "scope": "the published release v0.39.0 of pubkit",
+      "scope": "the published release v0.40.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
+          "revision": "8475143eeef3ef7f51587a2434891cb162121128"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.39.0 was released on 2026-11-14 from commit 95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3 with these changes.",
+      "content": "pubkit 0.40.0 was released on 2026-11-15 from commit 8475143eeef3ef7f51587a2434891cb162121128 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,23 +58,27 @@
         "rows": [
           [
             "changed",
-            "The reusable workflows and actions pin the Node 24 majors of GitHub's actions: setup-python 7.1.0, setup-node 7.1.0, upload-artifact 7.0.2, download-artifact 8.0.2 and cache 6.1.0 (with save and restore), so no job warns that Node 20 is deprecated; a self-hosted runner needs Actions Runner 2.327.1 or later"
+            "Rust's fuzz job runs each target for 5 s in the merge queue and on a push (fuzz-seconds, was 60 s), after replaying fuzz/regressions/, so a merge waits about a minute for it as for the other jobs; the nightly still fuzzes each for 900 s"
+          ],
+          [
+            "fixed",
+            "job-tested uses an earlier run's tests only while that run's coverage artifacts are there: a run whose artifacts had expired and been deleted counted as having none expired, so main's sonar read no coverage and failed (pubsec, after a release PR merged a day after its run)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.39.0 of pubkit",
+      "scope": "the published release v0.40.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "95796d484a43a2dbd7fe8f65bec7fcb6fb1b6ba3"
+          "revision": "8475143eeef3ef7f51587a2434891cb162121128"
         }
       ]
     }
   },
-  "created": "2026-11-14T00:00:00Z",
+  "created": "2026-11-15T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
