@@ -357,7 +357,9 @@ def github_holds(runs):
         jobs = [{"id": 900 + int(run), "name": "ci / tested", "conclusion": "success"}]
         answers[f"/runs/{run}/jobs"] = {"jobs": jobs}
         answers[f"/check-runs/{900 + int(run)}/annotations"] = []
-        answers[f"/runs/{run}/artifacts"] = {"artifacts": [{"name": "coverage-test", "expired": "expired" in runs}]}
+        # Kept a day, then expired, then gone from the list altogether.
+        answers[f"/runs/{run}/artifacts"] = {"artifacts": [] if "artifacts gone" in runs else
+                                             [{"name": "coverage-test", "expired": "expired" in runs}]}
     took = re.search(r"took its tests from run (\d+)", runs)
     if took:
         answers["/git/commits/queue"] = {"tree": {"sha": "T"}}

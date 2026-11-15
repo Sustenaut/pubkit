@@ -58,6 +58,7 @@ Feature: pubkit sync writes a repository's CI from pubkit.json, with no skipped 
       | a pull request run 11 of commit "pr" with tree "T"                           | merge_group  | queue  | true   | 11  |
       | a pull request run 11 of commit "pr" with tree "U"                           | merge_group  | queue  | false  |     |
       | a pull request run 11 of commit "pr" with tree "T", its artifacts expired    | merge_group  | queue  | false  |     |
+      | a pull request run 11 of commit "pr" with tree "T", its artifacts gone       | merge_group  | queue  | false  |     |
       | a pull request run 11 of commit "pr" with tree "T", and a queue run 12 of commit "queue" that took its tests from run 11 | push | queue | true | 11 |
       | a queue run 12 of commit "queue" with tree "T" that ran its tests            | push         | queue  | true   | 12  |
 

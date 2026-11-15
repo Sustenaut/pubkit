@@ -12,7 +12,8 @@
 # `tested` is "true" then, and `run-id` names the run that ran the tests,
 # whose coverage artifacts the sonar job reads: a run that skipped its own
 # tests says, in a notice of its tested job, which run it took them from,
-# and that run is followed. Its artifacts must not have expired. Otherwise
+# and that run is followed. Its coverage artifacts must still be there: a
+# run with none, or with one expired, is not used. Otherwise
 # (a pull request's own run, main moved in between, several pull requests
 # merged together, a commit pushed some other way) `tested` is "false",
 # and every job runs as it would without this.
@@ -57,9 +58,11 @@ jobs:
                 | sed -n 's/.*[Ii]n run \([0-9][0-9]*\).*/\1/p;T;q')
               run=${from:-$run}
             fi
-            expired=$(gh api "repos/$REPO/actions/runs/$run/artifacts?per_page=100" \
-              --jq '[.artifacts[] | select(.expired)] | length')
-            [ "$expired" = 0 ] || continue
+            # Its coverage must still be there: kept a day, then expired, then gone from the list.
+            live=$(gh api "repos/$REPO/actions/runs/$run/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select(.name | startswith("coverage"))] as $c
+                    | if ($c | length) > 0 and all($c[]; .expired | not) then "yes" else "no" end')
+            [ "$live" = yes ] || continue
             echo "::notice::This commit's tree was tested in run $run of $WORKFLOW, so this run tests nothing it tested: the scan reads its coverage."
             { echo tested=true; echo "run-id=$run"; } >> "$GITHUB_OUTPUT"
             exit 0
