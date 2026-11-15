@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "job-tested uses an earlier run's tests only while that run's coverage artifacts are there: a run whose artifacts had expired and been deleted counted as having none expired, so main's sonar read no coverage and failed (pubsec, after a release PR merged a day after its run)"
+}
