@@ -99,6 +99,7 @@ Feature: Every test is a Gherkin scenario
     And pubkit.json declares an exception for "TEST-02" until "2026-12-31"
     When I run pubkit "gherkin"
     Then it succeeds
+    And it prints "every test is a Gherkin scenario, but for 1 open exception"
     And it prints "open exception: TEST-02 until 2026-12-31"
 
   Scenario: An expired exception fails
