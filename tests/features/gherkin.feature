@@ -129,6 +129,11 @@ Feature: Every test is a Gherkin scenario
     Then it succeeds
     And it prints "the Gherkin rule does not apply to a content repository"
 
+  Scenario: A seeded template compiled by the installer is not a template
+    Given pubkit's templates hold a compiled copy of a seeded .py file, as pip leaves one
+    When I run pubkit "sync" "--check"
+    Then it reads every template, with no traceback
+
   Scenario: A new repository starts with a suite that passes
     Given a repository initialised as "utility"
     When I run pubkit "gherkin"
