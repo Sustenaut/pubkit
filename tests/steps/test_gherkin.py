@@ -4,9 +4,10 @@ Gherkin, changed one way at a time."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
-from pytest_bdd import given, parsers, scenarios
+from pytest_bdd import given, parsers, scenarios, then
 
 scenarios("gherkin.feature")
 
@@ -99,3 +100,28 @@ def exception(repo, rule, until):
     config = json.loads((repo / "pubkit.json").read_text())
     config["exceptions"] = [{"rule": rule, "reason": "moving to scenarios", "until": until}]
     write(repo, "pubkit.json", json.dumps(config) + "\n")
+
+
+@given("pubkit's templates hold a compiled copy of a seeded .py file, as pip leaves one")
+def compiled_template(repo, ctx):
+    """What `pip install` does to the installed wheel: a __pycache__ beside
+    templates/common/tests/steps/test_repository.py, which is not text."""
+    from importlib import resources  # noqa: PLC0415
+    steps = Path(str(resources.files("pubkit") / "templates" / "common" / "tests" / "steps"))
+    cache = steps / "__pycache__"
+    made = not cache.exists()
+    cache.mkdir(exist_ok=True)
+    stale = cache / "test_repository.cpython-0.pyc"
+    stale.write_bytes(b"\x00\xf7\x0d\x0a binary")
+    write(repo, "pubkit.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
+
+    @ctx.cleanup
+    def tidy():
+        stale.unlink(missing_ok=True)
+        if made:
+            cache.rmdir()
+
+
+@then("it reads every template, with no traceback")
+def no_traceback(result):
+    assert "Traceback" not in result.stderr and "UnicodeDecodeError" not in result.stderr, result.stderr

@@ -105,6 +105,10 @@ def templates(kind: str, layers: tuple[str, ...] | None = None) -> dict[str, str
         while stack:
             node, prefix = stack.pop()
             for child in node.iterdir():
+                # What an installer compiles beside a seeded .py template (pip
+                # writes __pycache__ into site-packages) is no template.
+                if child.name == "__pycache__" or child.name.endswith((".pyc", ".pyo")):
+                    continue
                 path = f"{prefix}{child.name}"
                 if child.is_dir():
                     stack.append((child, path + "/"))
