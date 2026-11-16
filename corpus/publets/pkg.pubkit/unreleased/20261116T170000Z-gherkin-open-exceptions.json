@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubkit gherkin no longer says every test is a Gherkin scenario when open exceptions waive a rule: it says how many are open, then lists them"
+}

@@ -237,7 +237,12 @@ def run(root: Path, config: dict) -> tuple[list[str], list[str]]:
     for rule, texts in sorted(checks(root).items()):
         if rule not in waived:
             problems += [f"{rule}: {t}" for t in texts]
-    lines = ["every test is a Gherkin scenario"] if not problems else []
+    if problems:
+        lines = []
+    elif open_:
+        lines = [f"every test is a Gherkin scenario, but for {len(open_)} open exception{'s' if len(open_) > 1 else ''}"]
+    else:
+        lines = ["every test is a Gherkin scenario"]
     lines += [f"open exception: {e}" for e in open_]
     return lines, problems
 
