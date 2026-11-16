@@ -64,6 +64,20 @@ Feature: Every test is a Gherkin scenario
     When I run pubkit "gherkin"
     Then it succeeds
 
+  Scenario: A step file may load node:test's mock beside cucumber-js
+    Given a utility whose suite is Gherkin
+    And the file "test/site.steps.js" holds cucumber steps that use node:test's mock
+    When I run pubkit "gherkin"
+    Then it succeeds
+
+  Scenario: A package of the repository that runs quickpickle runs every feature file it is given
+    Given a utility whose suite is Gherkin
+    And the suite's feature file is removed
+    And the file "widget/features/form.feature" holds a scenario
+    And the file "widget/package.json" lists "quickpickle" as a dev dependency
+    When I run pubkit "gherkin"
+    Then it succeeds
+
   Scenario: cucumber-js runs every feature file it is given
     Given a utility whose suite is Gherkin
     And the suite's feature file is removed
