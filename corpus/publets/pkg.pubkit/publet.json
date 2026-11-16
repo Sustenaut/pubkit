@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.41.0 is released as v0.41.0 from commit 1653e331e30a2e7ed0cf01d2cc2f362955f617cc.",
+      "content": "pubkit 0.41.1 is released as v0.41.1 from commit 218714c3219dad849c7a1f33fc99026284b13a95.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.41.0",
+            "0.41.1",
             "pubkit --version",
-            "pubkit 0.41.0",
-            "v0.41.0",
-            "1653e331e30a2e7ed0cf01d2cc2f362955f617cc"
+            "pubkit 0.41.1",
+            "v0.41.1",
+            "218714c3219dad849c7a1f33fc99026284b13a95"
           ]
         ]
       },
-      "scope": "the published release v0.41.0 of pubkit",
+      "scope": "the published release v0.41.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1653e331e30a2e7ed0cf01d2cc2f362955f617cc"
+          "revision": "218714c3219dad849c7a1f33fc99026284b13a95"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.41.0 was released on 2026-11-16 from commit 1653e331e30a2e7ed0cf01d2cc2f362955f617cc with these changes.",
+      "content": "pubkit 0.41.1 was released on 2026-11-16 from commit 218714c3219dad849c7a1f33fc99026284b13a95 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,23 @@
         ],
         "rows": [
           [
-            "added",
-            "sync --check holds every repository but a content one to the Gherkin rule, and `pubkit gherkin` runs it alone: TEST-01 a feature file with a scenario, TEST-02 no test outside a scenario (plain pytest functions and classes, unittest, Node test files, test shell scripts; Rust's own tests stay), TEST-03 every feature file bound; declared exceptions with an until date waive a rule; `pubkit init` seeds a first scenario"
+            "fixed",
+            "sync reads no compiled file as a template: pip compiles the seeded tests/steps/test_repository.py into a __pycache__ inside the installed package, which 0.41.0 then read as text and failed on (UnicodeDecodeError) in every repository's sync --check"
           ],
           [
-            "changed",
-            "The Gherkin check reads a Node file that loads @cucumber/cucumber, quickpickle or @amiceli/vitest-cucumber as steps, even when it also loads node:test's mock, and counts such a runner in any package.json of the repository (a package's too) as running every feature file; a shell script named *.test.sh is a test too"
+            "fixed",
+            "pubkit gherkin no longer says every test is a Gherkin scenario when open exceptions waive a rule: it says how many are open, then lists them"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.41.0 of pubkit",
+      "scope": "the published release v0.41.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "1653e331e30a2e7ed0cf01d2cc2f362955f617cc"
+          "revision": "218714c3219dad849c7a1f33fc99026284b13a95"
         }
       ]
     }

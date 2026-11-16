@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "sync reads no compiled file as a template: pip compiles the seeded tests/steps/test_repository.py into a __pycache__ inside the installed package, which 0.41.0 then read as text and failed on (UnicodeDecodeError) in every repository's sync --check"
-}
