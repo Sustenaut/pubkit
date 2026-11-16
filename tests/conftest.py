@@ -53,10 +53,19 @@ def offline_pubrel(tmp_path, monkeypatch):
     monkeypatch.delenv("PUBKIT_RELEASE_COMMIT", raising=False)
 
 
+# A scenario and its binding, so `sync --check` gets past the Gherkin rule
+# (gherkin.py) in a scratch repository a scenario builds by hand. At the
+# root, out of the way of the tests/ a scenario makes.
+SEED = {"seed.feature": "Feature: Seed\n  Scenario: Seed\n    Then it holds\n",
+        "test_seed.py": 'from pytest_bdd import scenarios\n\nscenarios("seed.feature")\n'}
+
+
 @pytest.fixture
 def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
+    for path, text in SEED.items():
+        (root / path).write_text(text)
     return root
 
 

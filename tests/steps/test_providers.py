@@ -14,6 +14,9 @@ from types import SimpleNamespace
 import pytest
 
 from pubkit import cli
+from pytest_bdd import scenarios, then
+
+scenarios("providers.feature")
 
 OLD_SCRIPT = "#!/usr/bin/env bash\nexec bws run -- \"$@\"\n"
 @pytest.fixture
@@ -32,7 +35,8 @@ def init(root, kind, **extra):
     (root / "pubkit.json").write_text(json.dumps(config | extra, indent=2))
 
 
-def test_a_utility_with_a_with_secrets_json_gets_the_managed_with_secrets(repo, capsys):
+@then("a utility with a with secrets json gets the managed with secrets")
+def a_utility_with_a_with_secrets_json_gets_the_managed_with_secrets(repo, capsys):
     init(repo, "utility")
     (repo / "with-secrets.json").write_text('{"project": "example"}\n')
     (repo / "with-secrets").write_text(OLD_SCRIPT)
@@ -48,7 +52,8 @@ def test_a_utility_with_a_with_secrets_json_gets_the_managed_with_secrets(repo, 
     assert cli.main(["sync", "--check"]) == 0
 
 
-def test_a_utility_without_one_gets_none(repo, capsys):
+@then("a utility without one gets none")
+def a_utility_without_one_gets_none(repo, capsys):
     init(repo, "utility")
     assert cli.main(["sync"]) == 0
     assert not (repo / "with-secrets").exists()
@@ -61,7 +66,8 @@ def launcher(config):
     return cli.render(cli.templates("utility")["pubkit"], cli.values(config))
 
 
-def test_the_launcher_runs_with_each_provider_checked_against_its_sha256(tmp_path):
+@then("the launcher runs with each provider checked against its sha256")
+def the_launcher_runs_with_each_provider_checked_against_its_sha256(tmp_path):
     wheel = b"a wheel"
     digest = hashlib.sha256(wheel).hexdigest()
     text = launcher({"deploy": {"providers": [{"distribution": "example-needs", "wheel": WHEEL, "sha256": digest}]}})
@@ -82,7 +88,8 @@ def test_the_launcher_runs_with_each_provider_checked_against_its_sha256(tmp_pat
     assert not held.exists()
 
 
-def test_the_launcher_without_providers_is_as_it_was():
+@then("the launcher without providers is as it was")
+def the_launcher_without_providers_is_as_it_was():
     text = launcher({})
     assert "provider" not in text and 'py3-none-any.whl" pubkit "$@"' in text
 
@@ -127,7 +134,8 @@ def deployed(repo, hooks, **deploy):
     (repo / "pubkit.json").write_text(json.dumps(config | {"deploy": {"namespace": "example"} | deploy}, indent=2) + "\n")
 
 
-def test_sync_lists_pubsec_and_pubdeploy_in_deploy_providers_and_check_fails_without_them(repo, capsys, hooks):
+@then("sync lists pubsec and pubdeploy in deploy providers and check fails without them")
+def sync_lists_pubsec_and_pubdeploy_in_deploy_providers_and_check_fails_without_them(repo, capsys, hooks):
     deployed(repo, hooks)
     before = (repo / "pubkit.json").read_text()
     assert cli.main(["sync", "--check"]) == 1
@@ -144,7 +152,8 @@ def test_sync_lists_pubsec_and_pubdeploy_in_deploy_providers_and_check_fails_wit
     assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
 
 
-def test_sync_writes_pubsec_and_with_secrets_runs_it(repo, capsys, hooks):
+@then("sync writes pubsec and with secrets runs it")
+def sync_writes_pubsec_and_with_secrets_runs_it(repo, capsys, hooks):
     deployed(repo, hooks)
     assert cli.main(["sync"]) == 0
     launcher, wrapper = (repo / "pubsec").read_text(), (repo / "with-secrets").read_text()
@@ -157,7 +166,8 @@ def test_sync_writes_pubsec_and_with_secrets_runs_it(repo, capsys, hooks):
         assert f"provider {pin(name)['wheel']} {pin(name)['sha256']}\n" in (repo / "pubkit").read_text()
 
 
-def test_sync_writes_pubdeploy_which_runs_with_the_other_providers(repo, capsys, hooks, tmp_path):
+@then("sync writes pubdeploy which runs with the other providers")
+def sync_writes_pubdeploy_which_runs_with_the_other_providers(repo, capsys, hooks, tmp_path):
     deployed(repo, hooks)
     assert cli.main(["sync"]) == 0
     text = (repo / "pubdeploy").read_text()
@@ -188,13 +198,15 @@ def test_sync_writes_pubdeploy_which_runs_with_the_other_providers(repo, capsys,
     assert rest[0] == "--with" and rest[1].endswith(pin()["wheel"].rsplit("/", 1)[1]) and len(rest) == 2
 
 
-def test_without_a_deploy_block_there_is_no_pubdeploy(repo, capsys, hooks):
+@then("without a deploy block there is no pubdeploy")
+def without_a_deploy_block_there_is_no_pubdeploy(repo, capsys, hooks):
     init(repo, "service")
     assert cli.main(["sync"]) == 0
     assert not (repo / "pubdeploy").exists()
 
 
-def test_a_floored_package_below_the_floor_is_moved_up_and_a_newer_one_kept(repo, capsys, hooks):
+@then("a floored package below the floor is moved up and a newer one kept")
+def a_floored_package_below_the_floor_is_moved_up_and_a_newer_one_kept(repo, capsys, hooks):
     old = {"distribution": "pubsec", "sha256": "0" * 64,
            "wheel": "https://github.com/example-org/pubsec/releases/download/v0.0.1/pubsec-0.0.1-py3-none-any.whl"}
     deployed(repo, hooks, providers=[old, pin("pubdeploy")])
@@ -216,7 +228,8 @@ def test_a_floored_package_below_the_floor_is_moved_up_and_a_newer_one_kept(repo
 # --- the hooks ------------------------------------------------------------------
 
 
-def test_the_sync_hooks_run_and_their_lines_are_printed(repo, capsys, hooks):
+@then("the sync hooks run and their lines are printed")
+def the_sync_hooks_run_and_their_lines_are_printed(repo, capsys, hooks):
     calls = []
 
     def check(root, config, check):
@@ -231,7 +244,8 @@ def test_the_sync_hooks_run_and_their_lines_are_printed(repo, capsys, hooks):
     assert [(c[1], c[2]) for c in calls] == [("example", False), ("example", True)]
 
 
-def test_a_sync_hook_that_fails_is_said_by_its_type_alone_and_fails_check(repo, capsys, hooks):
+@then("a sync hook that fails is said by its type alone and fails check")
+def a_sync_hook_that_fails_is_said_by_its_type_alone_and_fails_check(repo, capsys, hooks):
     secret = "canary-7f3e"
 
     def broken(root, config, check):
@@ -244,7 +258,8 @@ def test_a_sync_hook_that_fails_is_said_by_its_type_alone_and_fails_check(repo, 
     assert "pubkit: the sustenaut.sync hook other failed (ValueError)" in err and secret not in err
 
 
-def test_a_deploy_block_without_pubdeploy_installed_fails_check(repo, capsys, hooks):
+@then("a deploy block without pubdeploy installed fails check")
+def a_deploy_block_without_pubdeploy_installed_fails_check(repo, capsys, hooks):
     hooks["sustenaut.sync"] = []
     deployed(repo, hooks, providers=both())
     assert cli.main(["sync"]) == 0
@@ -253,14 +268,16 @@ def test_a_deploy_block_without_pubdeploy_installed_fails_check(repo, capsys, ho
         in capsys.readouterr().err
 
 
-def test_a_repository_without_a_deploy_block_needs_no_pubdeploy(repo, capsys, hooks):
+@then("a repository without a deploy block needs no pubdeploy")
+def a_repository_without_a_deploy_block_needs_no_pubdeploy(repo, capsys, hooks):
     hooks["sustenaut.sync"] = []
     init(repo, "utility")
     assert cli.main(["sync"]) == 0
     assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
 
 
-def test_bump_runs_the_bump_hooks_before_sync_writes_the_launchers(repo, capsys, hooks, monkeypatch):
+@then("bump runs the bump hooks before sync writes the launchers")
+def bump_runs_the_bump_hooks_before_sync_writes_the_launchers(repo, capsys, hooks, monkeypatch):
     deployed(repo, hooks, providers=both())
     newer = {"distribution": "pubdeploy", "sha256": "2" * 64,
              "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.1.0/pubdeploy-9.1.0-py3-none-any.whl"}
@@ -283,14 +300,16 @@ def test_bump_runs_the_bump_hooks_before_sync_writes_the_launchers(repo, capsys,
     assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
 
 
-def test_the_removed_commands_are_gone():
+@then("the removed commands are gone")
+def the_removed_commands_are_gone():
     for command in (["deploy", "walk"], ["k8s", "preflight"]):
         with pytest.raises(SystemExit) as stopped:
             cli.main(command)
         assert stopped.value.code == 2
 
 
-def test_the_nightly_runs_the_bump_hooks_and_syncs_what_they_moved(repo, capsys, hooks, monkeypatch):
+@then("the nightly runs the bump hooks and syncs what they moved")
+def the_nightly_runs_the_bump_hooks_and_syncs_what_they_moved(repo, capsys, hooks, monkeypatch):
     """pins, as `pubkit bump` does: a moved provider reaches the launchers and the lock."""
     deployed(repo, hooks, providers=both())
     assert cli.main(["sync"]) == 0
@@ -316,7 +335,8 @@ def test_the_nightly_runs_the_bump_hooks_and_syncs_what_they_moved(repo, capsys,
     assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
 
 
-def test_the_nightly_with_nothing_moved_neither_syncs_nor_locks(repo, capsys, hooks, monkeypatch):
+@then("the nightly with nothing moved neither syncs nor locks")
+def the_nightly_with_nothing_moved_neither_syncs_nor_locks(repo, capsys, hooks, monkeypatch):
     deployed(repo, hooks, providers=both())
     assert cli.main(["sync"]) == 0
     hooks["sustenaut.bump"] = [Hook("pubdeploy", lambda root: [])]

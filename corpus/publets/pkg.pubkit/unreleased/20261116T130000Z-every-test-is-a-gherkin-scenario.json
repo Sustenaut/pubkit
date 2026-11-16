@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "sync --check holds every repository but a content one to the Gherkin rule, and `pubkit gherkin` runs it alone: TEST-01 a feature file with a scenario, TEST-02 no test outside a scenario (plain pytest functions and classes, unittest, Node test files, test shell scripts; Rust's own tests stay), TEST-03 every feature file bound; declared exceptions with an until date waive a rule; `pubkit init` seeds a first scenario"
+}

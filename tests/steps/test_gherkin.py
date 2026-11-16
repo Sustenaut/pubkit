@@ -1,0 +1,93 @@
+"""Steps for `pubkit gherkin`, against a scratch utility whose suite is
+Gherkin, changed one way at a time."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from pytest_bdd import given, parsers, scenarios
+
+scenarios("gherkin.feature")
+
+FEATURE = """Feature: Adding
+  Scenario: Two and two
+    Then two and two make four
+"""
+STEPS = '''from pytest_bdd import scenarios, then
+
+scenarios("adding.feature")
+
+
+@then("two and two make four")
+def four():
+    assert 2 + 2 == 4
+'''
+TESTS = {
+    "a plain test function": "def test_adds():\n    assert 2 + 2 == 4\n",
+    "a test class": "class TestAdding:\n    def test_adds(self):\n        assert 2 + 2 == 4\n",
+    "a unittest test case": "import unittest\nclass Adding(unittest.TestCase):\n    def test_adds(self):\n"
+                            "        self.assertEqual(2 + 2, 4)\n",
+    "a binding that tests too": "from pytest_bdd import scenario\n\n\n"
+                                "@scenario('adding.feature', 'Two and two')\ndef test_adds():\n"
+                                "    assert 2 + 2 == 4\n",
+    "a node:test test": "import test from 'node:test';\ntest('adds', () => {});\n",
+    "a shell script": "#!/bin/sh\n[ \"$(expr 2 + 2)\" = 4 ]\n",
+    "a fixture and a step": "import pytest\nfrom pytest_bdd import given\n\n\n@pytest.fixture\n"
+                            "def testdata():\n    return 4\n\n\n@given('a number')\ndef test_number():\n"
+                            "    return 4\n",
+    "a fake server": "export function fakeGithub() { return {}; }\n",
+    "a scenario": FEATURE.replace("Adding", "Not bound"),
+}
+
+
+@pytest.fixture
+def repo(tmp_path):
+    """A scratch repository with nothing in it: not conftest's, which holds
+    the suite init seeds."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    return root
+
+
+def write(repo, path, text):
+    (repo / path).parent.mkdir(parents=True, exist_ok=True)
+    (repo / path).write_text(text)
+
+
+@given("a utility whose suite is Gherkin")
+def gherkin_suite(repo, env):
+    write(repo, "pubkit.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
+    write(repo, "tests/pytest.ini", "[pytest]\nbdd_features_base_dir = features/\n")
+    write(repo, "tests/features/adding.feature", FEATURE)
+    write(repo, "tests/steps/test_adding.py", STEPS)
+    env["PUBKIT_TODAY"] = "2026-11-16"
+
+
+@given("the suite's feature file is removed")
+def feature_removed(repo):
+    (repo / "tests/features/adding.feature").unlink()
+    (repo / "tests/steps/test_adding.py").unlink()
+
+
+@given(parsers.parse('the file "{path}" holds {test}'))
+def holds(repo, path, test):
+    write(repo, path, TESTS[test])
+
+
+@given("the suite binds the whole features directory")
+def binds_directory(repo):
+    path = repo / "tests/steps/test_adding.py"
+    path.write_text(path.read_text().replace('scenarios("adding.feature")', 'scenarios(".")'))
+
+
+@given(parsers.parse('package.json lists "{package}" as a dev dependency'))
+def dev_dependency(repo, package):
+    write(repo, "package.json", json.dumps({"devDependencies": {package: "12.2.0"}}))
+
+
+@given(parsers.parse('pubkit.json declares an exception for "{rule}" until "{until}"'))
+def exception(repo, rule, until):
+    config = json.loads((repo / "pubkit.json").read_text())
+    config["exceptions"] = [{"rule": rule, "reason": "moving to scenarios", "until": until}]
+    write(repo, "pubkit.json", json.dumps(config) + "\n")
