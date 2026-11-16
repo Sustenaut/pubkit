@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.40.0 is released as v0.40.0 from commit 8475143eeef3ef7f51587a2434891cb162121128.",
+      "content": "pubkit 0.40.1 is released as v0.40.1 from commit f1269f41ddd615cb103afe40f4996824a8aa5550.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.40.0",
+            "0.40.1",
             "pubkit --version",
-            "pubkit 0.40.0",
-            "v0.40.0",
-            "8475143eeef3ef7f51587a2434891cb162121128"
+            "pubkit 0.40.1",
+            "v0.40.1",
+            "f1269f41ddd615cb103afe40f4996824a8aa5550"
           ]
         ]
       },
-      "scope": "the published release v0.40.0 of pubkit",
+      "scope": "the published release v0.40.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "8475143eeef3ef7f51587a2434891cb162121128"
+          "revision": "f1269f41ddd615cb103afe40f4996824a8aa5550"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.40.0 was released on 2026-11-15 from commit 8475143eeef3ef7f51587a2434891cb162121128 with these changes.",
+      "content": "pubkit 0.40.1 was released on 2026-11-16 from commit f1269f41ddd615cb103afe40f4996824a8aa5550 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,24 @@
         ],
         "rows": [
           [
-            "changed",
-            "Rust's fuzz job runs each target for 5 s in the merge queue and on a push (fuzz-seconds, was 60 s), after replaying fuzz/regressions/, so a merge waits about a minute for it as for the other jobs; the nightly still fuzzes each for 900 s"
-          ],
-          [
-            "fixed",
-            "job-tested uses an earlier run's tests only while that run's coverage artifacts are there: a run whose artifacts had expired and been deleted counted as having none expired, so main's sonar read no coverage and failed (pubsec, after a release PR merged a day after its run)"
+            "added",
+            "sync --check holds every repository but a content one to the Gherkin rule, and `pubkit gherkin` runs it alone: TEST-01 a feature file with a scenario, TEST-02 no test outside a scenario (plain pytest functions and classes, unittest, Node test files, test shell scripts; Rust's own tests stay), TEST-03 every feature file bound; declared exceptions with an until date waive a rule; `pubkit init` seeds a first scenario"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.40.0 of pubkit",
+      "scope": "the published release v0.40.1 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "8475143eeef3ef7f51587a2434891cb162121128"
+          "revision": "f1269f41ddd615cb103afe40f4996824a8aa5550"
         }
       ]
     }
   },
-  "created": "2026-11-15T00:00:00Z",
+  "created": "2026-11-16T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
