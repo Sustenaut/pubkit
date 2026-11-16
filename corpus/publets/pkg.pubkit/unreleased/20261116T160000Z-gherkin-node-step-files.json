@@ -1,4 +1,4 @@
 {
   "category": "changed",
-  "change": "The Gherkin check reads a Node file that loads @cucumber/cucumber, quickpickle or @amiceli/vitest-cucumber as steps, even when it also loads node:test's mock, and counts such a runner in any package.json of the repository (a package's too) as running every feature file"
+  "change": "The Gherkin check reads a Node file that loads @cucumber/cucumber, quickpickle or @amiceli/vitest-cucumber as steps, even when it also loads node:test's mock, and counts such a runner in any package.json of the repository (a package's too) as running every feature file; a shell script named *.test.sh is a test too"
 }

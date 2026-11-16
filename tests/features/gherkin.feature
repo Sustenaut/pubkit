@@ -42,6 +42,7 @@ Feature: Every test is a Gherkin scenario
       | worker/site.test.js        | a node:test test            | worker/site.test.js: a Node test outside a scenario              |
       | test/site.mjs              | a node:test test            | test/site.mjs: a Node test outside a scenario                    |
       | scripts/test-deploy.sh     | a shell script              | scripts/test-deploy.sh: a test script outside a scenario         |
+      | tests/deploy.test.sh       | a shell script              | tests/deploy.test.sh: a test script outside a scenario           |
 
   Scenario: Fixtures, steps and test helpers are not tests
     Given a utility whose suite is Gherkin

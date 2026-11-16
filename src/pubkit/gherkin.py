@@ -40,7 +40,7 @@ SCENARIO = re.compile(r"^\s*(Scenario|Scenario Outline|Scenario Template|Example
 NODE_TEST = re.compile(r"\.(test|spec)\.(m|c)?(j|t)sx?$")
 NODE_SOURCE = re.compile(r"\.(m|c)?(j|t)sx?$")
 NODE_TEST_DIRS = {"test", "tests", "__tests__"}
-SHELL_TEST = re.compile(r"^(test[-_].*|.*[-_]test)\.sh$")
+SHELL_TEST = re.compile(r"^(test[-_].*|.*[-_.]test)\.sh$")
 # What a test module defines that pytest does not collect as a test.
 NOT_TESTS = {"fixture", "given", "when", "then", "step"}
 # A Node script in a test directory is a test when it loads a test runner;
