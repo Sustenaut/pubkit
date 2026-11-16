@@ -400,3 +400,9 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When I start the package "pubfoo" without a key
     Then the repository has "Cargo.toml", "src/lib.rs", "release.json", "SECURITY.md", "TESTING.md", "SUPPLY-CHAIN.md", "fuzz/fuzz_targets/greet.rs", ".gitignore"
     And it conforms to the standard but for "RS-SUP-05"
+
+  Scenario: A uv lock made from a moved file is compiled again
+    Then a uv lock made from a moved file is compiled again
+
+  Scenario: A uv lock that fails to compile is said and left
+    Then a uv lock that fails to compile is said and left

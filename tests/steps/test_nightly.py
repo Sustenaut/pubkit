@@ -435,7 +435,8 @@ def committed_action(repo, monkeypatch, slug, old, latest):
     monkeypatch.setattr(nightly, "tag_commit", lambda s, tag: "2" * 40)
 
 
-def test_a_uv_lock_made_from_a_moved_file_is_compiled_again(tmp_path, monkeypatch):
+@then("a uv lock made from a moved file is compiled again")
+def a_uv_lock_made_from_a_moved_file_is_compiled_again(tmp_path, monkeypatch):
     from pubkit import nightly
     (tmp_path / "requirements.in").write_text("x\n")
     (tmp_path / "requirements.lock").write_text(
@@ -454,7 +455,8 @@ def test_a_uv_lock_made_from_a_moved_file_is_compiled_again(tmp_path, monkeypatc
         "pip", "compile", "--generate-hashes", "requirements.in", "-o", "requirements.lock"]
 
 
-def test_a_uv_lock_that_fails_to_compile_is_said_and_left(tmp_path, monkeypatch, capsys):
+@then("a uv lock that fails to compile is said and left")
+def a_uv_lock_that_fails_to_compile_is_said_and_left(tmp_path, monkeypatch, capsys):
     from pubkit import nightly
     (tmp_path / "requirements.in").write_text("x\n")
     (tmp_path / "requirements.lock").write_text("#    uv pip compile requirements.in -o requirements.lock\n")

@@ -487,9 +487,17 @@ def sync(root: Path, check: bool) -> int:
                   file=sys.stderr)
         unreported = unreported_checks(root, config)
         python_bad = python_checks(root) if python else []
-        if stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported or python_bad:
+        from .gherkin import run as gherkin  # noqa: PLC0415
+        gherkin_lines, gherkin_bad = gherkin(root, config)
+        for problem in gherkin_bad:
+            print(f"pubkit: {problem}", file=sys.stderr)
+        if (stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported
+                or python_bad or gherkin_bad):
             return 1
         print(f"in step with pubkit {__version__}")
+        for line in gherkin_lines:
+            if line.startswith("open exception"):
+                print(line)
         if kind == "rust":
             if not (root / "Cargo.toml").exists():
                 print("no Cargo.toml yet: the standard's checks wait for a crate")
@@ -663,7 +671,7 @@ def required(root: Path, github_output: bool, event: str = "", head_ref: str = "
 # write files `sync --check` then rejects. Commands that move a repository
 # to this pubkit (bump, pins, nightly), start one (init, new), or act on
 # other repositories run as whichever pubkit is installed.
-PINNED_COMMANDS = {"sync", "lock", "supply-chain", "doc-coverage", "required", "conform", "audit",
+PINNED_COMMANDS = {"sync", "lock", "supply-chain", "doc-coverage", "required", "conform", "gherkin", "audit",
                    "record"}
 
 
@@ -775,6 +783,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="move this repository to this pubkit: managed files, lock, workflow pins")
     commands.add_parser("conform",
                         help="check the standard's required files and settings, and the exceptions")
+    commands.add_parser("gherkin",
+                        help="check that every test is a Gherkin scenario (TEST-01..03), and list the exceptions")
     p = commands.add_parser("protect",
                             help="put pubkit's ruleset on the default branch of each repository")
     p.add_argument("--check", action="store_true",
@@ -827,6 +837,9 @@ def main(argv: list[str] | None = None) -> int:
                         args.changed_files)
     if args.command == "conform":
         return conform(root)
+    if args.command == "gherkin":
+        from .gherkin import main as gherkin  # noqa: PLC0415
+        return gherkin(root, read_config(root))
     if args.command == "pins":
         from .nightly import pins
         for line in pins(root, args.pubrel, lock=not args.no_lock):
