@@ -40,11 +40,16 @@ SCENARIO = re.compile(r"^\s*(Scenario|Scenario Outline|Scenario Template|Example
 NODE_TEST = re.compile(r"\.(test|spec)\.(m|c)?(j|t)sx?$")
 NODE_SOURCE = re.compile(r"\.(m|c)?(j|t)sx?$")
 NODE_TEST_DIRS = {"test", "tests", "__tests__"}
-SHELL_TEST = re.compile(r"^(test[-_].*|.*[-_]test)\.sh$")
+SHELL_TEST = re.compile(r"^(test[-_].*|.*[-_.]test)\.sh$")
 # What a test module defines that pytest does not collect as a test.
 NOT_TESTS = {"fixture", "given", "when", "then", "step"}
 # A Node script in a test directory is a test when it loads a test runner;
 # the rest there (fakes, setup, coverage helpers) serve the tests.
+# The Gherkin runners for Node: a file that loads one defines steps or their
+# support, whatever else it imports (node:test's mock, say), and each runs
+# every feature file it is given.
+GHERKIN_RUNNERS = ("@cucumber/cucumber", "quickpickle", "@amiceli/vitest-cucumber")
+GHERKIN_RUNNER = re.compile(r"""(from\s+|require\(\s*|import\(\s*)['"](""" + "|".join(map(re.escape, GHERKIN_RUNNERS)) + r""")['"/]""")
 NODE_RUNNER = re.compile(r"""(from\s+|require\(\s*|import\(\s*)['"](node:test|vitest|@playwright/test|mocha|jest|ava|tap|uvu)['"/]""")
 PYTHON_TEST = re.compile(r"^(test_.*|.*_test)\.py$")
 
@@ -156,17 +161,21 @@ def _base_for(path: PurePosixPath, bases: dict[PurePosixPath, PurePosixPath]) ->
 
 
 def _cucumber(root: Path, listed: list[PurePosixPath]) -> bool:
-    """The repository runs cucumber-js: a cucumber config, or it in package.json."""
-    if any(p.parent == PurePosixPath(".") and p.name.startswith("cucumber.") for p in listed):
+    """The repository runs a Gherkin runner for Node: a cucumber config, or a
+    package.json (the repository's, or a package's in it) that depends on one."""
+    if any(p.name.startswith("cucumber.") for p in listed):
         return True
-    package = root / "package.json"
-    if not package.is_file():
-        return False
-    try:
-        data = json.loads(package.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return False
-    return any("@cucumber/cucumber" in (data.get(k) or {}) for k in ("dependencies", "devDependencies"))
+    for path in listed:
+        if path.name != "package.json":
+            continue
+        try:
+            data = json.loads((root / path).read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if any(runner in (data.get(k) or {}) for k in ("dependencies", "devDependencies")
+               for runner in GHERKIN_RUNNERS):
+            return True
+    return False
 
 
 def checks(root: Path) -> dict[str, list[str]]:
@@ -196,10 +205,13 @@ def checks(root: Path) -> dict[str, list[str]]:
                     unresolved = True
                 else:
                     named.add(_normal(base / feature))
-        elif NODE_TEST.search(path.name) or (
-                NODE_SOURCE.search(path.name) and NODE_TEST_DIRS.intersection(path.parts[:-1])
-                and NODE_RUNNER.search((root / path).read_text(encoding="utf-8", errors="replace"))):
-            problems["TEST-02"].append(f"{path}: a Node test outside a scenario")
+        elif NODE_SOURCE.search(path.name) and (
+                NODE_TEST.search(path.name) or NODE_TEST_DIRS.intersection(path.parts[:-1])):
+            text = (root / path).read_text(encoding="utf-8", errors="replace")
+            if GHERKIN_RUNNER.search(text):
+                continue
+            if NODE_TEST.search(path.name) or NODE_RUNNER.search(text):
+                problems["TEST-02"].append(f"{path}: a Node test outside a scenario")
         elif path.suffix == ".sh" and SHELL_TEST.match(path.name):
             problems["TEST-02"].append(f"{path}: a test script outside a scenario")
     if not unresolved and not _cucumber(root, listed):

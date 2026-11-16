@@ -38,6 +38,9 @@ TESTS = {
                             "    return 4\n",
     "a fake server": "export function fakeGithub() { return {}; }\n",
     "a scenario": FEATURE.replace("Adding", "Not bound"),
+    "cucumber steps that use node:test's mock": "import { mock } from 'node:test';\n"
+                                                "import { Then } from '@cucumber/cucumber';\n"
+                                                "Then('it adds', () => { mock.fn(); });\n",
 }
 
 
@@ -84,6 +87,11 @@ def binds_directory(repo):
 @given(parsers.parse('package.json lists "{package}" as a dev dependency'))
 def dev_dependency(repo, package):
     write(repo, "package.json", json.dumps({"devDependencies": {package: "12.2.0"}}))
+
+
+@given(parsers.parse('the file "{path}" lists "{package}" as a dev dependency'))
+def dev_dependency_of(repo, path, package):
+    write(repo, path, json.dumps({"devDependencies": {package: "1.0.0"}}))
 
 
 @given(parsers.parse('pubkit.json declares an exception for "{rule}" until "{until}"'))

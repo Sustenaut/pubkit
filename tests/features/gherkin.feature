@@ -42,6 +42,7 @@ Feature: Every test is a Gherkin scenario
       | worker/site.test.js        | a node:test test            | worker/site.test.js: a Node test outside a scenario              |
       | test/site.mjs              | a node:test test            | test/site.mjs: a Node test outside a scenario                    |
       | scripts/test-deploy.sh     | a shell script              | scripts/test-deploy.sh: a test script outside a scenario         |
+      | tests/deploy.test.sh       | a shell script              | tests/deploy.test.sh: a test script outside a scenario           |
 
   Scenario: Fixtures, steps and test helpers are not tests
     Given a utility whose suite is Gherkin
@@ -61,6 +62,20 @@ Feature: Every test is a Gherkin scenario
     Given a utility whose suite is Gherkin
     And the file "tests/features/unbound.feature" holds a scenario
     And the suite binds the whole features directory
+    When I run pubkit "gherkin"
+    Then it succeeds
+
+  Scenario: A step file may load node:test's mock beside cucumber-js
+    Given a utility whose suite is Gherkin
+    And the file "test/site.steps.js" holds cucumber steps that use node:test's mock
+    When I run pubkit "gherkin"
+    Then it succeeds
+
+  Scenario: A package of the repository that runs quickpickle runs every feature file it is given
+    Given a utility whose suite is Gherkin
+    And the suite's feature file is removed
+    And the file "widget/features/form.feature" holds a scenario
+    And the file "widget/package.json" lists "quickpickle" as a dev dependency
     When I run pubkit "gherkin"
     Then it succeeds
 

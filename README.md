@@ -429,13 +429,14 @@ rule this README opens with, and `pubkit gherkin` runs that check alone:
 | Rule | Checked |
 |---|---|
 | TEST-01 | there is a `.feature` file with a scenario, and no feature file without one |
-| TEST-02 | no test runs outside a scenario: a test module's `test*` functions are pytest-bdd bindings (`scenarios(...)`, or an empty function decorated with `@scenario`); there is no `Test*` class, no `unittest.TestCase`, no Node test file (`*.test.js`, `*.spec.ts`, or a script in a `test/` directory that loads a test runner such as `node:test` or `vitest`) and no test shell script (`test-*.sh`) |
-| TEST-03 | every feature file runs: a `scenarios()` or `@scenario` call names it or its directory, resolved as pytest-bdd resolves it (`bdd_features_base_dir` in the nearest `pytest.ini`, or the module's own directory), unless the repository runs cucumber-js (`@cucumber/cucumber` in package.json, or a `cucumber.*` config), which runs every feature it is given |
+| TEST-02 | no test runs outside a scenario: a test module's `test*` functions are pytest-bdd bindings (`scenarios(...)`, or an empty function decorated with `@scenario`); there is no `Test*` class, no `unittest.TestCase`, no Node test file (`*.test.js`, `*.spec.ts`, or a script in a `test/` directory that loads a test runner such as `node:test` or `vitest`) and no test shell script (`test-*.sh`, `*-test.sh`, `*.test.sh`) |
+| TEST-03 | every feature file runs: a `scenarios()` or `@scenario` call names it or its directory, resolved as pytest-bdd resolves it (`bdd_features_base_dir` in the nearest `pytest.ini`, or the module's own directory), unless the repository runs a Node Gherkin runner (`@cucumber/cucumber`, `quickpickle` or `@amiceli/vitest-cucumber` in its own or a package's package.json, or a `cucumber.*` config), which runs every feature it is given |
 
 A test that checks a function in one go becomes a scenario of one `Then`
 step that keeps its body and fixtures, as `properties.feature` does for
 the Hypothesis properties. Fixtures, steps, fakes and setup files are not
-tests. A Rust crate's `#[test]`s and doc tests are the Rust crate
+tests: a Node file that loads a Gherkin runner holds steps or their
+support, even beside node:test's `mock`. A Rust crate's `#[test]`s and doc tests are the Rust crate
 standard's (RS-DOC-02, RS-TEST-02), and stay. `pubkit init` seeds
 `tests/features/repository.feature` and its steps, so a new repository
 starts in step.
