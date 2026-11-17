@@ -1152,7 +1152,7 @@ builds a throwaway suite, runs it in a subprocess, and judges what pytest
 reports. It drives the command in a scratch repository. pubrules is its own
 first consumer: its CI runs through `python-ci.yml` from this checkout, and
 it is released with [pubrel](https://github.com/Sustenaut/pubrel). Its
-package publet, `pkg.pubkit`, lives in `corpus/`.
+package publet, `pkg.pubrules`, lives in `corpus/`.
 
 ## Licence
 
