@@ -38,7 +38,10 @@ protect leaves the setting as it is. It loosens nothing, since the ruleset
 still decides what may merge.
 Each public repository also gets secret scanning and push protection turned on,
 unless its block says `"secret_scanning": false`; a private one isn't touched, since
-those need GitHub Advanced Security there. Nothing here ever turns them off.
+those need GitHub Advanced Security there. A public repository gets its
+dependency graph and Dependabot alerts turned on too, which the review job's
+dependency review needs and GitHub leaves off on a new repository. Nothing here
+ever turns them off.
 `pubkit protect OWNER/NAME` reads it from GitHub, and `pubkit protect` with no
 repositories reads `./pubkit.json`, for the repository `origin` points at.
 
@@ -263,7 +266,8 @@ def protect(api: Api, repo: str, checks: list[str], check: bool,
         lines, bad = lines + merge_lines, bad or merge_bad
     if scanning:
         scan_lines, scan_bad = attempt(lambda: secret_scanning(api, repo, check), repo, check)
-        lines, bad = lines + scan_lines, bad or scan_bad
+        graph_lines, graph_bad = attempt(lambda: dependency_graph(api, repo, check), repo, check)
+        lines, bad = lines + scan_lines + graph_lines, bad or scan_bad or graph_bad
     return lines, bad
 
 
@@ -302,6 +306,32 @@ def secret_scanning(api: Api, repo: str, check: bool) -> tuple[list[str], bool]:
     api("PATCH", f"repos/{repo}",
         {"security_and_analysis": {name: {"status": "enabled"} for name in off}})
     return [f"{repo}: turned on {said}"], False
+
+
+def dependency_graph(api: Api, repo: str, check: bool) -> tuple[list[str], bool]:
+    """Bring a public repository's dependency graph and Dependabot alerts on
+    (one setting: turning the alerts on turns the graph on), which the review
+    job's dependency review needs. It never turns them off."""
+    info = api("GET", f"repos/{repo}", None) or {}
+    if info.get("visibility", "public") != "public":
+        return [], False
+    try:
+        api("GET", f"repos/{repo}/vulnerability-alerts", None)
+        return [f"{repo}: dependency graph and Dependabot alerts on, up to date"], False
+    except ApiError as e:
+        if e.status != 404:
+            return [f"{repo}: dependency graph not readable; reading it needs Administration read"], False
+    if check:
+        return [f"{repo}: dependency graph and Dependabot alerts off; pubkit wants them on "
+                f"(the review job's dependency review needs them)"], True
+    try:
+        api("PUT", f"repos/{repo}/vulnerability-alerts", None)
+    except ApiError as e:
+        # A token that may set rulesets but not this changes nothing here, and
+        # stops nothing else: say so, as for secret scanning.
+        return [f"{repo}: warning: the dependency graph stays off: {e}; turning it on needs "
+                f"a repository admin"], False
+    return [f"{repo}: turned on the dependency graph and Dependabot alerts"], False
 
 
 def attempt(step, repo: str, check: bool) -> tuple[list[str], bool]:

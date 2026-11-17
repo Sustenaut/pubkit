@@ -745,6 +745,9 @@ It also turns on secret scanning and push protection on each public repository, 
 its block says `"secret_scanning": false`. It never turns them off, and leaves a private
 repository alone, since they need GitHub Advanced Security there. Reading them needs
 Administration read, and a token without it changes nothing and fails nothing.
+Each public repository's dependency graph and Dependabot alerts are turned on too:
+the review job's dependency review fails without them, and GitHub leaves them off on a
+new repository. `protect --check` reports them off.
 
 `auto_merge` is the repository's "Allow auto-merge" setting, which lets a
 pull request be set to merge by itself once the ruleset's required checks
