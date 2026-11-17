@@ -283,13 +283,14 @@ def applies(config: dict) -> bool:
     return config.get("kind") != "content"
 
 
-def grandfather(root: Path, before: str | None) -> list[str]:
-    """On the move from a pubrules without TEST-04 (WHEN_AFTER or older), the TEST-04
+def grandfather(root: Path, package: str | None, before: str | None) -> list[str]:
+    """On the move from a pubrules without TEST-04 (WHEN_AFTER or older, or
+    any pubkit, as pubrules was called before 0.43.0), the TEST-04
     exception a repository that fails the rule needs, written into its
     pubrules.json; what was written, or nothing."""
     from .conform import today  # noqa: PLC0415
     try:
-        older = bool(before) and _release(before) <= _release(WHEN_AFTER)
+        older = bool(before) and (package == "pubkit" or _release(before) <= _release(WHEN_AFTER))
     except ValueError:
         older = False
     path = root / "pubrules.json"
@@ -306,7 +307,7 @@ def grandfather(root: Path, before: str | None) -> list[str]:
     count = f"{len(missing)} scenario{'s' if len(missing) > 1 else ''}"
     config["exceptions"] = [*declared, {
         "rule": "TEST-04",
-        "reason": f"{count} had no When on the move from pubrules {before}, before the rule; "
+        "reason": f"{count} had no When on the move from {package or 'pubrules'} {before}, before the rule; "
                   f"give each its one action, on pubtest's steps",
         "until": WHEN_UNTIL}]
     path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")

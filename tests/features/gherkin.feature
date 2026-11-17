@@ -119,6 +119,15 @@ Feature: Every test is a Gherkin scenario
     And "pubrules.json" contains ""until": "2026-12-31""
     And "pubrules.json" contains "had no When on the move from pubrules 0.43.0, before the rule"
 
+  Scenario: The move from pubkit 0.41.1 waives TEST-04 where it fails
+    Given a utility whose suite is Gherkin
+    And the suite's scenario has no When
+    And the file "tests/requirements.lock" reads "pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v0.41.1/pubkit-0.41.1-py3-none-any.whl"
+    When I run pubrules "pins" "--no-lock"
+    Then it succeeds
+    And it prints "pubrules.json: TEST-04 waived until 2026-12-31, for the 1 scenario with no When"
+    And "pubrules.json" contains "had no When on the move from pubkit 0.41.1, before the rule"
+
   Scenario: Once waived by the move, TEST-04 is an open exception
     Given a utility whose suite is Gherkin
     And the suite's scenario has no When
