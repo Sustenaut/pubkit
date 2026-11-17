@@ -1,29 +1,27 @@
 # pubkit
 
 The testing and quality setup every package shares:
-- a pytest-bdd plugin;
+- the pin of pubtest, the pytest-bdd plugin and Gherkin steps every suite loads;
 - the files each repository must hold, kept in step by a command;
 - reusable CI workflows;
 - the Rust crate standard, with a Claude Code agent that audits crates
   against it.
 
 Every package tests its behaviour the same way: Gherkin feature files, run
-by pytest-bdd, driving the built program as a user would. pubkit is that
-setup, written once.
+by pytest-bdd (or cucumber-js and quickpickle in Node), with pubtest's steps,
+driving the built program as a user would. pubkit is that setup, written once.
 
-## The pytest plugin
+## The steps: pubtest
 
-Installed, it loads into every pytest session (the `pytest11` entry point):
-
-| Provides | What it is |
-|---|---|
-| `binary(name, var=None)` | The program under test, from `<NAME>_BIN_DIR` (`pub` → `PUB_BIN_DIR`). Never from PATH, so the suite cannot quietly test whatever is installed; another implementation runs the suite by setting one variable. |
-| `run(program, *args, stdin=, cwd=, env=)` | Runs a command in the test's scratch directory and returns a `Completed`: `code`, `stdout`, `stderr`, `lines`. |
-| `ctx` | A per-scenario namespace. `ctx.cleanup(fn)` runs `fn` when the scenario ends, in reverse order, passed or failed. |
-| common steps | `it succeeds`, `it fails`, `the exit code is N`, `it prints "…"`, `stderr mentions "…"`, `stdout is empty`. Each reads the `result` fixture a `when` step sets with `target_fixture="result"`. |
-| markers | Every `@tag` in the feature files is registered, so `--strict-markers` works and `-m "not browser"` selects. |
-
-A suite's own step with the same text wins over the plugin's.
+The pytest plugin and the Gherkin steps every suite loads are
+[pubtest](https://github.com/Sustenaut/pubtest)'s: one grammar
+([GRAMMAR.md](https://github.com/Sustenaut/pubtest/blob/main/GRAMMAR.md)), a
+pytest-bdd plugin and an npm package for cucumber-js and quickpickle. The managed
+`tests/requirements-pubkit.txt` pins the pubtest this pubkit was released with, so
+every suite gets `ctx`, `binary(name)`, `run(...)`, the tag markers and the steps
+(`it succeeds`, `it prints "…"`, `the result is "V"`, the files, stand-ins, HTTP and
+secrets steps) without writing them. pubkit carried the plugin itself until 0.42.0;
+a suite that imported `pubkit.plugin` imports `pubtest.core` instead.
 
 ## Keeping the files in step
 
