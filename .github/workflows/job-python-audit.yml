@@ -2,15 +2,15 @@
 # pip-audit, which reads the files without installing them. Any finding
 # fails.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-python-audit
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       audit-requirements: { type: string, default: tests/requirements.lock, description: "The hash-locked requirements files the audit job checks, space-separated." }
 
@@ -25,7 +25,7 @@ jobs:
         with: { python-version: '${{ inputs.python-version }}' }
       # pip-audit fetches each locked wheel, and a release download can time
       # out (pip retries no 504), so it is tried three times, the last with
-      # our release wheels from pubkit.json's wheel mirror (tests/install-lock
+      # our release wheels from pubrules.json's wheel mirror (tests/install-lock
       # --rewrite; the hashes stay). A finding fails each try, and so the job.
       - id: audit-1
         continue-on-error: true

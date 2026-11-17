@@ -1,4 +1,4 @@
-"""Steps for `pubkit audit prepare` and `pubkit audit draft`, against the
+"""Steps for `pubrules audit prepare` and `pubrules audit draft`, against the
 fixture crates in tests/fixtures/audit, each copied into a scratch git
 repository with a release tag and a change after it.
 
@@ -21,8 +21,8 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import audit
-from pubkit.audit_draft import SCHEMA
+from pubrules import audit
+from pubrules.audit_draft import SCHEMA
 
 scenarios("audit-prepare.feature")
 scenarios("audit-draft.feature")
@@ -55,7 +55,7 @@ def released_crate(repo, env, tmp_path, name, tag, version):
     pubrel.write_text(f'#!/bin/sh\n[ "$1" = next ] && echo "{version}"\n')
     pubrel.chmod(pubrel.stat().st_mode | stat.S_IEXEC)
     env["PUBREL"] = str(pubrel)
-    env["PUBKIT_TODAY"] = "2026-10-28"
+    env["PUBRULES_TODAY"] = "2026-10-28"
 
 
 @given(parsers.parse('the crate "{name}" released as "{tag}" and changed since, with no pubrel'))
@@ -180,7 +180,7 @@ def fake_api():
 def fake_claude(fake_api, env, repo):
     env["ANTHROPIC_BASE_URL"] = fake_api.url
     env["ANTHROPIC_API_KEY"] = "test-key"
-    env["PUBKIT_AUDIT_MODEL"] = None
+    env["PUBRULES_AUDIT_MODEL"] = None
     blocking = audit.header(report_text(repo, "demo", "0.1.1"))["blocking"]
     env["resolved"] = {"blocking": int(blocking)}
 
@@ -195,9 +195,9 @@ def api_errors(fake_api, status, message):
     fake_api.mode = ("draft", status, message)
 
 
-@given(parsers.parse('PUBKIT_AUDIT_MODEL is "{model}"'))
+@given(parsers.parse('PUBRULES_AUDIT_MODEL is "{model}"'))
 def audit_model(env, model):
-    env["PUBKIT_AUDIT_MODEL"] = model
+    env["PUBRULES_AUDIT_MODEL"] = model
 
 
 @given("no ANTHROPIC_API_KEY")
@@ -250,9 +250,9 @@ def asked_nothing(fake_api):
 
 @given(parsers.parse('the audit of "{package}" has been prepared'))
 def prepared(repo, run, env, package):
-    from conftest import pubkit
+    from conftest import pubrules
     variables = {k: v for k, v in env.items() if k != "resolved"}
-    done = run(pubkit(), "audit", "prepare", "--package", package, "--quick", cwd=repo, env=variables)
+    done = run(pubrules(), "audit", "prepare", "--package", package, "--quick", cwd=repo, env=variables)
     assert done.code == 0, done
 
 

@@ -3,14 +3,14 @@
     {
       "plugin": "anthropic.api",
       "paths": [
-        "src/pubkit/audit_draft.py"
+        "src/pubrules/audit_draft.py"
       ],
       "mode": "required"
     },
     {
       "plugin": "cloudflare.pages",
       "paths": [
-        "src/pubkit/hosting.py"
+        "src/pubrules/hosting.py"
       ],
       "mode": "required"
     },
@@ -18,16 +18,16 @@
       "plugin": "crates-io.publish",
       "paths": [
         "plugins/rust-crate-quality/.claude-plugin/plugin.json",
-        "src/pubkit/audit_prepare.py",
-        "src/pubkit/nightly.py",
-        "src/pubkit/standard.json"
+        "src/pubrules/audit_prepare.py",
+        "src/pubrules/nightly.py",
+        "src/pubrules/standard.json"
       ],
       "mode": "required"
     },
     {
       "plugin": "desec.dns",
       "paths": [
-        "src/pubkit/hosting.py"
+        "src/pubrules/hosting.py"
       ],
       "mode": "required"
     },
@@ -35,7 +35,7 @@
       "plugin": "github.app-token",
       "paths": [
         ".github/workflows/ci.yml",
-        "src/pubkit/ci.py"
+        "src/pubrules/ci.py"
       ],
       "mode": "required"
     },
@@ -46,15 +46,15 @@
         ".github/workflows/job-tested.yml",
         "Makefile",
         "actions/pr-label/",
-        "src/pubkit/nightly.py",
-        "src/pubkit/protect.py"
+        "src/pubrules/nightly.py",
+        "src/pubrules/protect.py"
       ],
       "mode": "required"
     },
     {
       "plugin": "mailbox.smtp",
       "paths": [
-        "src/pubkit/hosting.py"
+        "src/pubrules/hosting.py"
       ],
       "mode": "required"
     },
@@ -71,7 +71,7 @@
     {
       "plugin": "pypi.publish",
       "paths": [
-        "src/pubkit/cli.py"
+        "src/pubrules/cli.py"
       ],
       "mode": "required"
     },
@@ -79,7 +79,7 @@
       "plugin": "sonarcloud.scan",
       "paths": [
         ".github/workflows/**",
-        "src/pubkit/ci.py"
+        "src/pubrules/ci.py"
       ],
       "mode": "required"
     }

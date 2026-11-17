@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pytest_bdd import scenarios, then, when
 
-from pubkit.refs import SHIPPED
+from pubrules.refs import SHIPPED
 
 scenarios("shipped.feature")
 

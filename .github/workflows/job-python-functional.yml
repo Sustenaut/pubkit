@@ -1,24 +1,24 @@
-# Python: the hash-locked environment, pubkit sync --check, and the
+# Python: the hash-locked environment, pubrules sync --check, and the
 # functional suite, whose coverage report goes to the sonar job as the
-# `coverage` artifact. Hypothesis property tests try PUBKIT_FUZZ_RUNS inputs
+# `coverage` artifact. Hypothesis property tests try PUBRULES_FUZZ_RUNS inputs
 # each: fuzz-runs, or fuzz-runs-scheduled on a schedule.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-python-functional
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
       setup: { type: string, default: make venv, description: Creates .venv from the hash-locked requirements. }
       test: { type: string, default: make functional, description: Runs the default scenarios. }
-      sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+      sync-check: { type: boolean, default: true, description: Fail if pubrules's managed files drifted. }
       coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
-      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBKIT_FUZZ_RUNS)." }
+      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBRULES_FUZZ_RUNS)." }
       fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }
 
 jobs:
@@ -32,19 +32,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with: { run: '${{ inputs.setup }}' }
       - if: inputs.sync-check
-        run: .venv/bin/pubkit sync --check
-      # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
-      # inputs. A scheduled run tries more, unless pubkit.json sets
+        run: .venv/bin/pubrules sync --check
+      # Each property test (Hypothesis, fast-check) tries PUBRULES_FUZZ_RUNS
+      # inputs. A scheduled run tries more, unless pubrules.json sets
       # "security": { "fuzz": { "python": false } }.
       - run: |
           runs=$SHORT
-          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .python else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .python else . end) != false' pubrules.json 2>/dev/null || echo true)" = true ]; then
             runs=$LONG
           fi
-          echo "PUBKIT_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
+          echo "PUBRULES_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
         env:
           EVENT: '${{ github.event_name }}'
           SHORT: '${{ inputs.fuzz-runs }}'

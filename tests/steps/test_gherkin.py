@@ -1,4 +1,4 @@
-"""Steps for `pubkit gherkin`, against a scratch utility whose suite is
+"""Steps for `pubrules gherkin`, against a scratch utility whose suite is
 Gherkin, changed one way at a time."""
 
 from __future__ import annotations
@@ -61,11 +61,11 @@ def write(repo, path, text):
 
 @given("a utility whose suite is Gherkin")
 def gherkin_suite(repo, env):
-    write(repo, "pubkit.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
+    write(repo, "pubrules.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
     write(repo, "tests/pytest.ini", "[pytest]\nbdd_features_base_dir = features/\n")
     write(repo, "tests/features/adding.feature", FEATURE)
     write(repo, "tests/steps/test_adding.py", STEPS)
-    env["PUBKIT_TODAY"] = "2026-11-16"
+    env["PUBRULES_TODAY"] = "2026-11-16"
 
 
 @given("the suite's feature file is removed")
@@ -95,25 +95,25 @@ def dev_dependency_of(repo, path, package):
     write(repo, path, json.dumps({"devDependencies": {package: "1.0.0"}}))
 
 
-@given(parsers.parse('pubkit.json declares an exception for "{rule}" until "{until}"'))
+@given(parsers.parse('pubrules.json declares an exception for "{rule}" until "{until}"'))
 def exception(repo, rule, until):
-    config = json.loads((repo / "pubkit.json").read_text())
+    config = json.loads((repo / "pubrules.json").read_text())
     config["exceptions"] = [{"rule": rule, "reason": "moving to scenarios", "until": until}]
-    write(repo, "pubkit.json", json.dumps(config) + "\n")
+    write(repo, "pubrules.json", json.dumps(config) + "\n")
 
 
-@given("pubkit's templates hold a compiled copy of a seeded .py file, as pip leaves one")
+@given("pubrules's templates hold a compiled copy of a seeded .py file, as pip leaves one")
 def compiled_template(repo, ctx):
     """What `pip install` does to the installed wheel: a __pycache__ beside
     templates/common/tests/steps/test_repository.py, which is not text."""
     from importlib import resources  # noqa: PLC0415
-    steps = Path(str(resources.files("pubkit") / "templates" / "common" / "tests" / "steps"))
+    steps = Path(str(resources.files("pubrules") / "templates" / "common" / "tests" / "steps"))
     cache = steps / "__pycache__"
     made = not cache.exists()
     cache.mkdir(exist_ok=True)
     stale = cache / "test_repository.cpython-0.pyc"
     stale.write_bytes(b"\x00\xf7\x0d\x0a binary")
-    write(repo, "pubkit.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
+    write(repo, "pubrules.json", json.dumps({"kind": "utility", "ci": {}}) + "\n")
 
     @ctx.cleanup
     def tidy():

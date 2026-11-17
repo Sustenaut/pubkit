@@ -1,14 +1,14 @@
-# terraform init, tried again when it fails, then once from pubkit.json's
+# terraform init, tried again when it fails, then once from pubrules.json's
 # provider mirror (mirror.terraform), if it names one: a provider
 # download can time out. The lock's hashes still check every archive the
 # mirror gives. Run it after hashicorp/setup-terraform, in the checkout's
-# root, where pubkit.json is.
+# root, where pubrules.json is.
 #
 #   - name: terraform init, tried three times, then from the provider mirror
-#     uses: Sustenaut/pubkit/actions/terraform-init@<commit> # vX.Y.Z
+#     uses: Sustenaut/pubrules/actions/terraform-init@<commit> # vX.Y.Z
 #     with: { dir: infra, args: -backend=false -input=false }
 name: terraform-init
-description: terraform init, tried up to a number of times, then once from pubkit.json's provider mirror.
+description: terraform init, tried up to a number of times, then once from pubrules.json's provider mirror.
 
 inputs:
   terraform:

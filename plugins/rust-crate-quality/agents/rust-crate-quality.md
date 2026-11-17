@@ -1,6 +1,6 @@
 ---
 name: rust-crate-quality
-description: Audits a Rust crate meant for crates.io, library or command-line tool, against pubkit's Rust crate standard, and writes or fixes its documentation to meet it. Use before a crate's first release or any release, when its docs or public API change, or when asked whether a crate is ready to publish. Reports findings with evidence; edits only documentation.
+description: Audits a Rust crate meant for crates.io, library or command-line tool, against pubrules's Rust crate standard, and writes or fixes its documentation to meet it. Use before a crate's first release or any release, when its docs or public API change, or when asked whether a crate is ready to publish. Reports findings with evidence; edits only documentation.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
@@ -84,19 +84,19 @@ Start the file with this header, then the report:
 ---
 package: <package>
 version: <version>
-standard: <the output of `pubkit audit --standard`>
+standard: <the output of `pubrules audit --standard`>
 blocking: <how many findings are under "Blocks a release">
 date: <today, YYYY-MM-DD>
 auditor: rust-crate-quality
 ---
 ```
 
-If `pubkit audit prepare` has already written that file, start from it:
+If `pubrules audit prepare` has already written that file, start from it:
 keep its machine findings, judge each rule it marks `[needs review]` or
 `[machine-drafted ...]`, move what you find into the sections above,
 remove the mark, and count `blocking` again.
 
-`pubkit audit --check` reads that header when the release is cut. It refuses
+`pubrules audit --check` reads that header when the release is cut. It refuses
 a report on another version, against another version of the standard, or
 with `blocking` above 0. Count `blocking` honestly: it is what lets a
 release through. This file is the one thing you write outside the docs; say

@@ -1,15 +1,15 @@
 # Rust: a build on the oldest Rust the packages promise, the lowest
 # `rust-version` their manifests state, by `make msrv MSRV=<version>`.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-rust-msrv
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
 
 env:
   CARGO_TERM_COLOR: always

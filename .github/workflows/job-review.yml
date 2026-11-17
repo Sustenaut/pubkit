@@ -1,16 +1,16 @@
-# A pull request's dependency changes against GitHub's advisories. pubkit
+# A pull request's dependency changes against GitHub's advisories. pubrules
 # puts it in the pull request workflow only, and only for a public
 # repository, where GitHub's dependency graph serves it.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-review
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
 
 jobs:
   # A pull request that adds or moves a dependency to a version with a
@@ -22,8 +22,8 @@ jobs:
       # The owner's own reusable workflows and actions carry no license
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
-      # `pubkit sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubkit's and
+      # `pubrules sync` lists those the repository calls in
+      # .github/dependency-review-licenses.txt; without it, pubrules's and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.
@@ -41,35 +41,35 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           DEFAULT: >-
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-osv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-review.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-cross.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-fuzz.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-gates.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-msrv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-toolchains.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-checks.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-terraform.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-tests.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-sonar.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-tested.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/node-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/actions/cache,
-              pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
-              pkg:githubactions/Sustenaut/pubkit/actions/retry,
-              pkg:githubactions/Sustenaut/pubkit/actions/terraform-init,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-osv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-review.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-cross.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-fuzz.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-gates.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-msrv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-toolchains.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-checks.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-terraform.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-tests.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-sonar.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-tested.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/node-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/python-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/rust-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/actions/cache,
+              pkg:githubactions/Sustenaut/pubrules/actions/pr-label,
+              pkg:githubactions/Sustenaut/pubrules/actions/retry,
+              pkg:githubactions/Sustenaut/pubrules/actions/terraform-init,
               pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:

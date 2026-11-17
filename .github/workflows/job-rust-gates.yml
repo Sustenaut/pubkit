@@ -1,20 +1,20 @@
-# Rust: pubkit's managed files in step, then the gates the Rust crate
-# standard requires and the repository's own after them. `pubkit sync`
-# gives the required targets, from the standard and pubkit.json's
+# Rust: pubrules's managed files in step, then the gates the Rust crate
+# standard requires and the repository's own after them. `pubrules sync`
+# gives the required targets, from the standard and pubrules.json's
 # exceptions, so a change to either shows in the generated workflow, and
 # the sync check fails until it is written.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-rust-gates
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
-      required: { type: string, default: '', description: "The make targets the standard requires, which pubkit sync gives." }
+      required: { type: string, default: '', description: "The make targets the standard requires, which pubrules sync gives." }
       gates: { type: string, default: '', description: "Extra make targets to run after the required ones." }
 
 env:

@@ -1,4 +1,4 @@
-"""Steps parsing the workflows pubkit ships, as YAML, the way GitHub does."""
+"""Steps parsing the workflows pubrules ships, as YAML, the way GitHub does."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from pubkit import standard
+from pubrules import standard
 from pytest_bdd import parsers, scenarios, then, when
 
 scenarios("workflows.feature")
@@ -57,7 +57,7 @@ def aggregate(workflow, name):
     assert set(job["needs"]) == set(jobs) - {name}, job["needs"]
 
 
-@then("every job pubkit required plans for reads its targets from the plan job")
+@then("every job pubrules required plans for reads its targets from the plan job")
 def jobs_read_plan(workflow):
     jobs = workflow["data"]["jobs"]
     outputs = jobs["plan"]["outputs"]
@@ -76,7 +76,7 @@ def inputs_only_add(workflow):
         assert f"REQUIRED: '${{{{ needs.plan.outputs.{name} }}}}'" in workflow["text"], name
 
 
-@then("the plan job compares a pull request with its base and passes it to pubkit required")
+@then("the plan job compares a pull request with its base and passes it to pubrules required")
 def plan_passes_changes(workflow):
     steps = workflow["data"]["jobs"]["plan"]["steps"]
     checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout"))
@@ -109,7 +109,7 @@ def sonar_job(workflow, name):
     assert any(s.get("if") == "env.SONAR_TOKEN == ''" and "::notice::" in s["run"] for s in steps)
 
 
-@then("the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubkit.json names it")
+@then("the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubrules.json names it")
 def sonar_project(workflow):
     steps = workflow["data"]["jobs"]["sonar"]["steps"]
     args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"]
@@ -117,7 +117,7 @@ def sonar_project(workflow):
     settings = next(s for s in steps if s.get("id") == "settings")
     assert ".security.sonar.organization" in settings["run"]
     assert 'organization=${organization:-${OWNER,,}}' in settings["run"]
-    assert "2>/dev/null || true)" in settings["run"]  # no pubkit.json is no failure
+    assert "2>/dev/null || true)" in settings["run"]  # no pubrules.json is no failure
     assert settings["env"]["OWNER"] == "${{ github.repository_owner }}"
     assert "-Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}" in args
 
@@ -139,7 +139,7 @@ def check_only(action):
     assert steps["Check the inputs"]["env"]["CHECK_ONLY"] == "${{ inputs.check-only }}"
 
 
-@then("the scan's layout comes before sonar-args and pubkit.json's sonar args")
+@then("the scan's layout comes before sonar-args and pubrules.json's sonar args")
 def layout_first(workflow):
     steps = workflow["data"]["jobs"]["sonar"]["steps"]
     args = next(s for s in steps if "sonarqube-scan-action" in s.get("uses", ""))["with"]["args"].split()
@@ -170,7 +170,7 @@ def pinned(workflow):
         if not match or match.group(1).startswith("./") or line.lstrip().startswith("#"):
             continue
         action, rest = match.groups()
-        # pubrel's and pubkit's own reusable workflows too (SonarQube's S7637).
+        # pubrel's and pubrules's own reusable workflows too (SonarQube's S7637).
         assert re.search(r"@[0-9a-f]{40}$", action), f"not pinned to a commit: {line.strip()}"
         assert re.match(r"\s+# v\d+\.\d+\.\d+$", rest), f"no version comment: {line.strip()}"
 
@@ -229,8 +229,8 @@ def coverage_in_place(workflow):
     assert job["env"]["COVERAGE"] == "${{ secrets.SONAR_TOKEN != '' }}", job["env"]
     loop = next(s for s in job["steps"] if "for target in" in s.get("run", ""))
     assert 'if [[ "$target" = functional && "$COVERAGE" = true ]]; then target=coverage; fi' in loop["run"]
-    shipped = (SOURCE / "src" / "pubkit" / "templates" / "rust" / "pubkit.mk").read_text()
-    assert re.search(r"^coverage: .*##", shipped, re.M), "pubkit.mk has no coverage target"
+    shipped = (SOURCE / "src" / "pubrules" / "templates" / "rust" / "pubrules.mk").read_text()
+    assert re.search(r"^coverage: .*##", shipped, re.M), "pubrules.mk has no coverage target"
     assert re.search(r"^\.PHONY: .*\bcoverage\b", shipped, re.M), "coverage is not phony"
 
 
@@ -256,20 +256,20 @@ def audit_unconditional(workflow):
     assert not any("inputs." in str(step.get("if", "")) for step in steps)
 
 
-@then("its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run")
+@then("its fuzz job reads security.fuzz.rust from pubrules.json on a scheduled run")
 def fuzz_setting(workflow):
     run = next(s["run"] for s in workflow["data"]["jobs"]["fuzz"]["steps"]
                if "fuzz-smoke" in s.get("run", ""))
     assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and ".rust" in run
-    assert "pubkit.json" in run and "$LONG" in run and "seconds=$SHORT" in run
+    assert "pubrules.json" in run and "$LONG" in run and "seconds=$SHORT" in run
 
 
-@then(parsers.parse('its "{name}" job sets PUBKIT_FUZZ_RUNS before its tests, '
+@then(parsers.parse('its "{name}" job sets PUBRULES_FUZZ_RUNS before its tests, '
                     'from security.fuzz.{language} on a scheduled run'))
 def property_runs(workflow, name, language):
     data = workflow["data"]
     steps = data["jobs"][name]["steps"]
-    at = next(i for i, s in enumerate(steps) if "PUBKIT_FUZZ_RUNS" in s.get("run", ""))
+    at = next(i for i, s in enumerate(steps) if "PUBRULES_FUZZ_RUNS" in s.get("run", ""))
     run = steps[at]["run"]
     assert '"$EVENT" = schedule' in run and ".security.fuzz" in run and f".{language}" in run
     assert "runs=$SHORT" in run and "runs=$LONG" in run and '>> "$GITHUB_ENV"' in run

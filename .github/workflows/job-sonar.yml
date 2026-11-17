@@ -1,5 +1,5 @@
 # SonarQube Cloud's analysis, into the project OWNER_REPO of the
-# organization owner, in lower case (or pubkit.json's
+# organization owner, in lower case (or pubrules.json's
 # security.sonar.organization), when the caller passes a SONAR_TOKEN. Without one, as
 # in a private repository or a pull request from a fork, it says so and
 # passes. The full history lets it tell new code from old, and every
@@ -8,21 +8,21 @@
 # coverage-run instead, when the tests ran there and not here. Each
 # `property=pattern` in reports sends the files whose names match the
 # pattern (find -name) to that property. layout, where the code and its
-# tests are, which `pubkit sync` works out, comes first: sonar-args, then
-# the properties pubkit.json adds (security.sonar.args), come after it, so
+# tests are, which `pubrules sync` works out, comes first: sonar-args, then
+# the properties pubrules.json adds (security.sonar.args), come after it, so
 # a repository's own setting of the same property wins.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-sonar
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties, such as -Dsonar.exclusions=vendor/**." }
-      layout: { type: string, default: '', description: "Where the code and its tests are, as SonarQube Cloud properties, such as -Dsonar.sources=src -Dsonar.tests=tests; pubkit sync gives it from the directories the repository has. sonar-args comes after it, so the repository's own wins." }
+      layout: { type: string, default: '', description: "Where the code and its tests are, as SonarQube Cloud properties, such as -Dsonar.sources=src -Dsonar.tests=tests; pubrules sync gives it from the directories the repository has. sonar-args comes after it, so the repository's own wins." }
       coverage-run: { type: string, default: '', description: "Another run of this commit whose coverage artifacts to read, such as the merge queue's that a push to main skipped its tests for; the caller grants actions: read. Empty reads this run's." }
       reports: { type: string, required: true, description: "Where the coverage reports go: space-separated property=pattern pairs, such as sonar.rust.lcov.reportPaths=lcov.info sonar.python.coverage.reportPaths=*.xml." }
     secrets:
@@ -74,8 +74,8 @@ jobs:
         # The organization: security.sonar.organization, or the owner in
         # lower case, since SonarQube Cloud's organization keys are.
         run: |
-          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
-          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null || true)
+          echo "args=$(jq -r '.security.sonar.args // ""' pubrules.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubrules.json 2>/dev/null || true)
           echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
         env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''

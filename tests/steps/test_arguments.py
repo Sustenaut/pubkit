@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import new, nightly, paths, supply_chain
+from pubrules import new, nightly, paths, supply_chain
 
 scenarios("arguments.feature")
 
@@ -31,7 +31,7 @@ def runner_temp(repo, monkeypatch, name):
     monkeypatch.setenv("RUNNER_TEMP", str(repo / name))
 
 
-@when(parsers.parse('pubkit confines the file "{path}"'), target_fixture="confined")
+@when(parsers.parse('pubrules confines the file "{path}"'), target_fixture="confined")
 def confine(repo, path):
     return paths.confined(repo / path, "the file")
 
@@ -41,7 +41,7 @@ def allowed(repo, confined):
     assert confined.is_relative_to(Path(os.environ["RUNNER_TEMP"]).resolve()), confined
 
 
-@when(parsers.parse('pubkit records "{text}" as a row in the category "{category}"'),
+@when(parsers.parse('pubrules records "{text}" as a row in the category "{category}"'),
       target_fixture="stopped")
 def record_row(repo, text, category):
     with pytest.raises(SystemExit) as stopped:
@@ -49,7 +49,7 @@ def record_row(repo, text, category):
     return stopped.value
 
 
-@when(parsers.parse('pubkit reads the version of "{tool}"'), target_fixture="version")
+@when(parsers.parse('pubrules reads the version of "{tool}"'), target_fixture="version")
 def read_version(tool):
     return new.version_of(tool)
 
@@ -77,7 +77,7 @@ def fake_pubrel(repo, monkeypatch, package):
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
 
-@when(parsers.parse('pubkit records "{text}" as a row in the category "{category}" with it'),
+@when(parsers.parse('pubrules records "{text}" as a row in the category "{category}" with it'),
       target_fixture="recorded")
 def record_with_pubrel(repo, text, category):
     return nightly.record(repo, text, category)

@@ -10,7 +10,7 @@ from __future__ import annotations
 from hypothesis import given, strategies as st
 from pytest_bdd import scenarios, then
 
-from pubkit import cbor, nightly
+from pubrules import cbor, nightly
 
 scenarios("properties.feature")
 

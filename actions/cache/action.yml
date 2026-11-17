@@ -1,23 +1,23 @@
 # Keeps what a build fetched or made between runs, by the entries of the
-# repository's pubkit.json `cache` block (README, "Caching a build"). Each
+# repository's pubrules.json `cache` block (README, "Caching a build"). Each
 # entry gets a key of its own: a fetched entry (refresh: day, week, month
 # or never) is kept for its period; a made entry (inputs or unit) is
 # restored from the latest run, and the build makes it through
-# `pubkit cache run`. Call it twice:
+# `pubrules cache run`. Call it twice:
 #
-#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#   - uses: Sustenaut/pubrules/actions/cache@vX.Y.Z
 #     with: { step: restore, fresh: "${{ inputs.fresh || false }}" }
 #
 # refresh: 'true' on restore restores nothing at all, as when the pull
 # request a run is for carries the "refresh cache" label (actions/pr-label).
-#   - run: bin/build              # uses `pubkit cache run` for what it makes
-#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#   - run: bin/build              # uses `pubrules cache run` for what it makes
+#   - uses: Sustenaut/pubrules/actions/cache@vX.Y.Z
 #     with: { step: save }
 #
-# save first drops what no run used (pubkit cache prune), then keeps each
+# save first drops what no run used (pubrules cache prune), then keeps each
 # entry under its key. A cache block holds at most eight entries.
 name: cache
-description: Restore or save a build's cache entries by the cache block in pubkit.json.
+description: Restore or save a build's cache entries by the cache block in pubrules.json.
 
 inputs:
   step:

@@ -1,36 +1,36 @@
-Feature: A content repository is one pubkit neither releases nor deploys
+Feature: A content repository is one pubrules neither releases nor deploys
   A content repository holds authored information, documents or data, and is
-  private. pubkit keeps its common files in step and writes its CI, but it has
+  private. pubrules keeps its common files in step and writes its CI, but it has
   no release, no release tags and no secrets wrapper: whatever builds, checks
   or versions what it holds is its own tooling's, run as the ci tests job.
 
   Scenario: init writes the common files only, and needs no project
     Given an empty repository
-    When I run pubkit "init" "--kind=content"
+    When I run pubrules "init" "--kind=content"
     Then it succeeds
-    And the repository has "pubkit", "AGENTS.md", "tests/requirements-pubkit.txt", "tests/install-lock", "tests/requirements.txt", ".github/workflows/pr.yml", ".github/workflows/main.yml"
-    And the repository has no "with-secrets", "with-secrets.json", "pubsec", "pubdeploy", "pubkit.mk", "pubkit-python.mk", "rust-toolchain.toml", "Makefile"
-    And pubkit.json reads {"kind": "content", "ci": {}}
+    And the repository has "pubrules", "AGENTS.md", "tests/requirements-pubrules.txt", "tests/install-lock", "tests/requirements.txt", ".github/workflows/pr.yml", ".github/workflows/main.yml"
+    And the repository has no "with-secrets", "with-secrets.json", "pubsec", "pubdeploy", "pubrules.mk", "pubrules-python.mk", "rust-toolchain.toml", "Makefile"
+    And pubrules.json reads {"kind": "content", "ci": {}}
 
   Scenario: A repository just initialised as content is in step
     Given a repository initialised as "content"
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it succeeds
-    And it prints "in step with pubkit"
+    And it prints "in step with pubrules"
 
   Scenario: Without a test command, CI runs only the checks, and shellcheck on its shell scripts
     Given a content repository whose ci block is '{}'
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then it succeeds
     And "pr.yml" runs the jobs "tested, checks, passed"
     And "main.yml" runs the jobs "tested, checks, passed"
     And in "pr.yml" the "checks" job calls "job-service-checks.yml" with "shellcheck" "**/*.sh"
     And "pr.yml" has no release
-    And no workflow pubkit writes scans with SonarQube Cloud
+    And no workflow pubrules writes scans with SonarQube Cloud
 
   Scenario: With a test command, CI runs its tooling's checks as the tests job
     Given a content repository whose ci block is '{"with": {"setup": "make venv", "test": "make check", "shellcheck": "bin/*"}}'
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then it succeeds
     And "pr.yml" runs the jobs "tested, checks, tests, passed"
     And in "pr.yml" the "tests" job calls "job-service-tests.yml" with "test" "make check"
@@ -40,13 +40,13 @@ Feature: A content repository is one pubkit neither releases nor deploys
 
   Scenario: A content repository has no scan to turn on
     Given a content repository whose ci block is '{"jobs": {"sonar": {"events": ["pr"]}}}'
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then it fails
     And stderr mentions "jobs names sonar, which content has not"
 
   Scenario: Its runners are the ci block's, as for any kind
     Given a content repository whose ci block is '{"runs-on": "my-runners", "with": {"test": "make check"}}'
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then it succeeds
     And in "pr.yml" the "tests" job calls "job-service-tests.yml" with "runs-on" "my-runners"
     And in "pr.yml" the "checks" job calls "job-service-checks.yml" with "runs-on" "my-runners"
@@ -63,7 +63,7 @@ Feature: A content repository is one pubkit neither releases nor deploys
 
   Scenario Outline: A content repository's protect block refuses release tags and a release app
     Given a content repository whose protect block is <block>
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "<message>"
 

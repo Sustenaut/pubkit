@@ -2,15 +2,15 @@
 # browser-coverage-report goes to the sonar job as the `coverage-browser`
 # artifact.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-python-browser
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
       setup: { type: string, default: make venv, description: Creates .venv from the hash-locked requirements. }
@@ -29,7 +29,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}

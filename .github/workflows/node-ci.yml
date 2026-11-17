@@ -1,7 +1,7 @@
 # Reusable CI for a Node package:
 #
 #   ci:
-#     uses: Sustenaut/pubkit/.github/workflows/node-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubrules/.github/workflows/node-ci.yml@vX.Y.Z
 #     with: { browser-test: npm run test:browser }
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
@@ -10,11 +10,11 @@
 # cannot run code just by being installed. The commands are inputs; the
 # defaults are npm's own.
 #
-# fast-check property tests try PUBKIT_FUZZ_RUNS inputs each, given a setup
+# fast-check property tests try PUBRULES_FUZZ_RUNS inputs each, given a setup
 # file the test command loads that calls
-#   fc.configureGlobal({ numRuns: Number(process.env.PUBKIT_FUZZ_RUNS) || 100 })
+#   fc.configureGlobal({ numRuns: Number(process.env.PUBRULES_FUZZ_RUNS) || 100 })
 # fuzz-runs on every push and pull request, fuzz-runs-scheduled on a
-# schedule (security.fuzz.node in pubkit.json).
+# schedule (security.fuzz.node in pubrules.json).
 #
 # The audit job checks every locked package, development ones included,
 # against npm's advisories on every run, nightly included, and fails on any
@@ -24,19 +24,19 @@ name: node-ci
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       node-version: { type: string, default: '22' }
-      python-version: { type: string, default: '3.14', description: For pubkit sync --check. }
+      python-version: { type: string, default: '3.14', description: For pubrules sync --check. }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
       setup: { type: string, default: npm ci --ignore-scripts --no-audit --no-fund, description: Installs the locked dependencies. }
       test: { type: string, default: npm test, description: Runs the tests. }
       browser-test: { type: string, default: '', description: Runs the browser tests too; empty skips the browser job. }
       browser-setup: { type: string, default: npx --no-install playwright install --with-deps chromium }
       browser-coverage-report: { type: string, default: coverage/, description: "The coverage the browser test command writes, if any, which the sonar job reads with the test job's report." }
-      sync-check: { type: boolean, default: true, description: "Fail if pubkit's managed files drifted, using the pubkit tests/requirements.lock pins." }
+      sync-check: { type: boolean, default: true, description: "Fail if pubrules's managed files drifted, using the pubrules tests/requirements.lock pins." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/lcov.info, description: "The LCOV report the test command writes, if any, which the sonar job reads: node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info writes one." }
-      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBKIT_FUZZ_RUNS)." }
+      fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBRULES_FUZZ_RUNS)." }
       fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }
     secrets:
       SONAR_TOKEN: { required: false, description: "A SonarQube Cloud token: with it, the sonar job analyses the code. Pass it by name: secrets: inherit does not reach a workflow of another owner." }
@@ -59,22 +59,22 @@ jobs:
           python -m venv .venv
           # Tried three times, then from the wheel mirror: a release download can time out.
           tests/install-lock .venv/bin/pip
-          .venv/bin/pubkit sync --check
+          .venv/bin/pubrules sync --check
       - if: inputs.apt-packages != ''
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with: { run: '${{ inputs.setup }}' }
-      # Each property test (Hypothesis, fast-check) tries PUBKIT_FUZZ_RUNS
-      # inputs. A scheduled run tries more, unless pubkit.json sets
+      # Each property test (Hypothesis, fast-check) tries PUBRULES_FUZZ_RUNS
+      # inputs. A scheduled run tries more, unless pubrules.json sets
       # "security": { "fuzz": { "node": false } }.
       - run: |
           runs=$SHORT
-          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .node else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .node else . end) != false' pubrules.json 2>/dev/null || echo true)" = true ]; then
             runs=$LONG
           fi
-          echo "PUBKIT_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
+          echo "PUBRULES_FUZZ_RUNS=$runs" >> "$GITHUB_ENV"
         env:
           EVENT: '${{ github.event_name }}'
           SHORT: '${{ inputs.fuzz-runs }}'
@@ -101,7 +101,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y $APT
         env: { APT: '${{ inputs.apt-packages }}' }
       - name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.browser-setup }}
       - run: ${{ inputs.browser-test }}
@@ -161,8 +161,8 @@ jobs:
       # The owner's own reusable workflows and actions carry no license
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
-      # `pubkit sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubkit's and
+      # `pubrules sync` lists those the repository calls in
+      # .github/dependency-review-licenses.txt; without it, pubrules's and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.
@@ -180,35 +180,35 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           DEFAULT: >-
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-osv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-review.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-cross.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-fuzz.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-gates.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-msrv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-toolchains.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-checks.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-terraform.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-tests.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-sonar.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-tested.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/node-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/actions/cache,
-              pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
-              pkg:githubactions/Sustenaut/pubkit/actions/retry,
-              pkg:githubactions/Sustenaut/pubkit/actions/terraform-init,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-osv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-review.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-cross.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-fuzz.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-gates.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-msrv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-toolchains.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-checks.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-terraform.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-tests.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-sonar.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-tested.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/node-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/python-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/rust-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/actions/cache,
+              pkg:githubactions/Sustenaut/pubrules/actions/pr-label,
+              pkg:githubactions/Sustenaut/pubrules/actions/retry,
+              pkg:githubactions/Sustenaut/pubrules/actions/terraform-init,
               pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -254,14 +254,14 @@ jobs:
       - if: env.SONAR_TOKEN != ''
         id: report
         run: echo "paths=$(find coverage-download -type f 2>/dev/null | paste -sd, -)" >> "$GITHUB_OUTPUT"
-      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      # Properties pubrules.json adds (security.sonar.args), after the input's.
       - if: env.SONAR_TOKEN != ''
         id: settings
         # The organization: security.sonar.organization, or the owner in
         # lower case, since SonarQube Cloud's organization keys are.
         run: |
-          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
-          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null || true)
+          echo "args=$(jq -r '.security.sonar.args // ""' pubrules.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubrules.json 2>/dev/null || true)
           echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
         env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''

@@ -1,11 +1,11 @@
 {
   "name": "rust-crate-quality",
-  "description": "An agent that audits a Rust crate (library or command-line tool) against pubkit's Rust crate standard, and writes or fixes its documentation to meet it.",
+  "description": "An agent that audits a Rust crate (library or command-line tool) against pubrules's Rust crate standard, and writes or fixes its documentation to meet it.",
   "author": {
     "name": "David Schryer"
   },
   "license": "MIT",
-  "repository": "https://github.com/Sustenaut/pubkit",
+  "repository": "https://github.com/Sustenaut/pubrules",
   "keywords": [
     "rust",
     "crates.io",

@@ -1,11 +1,11 @@
-"""Steps for `pubkit audit`, against reports written into a scratch
+"""Steps for `pubrules audit`, against reports written into a scratch
 repository."""
 
 from __future__ import annotations
 
 from pytest_bdd import given, parsers, scenarios, then
 
-from pubkit import audit
+from pubrules import audit
 
 scenarios("audit.feature")
 
@@ -45,7 +45,7 @@ def cutting(env, package, version):
     env["PUBREL_VERSION"] = version
 
 
-@then("it prints the sha256 of the standard pubkit ships")
+@then("it prints the sha256 of the standard pubrules ships")
 def prints_digest(result):
     out = result.stdout.decode() if isinstance(result.stdout, bytes) else result.stdout
     assert out.strip() == audit.current()

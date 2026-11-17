@@ -1,21 +1,21 @@
 # Reusable CI for a Rust package whose behaviour a Gherkin suite tests:
 #
 #   ci:
-#     uses: Sustenaut/pubkit/.github/workflows/rust-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubrules/.github/workflows/rust-ci.yml@vX.Y.Z
 #     with:
 #       tools: '[{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]'
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
 # Every check the Rust crate standard tags `[checked: ..., make TARGET]` runs
-# here, for every repository: the plan job asks `pubkit required` (from the
-# pubkit the repository's lock pins) which targets each job must run, and
+# here, for every repository: the plan job asks `pubrules required` (from the
+# pubrules the repository's lock pins) which targets each job must run, and
 # the jobs run them. The `gates` and `functional` inputs add a repository's
 # own targets (guards, conformance) after the required ones; they cannot
 # drop one. The cross-platform job runs cargo directly: macOS ships make
 # 3.81, and Windows has no /bin/bash.
 #
 # Jobs the standard requires, beyond gates, test and functional, each run
-# unless the repository declares an exception for its rule in pubkit.json.
+# unless the repository declares an exception for its rule in pubrules.json.
 # fuzz and cross are also skipped on a pull request that touches no Rust
 # code, Cargo files, fuzz/ or workflow files; a release pull request, a push
 # and the nightly run them always:
@@ -23,7 +23,7 @@
 # - msrv builds on the oldest Rust the packages promise, the lowest
 #   `rust-version` their manifests state, by `make msrv MSRV=<version>`.
 # - fuzz runs `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust: briefly on
-#   every change, longer on a schedule unless pubkit.json sets
+#   every change, longer on a schedule unless pubrules.json sets
 #   `"security": { "fuzz": { "rust": false } }`.
 # - cross runs the tests under emulation on cross-targets: i686 (32-bit) and
 #   s390x (big-endian) by default, which find word-size and byte-order bugs.
@@ -44,10 +44,10 @@ name: rust-ci
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages for the functional job. }
-      tools: { type: string, default: '', description: 'JSON list of the tools the functional suite drives, each {"crate", "git", "tag"}, which pubkit sync gives from ci.tools; empty installs none.' }
+      tools: { type: string, default: '', description: 'JSON list of the tools the functional suite drives, each {"crate", "git", "tag"}, which pubrules sync gives from ci.tools; empty installs none.' }
       os-matrix: { type: string, default: '["ubuntu-latest", "macos-latest", "windows-latest"]' }
       gates: { type: string, default: '', description: "Extra make targets the gates job runs after the required ones." }
       test-args: { type: string, default: '', description: Arguments to cargo test on every platform. }
@@ -55,7 +55,7 @@ on:
       msrv: { type: boolean, default: true, description: "Ignored: the msrv job runs whenever the standard requires it (RS-VER-02). Kept so callers that pass it keep working." }
       fuzz: { type: boolean, default: true, description: "Ignored: the fuzz job runs whenever the standard requires it (RS-FUZZ-01, RS-FUZZ-02). Kept so callers that pass it keep working." }
       fuzz-seconds: { type: number, default: 5, description: "Seconds per fuzz target in the merge queue or on a push: a smoke run, after the replay of fuzz/regressions/; the nightly searches for longer." }
-      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
+      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubrules.json sets "security": { "fuzz": { "rust": false } }.' }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
@@ -72,7 +72,7 @@ env:
 
 jobs:
   # What the standard requires here: the managed files in step, then the
-  # make targets each job must run, from `pubkit required`.
+  # make targets each job must run, from `pubrules required`.
   plan:
     runs-on: ${{ inputs.runs-on }}
     outputs:
@@ -99,7 +99,7 @@ jobs:
         run: |
           changed=()
           if [ -f "$RUNNER_TEMP/changed-files" ]; then changed=(--changed-files "$RUNNER_TEMP/changed-files"); fi
-          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" "${changed[@]}"
+          .venv/bin/pubrules required --github-output --event "$EVENT" --head-ref "$HEAD_REF" "${changed[@]}"
         env: { EVENT: '${{ github.event_name }}', HEAD_REF: '${{ github.head_ref }}' }
 
   gates:
@@ -237,12 +237,12 @@ jobs:
           command -v cargo-fuzz >/dev/null && cargo-fuzz --version | grep -q " ${VERSION}$" \
             || cargo install --locked cargo-fuzz --version "$VERSION"
         env: { VERSION: '${{ inputs.cargo-fuzz-version }}' }
-      # A scheduled run fuzzes for longer, unless pubkit.json sets
+      # A scheduled run fuzzes for longer, unless pubrules.json sets
       # "security": { "fuzz": { "rust": false } }; then it fuzzes as briefly
       # as any other.
       - run: |
           seconds=$SHORT
-          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubrules.json 2>/dev/null || echo true)" = true ]; then
             seconds=$LONG
           fi
           make fuzz-smoke FUZZ_SECONDS="$seconds"
@@ -368,8 +368,8 @@ jobs:
       # The owner's own reusable workflows and actions carry no license
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
-      # `pubkit sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubkit's and
+      # `pubrules sync` lists those the repository calls in
+      # .github/dependency-review-licenses.txt; without it, pubrules's and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.
@@ -387,35 +387,35 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           DEFAULT: >-
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-node-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-osv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-browser.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-python-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-review.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-audit.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-cross.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-functional.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-fuzz.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-gates.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-msrv.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-test.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-rust-toolchains.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-checks.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-terraform.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-service-tests.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-sonar.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/job-tested.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/node-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/python-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/rust-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/.github/workflows/service-ci.yml,
-              pkg:githubactions/Sustenaut/pubkit/actions/cache,
-              pkg:githubactions/Sustenaut/pubkit/actions/pr-label,
-              pkg:githubactions/Sustenaut/pubkit/actions/retry,
-              pkg:githubactions/Sustenaut/pubkit/actions/terraform-init,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-osv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-browser.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-python-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-review.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-audit.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-cross.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-functional.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-fuzz.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-gates.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-msrv.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-test.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-rust-toolchains.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-checks.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-terraform.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-service-tests.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-sonar.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-tested.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/node-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/python-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/rust-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/actions/cache,
+              pkg:githubactions/Sustenaut/pubrules/actions/pr-label,
+              pkg:githubactions/Sustenaut/pubrules/actions/retry,
+              pkg:githubactions/Sustenaut/pubrules/actions/terraform-init,
               pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -453,14 +453,14 @@ jobs:
         with:
           name: coverage
           path: coverage-download
-      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      # Properties pubrules.json adds (security.sonar.args), after the input's.
       - if: env.SONAR_TOKEN != ''
         id: settings
         # The organization: security.sonar.organization, or the owner in
         # lower case, since SonarQube Cloud's organization keys are.
         run: |
-          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
-          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null || true)
+          echo "args=$(jq -r '.security.sonar.args // ""' pubrules.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubrules.json 2>/dev/null || true)
           echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
         env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''

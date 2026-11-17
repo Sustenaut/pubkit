@@ -11,8 +11,8 @@ coverage/
 .terraform/
 .terraform.lock.hcl
 
-# Written by the release CI into the wheel it builds (src/pubkit/refs.py).
-/src/pubkit/release-commit
+# Written by the release CI into the wheel it builds (src/pubrules/refs.py).
+/src/pubrules/release-commit
 
 # Local secrets, such as the Bitwarden token ./with-secrets reads: never committed.
 .env

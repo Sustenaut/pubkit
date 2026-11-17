@@ -1,5 +1,5 @@
-"""Steps for hosting.py: the hosting block of pubkit.json that the hosting
-modules read. fixtures/hosting/pubkit.json is a copy of the block the
+"""Steps for hosting.py: the hosting block of pubrules.json that the hosting
+modules read. fixtures/hosting/pubrules.json is a copy of the block the
 modules are tested with, in the package that ships them."""
 
 from __future__ import annotations
@@ -10,14 +10,14 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then
 
-from pubkit import hosting
+from pubrules import hosting
 
 scenarios("hosting.feature")
 
-TESTDATA = Path(__file__).resolve().parents[1] / "fixtures" / "hosting" / "pubkit.json"
+TESTDATA = Path(__file__).resolve().parents[1] / "fixtures" / "hosting" / "pubrules.json"
 
 
-@given("the pubkit.json the Terraform modules are tested with", target_fixture="config")
+@given("the pubrules.json the Terraform modules are tested with", target_fixture="config")
 def module_testdata():
     return json.loads(TESTDATA.read_text())
 
@@ -35,7 +35,7 @@ def with_zone(zone):
     return config
 
 
-@then("pubkit accepts its hosting block")
+@then("pubrules accepts its hosting block")
 def accepts(config):
     assert hosting.settings(config) == config.get("hosting", {})
 

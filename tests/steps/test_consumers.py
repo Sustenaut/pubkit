@@ -1,4 +1,4 @@
-"""Steps for the guard that keeps consumers' names out of what pubkit ships."""
+"""Steps for the guard that keeps consumers' names out of what pubrules ships."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 scenarios("consumers.feature")
 
 ROOT = Path(__file__).resolve().parents[2]
-SHIPPED = ("src/pubkit", "actions", "terraform", ".github")
+SHIPPED = ("src/pubrules", "actions", "terraform", ".github")
 
 NAME = r"[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9_.-]*?"
 END = r"(?:\.git)?(?=[/@\"'\s,})]|$)"
@@ -24,20 +24,20 @@ NAMED = [re.compile(rf"github\.com[:/]({NAME}){END}"),
          re.compile(rf"\bREPOS?=({NAME}){END}"),
          re.compile(rf"(?i)\b((?:schryer|sustenaut)/[A-Za-z0-9][A-Za-z0-9_.-]*?){END}")]
 
-# pubkit itself, its release tool, and what the examples use.
-ALWAYS = {"pubkit", "pubrel"}
+# pubrules itself, its release tool, and what the examples use.
+ALWAYS = {"pubrules", "pubrel"}
 NEUTRAL = "example-org"
-# The owners of the actions, the tools (actionlint) and the registry pubkit's own files depend on.
+# The owners of the actions, the tools (actionlint) and the registry pubrules's own files depend on.
 DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google-github-actions", "hashicorp", "pypa",
                 "rhysd", "rust-lang", "SonarSource", "tailscale"}
 
-# pub is a pubkit tool, like pubrel, so `pubkit new` names where it comes from.
-# pubkit's own CI, which it does not ship to anyone, runs the integrations scan.
-TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
-         ("src/pubkit/new.py", "Sustenaut/pubsec"),
-         ("src/pubkit/new.py", "Sustenaut/pubdeploy"),
+# pub is a pubrules tool, like pubrel, so `pubrules new` names where it comes from.
+# pubrules's own CI, which it does not ship to anyone, runs the integrations scan.
+TOOLS = {("src/pubrules/new.py", "Sustenaut/publet"),
+         ("src/pubrules/new.py", "Sustenaut/pubsec"),
+         ("src/pubrules/new.py", "Sustenaut/pubdeploy"),
          (".github/workflows/integrations.yml", "Sustenaut/integrations"),
-         ("src/pubkit/templates/common/tests/requirements-pubkit.txt", "Sustenaut/pubtest")}
+         ("src/pubrules/templates/common/tests/requirements-pubrules.txt", "Sustenaut/pubtest")}
 ALLOWED = TOOLS
 
 
@@ -57,7 +57,7 @@ def shipped_files():
     return [ROOT / name for name in listed.splitlines()]
 
 
-@when("I scan what pubkit ships for owner/repo names", target_fixture="found")
+@when("I scan what pubrules ships for owner/repo names", target_fixture="found")
 def scan_shipped():
     found = set()
     for path in shipped_files():

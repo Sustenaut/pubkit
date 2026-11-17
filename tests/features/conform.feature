@@ -1,28 +1,28 @@
 Feature: A Rust repository conforms to the standard, or says why not
-  `pubkit conform` checks what no make target can: the files and settings
-  the Rust crate standard requires, and that the workflow pins the pubkit
-  the lock pins. `pubkit sync --check` runs it, so CI does on every change.
+  `pubrules conform` checks what no make target can: the files and settings
+  the Rust crate standard requires, and that the workflow pins the pubrules
+  the lock pins. `pubrules sync --check` runs it, so CI does on every change.
   A rule the repository cannot meet yet is declared as an exception in
-  pubkit.json, with a reason and a date. It is skipped until that date, and
+  pubrules.json, with a reason and a date. It is skipped until that date, and
   fails after it.
 
   Scenario: A conforming crate passes
     Given a Rust crate that meets the standard
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it succeeds
     And it prints "conforms to the Rust crate standard"
 
   Scenario: sync --check runs the conformance checks
     Given a Rust crate that meets the standard
     And the file "SECURITY.md" is removed
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "RS-SUP-04: no SECURITY.md"
 
   Scenario Outline: A missing file or setting fails its rule
     Given a Rust crate that meets the standard
     And <change>
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
     And stderr mentions "<message>"
 
@@ -40,7 +40,7 @@ Feature: A Rust repository conforms to the standard, or says why not
   Scenario: A release key labelled with a person's name fails
     Given a Rust crate that meets the standard
     And the release key is labelled "Jane Doe"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
     And stderr mentions "RS-SUP-05: the release key is labelled 'Jane Doe'"
     And stderr mentions "such as 'demo release key'"
@@ -48,79 +48,79 @@ Feature: A Rust repository conforms to the standard, or says why not
   Scenario: The release key's object must be exported to be checked
     Given a Rust crate that meets the standard
     And the release key's object is not in corpus/objects
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
     And stderr mentions "RS-SUP-05: the key object pub:sha2-256:demokey is not in corpus/objects/"
 
   Scenario: A release must be gated on a current quality audit
     Given a Rust crate that meets the standard
     And release.json declares no audit check
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "RS-REL-01: release.json declares no `pubkit audit --check` security check"
+    And stderr mentions "RS-REL-01: release.json declares no `pubrules audit --check` security check"
 
-  Scenario: A workflow pinning another pubkit fails
+  Scenario: A workflow pinning another pubrules fails
     Given a Rust crate that meets the standard
     And the workflow calls rust-ci.yml at "v0.0.1"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "rust-ci.yml@v0.0.1 is not pubkit"
+    And stderr mentions "rust-ci.yml@v0.0.1 is not pubrules"
 
-  Scenario: A workflow pinning this pubkit's tag's commit conforms
+  Scenario: A workflow pinning this pubrules's tag's commit conforms
     Given a Rust crate that meets the standard
-    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow calls rust-ci.yml at commit "0f3574a72707a46bae149d3ed7a4644b4837795a" of "this pubkit"
-    When I run pubkit "conform"
+    And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow calls rust-ci.yml at commit "0f3574a72707a46bae149d3ed7a4644b4837795a" of "this pubrules"
+    When I run pubrules "conform"
     Then it succeeds
 
-  Scenario: A workflow pinning another pubkit's commit fails
+  Scenario: A workflow pinning another pubrules's commit fails
     Given a Rust crate that meets the standard
     And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "0.0.1"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "rust-ci.yml@v0.0.1 is not pubkit"
+    And stderr mentions "rust-ci.yml@v0.0.1 is not pubrules"
 
-  Scenario: A workflow pinning a commit other than this pubkit's tag's fails
+  Scenario: A workflow pinning a commit other than this pubrules's tag's fails
     Given a Rust crate that meets the standard
-    And pubkit is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "this pubkit"
-    When I run pubkit "conform"
+    And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "this pubrules"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "rust-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit of pubkit"
+    And stderr mentions "rust-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 is not the commit of pubrules"
 
-  Scenario: A workflow calling pubkit under another owner still conforms
+  Scenario: A workflow calling pubrules under another owner still conforms
     Given a Rust crate that meets the standard
-    And the workflow calls "sustenaut"'s rust-ci.yml at "this pubkit"
-    When I run pubkit "conform"
+    And the workflow calls "sustenaut"'s rust-ci.yml at "this pubrules"
+    When I run pubrules "conform"
     Then it succeeds
 
   Scenario: Without a workflow calling rust-ci.yml, conform names workflows_owner's
     Given a Rust crate that meets the standard
-    And pubkit.json names the workflows owner "sustenaut"
+    And pubrules.json names the workflows owner "sustenaut"
     And the file ".github/workflows/ci.yml" reads "jobs: {}"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "no workflow calls sustenaut/pubkit/.github/workflows/rust-ci.yml"
+    And stderr mentions "no workflow calls sustenaut/pubrules/.github/workflows/rust-ci.yml"
 
-  Scenario: A pubkit action pinned to another pubkit fails
+  Scenario: A pubrules action pinned to another pubrules fails
     Given a Rust crate that meets the standard
-    And the workflow "deploy.yml" uses "Sustenaut"'s pubkit action "cache" at "another pubkit"
-    When I run pubkit "conform"
+    And the workflow "deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "another pubrules"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "cache@v0.0.1 is not pubkit"
+    And stderr mentions "cache@v0.0.1 is not pubrules"
 
-  Scenario: A hand-written call of another pubkit's workflow fails
+  Scenario: A hand-written call of another pubrules's workflow fails
     Given a Rust crate that meets the standard
-    And the workflow "extra.yml" calls "Sustenaut"'s pubkit workflow "job-osv.yml" at "another pubkit"
-    When I run pubkit "conform"
+    And the workflow "extra.yml" calls "Sustenaut"'s pubrules workflow "job-osv.yml" at "another pubrules"
+    When I run pubrules "conform"
     Then it fails
-    And stderr mentions "extra.yml: job-osv.yml@v0.0.1 is not pubkit"
+    And stderr mentions "extra.yml: job-osv.yml@v0.0.1 is not pubrules"
 
   Scenario: An exception skips its rule, and is listed
     Given a Rust crate that meets the standard
     And the directory "testdata" is removed
     And an exception for "RS-TEST-01" until "2099-01-01" because "no independent source yet"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it succeeds
     And it prints "open exception: RS-TEST-01 until 2099-01-01: no independent source yet"
 
@@ -128,20 +128,20 @@ Feature: A Rust repository conforms to the standard, or says why not
     Given a Rust crate that meets the standard
     And the directory "testdata" is removed
     And an exception for "RS-TEST-01" until "2026-01-01" because "no independent source yet"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
     And stderr mentions "RS-TEST-01: the exception expired on 2026-01-01"
 
   Scenario: An exception must name a rule of the standard
     Given a Rust crate that meets the standard
     And an exception for "RS-NOPE-01" until "2099-01-01" because "typo"
-    When I run pubkit "conform"
+    When I run pubrules "conform"
     Then it fails
     And stderr mentions "RS-NOPE-01 is not a rule of the standard"
 
   Scenario: An excepted rule's targets leave the plan
     Given a Rust crate that meets the standard
     And an exception for "RS-TEST-01" until "2099-01-01" because "no independent source yet"
-    When I run pubkit "required"
+    When I run pubrules "required"
     Then it succeeds
     And it prints "functional=functional supply-chain-check"

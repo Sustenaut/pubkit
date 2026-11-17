@@ -1,4 +1,4 @@
-"""Steps for the service kind: `with-secrets` and `pubkit secrets run`, run as a
+"""Steps for the service kind: `with-secrets` and `pubrules secrets run`, run as a
 person would, against a stand-in for the bws CLI that serves fake secrets from a
 JSON file."""
 
@@ -32,8 +32,8 @@ pwd > "$SHOW_ENV.cwd"
 
 
 
-def _pubkit():
-    found = shutil.which("pubkit", path=str(Path(sys.executable).parent))
+def _pubrules():
+    found = shutil.which("pubrules", path=str(Path(sys.executable).parent))
     assert found
     return found
 
@@ -45,10 +45,10 @@ def fake(tmp_path):
     bws = root / "bin" / "bws"
     bws.write_text(BWS)
     bws.chmod(0o755)
-    # ./with-secrets runs ./pubkit, which runs the release wheel through uvx:
-    # this stand-in runs the pubkit under test with the same arguments.
+    # ./with-secrets runs ./pubrules, which runs the release wheel through uvx:
+    # this stand-in runs the pubrules under test with the same arguments.
     uvx = root / "bin" / "uvx"
-    uvx.write_text(f'#!/bin/sh\n[ "$1 $3" = "--from pubkit" ] || exit 9\nshift 3\nexec "{_pubkit()}" "$@"\n')
+    uvx.write_text(f'#!/bin/sh\n[ "$1 $3" = "--from pubrules" ] || exit 9\nshift 3\nexec "{_pubrules()}" "$@"\n')
     uvx.chmod(0o755)
     show = root / "show"
     show.write_text(SHOW)
@@ -61,7 +61,7 @@ def fake(tmp_path):
 
 @given(parsers.parse('a repository initialised as service for the project "{project}"'))
 def service_repo(repo, run, project):
-    assert run(_pubkit(), "init", "--kind=service", f"--project={project}", cwd=repo).code == 0
+    assert run(_pubrules(), "init", "--kind=service", f"--project={project}", cwd=repo).code == 0
 
 
 @given(parsers.parse('a service whose Terraform declares "{variable}"'))
@@ -115,8 +115,8 @@ def _wrapper(repo, run, fake, env, runner, *command):
     if runner == "./with-secrets":
         return run(repo / "with-secrets", *command, cwd=repo, env=env)
     program, *args = runner.split(" ")
-    assert program == "pubkit", runner
-    return run(_pubkit(), *args, "--", *command, cwd=repo, env=env)
+    assert program == "pubrules", runner
+    return run(_pubrules(), *args, "--", *command, cwd=repo, env=env)
 
 
 @when(parsers.parse('I run "{runner}" with the token "{token}"'), target_fixture="result")
@@ -223,19 +223,19 @@ def cached():
 
 @given(parsers.parse('deploy.providers lists a pubsec wheel in the cache, at "{version}"'))
 def cached_wheel(repo, tmp_path, cached, version):
-    """./pubsec as sync writes it for a pubkit.json whose deploy.providers lists
+    """./pubsec as sync writes it for a pubrules.json whose deploy.providers lists
     pubsec at `version`, and that wheel already fetched into the cache, so
     nothing is downloaded."""
     import hashlib  # noqa: PLC0415
 
-    from pubkit.cli import render, templates, values  # noqa: PLC0415
+    from pubrules.cli import render, templates, values  # noqa: PLC0415
     data = b"a stand-in for pubsec's wheel"
     sha = hashlib.sha256(data).hexdigest()
     wheel = f"https://github.com/example-org/pubsec/releases/download/v{version}/pubsec-{version}-py3-none-any.whl"
     config = {"kind": "service", "deploy": {"providers": [{"distribution": "pubsec", "wheel": wheel, "sha256": sha}]}}
     (repo / "pubsec").write_text(render(templates("service")["pubsec"], values(config)))
     (repo / "pubsec").chmod(0o755)
-    file = tmp_path / "cache" / "pubkit" / "providers" / sha / wheel.rsplit("/", 1)[1]
+    file = tmp_path / "cache" / "pubrules" / "providers" / sha / wheel.rsplit("/", 1)[1]
     file.parent.mkdir(parents=True)
     file.write_bytes(data)
     cached["file"] = file
@@ -265,24 +265,24 @@ def uvx_not_run(tmp_path):
     assert not (tmp_path / "uvx.json").exists()
 
 
-@then(parsers.parse('"{path}" runs the oldest pubsec this pubkit works with'))
+@then(parsers.parse('"{path}" runs the oldest pubsec this pubrules works with'))
 def runs_pinned(repo, path):
-    from pubkit.new import PUBSEC_FLOOR, PUBSEC_WHEEL  # noqa: PLC0415
+    from pubrules.new import PUBSEC_FLOOR, PUBSEC_WHEEL  # noqa: PLC0415
     text = (repo / path).read_text()
     assert f"fetch {PUBSEC_WHEEL.format(PUBSEC_FLOOR[0])} {PUBSEC_FLOOR[1]} providers deploy.providers\n" in text, text
     assert 'exec uvx --from "$fetched" pubsec "$@"' in text, text
 
 
-@given("pubkit.json has a deploy block")
+@given("pubrules.json has a deploy block")
 def deploy_block(repo):
-    config = json.loads((repo / "pubkit.json").read_text())
+    config = json.loads((repo / "pubrules.json").read_text())
     config["deploy"] = {"namespace": "example"}
-    (repo / "pubkit.json").write_text(json.dumps(config, indent=2) + "\n")
+    (repo / "pubrules.json").write_text(json.dumps(config, indent=2) + "\n")
 
 
 @then(parsers.parse('"{path}" lists the pubsec and pubdeploy of deploy.providers by their wheels'))
 def lists_provider(repo, path):
-    listed = {p["distribution"]: p for p in json.loads((repo / "pubkit.json").read_text())["deploy"]["providers"]}
+    listed = {p["distribution"]: p for p in json.loads((repo / "pubrules.json").read_text())["deploy"]["providers"]}
     assert set(listed) == {"pubsec", "pubdeploy"}
     lines = (repo / path).read_text().splitlines()
     assert f"pubsec @ {listed['pubsec']['wheel']}" in lines and f"pubdeploy @ {listed['pubdeploy']['wheel']}" in lines

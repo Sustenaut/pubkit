@@ -1,5 +1,5 @@
-Feature: pubkit cache keeps what a build fetched or made, by the repository's entries
-  pubkit.json's cache block is one map of named entries with the same keys:
+Feature: pubrules cache keeps what a build fetched or made, by the repository's entries
+  pubrules.json's cache block is one map of named entries with the same keys:
   path, refresh, version, inputs, tools and unit. A fetched entry is kept
   for a period. A made entry is kept under a fingerprint of what made it
   (the unit's files, the inputs, the tools' output and the version), and a
@@ -54,60 +54,60 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's en
   Scenario: prune keeps only what runs since the last prune used
     When I make the pack of "north"
     And I make the pack of "south"
-    And I run pubkit "cache" "prune"
+    And I run pubrules "cache" "prune"
     And I make the pack of "north"
-    And I run pubkit "cache" "prune"
+    And I run pubrules "cache" "prune"
     Then it prints "packs: kept 1, removed 1"
 
   Scenario: A command that fails, or does not write its output, keeps nothing
-    When I run pubkit "cache" "run" "packs" "--unit" "north" "--output" "out/north.pack" "--" "false"
+    When I run pubrules "cache" "run" "packs" "--unit" "north" "--output" "out/north.pack" "--" "false"
     Then the exit code is 2
     And stderr mentions "the command for packs failed (exit 1); nothing kept"
-    When I run pubkit "cache" "run" "packs" "--unit" "north" "--output" "out/north.pack" "--" "true"
+    When I run pubrules "cache" "run" "packs" "--unit" "north" "--output" "out/north.pack" "--" "true"
     Then the exit code is 2
     And stderr mentions "did not write"
 
   Scenario: A made-per-unit entry needs --unit
-    When I run pubkit "cache" "run" "packs" "--output" "out/x.pack" "--" "true"
+    When I run pubrules "cache" "run" "packs" "--output" "out/x.pack" "--" "true"
     Then the exit code is 2
     And stderr mentions "cache entry packs is made per unit: give --unit"
 
   Scenario: Each entry gets its own key: a fetched one by its period, a made one by the run
     Given the cache entry "data" keeps "data" with refresh "week"
     And today is "2026-10-29"
-    When I run pubkit "cache" "plan"
-    Then it prints "data: path=data key=pubkit-cache-data-"
-    And it prints "packs: path=.packcache key=pubkit-cache-packs-"
+    When I run pubrules "cache" "plan"
+    Then it prints "data: path=data key=pubrules-cache-data-"
+    And it prints "packs: path=.packcache key=pubrules-cache-packs-"
     And I note the key of "data"
     Given today is "2026-11-01"
-    When I run pubkit "cache" "plan"
+    When I run pubrules "cache" "plan"
     Then the key of "data" is as noted
     Given today is "2026-11-02"
-    When I run pubkit "cache" "plan"
+    When I run pubrules "cache" "plan"
     Then the key of "data" is not as noted
 
   Scenario: A refresh run restores no entry, fetched or made
     Given the cache entry "data" keeps "data" with refresh "week"
-    When I run pubkit "cache" "plan" "--refresh"
-    Then it prints "data: path=data key=pubkit-cache-data-"
+    When I run pubrules "cache" "plan" "--refresh"
+    Then it prints "data: path=data key=pubrules-cache-data-"
     And it prints "(refresh: not restored)"
-    And it prints "packs: path=.packcache key=pubkit-cache-packs-"
+    And it prints "packs: path=.packcache key=pubrules-cache-packs-"
 
-  Scenario: An entry with an unknown setting fails pubkit sync, naming it
+  Scenario: An entry with an unknown setting fails pubrules sync, naming it
     Given the cache entry "packs" has the setting "dir"
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "cache entry packs has no setting dir"
 
   Scenario: An entry with neither refresh nor inputs is refused
     Given the cache entry "loose" keeps "loose" with no refresh or inputs
-    When I run pubkit "cache" "plan"
+    When I run pubrules "cache" "plan"
     Then the exit code is 2
     And stderr mentions "cache entry loose needs refresh or inputs (or both)"
 
   Scenario Outline: A cache block that does not fit is refused, naming what is wrong
     Given the cache block is <block>
-    When I run pubkit "cache" "plan"
+    When I run pubrules "cache" "plan"
     Then the exit code is 2
     And stderr mentions "<reason>"
 
@@ -125,7 +125,7 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's en
   Scenario Outline: A run that does not fit the entries is refused
     Given the cache entry "data" keeps "data" with refresh "week"
     And the cache entry "notes" is made from the input "notes.txt"
-    When I run pubkit <args>
+    When I run pubrules <args>
     Then the exit code is 2
     And stderr mentions "<reason>"
 
@@ -155,14 +155,14 @@ Feature: pubkit cache keeps what a build fetched or made, by the repository's en
     Given the cache entry "daily" keeps "daily" with refresh "day"
     And the cache entry "monthly" keeps "monthly" with refresh "month"
     And today is "2026-10-29"
-    When I run pubkit "cache" "plan"
+    When I run pubrules "cache" "plan"
     Then it prints "-2026-10-29-"
     And it prints "-2026-10-"
 
   Scenario: plan writes a restore and a save slot for each entry to GitHub's step output
     Given the cache entry "data" keeps "data" with refresh "week"
     And GitHub's step output goes to "gh-output"
-    When I run pubkit "cache" "plan" "--github-output" "--fresh"
+    When I run pubrules "cache" "plan" "--github-output" "--fresh"
     Then it succeeds
     And "gh-output" has the line "path-1=data"
     And "gh-output" has the line "restore-1=false"

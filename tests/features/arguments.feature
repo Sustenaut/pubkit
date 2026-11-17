@@ -1,6 +1,6 @@
 Feature: A command-line argument cannot reach outside the repository
-  A file pubkit writes or reads because an argument named it lies in the
-  working directory or a temporary directory, and an argument pubkit passes
+  A file pubrules writes or reads because an argument named it lies in the
+  working directory or a temporary directory, and an argument pubrules passes
   on to another program can never be taken for one of that program's
   options.
 
@@ -8,17 +8,17 @@ Feature: A command-line argument cannot reach outside the repository
     Given an empty repository
 
   Scenario Outline: A file outside the repository and the temporary directories is refused
-    When I run pubkit <args>
+    When I run pubrules <args>
     Then it fails
     And stderr mentions "must be in the working directory or a temporary directory"
 
     Examples:
       | args                                                                        |
-      | "nightly" "--pubrel" "0.5.3" "--body" "/etc/pubkit-body.md" |
-      | "crates" "--report" "../../../../../../../etc/pubkit-crates.json"           |
+      | "nightly" "--pubrel" "0.5.3" "--body" "/etc/pubrules-body.md" |
+      | "crates" "--report" "../../../../../../../etc/pubrules-crates.json"           |
 
   Scenario: A row's text that pubrel would take for an option is refused
-    When I run pubkit "record" "--" "--package=other"
+    When I run pubrules "record" "--" "--package=other"
     Then it fails
     And stderr mentions "which pubrel would take for an option"
 
@@ -28,22 +28,22 @@ Feature: A command-line argument cannot reach outside the repository
 
   Scenario: A file in the Actions runner's temporary directory is allowed
     Given RUNNER_TEMP names the directory "runner-temp"
-    When pubkit confines the file "runner-temp/changed-files"
+    When pubrules confines the file "runner-temp/changed-files"
     Then it is allowed
 
   Scenario: A row in a category pubrel does not know is refused
-    When pubkit records "Tidied" as a row in the category "tidied"
+    When pubrules records "Tidied" as a row in the category "tidied"
     Then it stops with "pubrel has no category 'tidied'"
 
   Scenario: A tool's version is the first x.y.z it prints
-    When pubkit reads the version of "python3"
+    When pubrules reads the version of "python3"
     Then it is three numbers
 
   Scenario: A tool that prints no version has none
-    When pubkit reads the version of "true"
+    When pubrules reads the version of "true"
     Then it has no version
 
   Scenario: A row's text goes to pubrel add as it was given
     Given a pubrel that asks for a row for the package "demo"
-    When pubkit records "Tidied the nightly" as a row in the category "internal" with it
+    When pubrules records "Tidied the nightly" as a row in the category "internal" with it
     Then pubrel add was run with "--package demo internal Tidied the nightly"

@@ -1,0 +1,134 @@
+"""The `security` block of pubrules.json, beyond fuzzing (see nightly.py).
+
+`security.dependabot` is the Dependabot configuration `pubrules sync` writes
+to `.github/dependabot.yml`:
+
+    "dependabot": {"schedule": "weekly", "ecosystems": ["github-actions"],
+                   "options": {"open-pull-requests-limit": 5}}
+
+`schedule` is Dependabot's interval, `ecosystems` the package ecosystems it
+updates, each at the repository's root unless given as Dependabot's own
+`{"package-ecosystem": ..., "directory": ...}`, and `options` any other
+Dependabot setting, added to every ecosystem's entry. The default is weekly
+updates of the GitHub Actions alone: the nightly pull request updates the
+languages, gated on CI, so Dependabot doing the same would open duplicate
+pull requests. `"dependabot": false` leaves `.github/dependabot.yml` to the
+repository.
+
+Every github-actions entry ignores the owner's pubrules and pubrel workflows
+and actions. Their pins move only with pubrules (`pubrules bump`), so
+`pubrules sync --check` fails any pull request that moves one alone. Ignores
+given in `options` are kept, after these.
+
+Every github-actions entry also sets `open-pull-requests-limit` to 0, which
+turns Dependabot's version updates off and leaves its security updates on:
+the nightly moves the other actions (`pubrules actions`), on a branch that
+can carry a pubrel row and gets a SonarQube Cloud token, which a Dependabot
+pull request cannot. A repository whose pubrules.json sets `update.actions`
+(or `update`) to false takes no nightly action updates, so Dependabot's
+version updates stay on there, with any limit `options` gives.
+
+`security.sonar` is `{"args": "-Dsonar.exclusions=vendor/**", "organization":
+"example-org"}`: `args` are properties every workflow's sonar job adds, after
+its `sonar-args` input, and `organization` is the SonarQube Cloud
+organization key the scan sends the project to. By default that is the
+GitHub owner in lower case, as SonarQube Cloud's keys are; the project key
+stays `OWNER_REPO` with the owner as GitHub spells it.
+
+The advisory checks (cargo deny, npm audit, pip-audit, OSV-Scanner,
+dependency review) have no setting: every run makes them.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from typing import Any
+
+from .refs import owner
+
+DEPENDABOT_PATH = ".github/dependabot.yml"
+SCHEDULES = ("daily", "weekly", "monthly")
+DEPENDABOT = {"schedule": "weekly", "ecosystems": ["github-actions"], "options": {}}
+# The owner's repositories whose workflows and actions `pubrules sync` and
+# `pubrules bump` pin: Dependabot leaves them to pubrules.
+PINNED = ("pubrules", "pubrel")
+SONAR = ("args", "organization")
+# SonarQube Cloud's organization keys: lower-case letters, digits and dashes.
+ORGANIZATION = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+def block(config: dict[str, Any], name: str) -> Any:
+    security = config.get("security", {})
+    return security.get(name) if isinstance(security, dict) else None
+
+
+def dependabot_settings(config: dict[str, Any]) -> dict[str, Any] | None:
+    """`security.dependabot` over the defaults, or None when it is false."""
+    given = block(config, "dependabot")
+    if given is False:
+        return None
+    given = {} if given is None else given
+    if not isinstance(given, dict):
+        sys.exit("pubrules: pubrules.json's security.dependabot must be an object, such as "
+                 '{"schedule": "weekly"}, or false')
+    unknown = sorted(set(given) - set(DEPENDABOT))
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's security.dependabot has no setting {', '.join(unknown)}; "
+                 f"it takes {', '.join(DEPENDABOT)}, and other Dependabot settings go in options")
+    out = {**DEPENDABOT, **given}
+    if out["schedule"] not in SCHEDULES:
+        sys.exit(f"pubrules: security.dependabot.schedule must be one of {', '.join(SCHEDULES)}, "
+                 f"not {out['schedule']!r}")
+    ecosystems = out["ecosystems"]
+    if not isinstance(ecosystems, list) or not ecosystems or not all(
+            isinstance(e, str) or (isinstance(e, dict) and isinstance(e.get("package-ecosystem"), str))
+            for e in ecosystems):
+        sys.exit("pubrules: security.dependabot.ecosystems must list ecosystems, each a name such "
+                 'as "npm" or {"package-ecosystem": "pip", "directory": "/tests"}')
+    if not isinstance(out["options"], dict):
+        sys.exit("pubrules: security.dependabot.options must be an object of Dependabot settings")
+    return out
+
+
+def dependabot(config: dict[str, Any]) -> str | None:
+    """The text of .github/dependabot.yml, or None when pubrules leaves it to
+    the repository. Each entry is JSON, which YAML reads as it is."""
+    settings = dependabot_settings(config)
+    if settings is None:
+        return None
+    from .nightly import UPDATES, by_language  # noqa: PLC0415
+    nightly_moves = by_language("update", config.get("update", {}), UPDATES)["actions"]
+    pinned = [{"dependency-name": f"{owner(config)}/{name}/*"} for name in PINNED]
+    lines = ["# Written by `pubrules sync` from security.dependabot in pubrules.json. Do not edit:",
+             "# change pubrules.json and run `pubrules sync`.", "version: 2", "updates:"]
+    for ecosystem in settings["ecosystems"]:
+        entry = ({"package-ecosystem": ecosystem, "directory": "/"}
+                 if isinstance(ecosystem, str) else {"directory": "/", **ecosystem})
+        entry = {**entry, "schedule": {"interval": settings["schedule"]}, **settings["options"]}
+        if entry["package-ecosystem"] == "github-actions":
+            given = entry.get("ignore", [])
+            entry["ignore"] = pinned + (given if isinstance(given, list) else [given])
+            if nightly_moves:
+                entry["open-pull-requests-limit"] = 0
+        lines.append(f"  - {json.dumps(entry)}")
+    return "\n".join(lines) + "\n"
+
+
+def sonar_settings(config: dict[str, Any]) -> dict[str, str]:
+    given = block(config, "sonar")
+    given = {} if given is None else given
+    if not isinstance(given, dict):
+        sys.exit('pubrules: pubrules.json\'s security.sonar must be an object, such as {"args": "..."}')
+    unknown = sorted(set(given) - set(SONAR))
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's security.sonar has no setting {', '.join(unknown)}; "
+                 f"it takes {', '.join(SONAR)}")
+    if not isinstance(given.get("args", ""), str):
+        sys.exit("pubrules: security.sonar.args must be a string of -D properties")
+    organization = given.get("organization", "")
+    if organization != "" and not (isinstance(organization, str) and ORGANIZATION.fullmatch(organization)):
+        sys.exit("pubrules: security.sonar.organization must be a SonarQube Cloud organization key: "
+                 "lower-case letters, digits and dashes, such as example-org")
+    return {"args": given.get("args", ""), "organization": organization}
