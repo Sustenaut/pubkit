@@ -396,6 +396,10 @@ def sync(root: Path, check: bool) -> int:
         from .variables import block_problems  # noqa: PLC0415
         if bad := block_problems(config["variables"]):
             sys.exit(f"pubrules: {CONFIG}'s variables block: {'; '.join(bad)}")
+    if "go-live" in config:
+        from .golive import block_problems as go_live_problems  # noqa: PLC0415
+        if bad := go_live_problems(config["go-live"]):
+            sys.exit(f"pubrules: {CONFIG}'s go-live block: {'; '.join(bad)}")
     deploy_failed = False
     if "deploy" in config:
         # pubsec and pubdeploy, whose types and walk a deploy block needs, in
@@ -440,6 +444,10 @@ def sync(root: Path, check: bool) -> int:
             print("seeded   Makefile")
     wanted = [(path, render(every[path], values(config))) for path in owned]
     wanted += workflows(config, root)
+    from .golive import CALLER, caller, is_caller  # noqa: PLC0415
+    from .refs import owner, ref, release_commit  # noqa: PLC0415
+    if (go_live := caller(config, owner(config), ref(__version__, release_commit()))) is not None:
+        wanted.append((CALLER, go_live))
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
     if (integrations := declared(root, wanted)) is not None:
@@ -447,6 +455,8 @@ def sync(root: Path, check: bool) -> int:
     if (licenses := review_licenses(config, root, wanted)) is not None:
         wanted.append(licenses)
     replaced = leftovers(config, root)
+    if go_live is None and (root / CALLER).is_file() and is_caller((root / CALLER).read_text(encoding="utf-8")):
+        replaced.append(CALLER)
     from .ignores import GITIGNORE, heal, missing  # noqa: PLC0415
     unignored = missing(root) if check else heal(root)
     if unignored and not check:
@@ -467,8 +477,9 @@ def sync(root: Path, check: bool) -> int:
     wheel = f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl"
     lock_stale = lock.exists() and wheel not in lock.read_text(encoding="utf-8")
     for path in replaced:
-        print(f"pubrules: delete {path}: pubrules.json's ci block writes the workflows now",
-              file=sys.stderr)
+        why = ("pubrules.json has no deploy block, so nothing goes live" if path == CALLER
+               else "pubrules.json's ci block writes the workflows now")
+        print(f"pubrules: delete {path}: {why}", file=sys.stderr)
     if check:
         for path in stale:
             held = root / path
@@ -716,6 +727,10 @@ def main(argv: list[str] | None = None) -> int:
         # Its own parser: `run` passes everything after -- to the command.
         from .cache import main as cache
         return cache(given[1:])
+    if given[:1] == ["go-live"]:
+        # Its own parser too: the go-live workflow's step (golive.py).
+        from .golive import main as go_live  # noqa: PLC0415
+        return go_live(given[1:])
     if given[:1] in (["secrets"], *([c] for c in MOVED)):
         # Moved to pubsec: say where, whatever the arguments.
         print(f"pubrules: this is now ./pubsec {' '.join(given[1:] if given[0] == 'secrets' else given)}; "
@@ -726,6 +741,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("cache", help="keep what a build fetched or made, by pubrules.json's cache rules "
                                       "(pubrules cache --help)")
+    commands.add_parser("go-live", help="in a go-live workflow: ask the convergence engine to fulfil a unit, "
+                                        "and wait for a person's approval and the end (pubrules go-live --help)")
     for moved in ("secrets", *MOVED):
         commands.add_parser(moved, help="deprecated: now ./pubsec, with the same arguments")
     p = commands.add_parser("init", help="write the shared files into this repository")

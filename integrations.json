@@ -32,6 +32,15 @@
       "mode": "required"
     },
     {
+      "plugin": "github.actions-oidc",
+      "paths": [
+        ".github/workflows/go-live.yml",
+        "src/pubrules/ci.py",
+        "src/pubrules/golive.py"
+      ],
+      "mode": "required"
+    },
+    {
       "plugin": "github.app-token",
       "paths": [
         ".github/workflows/ci.yml",
@@ -88,6 +97,10 @@
     {
       "host": "rustup.rs",
       "reason": "A link in an install hint"
+    },
+    {
+      "host": "convergence.sustenaut.eu",
+      "reason": "The convergence engine, which the go-live workflow asks to fulfil a unit (Sustenaut/convergence-engine); a repository may name another in pubrules.json's go-live block"
     }
   ],
   "exclude": [

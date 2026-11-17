@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "Go-live from GitHub Actions: in a repository with a deploy block, sync writes .github/workflows/go-live.yml, run by hand with a unit, calling the reusable go-live.yml, whose pubrules go-live asks the convergence engine with the run's OIDC token, waits for a person's approval and ends as the request ends; pubrules.json's go-live block (engine, timeout-minutes, claude-dispatch)"
+}

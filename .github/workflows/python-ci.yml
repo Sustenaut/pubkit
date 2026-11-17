@@ -199,6 +199,7 @@ jobs:
         env:
           OWNER: ${{ github.repository_owner }}
           DEFAULT: >-
+              pkg:githubactions/Sustenaut/pubrules/.github/workflows/go-live.yml,
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-audit.yml,
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-browser.yml,
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/job-node-test.yml,
