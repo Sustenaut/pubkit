@@ -44,10 +44,9 @@ RULES = {
     "TEST-03": "every feature file runs",
     "TEST-04": "every scenario has a When",
 }
-# The release that brings TEST-04 (the one after 0.43.3, which the rename
-# cut without it), and how long a repository that moved to it failing the
-# rule has to meet it.
-WHEN_FROM = "0.43.4"
+# The release that brings TEST-04, and how long a repository that moved to
+# it failing the rule has to meet it.
+WHEN_FROM = "0.43.3"
 WHEN_UNTIL = "2026-12-31"
 # Never the repository's own: tools, environments and what they fetched.
 SKIPPED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "target",
