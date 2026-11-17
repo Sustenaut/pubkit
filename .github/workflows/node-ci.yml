@@ -33,7 +33,7 @@ on:
       browser-test: { type: string, default: '', description: Runs the browser tests too; empty skips the browser job. }
       browser-setup: { type: string, default: npx --no-install playwright install --with-deps chromium }
       browser-coverage-report: { type: string, default: coverage/, description: "The coverage the browser test command writes, if any, which the sonar job reads with the test job's report." }
-      sync-check: { type: boolean, default: true, description: "Fail if pubrules's managed files drifted, using the pubrules tests/requirements.lock pins." }
+      sync-check: { type: boolean, default: true, description: "Fail if pubrules' managed files drifted, using the pubrules tests/requirements.lock pins." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/lcov.info, description: "The LCOV report the test command writes, if any, which the sonar job reads: node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info writes one." }
       fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBRULES_FUZZ_RUNS)." }
@@ -162,7 +162,7 @@ jobs:
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
       # `pubrules sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubrules's and
+      # .github/dependency-review-licenses.txt; without it, pubrules' and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.

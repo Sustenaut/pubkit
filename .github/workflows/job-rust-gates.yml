@@ -1,4 +1,4 @@
-# Rust: pubrules's managed files in step, then the gates the Rust crate
+# Rust: pubrules' managed files in step, then the gates the Rust crate
 # standard requires and the repository's own after them. `pubrules sync`
 # gives the required targets, from the standard and pubrules.json's
 # exceptions, so a change to either shows in the generated workflow, and

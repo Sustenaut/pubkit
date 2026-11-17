@@ -45,7 +45,7 @@ def indexed(tmp_path, env, name, version, a, b):
 
 @given("pip can't be imported")
 def no_pip(tmp_path, env):
-    """A sitecustomize that hides pip from pubrules's own process, as in an
+    """A sitecustomize that hides pip from pubrules' own process, as in an
     environment uvx made; the pip it starts still runs."""
     hide = tmp_path / "hide-pip"
     hide.mkdir()
@@ -54,7 +54,7 @@ def no_pip(tmp_path, env):
     env.update(PYTHONPATH=str(hide), HIDE_PIP="1")
 
 
-@then(parsers.parse('"{path}" pins this pubrules\'s wheel'))
+@then(parsers.parse('"{path}" pins this pubrules\' wheel'))
 def pins_wheel(repo, path):
     assert f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl" in (
         repo / path).read_text()
@@ -70,7 +70,7 @@ def pins_hashes(repo, env, path, pin, a, b):
 
 
 
-@when("pubrules's wheel is built", target_fixture="wheel")
+@when("pubrules' wheel is built", target_fixture="wheel")
 def built_wheel(tmp_path):
     # Templates are package data, and a glob that misses one (a
     # dot-directory, say) passes every test run from source while the

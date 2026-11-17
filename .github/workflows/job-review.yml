@@ -23,7 +23,7 @@ jobs:
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
       # `pubrules sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubrules's and
+      # .github/dependency-review-licenses.txt; without it, pubrules' and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.

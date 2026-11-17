@@ -24,7 +24,7 @@ The deploy walk and the k8s checks are pubdeploy's: ./pubdeploy, which
 control plane runs across many repositories (the board, state files,
 variables, freshness), and a repository's hosting (the Terraform modules,
 terraform.yml, deploy-static, docker-build, dns check and site check), are
-not pubrules's: pubrules's README says where each went.
+not pubrules': pubrules' README says where each went.
 
 Deprecated, each now ./pubsec with the same arguments, and removed in the
 next minor: secrets run, app-secrets, github-app create,
@@ -221,9 +221,9 @@ provider() {
   with+=(--with "$fetched")
 }
 """
-# With a wheel mirror, pubrules's own wheel too, when tests/requirements.lock
+# With a wheel mirror, pubrules' own wheel too, when tests/requirements.lock
 # pins this version of it by its sha256.
-OWN = """# pubrules's own wheel, by the sha256 tests/requirements.lock pins, from the mirror when GitHub fails.
+OWN = """# pubrules' own wheel, by the sha256 tests/requirements.lock pins, from the mirror when GitHub fails.
 from="https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl"
 pin=$(sed -n "\\#^pubrules @ $from#,/--hash=sha256:/s/.*--hash=sha256:\\([0-9a-f]\\{{64\\}}\\).*/\\1/p" tests/requirements.lock 2>/dev/null | head -n 1)
 if [ -n "$pin" ]; then
@@ -403,7 +403,7 @@ def sync(root: Path, check: bool) -> int:
     deploy_failed = False
     if "deploy" in config:
         # pubsec and pubdeploy, whose types and walk a deploy block needs, in
-        # deploy.providers at this pubrules's floors or newer.
+        # deploy.providers at this pubrules' floors or newer.
         from .providers import ensure  # noqa: PLC0415
         lines, deploy_failed = ensure(root, config, check)
         for line in lines:
@@ -816,7 +816,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("gherkin",
                         help="check that every test is a Gherkin scenario (TEST-01..03), and list the exceptions")
     p = commands.add_parser("protect",
-                            help="put pubrules's ruleset on the default branch of each repository")
+                            help="put pubrules' ruleset on the default branch of each repository")
     p.add_argument("--check", action="store_true",
                    help="change nothing: print how each differs, and fail when one does")
     p.add_argument("--repos", dest="repos_file", type=Path, metavar="FILE",

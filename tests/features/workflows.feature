@@ -1,5 +1,5 @@
 Feature: The reusable workflows parse as GitHub reads them
-  pubrules's own CI runs only python-ci.yml, so a malformed rust-ci.yml would
+  pubrules' own CI runs only python-ci.yml, so a malformed rust-ci.yml would
   first fail in someone else's repository. Every workflow it ships is parsed
   here instead.
 

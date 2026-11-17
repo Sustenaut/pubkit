@@ -16,7 +16,7 @@ on:
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
       setup: { type: string, default: make venv, description: Creates .venv from the hash-locked requirements. }
       test: { type: string, default: make functional, description: Runs the default scenarios. }
-      sync-check: { type: boolean, default: true, description: Fail if pubrules's managed files drifted. }
+      sync-check: { type: boolean, default: true, description: Fail if pubrules' managed files drifted. }
       coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
       fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBRULES_FUZZ_RUNS)." }
       fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }

@@ -52,7 +52,7 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     And "integrations.json" does not contain ""with-secrets","
     When I run pubrules "sync" "--check"
     Then it succeeds
-  Scenario: A repository that does not run pubrules's with-secrets keeps its declaration
+  Scenario: A repository that does not run pubrules' with-secrets keeps its declaration
     Given a repository initialised as "utility"
     And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets"], "mode": "required"}]}"
     When I run pubrules "sync"

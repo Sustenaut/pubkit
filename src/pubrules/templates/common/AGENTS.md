@@ -3,7 +3,7 @@
 Managed by pubrules {version}: `pubrules sync` rewrites this file and `pubrules
 sync --check` fails when it differs, so every pub* repository gives agents
 and people the same rules. Repository-specific guidance lives in the
-README. The standard behind these rules is pubrules's README:
+README. The standard behind these rules is pubrules' README:
 <https://github.com/Sustenaut/pubrules#readme>.
 
 ## Pull requests: ready, or draft

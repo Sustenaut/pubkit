@@ -105,6 +105,12 @@ def person_reviews(repo, package, version):
     path.write_text(re.sub(r"^blocking: \d+$", "blocking: 0", text, count=1, flags=re.M))
 
 
+@given(parsers.parse('the report "{package}" "{version}" marks the rule "{rule}" for review, which the standard does not have'))
+def marks_unknown_rule(repo, package, version, rule):
+    path = repo / "audit" / f"{package}-{version}.md"
+    path.write_text(path.read_text() + f"\n<!-- rule {rule} review -->\n[needs review]\n<!-- /rule -->\n")
+
+
 # --- a fake Claude API -----------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-# pubrules's own suite: the same pins it manages for everyone else (plus
+# pubrules' own suite: the same pins it manages for everyone else (plus
 # PyYAML, to parse the workflows it ships), without
 # itself -- `make venv` installs this checkout, editable, on top.
 pytest==9.0.3

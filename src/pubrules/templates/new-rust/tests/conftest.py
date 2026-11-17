@@ -1,5 +1,5 @@
 """Fixtures for {name}'s functional suite. The binary is resolved by
-pubrules's `binary` fixture, from {bin_var}."""
+pubrules' `binary` fixture, from {bin_var}."""
 
 import pytest
 

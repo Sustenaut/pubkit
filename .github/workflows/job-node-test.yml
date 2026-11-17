@@ -17,7 +17,7 @@ on:
       apt-packages: { type: string, default: '', description: Extra Ubuntu packages to install first. }
       setup: { type: string, default: npm ci --ignore-scripts --no-audit --no-fund, description: Installs the locked dependencies. }
       test: { type: string, default: npm test, description: Runs the tests. }
-      sync-check: { type: boolean, default: true, description: "Fail if pubrules's managed files drifted, using the pubrules tests/requirements.lock pins." }
+      sync-check: { type: boolean, default: true, description: "Fail if pubrules' managed files drifted, using the pubrules tests/requirements.lock pins." }
       coverage-report: { type: string, default: coverage/lcov.info, description: "The LCOV report the test command writes, if any, which the sonar job reads: node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info writes one." }
       fuzz-runs: { type: string, default: '100', description: "Inputs each property test tries (PUBRULES_FUZZ_RUNS)." }
       fuzz-runs-scheduled: { type: string, default: '10000', description: "Inputs each property test tries on a scheduled run." }

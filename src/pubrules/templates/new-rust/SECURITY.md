@@ -14,7 +14,7 @@ next version. Earlier versions get no separate fixes.
 
 ## What is checked
 
-On every pull request, pubrules's `rust-ci.yml` runs every check the Rust
+On every pull request, pubrules' `rust-ci.yml` runs every check the Rust
 crate standard requires: formatting, clippy, docs, doc coverage, packaging,
 the tests on Linux, macOS, Windows, i686 and s390x, the Gherkin suite, the
 test vectors, the minimum Rust version, fuzzing, `cargo deny` and

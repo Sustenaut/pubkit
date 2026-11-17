@@ -18,7 +18,7 @@ Each check belongs to a rule the standard tags `pubrules conform`:
   name: its label is public in every release it signs.
 
 It also checks, without an exception possible, that every workflow calling
-pubrules's `rust-ci.yml`, or the `job-rust-*.yml` jobs a ci block's
+pubrules' `rust-ci.yml`, or the `job-rust-*.yml` jobs a ci block's
 generated workflows call, pins the pubrules this repository's lock pins, so the
 workflow and the standard it enforces never drift apart.
 
@@ -262,7 +262,7 @@ def audit_declared(root: Path) -> list[str]:
 
 
 def workflow_pins(root: Path, calls: str) -> list[str]:
-    """Problems with the pins of pubrules's reusable workflows and actions in
+    """Problems with the pins of pubrules' reusable workflows and actions in
     this repository's workflows, under any owner, and a repository that
     calls neither rust-ci.yml nor the job-rust-*.yml jobs; `calls` is the
     owner whose rust-ci.yml it should call."""

@@ -62,7 +62,7 @@ Feature: Go-live from GitHub Actions
       | {"claude-dispatch": "yes"}             | claude-dispatch must be true or false                  |
 
   Scenario: pubrules ships the reusable go-live workflow
-    Then pubrules's go-live.yml takes the unit, asks for id-token write, and runs pubrules go-live
+    Then pubrules' go-live.yml takes the unit, asks for id-token write, and runs pubrules go-live
 
   Scenario Outline: The run ends as the request ends
     Given the engine answers the request with "planning", then "awaiting", then <end>

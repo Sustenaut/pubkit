@@ -250,7 +250,7 @@ def draft(root: Path, name: str, report: str | None, model: str | None,
     rules = {r["id"]: r for r in standard.load()["judged"]}
     unknown = [k for k in pending if k not in rules]
     if unknown:
-        sys.exit(f"pubrules: {pkg.rel(path)} marks rules {', '.join(unknown)}, which this pubrules's "
+        sys.exit(f"pubrules: {pkg.rel(path)} marks rules {', '.join(unknown)}, which this pubrules' "
                  f"standard does not have: prepare the report again")
     changes = diff(pkg)
     if len(changes) > MAX_DIFF_CHARS:

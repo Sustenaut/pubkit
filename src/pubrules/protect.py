@@ -1,4 +1,4 @@
-"""`pubrules protect`: pubrules's rulesets on every repository: one on the
+"""`pubrules protect`: pubrules' rulesets on every repository: one on the
 default branch, and one on the release tags.
 
 `ruleset.json` is the ruleset every pub* repository's main carries: no
@@ -80,7 +80,7 @@ OWN = "pubrules.json"
 
 
 def base(name: str = "ruleset.json") -> dict:
-    """One of pubrules's rulesets; the default branch's is without its checks."""
+    """One of pubrules' rulesets; the default branch's is without its checks."""
     return json.loads(resources.files("pubrules").joinpath(name).read_text(encoding="utf-8"))
 
 
@@ -364,7 +364,7 @@ def bring(api: Api, repo: str, want: dict, have: list[dict], where: str,
     if not diff:
         return [f"{repo}: \"{want['name']}\" up to date", *lines], bool(others)
     if check:
-        return [f"{repo}: differs from pubrules's \"{want['name']}\"", *(f"  {d}" for d in diff),
+        return [f"{repo}: differs from pubrules' \"{want['name']}\"", *(f"  {d}" for d in diff),
                 *lines], True
     api("PUT", f"repos/{repo}/rulesets/{target['id']}", want)
     return [f"{repo}: updated \"{target['name']}\" (id {target['id']})",

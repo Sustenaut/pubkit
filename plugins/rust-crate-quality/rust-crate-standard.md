@@ -263,7 +263,7 @@ the rules above apply with these differences:
   cargo-semver-checks does not apply, because there is no library API.
   [judged]
 - **Its behaviour is tested end to end.** That means a functional suite
-  (pubrules's Gherkin plugin) that runs the built binary as a user would, in
+  (pubrules' Gherkin plugin) that runs the built binary as a user would, in
   addition to unit tests. [judged]
 - **Its usage text is documentation.** The `--help` output, usually a
   string constant, is held to the same standard as the README. `--help`
@@ -301,7 +301,7 @@ the rules above apply with these differences:
 Each `[checked: ...]` tag gives a rule a stable ID, such as `RS-DOC-04`, and
 names what checks it:
 
-- `make TARGET`: a make target, which pubrules's `rust-ci.yml` runs on every
+- `make TARGET`: a make target, which pubrules' `rust-ci.yml` runs on every
   pull request. `pubrules.mk` provides each one.
 - `rust-ci JOB`: a job of `rust-ci.yml` that always runs, such as `test`
   (Linux, macOS and Windows) or `cross` (i686 and s390x).

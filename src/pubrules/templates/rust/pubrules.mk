@@ -49,7 +49,7 @@ $(VENV): $(wildcard tests/requirements.lock)
 lock: $(VENV) ## Pin tests/requirements.txt, with hashes, in tests/requirements.lock
 	.venv/bin/pubrules lock
 
-sync-check: $(VENV) ## Fail if pubrules's managed files differ from the pinned version's
+sync-check: $(VENV) ## Fail if pubrules' managed files differ from the pinned version's
 	.venv/bin/pubrules sync --check
 
 fmt: ## Format Rust sources

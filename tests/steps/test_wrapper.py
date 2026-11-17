@@ -60,12 +60,12 @@ def executable(repo, path):
     assert (repo / path).stat().st_mode & stat.S_IXUSR
 
 
-@then(parsers.parse('"{path}" runs this pubrules\'s release wheel'))
+@then(parsers.parse('"{path}" runs this pubrules\' release wheel'))
 def pins(repo, path):
     assert f'uvx --from "{WHEEL}" pubrules "$@"' in (repo / path).read_text()
 
 
-@then(parsers.parse('uvx ran pubrules from this pubrules\'s release wheel with "{args}"'))
+@then(parsers.parse('uvx ran pubrules from this pubrules\' release wheel with "{args}"'))
 def ran(uvx_log, args):
     assert json.loads(uvx_log.read_text())["args"] == ["--from", WHEEL, "pubrules", *args.split(" ")]
 
