@@ -776,7 +776,7 @@ def workflows(root: Path) -> list[dict]:
     out = []
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")
-        # Under any owner: pubrules's, or the one before its transfer.
+        # Under any owner: pubrules', or the one before its transfer.
         jobs = set(re.findall(r"[\w-]+/pubrules/\.github/workflows/(job-[a-z-]+)\.yml@", text))
         if re.search(r"[\w-]+/pubrules/\.github/workflows/rust-ci\.yml@", text):
             jobs |= RUST_CI

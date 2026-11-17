@@ -59,7 +59,7 @@ PUBREL_COMMIT = "931f3016d6fec63315e413060cde079d77730b52"
 PUBSEC_FLOOR = ("0.3.0", "a9036c741e29098cdd04baf64c7873e0ff1dd6e7bde12e9671a3940370724e18")
 PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
 # The oldest pubdeploy this pubrules works with, the same way: the deploy walk,
-# whose sustenaut.sync and sustenaut.bump hooks pubrules's sync and bump call.
+# whose sustenaut.sync and sustenaut.bump hooks pubrules' sync and bump call.
 PUBDEPLOY_FLOOR = ("0.5.0", "320d68e081c674457294e6ed3a6c8ab9e2606ca4a2946c252a34021b62dc70cd")
 PUBDEPLOY_WHEEL = "https://github.com/Sustenaut/pubdeploy/releases/download/v{0}/pubdeploy-{0}-py3-none-any.whl"
 FLOORS = {"pubsec": (*PUBSEC_FLOOR, PUBSEC_WHEEL), "pubdeploy": (*PUBDEPLOY_FLOOR, PUBDEPLOY_WHEEL)}

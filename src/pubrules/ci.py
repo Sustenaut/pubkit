@@ -4,7 +4,7 @@ A reusable workflow that serves every repository has to skip the jobs a
 repository does not use, and GitHub shows each as skipped. Here pubrules
 writes the repository's workflows instead, one per event, each calling
 only the jobs that event runs: one reusable workflow per job
-(job-*.yml), pinned to the commit of this pubrules's release tag, with the
+(job-*.yml), pinned to the commit of this pubrules' release tag, with the
 version in a comment (refs.py).
 
     "ci": {
@@ -40,7 +40,7 @@ a test. Rust's jobs are the ones the Rust crate standard asks for here,
 from the rules and pubrules.json's exceptions, and sync writes each job's
 required make targets into its workflow, so a change to either shows as a
 change there. `release` adds pubrel's release workflow to pr.yml,
-queue.yml and main.yml, at this pubrules's pubrel unless it names one, passing it the
+queue.yml and main.yml, at this pubrules' pubrel unless it names one, passing it the
 release app's RELEASE_APP_ID and RELEASE_APP_KEY from pubrel 0.6.1, the
 first to take them, so `pubrel tag` tags with the app the tag ruleset lets
 through; `false` leaves it
@@ -145,7 +145,7 @@ class Job:
     when: str | None = None  # the input it runs only when given
     secrets: bool = False
     fixed: dict[str, str] = field(default_factory=dict)  # inputs pubrules gives
-    # Inputs that are pubrules's to give, whether or not this language gives
+    # Inputs that are pubrules' to give, whether or not this language gives
     # them, never the repository's.
     internal: tuple[str, ...] = ()
     # Inputs this kind gives unless the ci block's `with` does: the
@@ -265,7 +265,7 @@ TOOL_TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.+-]*")
 GITHUB_REPO = re.compile(r"https://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)"
                          r"(?:\.git)?/?")
 
-# The checkout the site job runs, pinned as pubrules's own workflows pin it.
+# The checkout the site job runs, pinned as pubrules' own workflows pin it.
 CHECKOUT = "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0"
 SITE = ("check_dir", "pr_build", "build", "url")
 # A use of a deploy-static action, from whichever repository ships it,
@@ -666,7 +666,7 @@ def workflow(ci: dict[str, Any], event: str) -> str:
             out.append(f"    with: {flow(given)}\n")
         # By name, not `secrets: inherit`: GitHub hands inherited secrets
         # only to a reusable workflow of the caller's own owner, and drops
-        # them without a word for pubrules's, once the two owners differ.
+        # them without a word for pubrules', once the two owners differ.
         if job.secrets:
             out.append("    secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }\n")
     if ci["site"] and event in SITE_EVENTS:

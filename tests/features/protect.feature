@@ -1,4 +1,4 @@
-Feature: Every repository carries pubrules's rulesets, on main and on its release tags
+Feature: Every repository carries pubrules' rulesets, on main and on its release tags
   src/pubrules/ruleset.json is main's ruleset, and tag-ruleset.json the
   release tags', both shipped in the wheel. Which repositories carry it comes from a
   repos file or the command line, and the checks each requires from its own pubrules.json,
@@ -83,13 +83,13 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: A ruleset that matches is up to date, whatever GitHub adds to it
     Given "example-org/foo"'s pubrules.json on GitHub requires "ci / passed"
-    And GitHub has pubrules's ruleset in "example-org/foo" requiring "ci / passed"
+    And GitHub has pubrules' ruleset in "example-org/foo" requiring "ci / passed"
     When I run pubrules "protect" "--check" "example-org/foo"
     Then it succeeds
     And it prints "example-org/foo: "main changes by pull request, after CI" up to date"
     And it prints "example-org/foo: "release tags only from CI" up to date"
 
-  Scenario: protect --check reports release tags without pubrules's tag ruleset
+  Scenario: protect --check reports release tags without pubrules' tag ruleset
     Given "example-org/foo"'s pubrules.json on GitHub requires "ci / passed"
     And GitHub has only main's ruleset in "example-org/foo" requiring "ci / passed"
     When I run pubrules "protect" "--check" "example-org/foo"
@@ -196,7 +196,7 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: protect --check takes a private repository's ruleset without the merge queue as up to date
     Given "example-org/private" is a private repository of an organization on the "team" plan
-    And GitHub has pubrules's ruleset in "example-org/private" requiring "ci / passed", without the merge queue
+    And GitHub has pubrules' ruleset in "example-org/private" requiring "ci / passed", without the merge queue
     When I run pubrules "protect" "--require" "ci / passed" "--no-tags" "--check" "example-org/private"
     Then it succeeds
     And it prints "example-org/private: "main changes by pull request, after CI" up to date"
@@ -204,7 +204,7 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: protect --check reports a ruleset without the merge queue
     Given "example-org/foo"'s pubrules.json on GitHub requires "ci / passed"
-    And GitHub has pubrules's ruleset in "example-org/foo" requiring "ci / passed", without the merge queue
+    And GitHub has pubrules' ruleset in "example-org/foo" requiring "ci / passed", without the merge queue
     When I run pubrules "protect" "--check" "example-org/foo"
     Then it fails
     And it prints "no merge_queue rule"
@@ -347,13 +347,13 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
     And stderr mentions "example-org/foo/../bar is not OWNER/NAME"
 
   Scenario: A read-only token can't see who may bypass a ruleset, and that's no difference
-    Given pubrules's ruleset as a read-only token sees it, with no bypass_actors
-    When I compare it with pubrules's ruleset
+    Given pubrules' ruleset as a read-only token sees it, with no bypass_actors
+    When I compare it with pubrules' ruleset
     Then it finds no difference
 
   Scenario: A bypass actor that can be read still counts
-    Given pubrules's ruleset, with a bypass actor added
-    When I compare it with pubrules's ruleset
+    Given pubrules' ruleset, with a bypass actor added
+    When I compare it with pubrules' ruleset
     Then it reports the bypass actors
 
   Scenario: A public repository gets secret scanning and push protection turned on
@@ -375,7 +375,7 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: protect --check reports them off, and changes nothing
     Given "example-org/site"'s pubrules.json on GitHub requires "ci / passed"
-    And GitHub has pubrules's ruleset in "example-org/site" requiring "ci / passed"
+    And GitHub has pubrules' ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" has secret scanning "disabled" and push protection "disabled"
     When I run pubrules "protect" "--check" "--no-tags" "example-org/site"
     Then the exit code is 1
@@ -401,7 +401,7 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: protect --check reports the dependency graph off, and changes nothing
     Given "example-org/site"'s pubrules.json on GitHub requires "ci / passed"
-    And GitHub has pubrules's ruleset in "example-org/site" requiring "ci / passed"
+    And GitHub has pubrules' ruleset in "example-org/site" requiring "ci / passed"
     And "example-org/site" has secret scanning "enabled" and push protection "enabled"
     And "example-org/site" has its dependency graph off
     When I run pubrules "protect" "--check" "--no-tags" "example-org/site"
@@ -420,7 +420,7 @@ Feature: Every repository carries pubrules's rulesets, on main and on its releas
 
   Scenario: A token that can't read them changes nothing, and fails nothing
     Given "example-org/site"'s pubrules.json on GitHub requires "ci / passed"
-    And GitHub has pubrules's ruleset in "example-org/site" requiring "ci / passed"
+    And GitHub has pubrules' ruleset in "example-org/site" requiring "ci / passed"
     When I run pubrules "protect" "--check" "--no-tags" "example-org/site"
     Then it succeeds
     And it prints "secret scanning not readable"

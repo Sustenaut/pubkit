@@ -1,7 +1,7 @@
 {
   "comment": "Generated from plugins/rust-crate-quality/rust-crate-standard.md by `make standard`. Do not edit.",
   "source": "plugins/rust-crate-quality/rust-crate-standard.md",
-  "sha256": "4db4feebe0e2037f0b045bf2675ab88f010eec4141bc9f4c731d8eb35c8eec58",
+  "sha256": "45390b67d5e4cbf27491f4de7ea4a2ca013482e4ebc474978fd5a1d49c65e163",
   "baseline": [
     {
       "target": "fmt-check",
@@ -584,7 +584,7 @@
       "applies": "binary",
       "question": "",
       "checked": "",
-      "text": "- **Its behaviour is tested end to end.** That means a functional suite (pubrules's Gherkin plugin) that runs the built binary as a user would, in addition to unit tests. [judged]"
+      "text": "- **Its behaviour is tested end to end.** That means a functional suite (pubrules' Gherkin plugin) that runs the built binary as a user would, in addition to unit tests. [judged]"
     },
     {
       "id": "9.5",

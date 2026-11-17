@@ -27,12 +27,12 @@ NAMED = [re.compile(rf"github\.com[:/]({NAME}){END}"),
 # pubrules itself, its release tool, and what the examples use.
 ALWAYS = {"pubrules", "pubrel"}
 NEUTRAL = "example-org"
-# The owners of the actions, the tools (actionlint) and the registry pubrules's own files depend on.
+# The owners of the actions, the tools (actionlint) and the registry pubrules' own files depend on.
 DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google-github-actions", "hashicorp", "pypa",
                 "rhysd", "rust-lang", "SonarSource", "tailscale"}
 
 # pub is a pubrules tool, like pubrel, so `pubrules new` names where it comes from.
-# pubrules's own CI, which it does not ship to anyone, runs the integrations scan.
+# pubrules' own CI, which it does not ship to anyone, runs the integrations scan.
 TOOLS = {("src/pubrules/new.py", "Sustenaut/publet"),
          ("src/pubrules/new.py", "Sustenaut/pubsec"),
          ("src/pubrules/new.py", "Sustenaut/pubdeploy"),

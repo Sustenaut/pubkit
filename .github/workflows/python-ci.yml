@@ -8,7 +8,7 @@
 # The commands are inputs, so a repository with its own entry point (a
 # ./dev script, tox) keeps it; the defaults are pubrules.mk's targets.
 #
-# Hypothesis property tests try PUBRULES_FUZZ_RUNS inputs each, which pubrules's
+# Hypothesis property tests try PUBRULES_FUZZ_RUNS inputs each, which pubrules'
 # pytest plugin reads: fuzz-runs on every push and pull request,
 # fuzz-runs-scheduled on a schedule (security.fuzz.python in pubrules.json).
 #
@@ -28,7 +28,7 @@ on:
       browser-test: { type: string, default: '', description: Runs the browser scenarios too; empty skips the browser job. }
       browser-setup: { type: string, default: .venv/bin/python -m playwright install --with-deps chromium }
       browser-coverage-report: { type: string, default: coverage/, description: "The coverage the browser test command writes, if any, which the sonar job reads with the test job's report." }
-      sync-check: { type: boolean, default: true, description: Fail if pubrules's managed files drifted. }
+      sync-check: { type: boolean, default: true, description: Fail if pubrules' managed files drifted. }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
       coverage-report: { type: string, default: coverage/coverage.xml, description: "The Cobertura XML report the test command writes, if any, which the sonar job reads." }
       audit-requirements: { type: string, default: tests/requirements.lock, description: "The hash-locked requirements files the audit job checks, space-separated." }
@@ -181,7 +181,7 @@ jobs:
       # GitHub can read, so they are left out of the license check alone,
       # each by name: v5.0.0 matches a purl's full name, with no wildcard.
       # `pubrules sync` lists those the repository calls in
-      # .github/dependency-review-licenses.txt; without it, pubrules's and
+      # .github/dependency-review-licenses.txt; without it, pubrules' and
       # pubrel's are. Only the owner's are taken from the file, which a pull
       # request may change. Advisories still apply to them, and everything
       # else is checked as before.

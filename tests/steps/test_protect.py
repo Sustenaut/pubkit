@@ -271,12 +271,12 @@ def _pubrules_ruleset(slug, checks, queue=True):
     return rs
 
 
-@given(parsers.parse('GitHub has pubrules\'s ruleset in "{slug}" requiring "{checks}"'))
+@given(parsers.parse('GitHub has pubrules\' ruleset in "{slug}" requiring "{checks}"'))
 def has_pubrules_ruleset(github, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubrules_ruleset(slug, checks), _tags()]))
 
 
-@given(parsers.parse('GitHub has pubrules\'s ruleset in "{slug}" requiring "{checks}", '
+@given(parsers.parse('GitHub has pubrules\' ruleset in "{slug}" requiring "{checks}", '
                      'without the merge queue'))
 def has_unqueued_ruleset(github, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(
@@ -400,19 +400,19 @@ def no_auto_merge_note(result):
     assert "auto-merge" not in out, out
 
 
-@given("pubrules's ruleset as a read-only token sees it, with no bypass_actors", target_fixture="seen")
+@given("pubrules' ruleset as a read-only token sees it, with no bypass_actors", target_fixture="seen")
 def read_only_ruleset():
     have = protect.ruleset(["ci / passed"])
     del have["bypass_actors"]
     return have
 
 
-@given("pubrules's ruleset, with a bypass actor added", target_fixture="seen")
+@given("pubrules' ruleset, with a bypass actor added", target_fixture="seen")
 def bypassed_ruleset():
     return {**protect.ruleset(["ci / passed"]), "bypass_actors": [{"actor_id": 1}]}
 
 
-@when("I compare it with pubrules's ruleset", target_fixture="found")
+@when("I compare it with pubrules' ruleset", target_fixture="found")
 def compare(seen):
     return protect.differences(protect.ruleset(["ci / passed"]), seen)
 

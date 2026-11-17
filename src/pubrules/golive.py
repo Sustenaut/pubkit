@@ -93,7 +93,7 @@ def units(deploy: dict[str, Any]) -> list[str]:
 
 def caller(config: dict[str, Any], owner: str, pin: str) -> str | None:
     """The go-live workflow sync writes in a repository with a deploy block, or None
-    without one: run by hand, it calls the reusable go-live.yml at this pubrules's
+    without one: run by hand, it calls the reusable go-live.yml at this pubrules'
     release for the unit chosen. `pin` is what follows @, the release's commit and
     version."""
     deploy = config.get("deploy")

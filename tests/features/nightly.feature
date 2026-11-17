@@ -15,7 +15,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
     And ".github/workflows/ci.yml" contains "release.yml@v0.5.3 with: { pubrel-version: v0.5.3 }"
 
-  Scenario: pins moves pubrules's pin in every one of its reusable workflows
+  Scenario: pins moves pubrules' pin in every one of its reusable workflows
     Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrules/.github/workflows/node-ci.yml@v0.0.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
@@ -29,12 +29,12 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
     And ".github/workflows/ci.yml" pins pubrel's release workflow to the commit of "v0.5.3"
 
-  Scenario: pins moves pubrules's commit together with its version
+  Scenario: pins moves pubrules' commit together with its version
     Given pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrules/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/ci.yml" pins pubrules's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And ".github/workflows/ci.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
 
   Scenario: pins moves a current pin by tag to the tag's commit
     Given pubrel's repository tags "v0.5.3"
@@ -52,26 +52,26 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And ".github/workflows/ci.yml" contains "uses: sustenaut/pubrules/.github/workflows/node-ci.yml@v"
     And ".github/workflows/ci.yml" does not contain "example-org"
 
-  Scenario Outline: pins moves a pubrules action to this pubrules's commit, under the current owner
+  Scenario Outline: pins moves a pubrules action to this pubrules' commit, under the current owner
     Given pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "deploy.yml" uses "<owner>"'s pubrules action "cache" at "<pin>"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "this pubrules's commit"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "this pubrules' commit"
 
     Examples:
       | owner     | pin               |
       | Sustenaut | another pubrules    |
       | example-org   | another pubrules    |
-      | Sustenaut | this pubrules's tag |
+      | Sustenaut | this pubrules' tag |
       | Sustenaut | another commit    |
 
-  Scenario Outline: pins moves a hand-written call of any pubrules workflow to this pubrules's commit
+  Scenario Outline: pins moves a hand-written call of any pubrules workflow to this pubrules' commit
     Given pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "ci.yml" calls "<owner>"'s pubrules workflow "<workflow>" at "another pubrules"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/ci.yml" calls "Sustenaut"'s pubrules workflow "<workflow>" at "this pubrules's commit"
+    And ".github/workflows/ci.yml" calls "Sustenaut"'s pubrules workflow "<workflow>" at "this pubrules' commit"
 
     Examples:
       | owner     | workflow       |
@@ -177,7 +177,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then it succeeds
     And "infra/dns.tf" sources "example-org/somehost//terraform/hosting" at the commit of "v0.2.0"
 
-  Scenario: pins leaves pubrules's own Terraform modules and those outside .tf files
+  Scenario: pins leaves pubrules' own Terraform modules and those outside .tf files
     Given "example-org/somehost" releases "v0.2.0"
     And the file "infra/dns.tf" reads "  source = "github.com/Sustenaut/pubrules//terraform/hosting?ref=v0.24.4""
     And the file "infra/notes.md" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
@@ -227,7 +227,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And "tests/requirements.txt" contains "v0.2.1/somelib-0.2.1"
     And "README.md" contains "v0.1.0/somelib-0.1.0"
 
-  Scenario: pins run by an older pubrules than the repository's leaves pubrules's files alone
+  Scenario: pins run by an older pubrules than the repository's leaves pubrules' files alone
     Given the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v99.0.0/pubrules-99.0.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds

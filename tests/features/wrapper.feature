@@ -10,7 +10,7 @@ Feature: ./pubrules runs the repository's pinned pubrules
     Then it succeeds
     And the repository has "pubrules"
     And "pubrules" is executable
-    And "pubrules" runs this pubrules's release wheel
+    And "pubrules" runs this pubrules' release wheel
 
   Scenario: The wrapper is managed, so an edited copy fails the check
     Given a repository initialised as "utility"
@@ -27,7 +27,7 @@ Feature: ./pubrules runs the repository's pinned pubrules
     And uvx records how it was run
     When I run "../pubrules dns check example.eu" from the directory "docs"
     Then it succeeds
-    And uvx ran pubrules from this pubrules's release wheel with "dns check example.eu"
+    And uvx ran pubrules from this pubrules' release wheel with "dns check example.eu"
     And uvx ran in the repository's root
 
   Scenario: Without uv it says how to install it

@@ -184,7 +184,7 @@ jobs:
 """
 
 
-@given("a deploy workflow that calls integrations' scan, pubrules's cache action, actions/checkout and a local action")
+@given("a deploy workflow that calls integrations' scan, pubrules' cache action, actions/checkout and a local action")
 def deploy_workflow(repo):
     (repo / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
     (repo / ".github" / "workflows" / "deploy.yml").write_text(DEPLOY)
@@ -236,7 +236,7 @@ def owners_alone(exceptions):
                           "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml"]
 
 
-@then("it passes pubrules's and pubrel's")
+@then("it passes pubrules' and pubrel's")
 def pubruless(exceptions):
     assert exceptions == [p.strip() for p in _default_purls().split(",")]
 
@@ -508,7 +508,7 @@ def on_main(repo, name):
     assert triggers(generated(repo, name)) == {"push": {"branches": ["main"]}}
 
 
-@when("I read pubrules's own ci.yml", target_fixture="own")
+@when("I read pubrules' own ci.yml", target_fixture="own")
 def own_ci():
     return yaml.safe_load((WORKFLOWS / "ci.yml").read_text())
 
@@ -557,7 +557,7 @@ def own_scan(own):
 @then("its wheel job runs only on a push to main")
 def own_wheel(own):
     # The release itself tags from a push to main alone: pubrel's
-    # release.yml runs `pubrel tag` only then. The wheel is pubrules's own.
+    # release.yml runs `pubrel tag` only then. The wheel is pubrules' own.
     condition = own["jobs"]["wheel"]["if"]
     assert "github.event_name == 'push'" in condition
     assert "github.ref == 'refs/heads/main'" in condition
@@ -701,7 +701,7 @@ def inputs_match(table):
         passed = set(job.inputs) | set(job.fixed)
         # Every input but those pubrules gives itself is the repository's.
         assert set(job.fixed) <= set(job.internal), name
-        # runs-on is pubrules's too, from the ci block's runs-on, for every job
+        # runs-on is pubrules' too, from the ci block's runs-on, for every job
         # but one whose os-matrix gives its runners.
         own = {*job.internal, *(() if job.matrix else ("runs-on",))}
         assert job.matrix or "runs-on" in inputs, name
@@ -859,7 +859,7 @@ def mirror_refused(setting):
         in str(stop.value)
 
 
-@given("a lock that pins this pubrules's wheel", target_fixture="repo_dir")
+@given("a lock that pins this pubrules' wheel", target_fixture="repo_dir")
 def pinned_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
@@ -905,7 +905,7 @@ def launcher_stops(launched, message):
     assert launched["code"] == 1 and message in launched["stderr"], launched
 
 
-@then("the launcher without a mirror runs uvx on pubrules's GitHub release URL, with no fetch")
+@then("the launcher without a mirror runs uvx on pubrules' GitHub release URL, with no fetch")
 def launcher_plain():
     text = cli.render(cli.templates("utility")["pubrules"], cli.values({"kind": "utility"}))
     assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text and "fetch()" not in text
@@ -916,7 +916,7 @@ def _steps(workflow):
     return [s for job in data["jobs"].values() for s in job.get("steps", [])]
 
 
-# pubrules's own actions, as its reusable workflows pin them: by a release's commit.
+# pubrules' own actions, as its reusable workflows pin them: by a release's commit.
 SELF_PIN = re.compile(r"^Sustenaut/pubrules/actions/(?P<name>[\w-]+)@(?P<commit>[0-9a-f]{40})$")
 
 
@@ -930,7 +930,7 @@ def _action_inputs(name):
     return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())["inputs"]
 
 
-@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubrules's "
+@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubrules' "
                     "own pin, three times with 15 seconds between"))
 def setup_retried(workflow):
     steps = [s for s in _steps(workflow) if s.get("name", "").startswith("Set up, tried three times")]
@@ -943,7 +943,7 @@ def setup_retried(workflow):
         assert "run" not in step and "env" not in step, step
 
 
-@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubrules's own pin in the "
+@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubrules' own pin in the "
                     "terraform-dir input, with \"{args}\" and the action's default pause"))
 def init_by_action(workflow, args):
     (step,) = [s for s in _steps(workflow) if s.get("name", "").startswith("terraform init, tried three times")]
@@ -954,7 +954,7 @@ def init_by_action(workflow, args):
     assert "run" not in step and "env" not in step, step
 
 
-@then("every use of pubrules's actions in pubrules's workflows pins one commit, at a release no later than this pubrules")
+@then("every use of pubrules' actions in pubrules' workflows pins one commit, at a release no later than this pubrules")
 def self_pins_released():
     """No self-pin at all passes too: the workflows may carry their own steps."""
     pins = set()
@@ -963,15 +963,15 @@ def self_pins_released():
         uses = [u for u in refs.PUBRULES_USE.findall(text) if "/pubrules/actions/" in u]
         pinned = [m for m in refs.PUBRULES_PIN.finditer(text) if m["name"].startswith("actions/")]
         assert len(pinned) == len(uses) and all(m["commit"] for m in pinned), \
-            f"{path.name}: pin pubrules's actions by a release's commit, with its version: {uses}"
+            f"{path.name}: pin pubrules' actions by a release's commit, with its version: {uses}"
         pins |= {(m["commit"], m["version"]) for m in pinned}
-    assert len(pins) <= 1, f"pubrules's workflows pin its actions at more than one commit: {sorted(pins)}"
+    assert len(pins) <= 1, f"pubrules' workflows pin its actions at more than one commit: {sorted(pins)}"
     for _, version in pins:
         assert tuple(map(int, version.split("."))) <= tuple(map(int, __version__.split("."))), \
-            f"pubrules's workflows pin its actions at v{version}, later than this pubrules ({__version__})"
+            f"pubrules' workflows pin its actions at v{version}, later than this pubrules ({__version__})"
 
 
-@then("no reusable workflow of pubrules's uses an action by a local path")
+@then("no reusable workflow of pubrules' uses an action by a local path")
 def no_local_actions():
     reusable = 0
     for path in sorted(WORKFLOWS.glob("*.yml")):
@@ -1087,7 +1087,7 @@ def _all_steps(data):
     yield from ((data.get("runs") or {}).get("steps") or [])
 
 
-@then("every upload-artifact and actions/cache step in pubrules's workflows continues on error, within five minutes")
+@then("every upload-artifact and actions/cache step in pubrules' workflows continues on error, within five minutes")
 def uploads_non_fatal():
     found = 0
     for path in sorted(WORKFLOWS.glob("*.yml")):
@@ -1099,7 +1099,7 @@ def uploads_non_fatal():
     assert found
 
 
-@then("every cache restore and save in pubrules's cache action continues on error")
+@then("every cache restore and save in pubrules' cache action continues on error")
 def cache_action_non_fatal():
     steps = [s for s in _all_steps(yaml.safe_load((PUBRULES_ACTIONS / "cache" / "action.yml").read_text()))
              if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]

@@ -4,8 +4,8 @@ repository pins; `pinned` here is what it, and the version guard, read.)
 
 `pubrules bump`, run in a repository, moves it to this pubrules: the managed
 files (`pubrules sync`), the lock (`pubrules lock`), and every workflow's pin of
-pubrules's reusable workflows (rust-ci.yml, service-ci.yml...) and actions
-(cache), to the commit of this pubrules's tag (refs.py). The nightly
+pubrules' reusable workflows (rust-ci.yml, service-ci.yml...) and actions
+(cache), to the commit of this pubrules' tag (refs.py). The nightly
 workflow does this, and more, through `pubrules nightly` (nightly.py).
 """
 

@@ -77,7 +77,7 @@ def has_no(repo, path):
     assert not (repo / path).exists()
 
 
-@then("pubrules's go-live.yml takes the unit, asks for id-token write, and runs pubrules go-live")
+@then("pubrules' go-live.yml takes the unit, asks for id-token write, and runs pubrules go-live")
 def reusable():
     flow = yaml.safe_load((ROOT / ".github/workflows/go-live.yml").read_text())
     inputs = flow[True]["workflow_call"]["inputs"]  # YAML reads `on` as true

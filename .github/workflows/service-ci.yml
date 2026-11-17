@@ -22,7 +22,7 @@ on:
       test: { type: string, default: '', description: 'Runs the tests. Empty skips it.' }
       terraform-dir: { type: string, default: '', description: 'Where the Terraform files are. Empty skips the Terraform checks.' }
       shellcheck: { type: string, default: with-secrets, description: 'Shell scripts to check: space-separated globs.' }
-      sync-check: { type: boolean, default: true, description: Fail if pubrules's managed files drifted. }
+      sync-check: { type: boolean, default: true, description: Fail if pubrules' managed files drifted. }
       coverage-report: { type: string, default: coverage/, description: "The coverage the test command writes, if any (Cobertura XML or LCOV lcov.info), which the sonar job reads." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
     secrets:
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '${{ inputs.python-version }}' }
       - if: inputs.sync-check
-        name: pubrules's managed files are in step
+        name: pubrules' managed files are in step
         run: |
           python3 -m venv .pubrules
           # Tried three times, then from the wheel mirror: a release download can time out.
