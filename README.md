@@ -480,7 +480,7 @@ writes its own Givens and its own When, through `attempt`, and takes every
 check from pubtest. A scenario of one `Then` that tests a function in one go
 was the first step onto Gherkin, and TEST-04 retires it. TEST-04 came after
 the repositories had suites, so the move from a pubrules before the release
-that brings it (0.43.4), or from any pubkit (its name before 0.43.0),
+that brings it (0.43.3), or from any pubkit (its name before 0.43.0),
 (`pubrules bump`, or the nightly's pins) writes its exception, until 2026-12-31, into a
 repository that fails it, with the count of scenarios that have no When;
 one that passes gets none, and no later move adds one.

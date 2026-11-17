@@ -1,0 +1,4 @@
+{
+  "category": "internal",
+  "change": "TEST-04's waiver counts a move from any pubrules before 0.43.3, the release that brings the rule"
+}
