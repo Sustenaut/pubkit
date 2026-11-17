@@ -91,7 +91,7 @@ def wheel_holds_templates(wheel):
     names = set(zipfile.ZipFile(wheel).namelist())
     src = SOURCE / "src"
     missing = [p.relative_to(src).as_posix() for p in (src / "pubkit" / "templates").rglob("*")
-               if p.is_file() and p.relative_to(src).as_posix() not in names]
+               if p.is_file() and "__pycache__" not in p.parts and p.relative_to(src).as_posix() not in names]
     missing += [] if "pubkit/standard.json" in names else ["pubkit/standard.json"]
     assert not missing, f"the wheel lacks {missing}"
 

@@ -36,7 +36,8 @@ DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google
 TOOLS = {("src/pubkit/new.py", "Sustenaut/publet"),
          ("src/pubkit/new.py", "Sustenaut/pubsec"),
          ("src/pubkit/new.py", "Sustenaut/pubdeploy"),
-         (".github/workflows/integrations.yml", "Sustenaut/integrations")}
+         (".github/workflows/integrations.yml", "Sustenaut/integrations"),
+         ("src/pubkit/templates/common/tests/requirements-pubkit.txt", "Sustenaut/pubtest")}
 ALLOWED = TOOLS
 
 

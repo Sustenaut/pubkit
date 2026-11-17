@@ -56,9 +56,18 @@ from importlib import resources
 from pathlib import Path
 
 from . import __version__
-from .plugin import bin_var
 
 KINDS = ("rust", "utility", "service", "content")
+# The step library every suite's tests/requirements-pubkit.txt pins: the
+# pytest-bdd plugin pubkit carried until 0.42.0, and the steps (GRAMMAR.md).
+PUBTEST = "0.1.0"
+
+
+def bin_var(name: str) -> str:
+    """The variable naming the directory that holds `name`: pub -> PUB_BIN_DIR,
+    as pubtest's binary() reads it."""
+    return re.sub(r"[^A-Za-z0-9]", "_", name).upper() + "_BIN_DIR"
+
 # The commands that hold a secret, pubsec's now: each prints where it went.
 MOVED = ("app-secrets", "github-app", "service-account-key", "signing-key")
 # Kinds pubkit no longer has, and what each became. Not accepted: a
@@ -290,7 +299,7 @@ def values(config: dict[str, str]) -> dict[str, str]:
     wheel = floored(config, SECRETS)
     walker = floored(config, DEPLOYS)
     others = [p for p in wheels if p.get("distribution") != DEPLOYS]
-    return {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
+    return {"version": __version__, "pubtest": PUBTEST, "bin_var": bin_var(config.get("bin", "app")),
             "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
             "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
             "pypi": mirrors(config).get("pypi", ""),

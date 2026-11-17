@@ -5,19 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pubkit"
 version = "0.41.1"
-description = "The testing setup every package shares: a pytest-bdd plugin, managed files, and reusable CI."
+description = "The setup every package shares: managed files, reusable CI, the Rust crate standard and the Gherkin rule."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [{ name = "David Schryer", email = "schryer@gmail.com" }]
 # PyYAML reads the workflows sync and conform check.
-dependencies = ["pytest>=8", "pytest-bdd>=8", "PyYAML>=6"]
+dependencies = ["PyYAML>=6"]
 
 [project.urls]
 Repository = "https://github.com/Sustenaut/pubkit"
-
-[project.entry-points.pytest11]
-pubkit = "pubkit.plugin"
 
 [project.scripts]
 pubkit = "pubkit.cli:main"
