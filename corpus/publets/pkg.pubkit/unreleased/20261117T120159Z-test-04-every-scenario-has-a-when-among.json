@@ -1,0 +1,4 @@
+{
+  "category": "added",
+  "change": "TEST-04: every scenario has a When among its own steps, checked by `pubrules gherkin` and `sync --check`; the move to this pubrules (`pubrules bump`, the nightly's pins) writes a TEST-04 exception until 2026-12-31 into a repository that fails it, and the seeded repository.feature takes its When and pubtest's Thens"
+}

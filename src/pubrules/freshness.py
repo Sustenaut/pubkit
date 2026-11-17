@@ -41,8 +41,14 @@ def bump(root: Path) -> int:
     from .hooks import bump as bump_hooks  # noqa: PLC0415
     for line in bump_hooks(root):
         print(line)
+    before = pinned(root)
     sync(root, check=False)
     lock(root)
+    # A rule this pubrules brings that the repository fails is waived, for a
+    # while, by the move that brings it.
+    from .gherkin import grandfather  # noqa: PLC0415
+    for line in grandfather(root, before):
+        print(line)
     commit, calls = release_commit(), owner_of(root)
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")

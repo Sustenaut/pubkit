@@ -2,7 +2,8 @@ Feature: Every test is a Gherkin scenario
   `pubrules gherkin` checks that a repository's tests are Gherkin scenarios,
   and `pubrules sync --check` runs it in every repository but a content one.
   TEST-01: there is a feature file with a scenario. TEST-02: no test runs
-  outside a scenario. TEST-03: every feature file runs. A rule the
+  outside a scenario. TEST-03: every feature file runs. TEST-04: every
+  scenario has a When of its own, the one action it tests. A rule the
   repository cannot meet yet is declared as an exception in pubrules.json,
   with a reason and a date, as for the Rust crate standard's rules.
 
@@ -86,6 +87,63 @@ Feature: Every test is a Gherkin scenario
     And package.json lists "@cucumber/cucumber" as a dev dependency
     When I run pubrules "gherkin"
     Then it succeeds
+
+  Scenario Outline: A scenario with no When of its own fails TEST-04
+    Given a utility whose suite is Gherkin
+    And the suite binds the whole features directory
+    And the file "tests/features/checks.feature" holds <scenario>
+    When I run pubrules "gherkin"
+    Then it fails
+    And stderr mentions "TEST-04: tests/features/checks.feature:<line>: Scenario: <title> has no When"
+
+    Examples:
+      | scenario                                   | line | title            |
+      | a scenario without a When                  | 2    | Only a check     |
+      | a scenario whose When is in its Background | 4    | Set up elsewhere |
+      | a scenario whose When is in a docstring    | 2    | A When in the text |
+
+  Scenario: An outline with a When, its action chained with And, meets TEST-04
+    Given a utility whose suite is Gherkin
+    And the suite binds the whole features directory
+    And the file "tests/features/checks.feature" holds an outline with a When, chained with And
+    When I run pubrules "gherkin"
+    Then it succeeds
+
+  Scenario: The move from a pubrules before TEST-04 waives it, until the end of 2026, where it fails
+    Given a utility whose suite is Gherkin
+    And the suite's scenario has no When
+    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    When I run pubrules "pins" "--no-lock"
+    Then it succeeds
+    And it prints "pubrules.json: TEST-04 waived until 2026-12-31, for the 1 scenario with no When"
+    And "pubrules.json" contains ""until": "2026-12-31""
+    And "pubrules.json" contains "had no When on the move from pubrules 0.43.0, before the rule"
+
+  Scenario: Once waived by the move, TEST-04 is an open exception
+    Given a utility whose suite is Gherkin
+    And the suite's scenario has no When
+    And PUBRULES_ANY_VERSION is set
+    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    When I run pubrules "pins" "--no-lock"
+    And I run pubrules "gherkin"
+    Then it succeeds
+    And it prints "open exception: TEST-04 until 2026-12-31"
+
+  Scenario: The move from a pubrules before TEST-04 waives nothing where every scenario has a When
+    Given a utility whose suite is Gherkin
+    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    When I run pubrules "pins" "--no-lock"
+    Then it succeeds
+    And "pubrules.json" does not contain "TEST-04"
+
+  Scenario: The move waives TEST-04 no more after 2026
+    Given a utility whose suite is Gherkin
+    And the suite's scenario has no When
+    And today is "2027-01-01"
+    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    When I run pubrules "pins" "--no-lock"
+    Then it succeeds
+    And "pubrules.json" does not contain "TEST-04"
 
   Scenario: A Rust crate's own tests are the Rust crate standard's
     Given a utility whose suite is Gherkin

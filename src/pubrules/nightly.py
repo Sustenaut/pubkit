@@ -538,6 +538,11 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         if lock:
             lock_requirements(root)
     if before and before != __version__:
+        # A rule this pubrules brings that the repository fails is waived,
+        # for a while, by the move that brings it.
+        from .gherkin import grandfather  # noqa: PLC0415
+        changes += grandfather(root, before)
+    if before and before != __version__:
         changes.append(f"pubrules {before} -> {__version__}")
     released = bool(pubrel) and released_by_config(root, pubrel, changes)
     if tools_by_config(root, changes) or released:

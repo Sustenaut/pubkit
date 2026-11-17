@@ -1,18 +1,14 @@
-"""Steps for repository.feature, which `pubrules init` seeded."""
+"""Steps for repository.feature, which `pubrules init` seeded. Its Thens are
+pubtest's; the When is the repository's own, through `ctx.attempt`."""
 
 import json
 from pathlib import Path
 
-from pytest_bdd import given, scenarios, then
+from pytest_bdd import scenarios, when
 
 scenarios("repository.feature")
 
 
-@given("the repository's pubrules.json", target_fixture="config")
-def config():
-    return json.loads((Path(__file__).parents[2] / "pubrules.json").read_text(encoding="utf-8"))
-
-
-@then("it names the repository's kind")
-def names_kind(config):
-    assert config["kind"] in ("rust", "utility", "service", "content")
+@when("I read the repository's pubrules.json")
+def read_config(ctx):
+    ctx.attempt(lambda: json.loads((Path(__file__).parents[2] / "pubrules.json").read_text(encoding="utf-8")))

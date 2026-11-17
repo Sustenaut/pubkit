@@ -56,7 +56,7 @@ def offline_pubrel(tmp_path, monkeypatch):
 # A scenario and its binding, so `sync --check` gets past the Gherkin rule
 # (gherkin.py) in a scratch repository a scenario builds by hand. At the
 # root, out of the way of the tests/ a scenario makes.
-SEED = {"seed.feature": "Feature: Seed\n  Scenario: Seed\n    Then it holds\n",
+SEED = {"seed.feature": "Feature: Seed\n  Scenario: Seed\n    When it is read\n    Then it holds\n",
         "test_seed.py": 'from pytest_bdd import scenarios\n\nscenarios("seed.feature")\n'}
 
 
