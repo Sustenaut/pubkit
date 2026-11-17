@@ -18,8 +18,8 @@
     ]
   },
   "publets": [
-    {"slug": "pkg.pubkit", "kind": "doc", "tag": "PKG-PUBKIT-10-2026", "source": "publets/pkg.pubkit", "cid": "pub:sha2-256:bxg3m7n55ds5yikbts6io2kr2dpnlebaspsc52hxkbwhekwcnaaq", "genesis": "pub:sha2-256:t3qh7yksriibaz5hp7sr7zy3m7pt7dfnord3ssv7myzgttuwxwuq", "deps": ["pkg.pubkit#identity", "pkg.pubkit#release"]},
-    {"slug": "pkg.pubkit#identity", "kind": "claim", "source": "publets/pkg.pubkit", "cid": "pub:sha2-256:6g7nbizgefa6dga6knufdzcnn6htljxs2a7f7oj7q2faevleadrq", "genesis": "pub:sha2-256:ymxkdj7f6qfwx76kq6h7dkh34rj2w2djbldpzbq5fm7u6wwtg35q", "deps": []},
-    {"slug": "pkg.pubkit#release", "kind": "claim", "source": "publets/pkg.pubkit", "cid": "pub:sha2-256:wkliqautqrjgiyw4ad3mjd5h7knp7szpi3o76yigwlaz5upbybkq", "genesis": "pub:sha2-256:cfwviqjxqsb5fgdgfdgat2qjaz4mmwsxp4vk4w6cgkkooo6xdfwq", "deps": ["pkg.pubkit#identity"]}
+    {"slug": "pkg.pubrules", "kind": "doc", "tag": "PKG-PUBKIT-10-2026", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:bxg3m7n55ds5yikbts6io2kr2dpnlebaspsc52hxkbwhekwcnaaq", "genesis": "pub:sha2-256:t3qh7yksriibaz5hp7sr7zy3m7pt7dfnord3ssv7myzgttuwxwuq", "deps": ["pkg.pubrules#identity", "pkg.pubrules#release"]},
+    {"slug": "pkg.pubrules#identity", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:6g7nbizgefa6dga6knufdzcnn6htljxs2a7f7oj7q2faevleadrq", "genesis": "pub:sha2-256:ymxkdj7f6qfwx76kq6h7dkh34rj2w2djbldpzbq5fm7u6wwtg35q", "deps": []},
+    {"slug": "pkg.pubrules#release", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:wkliqautqrjgiyw4ad3mjd5h7knp7szpi3o76yigwlaz5upbybkq", "genesis": "pub:sha2-256:cfwviqjxqsb5fgdgfdgat2qjaz4mmwsxp4vk4w6cgkkooo6xdfwq", "deps": ["pkg.pubrules#identity"]}
   ]
 }
