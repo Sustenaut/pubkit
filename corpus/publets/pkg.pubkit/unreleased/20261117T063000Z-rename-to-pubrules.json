@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubkit is now pubrules, at Sustenaut/pubrules: the package, the command and its module are pubrules, a repository's config is pubrules.json, the managed files are ./pubrules, pubrules.mk, pubrules-python.mk and tests/requirements-pubrules.txt, the environment variables are PUBRULES_*, and sync pins Sustenaut/pubrules/.github/workflows/... and Sustenaut/pubrules/actions/...; nothing reads the old names, so a repository moves over in one migration pull request"
+}
