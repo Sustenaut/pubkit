@@ -217,7 +217,7 @@ def go_live(http: Http, engine: str, unit: str, kind: str, minutes: float, plan:
         http.summary(f"### Go-live of {clean(unit)}\n\nNot asked: {e}.\n")
         return 1
     if first is None:
-        http.summary(f"### Go-live of {clean(unit)}\n\nThe engine did not answer: nothing was asked.\n")
+        http.summary(f"### Go-live of {clean(unit)}\n\nThe engine did not answer; if it took the request it is on /approvals.\n")
         return 1
     request = clean(first.get("id", ""))
     page = clean(first.get("url", ""))
@@ -260,7 +260,7 @@ def ended(http: Http, unit: str, answer: dict[str, Any]) -> int:
 
 def out_of_time(http: Http, unit: str, state: str, page: str) -> int:
     said = ("still awaiting approval: the engine runs it when approved" if state in ("planning", "awaiting")
-            else f"still {SAID.get(state, clean(state))}: the engine finishes it")
+            else "the engine is still fulfilling the unit")
     http.out(f"go-live: the time is up, {said}")
     http.summary(f"### Go-live of {clean(unit)}\n\nThe time is up, {said}: [{page}]({page})\n")
     return 0

@@ -87,11 +87,11 @@ Feature: Go-live from GitHub Actions
     Then it exits 0
     And the job summary says "still awaiting approval: the engine runs it when approved"
 
-  Scenario: A request still running when the time is up ends well, saying the engine finishes it
+  Scenario: A request still running when the time is up ends well, saying the engine is still fulfilling it
     Given the engine answers the request with "running" every time
     When the go-live of "example" runs for 1 minutes
     Then it exits 0
-    And the job summary says "still the engine is fulfilling the unit: the engine finishes it"
+    And the job summary says "the engine is still fulfilling the unit"
 
   Scenario: A 5xx or no answer is asked again, after a longer wait each time
     Given the engine answers the request with "awaiting", then 503, then no answer, then "done" with "k8s.secret:s" ready
@@ -100,11 +100,11 @@ Feature: Go-live from GitHub Actions
     And it waited 15, 15, 30 seconds
     And it printed "the engine answered 503; asking again in 15 s"
 
-  Scenario: An engine that never answers runs out the time and asks nothing more
+  Scenario: An engine that never answers runs out the time, and the run says where a request it took would be
     Given the engine never answers
     When the go-live of "example" runs for 1 minutes
     Then it exits 1
-    And the job summary says "The engine did not answer: nothing was asked"
+    And the job summary says "The engine did not answer; if it took the request it is on /approvals"
 
   Scenario: An engine that answers 5xx while the run waits, until the time is up, ends well
     Given the engine answers the request with "awaiting", then 503 every time
