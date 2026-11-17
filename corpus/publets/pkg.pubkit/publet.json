@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.43.0 is released as v0.43.0 from commit b6162f0e772ef6563a5eb366b940b90dfb4c013d.",
+      "content": "pubrules 0.43.1 is released as v0.43.1 from commit 860e9b32edd09f098c8f98f188820b0cd040cf96.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.43.0",
+            "0.43.1",
             "pubrules --version",
-            "pubrules 0.43.0",
-            "v0.43.0",
-            "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
+            "pubrules 0.43.1",
+            "v0.43.1",
+            "860e9b32edd09f098c8f98f188820b0cd040cf96"
           ]
         ]
       },
-      "scope": "the published release v0.43.0 of pubrules",
+      "scope": "the published release v0.43.1 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
+          "revision": "860e9b32edd09f098c8f98f188820b0cd040cf96"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.43.0 was released on 2026-11-17 from commit b6162f0e772ef6563a5eb366b940b90dfb4c013d with these changes.",
+      "content": "pubrules 0.43.1 was released on 2026-11-17 from commit 860e9b32edd09f098c8f98f188820b0cd040cf96 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "changed",
-            "pubkit is now pubrules, at Sustenaut/pubrules: the package, the command and its module are pubrules, a repository's config is pubrules.json, the managed files are ./pubrules, pubrules.mk, pubrules-python.mk and tests/requirements-pubrules.txt, the environment variables are PUBRULES_*, and sync pins Sustenaut/pubrules/.github/workflows/... and Sustenaut/pubrules/actions/...; nothing reads the old names, so a repository moves over in one migration pull request"
+            "fixed",
+            "A repository's suite runs on pubtest 0.2.0, which reads PUBRULES_FUZZ_RUNS, and deploy.providers' floors are pubsec 0.3.0 and pubdeploy 0.5.0, the first releases that read pubrules.json: sync moves an older pin up, and sync --check fails below them"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.43.0 of pubrules",
+      "scope": "the published release v0.43.1 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
+          "revision": "860e9b32edd09f098c8f98f188820b0cd040cf96"
         }
       ]
     }
