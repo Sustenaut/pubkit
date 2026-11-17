@@ -56,11 +56,11 @@ PUBREL_COMMIT = "931f3016d6fec63315e413060cde079d77730b52"
 # (pubdeploy's hook) moves to the latest release; sync adds the floor where none is listed and
 # moves one below it up, and sync --check fails below it. It moves only when
 # pubrules needs a newer pubsec, such as for a change to the provider contract.
-PUBSEC_FLOOR = ("0.1.2", "88a68ffd252b49289ae02d0a9f629f3e0f0832c921cb8ee0f1301f958527de17")
+PUBSEC_FLOOR = ("0.3.0", "a9036c741e29098cdd04baf64c7873e0ff1dd6e7bde12e9671a3940370724e18")
 PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
 # The oldest pubdeploy this pubrules works with, the same way: the deploy walk,
 # whose sustenaut.sync and sustenaut.bump hooks pubrules's sync and bump call.
-PUBDEPLOY_FLOOR = ("0.1.0", "2748a0bd8d9f5d12e7f99dd3f9f71ce84fe7281c7df78799755890fe81ba62af")
+PUBDEPLOY_FLOOR = ("0.5.0", "320d68e081c674457294e6ed3a6c8ab9e2606ca4a2946c252a34021b62dc70cd")
 PUBDEPLOY_WHEEL = "https://github.com/Sustenaut/pubdeploy/releases/download/v{0}/pubdeploy-{0}-py3-none-any.whl"
 FLOORS = {"pubsec": (*PUBSEC_FLOOR, PUBSEC_WHEEL), "pubdeploy": (*PUBDEPLOY_FLOOR, PUBDEPLOY_WHEEL)}
 
