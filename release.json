@@ -1,7 +1,7 @@
 {
   "name": "pubrules",
-  "package": "pkg.pubkit",
-  "tag": "PKG-PUBKIT-10-2026",
+  "package": "pkg.pubrules",
+  "tag": "PKG-PUBRUL-11-2026",
   "corpus": "corpus",
   "manifest": {
     "kind": "pyproject",
