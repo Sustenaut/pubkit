@@ -705,13 +705,14 @@ def wrong_pubrules(root: Path, command: str) -> str | None:
     $PUBRULES_ANY_VERSION set."""
     if command not in PINNED_COMMANDS or os.environ.get("PUBRULES_ANY_VERSION"):
         return None
-    from .freshness import pinned
-    pin = pinned(root)
-    if pin is None or pin == __version__:
+    from .freshness import pinned_package
+    found = pinned_package(root)
+    if found is None or found == ("pubrules", __version__):
         return None
+    package, pin = found
     move = ("; `pubrules bump` moves the repository to this one"
-            if _release(__version__) > _release(pin) else "")
-    return (f"this repository pins pubrules {pin}, and this is pubrules {__version__}: run "
+            if package == "pubkit" or _release(__version__) > _release(pin) else "")
+    return (f"this repository pins {package} {pin}, and this is pubrules {__version__}: run "
             f"`make venv` to install the pinned one, or `./pubrules {command} ...`, which runs it"
             f"{move} (PUBRULES_ANY_VERSION=1 runs this one anyway)")
 

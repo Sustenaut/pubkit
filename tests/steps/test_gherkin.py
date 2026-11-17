@@ -13,16 +13,22 @@ scenarios("gherkin.feature")
 
 FEATURE = """Feature: Adding
   Scenario: Two and two
-    Then two and two make four
+    When two and two are added
+    Then they make four
 """
-STEPS = '''from pytest_bdd import scenarios, then
+STEPS = '''from pytest_bdd import scenarios, then, when
 
 scenarios("adding.feature")
 
 
-@then("two and two make four")
-def four():
-    assert 2 + 2 == 4
+@when("two and two are added", target_fixture="sum")
+def added():
+    return 2 + 2
+
+
+@then("they make four")
+def four(sum):
+    assert sum == 4
 '''
 TESTS = {
     "a plain test function": "def test_adds():\n    assert 2 + 2 == 4\n",
@@ -39,6 +45,18 @@ TESTS = {
                             "    return 4\n",
     "a fake server": "export function fakeGithub() { return {}; }\n",
     "a scenario": FEATURE.replace("Adding", "Not bound"),
+    "a scenario without a When": "Feature: Checks\n  Scenario: Only a check\n    Given a number\n"
+                                 "    Then it is four\n",
+    "a scenario whose When is in its Background": "Feature: Checks\n  Background:\n    When two and two "
+                                                  "are added\n  Scenario: Set up elsewhere\n    Then they "
+                                                  "make four\n",
+    "a scenario whose When is in a docstring": "Feature: Checks\n  Scenario: A When in the text\n"
+                                               "    Given a file holding:\n      \"\"\"\n      When this "
+                                               "is only text\n      \"\"\"\n    Then it is text\n",
+    "an outline with a When, chained with And": "Feature: Checks\n  Scenario Outline: Adding <n>\n"
+                                                "    Given a number\n    When <n> is added\n"
+                                                "    And it is doubled\n    Then it is even\n\n"
+                                                "    Examples:\n      | n |\n      | 2 |\n",
     "cucumber steps that use node:test's mock": "import { mock } from 'node:test';\n"
                                                 "import { Then } from '@cucumber/cucumber';\n"
                                                 "Then('it adds', () => { mock.fn(); });\n",
@@ -77,6 +95,16 @@ def feature_removed(repo):
 @given(parsers.parse('the file "{path}" holds {test}'))
 def holds(repo, path, test):
     write(repo, path, TESTS[test])
+
+
+@given(parsers.parse('today is "{day}"'))
+def today_is(env, day):
+    env["PUBRULES_TODAY"] = day
+
+
+@given("the suite's scenario has no When")
+def no_when(repo):
+    write(repo, "tests/features/adding.feature", FEATURE.replace("When two and two are added", "Given two and two"))
 
 
 @given("the suite binds the whole features directory")

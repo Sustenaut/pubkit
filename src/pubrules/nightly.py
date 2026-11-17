@@ -511,7 +511,7 @@ def actions(root: Path) -> list[str]:
 
 
 def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
-    from .freshness import pinned  # noqa: PLC0415
+    from .freshness import pinned, pinned_package  # noqa: PLC0415
 
     changes = []
     # What installed packages move, as `pubrules bump` has them do: pubdeploy's
@@ -526,6 +526,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         else:
             print(line, file=sys.stderr)
     changes += moved
+    package = (pinned_package(root) or ("pubrules", None))[0]
     before = pinned(root)
     if before and RELEASE_TAG.fullmatch(f"v{before}") and release_key(before) > release_key(__version__):
         # Never backwards: sync would write this older pubrules' managed files.
@@ -537,6 +538,11 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
         sync(root, check=False)
         if lock:
             lock_requirements(root)
+    if before and before != __version__:
+        # A rule this pubrules brings that the repository fails is waived,
+        # for a while, by the move that brings it.
+        from .gherkin import grandfather  # noqa: PLC0415
+        changes += grandfather(root, package, before)
     if before and before != __version__:
         changes.append(f"pubrules {before} -> {__version__}")
     released = bool(pubrel) and released_by_config(root, pubrel, changes)

@@ -18,18 +18,26 @@ from . import __version__
 from .refs import (ANY_OWNER, AT, PUBRULES_PIN, VERSION, owner_of, ref, release_commit, repin,
                    stale_pins)
 
-PIN = re.compile(r"/download/v([0-9][^/]*)/pubrules-")
+# pubrules's wheel, or pubkit's, which pubrules was called before 0.43.0.
+PIN = re.compile(r"/download/v([0-9][^/]*)/(pubrules|pubkit)-")
 WORKFLOW_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrules/\.github/workflows/rust-ci\.yml@)"
                           + AT + VERSION)
 
 
-def pinned(repo: Path) -> str | None:
-    """The pubrules version a repository's lock pins."""
+def pinned_package(repo: Path) -> tuple[str, str] | None:
+    """(the package, its version) a repository's lock pins: pubrules, or
+    pubkit for a repository not yet moved past the rename."""
     lock = repo / "tests" / "requirements.lock"
     if not lock.is_file():
         return None
     m = PIN.search(lock.read_text(encoding="utf-8"))
-    return m.group(1) if m else None
+    return (m.group(2), m.group(1)) if m else None
+
+
+def pinned(repo: Path) -> str | None:
+    """The pubrules version a repository's lock pins (pubkit's, before the rename)."""
+    found = pinned_package(repo)
+    return found[1] if found else None
 
 
 def bump(root: Path) -> int:
@@ -41,8 +49,14 @@ def bump(root: Path) -> int:
     from .hooks import bump as bump_hooks  # noqa: PLC0415
     for line in bump_hooks(root):
         print(line)
+    before = pinned_package(root)
     sync(root, check=False)
     lock(root)
+    # A rule this pubrules brings that the repository fails is waived, for a
+    # while, by the move that brings it.
+    from .gherkin import grandfather  # noqa: PLC0415
+    for line in grandfather(root, *(before or (None, None))):
+        print(line)
     commit, calls = release_commit(), owner_of(root)
     for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         text = path.read_text(encoding="utf-8")

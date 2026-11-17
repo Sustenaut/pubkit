@@ -13,10 +13,20 @@ every repository to that has code (every kind but content).
 - **TEST-03:** every feature file runs: a pytest-bdd binding names it, or the
   directory it is in, or the repository runs cucumber-js, which runs every
   feature file it is given.
+- **TEST-04:** every scenario has a When among its own steps: it sets
+  something up, takes one action and checks what came of it (pubtest's
+  GRAMMAR.md). A When in a Background does not count, since a Background
+  builds the world. A step's `And` or `But` takes the keyword before it.
 
 A repository that cannot meet a rule yet declares an exception in
 pubrules.json, as for the Rust crate standard's rules:
 `{"rule": "TEST-02", "reason": "...", "until": "YYYY-MM-DD"}`.
+
+TEST-04 came after the repositories had suites, so the move to the pubrules
+that brings it (`pubrules bump`, and the nightly's pins) writes its exception,
+until 2026-12-31, into a repository that fails it (`grandfather`): no
+repository's CI goes red on the bump, and one that passes, or moves later,
+gets none.
 """
 
 from __future__ import annotations
@@ -32,7 +42,13 @@ RULES = {
     "TEST-01": "the repository has a Gherkin suite",
     "TEST-02": "no test runs outside a scenario",
     "TEST-03": "every feature file runs",
+    "TEST-04": "every scenario has a When",
 }
+# The release that brings TEST-04 (the one after 0.43.3, which the rename
+# cut without it), and how long a repository that moved to it failing the
+# rule has to meet it.
+WHEN_FROM = "0.43.4"
+WHEN_UNTIL = "2026-12-31"
 # Never the repository's own: tools, environments and what they fetched.
 SKIPPED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "target",
            "dist", "build", "coverage", ".terraform", "vendor"}
@@ -52,6 +68,10 @@ GHERKIN_RUNNERS = ("@cucumber/cucumber", "quickpickle", "@amiceli/vitest-cucumbe
 GHERKIN_RUNNER = re.compile(r"""(from\s+|require\(\s*|import\(\s*)['"](""" + "|".join(map(re.escape, GHERKIN_RUNNERS)) + r""")['"/]""")
 NODE_RUNNER = re.compile(r"""(from\s+|require\(\s*|import\(\s*)['"](node:test|vitest|@playwright/test|mocha|jest|ava|tap|uvu)['"/]""")
 PYTHON_TEST = re.compile(r"^(test_.*|.*_test)\.py$")
+# A Gherkin file's lines that matter to TEST-04: the blocks, and the steps.
+BLOCK = re.compile(r"^\s*(Feature|Rule|Background|Scenario Outline|Scenario Template|Scenario|Example|Examples|Scenarios):")
+STEP = re.compile(r"^\s*(Given|When|Then|And|But|\*)\s")
+DOCSTRING = re.compile(r'^\s*("""|```)')
 
 
 def files(root: Path) -> list[PurePosixPath]:
@@ -178,6 +198,40 @@ def _cucumber(root: Path, listed: list[PurePosixPath]) -> bool:
     return False
 
 
+def whenless(text: str) -> list[tuple[int, str]]:
+    """(line, title) of each scenario in a feature file's text that has no
+    When of its own. An Outline is one scenario, whatever its Examples."""
+    found: list[tuple[int, str]] = []
+    scenario: tuple[int, str] | None = None
+    has_when = False
+    fence = None
+    for number, line in enumerate(text.splitlines(), 1):
+        if fence:
+            if line.strip().startswith(fence):
+                fence = None
+            continue
+        opened = DOCSTRING.match(line)
+        if opened:
+            fence = opened.group(1)
+            continue
+        block = BLOCK.match(line)
+        if block:
+            if block.group(1) in ("Examples", "Scenarios"):
+                continue
+            if scenario and not has_when:
+                found.append(scenario)
+            scenario = None
+            if block.group(1) not in ("Feature", "Rule", "Background"):
+                scenario, has_when = (number, line.strip()), False
+            continue
+        step = STEP.match(line)
+        if step and scenario and step.group(1) == "When":
+            has_when = True
+    if scenario and not has_when:
+        found.append(scenario)
+    return found
+
+
 def checks(root: Path) -> dict[str, list[str]]:
     """Each rule's problems here."""
     listed = files(root)
@@ -192,6 +246,9 @@ def checks(root: Path) -> dict[str, list[str]]:
     for path in features:
         if path not in with_scenarios:
             problems["TEST-01"].append(f"{path} has no scenario")
+        for line, title in whenless((root / path).read_text(encoding="utf-8", errors="replace")):
+            problems["TEST-04"].append(f"{path}:{line}: {title} has no When: give it the one action "
+                                       f"it tests (pubtest's GRAMMAR.md)")
     bases = _features_base(root, listed)
     named: set[str] = set()
     unresolved = False
@@ -225,6 +282,41 @@ def checks(root: Path) -> dict[str, list[str]]:
 def applies(config: dict) -> bool:
     """Every kind but content, whose own tooling checks what it holds."""
     return config.get("kind") != "content"
+
+
+def grandfather(root: Path, package: str | None, before: str | None) -> list[str]:
+    """On the move from a pubrules without TEST-04 (one before WHEN_FROM, or
+    any pubkit, as pubrules was called before 0.43.0), the TEST-04
+    exception a repository that fails the rule needs, written into its
+    pubrules.json; what was written, or nothing."""
+    from .conform import today  # noqa: PLC0415
+    try:
+        older = bool(before) and (package == "pubkit" or _release(before) < _release(WHEN_FROM))
+    except ValueError:
+        older = False
+    path = root / "pubrules.json"
+    if not older or not path.is_file():
+        return []
+    config = json.loads(path.read_text(encoding="utf-8"))
+    declared = config.get("exceptions", [])
+    if (not applies(config) or any(isinstance(e, dict) and e.get("rule") == "TEST-04" for e in declared)
+            or str(today()) > WHEN_UNTIL):
+        return []
+    missing = checks(root).get("TEST-04", [])
+    if not missing:
+        return []
+    count = f"{len(missing)} scenario{'s' if len(missing) > 1 else ''}"
+    config["exceptions"] = [*declared, {
+        "rule": "TEST-04",
+        "reason": f"{count} had no When on the move from {package or 'pubrules'} {before}, before the rule; "
+                  f"give each its one action, on pubtest's steps",
+        "until": WHEN_UNTIL}]
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return [f"pubrules.json: TEST-04 waived until {WHEN_UNTIL}, for the {count} with no When"]
+
+
+def _release(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in str(version).split(".")[:3])
 
 
 def run(root: Path, config: dict) -> tuple[list[str], list[str]]:
