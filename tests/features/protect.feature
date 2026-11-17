@@ -390,6 +390,25 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     Then it prints "secret scanning and push protection on, up to date"
     And GitHub was asked to turn on nothing in "example-org/site"
 
+  Scenario: A public repository gets its dependency graph turned on, which dependency review needs
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
+    And GitHub has no ruleset in "example-org/site"
+    And "example-org/site" has its dependency graph off
+    When I run pubkit "protect" "example-org/site"
+    Then it succeeds
+    And it prints "example-org/site: turned on the dependency graph and Dependabot alerts"
+    And GitHub was asked to turn on the dependency graph in "example-org/site"
+
+  Scenario: protect --check reports the dependency graph off, and changes nothing
+    Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
+    And GitHub has pubkit's ruleset in "example-org/site" requiring "ci / passed"
+    And "example-org/site" has secret scanning "enabled" and push protection "enabled"
+    And "example-org/site" has its dependency graph off
+    When I run pubkit "protect" "--check" "--no-tags" "example-org/site"
+    Then the exit code is 1
+    And it prints "dependency graph and Dependabot alerts off; pubkit wants them on"
+    And GitHub was not asked to turn on the dependency graph in "example-org/site"
+
   Scenario: A private repository is left alone
     Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"
     And GitHub has no ruleset in "example-org/site"
@@ -397,6 +416,7 @@ Feature: Every repository carries pubkit's rulesets, on main and on its release 
     When I run pubkit "protect" "example-org/site"
     Then it prints "secret scanning left alone"
     And GitHub was asked to turn on nothing in "example-org/site"
+    And GitHub was not asked to turn on the dependency graph in "example-org/site"
 
   Scenario: A token that can't read them changes nothing, and fails nothing
     Given "example-org/site"'s pubkit.json on GitHub requires "ci / passed"

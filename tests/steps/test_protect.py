@@ -33,6 +33,18 @@ if f:
         sys.exit(1)
     print(json.dumps({{"content": state["files"][f.group(1)]}}))
     sys.exit(0)
+v = re.match(r"repos/([^/]+/[^/]+)/vulnerability-alerts$", url)
+if v:
+    off = v.group(1) in state.get("alerts_off", [])
+    if method == "PUT":
+        state["alerts_off"] = [x for x in state.get("alerts_off", []) if x != v.group(1)]
+        state["sent"].append({{"method": method, "url": url, "body": None}})
+        json.dump(state, open(path, "w"))
+        sys.exit(0)
+    if off:
+        sys.stderr.write("gh: Not Found (HTTP 404)\\n")
+        sys.exit(1)
+    sys.exit(0)
 r = re.match(r"repos/([^/]+/[^/]+)$", url)
 if r and method == "PATCH":
     body = json.load(sys.stdin)
@@ -444,3 +456,20 @@ def turned_on(github, names, slug):
 @then(parsers.parse('GitHub was asked to turn on nothing in "{slug}"'))
 def turned_on_nothing(github, slug):
     assert _turned_on(github, slug) == []
+
+
+@given(parsers.parse('"{slug}" has its dependency graph off'))
+def graph_off(github, slug):
+    _edit(github, lambda s: s.setdefault("alerts_off", []).append(slug))
+
+
+@then(parsers.parse('GitHub was asked to turn on the dependency graph in "{slug}"'))
+def graph_turned_on(github, slug):
+    sent = json.loads(github.read_text())["sent"]
+    assert any(c["method"] == "PUT" and c["url"] == f"repos/{slug}/vulnerability-alerts" for c in sent), sent
+
+
+@then(parsers.parse('GitHub was not asked to turn on the dependency graph in "{slug}"'))
+def graph_not_turned_on(github, slug):
+    sent = json.loads(github.read_text())["sent"]
+    assert not any(c["url"] == f"repos/{slug}/vulnerability-alerts" for c in sent), sent
