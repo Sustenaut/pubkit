@@ -6,7 +6,7 @@ step, a person approves it on the engine's page, and the run waits for the end.
 The run's identity is its GitHub Actions OIDC token, for the engine's own address
 as audience: the job needs `id-token: write`, and nothing else, no secret. The
 token is asked for afresh for every call, since a wait outlives one; it is masked
-in the log and never printed. The engine (Sustenaut/convergence-engine) takes
+in the log and never printed. The engine takes
 
     POST ENGINE/requests        {"kind": "fulfil", "unit": UNIT}
     GET  ENGINE/requests/ID     the request's state, for the run that asked

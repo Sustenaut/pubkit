@@ -26,7 +26,8 @@ permissions:
 jobs:
   go-live:
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: ${{ inputs.timeout-minutes + 15 }}
+    # The run's own limit is timeout-minutes (at most 340); the job's leaves room for the setup.
+    timeout-minutes: 360
     permissions:
       contents: read
       id-token: write
