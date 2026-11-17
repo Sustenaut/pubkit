@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pubrules"
-version = "0.43.2"
+version = "0.43.3"
 description = "The setup every package shares: managed files, reusable CI, the Rust crate standard and the Gherkin rule."
 readme = "README.md"
 license = "Apache-2.0"

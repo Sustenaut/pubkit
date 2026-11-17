@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.43.2 is released as v0.43.2 from commit 9e5a31853fd5891ec15a381efd997a9d66369ef5.",
+      "content": "pubrules 0.43.3 is released as v0.43.3 from commit 8eebc3e0aabad8fdae96fd424392ba1b1c8ea4ef.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.43.2",
+            "0.43.3",
             "pubrules --version",
-            "pubrules 0.43.2",
-            "v0.43.2",
-            "9e5a31853fd5891ec15a381efd997a9d66369ef5"
+            "pubrules 0.43.3",
+            "v0.43.3",
+            "8eebc3e0aabad8fdae96fd424392ba1b1c8ea4ef"
           ]
         ]
       },
-      "scope": "the published release v0.43.2 of pubrules",
+      "scope": "the published release v0.43.3 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "9e5a31853fd5891ec15a381efd997a9d66369ef5"
+          "revision": "8eebc3e0aabad8fdae96fd424392ba1b1c8ea4ef"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.43.2 was released on 2026-11-17 from commit 9e5a31853fd5891ec15a381efd997a9d66369ef5 with these changes.",
+      "content": "pubrules 0.43.3 was released on 2026-11-17 from commit 8eebc3e0aabad8fdae96fd424392ba1b1c8ea4ef with these changes.",
       "data": {
         "columns": [
           {
@@ -58,18 +58,22 @@
         "rows": [
           [
             "added",
-            "Go-live from GitHub Actions: in a repository with a deploy block, sync writes .github/workflows/go-live.yml, run by hand with a unit, calling the reusable go-live.yml, whose pubrules go-live asks the convergence engine with the run's OIDC token, waits for a person's approval and ends as the request ends; pubrules.json's go-live block (engine, timeout-minutes, claude-dispatch)"
+            "TEST-04: every scenario has a When among its own steps, checked by `pubrules gherkin` and `sync --check`; the move to this pubrules (`pubrules bump`, the nightly's pins) writes a TEST-04 exception until 2026-12-31 into a repository that fails it, and the seeded repository.feature takes its When and pubtest's Thens"
+          ],
+          [
+            "fixed",
+            "Managed files, workflow descriptions, step names and messages say pubrules' where the rename left pubrules's"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.43.2 of pubrules",
+      "scope": "the published release v0.43.3 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "9e5a31853fd5891ec15a381efd997a9d66369ef5"
+          "revision": "8eebc3e0aabad8fdae96fd424392ba1b1c8ea4ef"
         }
       ]
     }
