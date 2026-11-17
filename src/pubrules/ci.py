@@ -766,12 +766,15 @@ def path(event: str) -> str:
 
 INTEGRATIONS = "integrations.json"
 WITH_SECRETS = "with-secrets"
+OIDC = "github.actions-oidc"
+GO_LIVE = ".github/workflows/go-live.yml"  # golive.CALLER
 
 
 def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
     """integrations.json as it must read for the integrations scan to pass: every
     workflow pubrules writes that takes SONAR_TOKEN listed under a sonarcloud use, adding
-    them to "sonarcloud.scan" where none lists them. None where the repository keeps no
+    them to "sonarcloud.scan" where none lists them, and the go-live caller, whose OIDC
+    token is GitHub's identity, under "github.actions-oidc". None where the repository keeps no
     integrations.json, or one that isn't JSON, which the scan reports itself. A path
     already listed, by name or by a pattern, leaves the file as it is, byte for byte;
     nothing else is taken out, since something else may need it.
@@ -804,16 +807,21 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
                     and WITH_SECRETS in paths):
                 use["paths"] = sorted({*(p for p in paths if p != WITH_SECRETS), f"{WITH_SECRETS}.json"})
                 moved = True
-    if not missing and not moved:
+    # The go-live caller's OIDC token (id-token: write), under GitHub's OIDC use.
+    oidc = [p for u in uses if u.get("plugin") == OIDC for p in u.get("paths") or [] if isinstance(p, str)]
+    identity = [name for name, body in wanted if name == GO_LIVE and "id-token: write" in body
+                and not any(name == p or fnmatch(name, p) for p in oidc)]
+    if not missing and not moved and not identity:
         return INTEGRATIONS, text
-    if not missing:
-        return INTEGRATIONS, json.dumps(data, indent=2) + "\n"
-    scan = next((u for u in uses if u.get("plugin") == "sonarcloud.scan"), None)
-    if scan is None:
-        scan = {"plugin": "sonarcloud.scan", "paths": [], "mode": "required"}
-        uses.append(scan)
-        uses.sort(key=lambda u: str(u.get("plugin", "")))
-    scan["paths"] = sorted({*scan.get("paths", []), *missing})
+    for plugin, paths in (("sonarcloud.scan", missing), (OIDC, identity)):
+        if not paths:
+            continue
+        use = next((u for u in uses if u.get("plugin") == plugin), None)
+        if use is None:
+            use = {"plugin": plugin, "paths": [], "mode": "required"}
+            uses.append(use)
+            uses.sort(key=lambda u: str(u.get("plugin", "")))
+        use["paths"] = sorted({*use.get("paths", []), *paths})
     return INTEGRATIONS, json.dumps(data, indent=2) + "\n"
 
 

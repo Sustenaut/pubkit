@@ -258,6 +258,49 @@ contract"). pubrules keeps three things of it:
   installs it from the lock, since `tests/requirements-pubrules.txt` lists
   every deploy.providers wheel, and `./pubrules` runs with each.
 
+## Go-live from GitHub Actions
+
+A step that used to be a per-repository `scripts/go-live*.sh` is a declared need
+(pubdeploy's README), and the convergence engine
+([Sustenaut/convergence-engine](https://github.com/Sustenaut/convergence-engine))
+fulfils it once a person approves its plan on the engine's page. In a repository
+with a deploy block, `pubrules sync` writes `.github/workflows/go-live.yml`: run by
+hand (Actions, "go-live", Run workflow), with the unit to fulfil chosen from the
+block's units, it calls pubrules's reusable `go-live.yml` at this release, which
+runs `pubrules go-live`:
+
+1. It asks GitHub for the run's OIDC token for the engine's address (`id-token:
+   write`, the one permission the caller grants; no secret), masks it, and asks the
+   engine, `POST /requests {"kind": "fulfil", "unit": U}`. The engine takes a run
+   on the default branch of a repository of an owner it lists, walks the unit
+   read-only for its plan, and waits for a person.
+2. It polls `GET /requests/ID` every 15 seconds, with a fresh token each time;
+   after a 5xx or no answer it waits 15, 30, 60, then 120 seconds before asking
+   again. Each state is printed once, and while the request awaits a decision the
+   job summary links the approval page.
+3. It ends as the request ends: done, a success, with each need's end state in the
+   job summary; declined, expired or failed (a plan that changed since its approval
+   among them), a failure with the engine's reason. Still awaiting (or still
+   running) when `timeout-minutes` (300) is up, it ends as a success, saying so:
+   the engine runs it once approved, whether or not the run still waits.
+
+Nothing it prints holds an email or other value: the engine names no approver to a
+caller, and what it says is printed with any email-shaped text taken out. `sync`
+also lists the caller under `github.actions-oidc` in integrations.json, and
+`sync --check` fails when the caller differs or is left behind without a deploy
+block. pubrules.json's `go-live` block, all optional, reaches the caller:
+
+```json
+"go-live": {"engine": "https://convergence.sustenaut.eu", "timeout-minutes": 300, "claude-dispatch": false}
+```
+
+`engine` is the engine's address (and the token's audience), `timeout-minutes` how
+long a run waits, and `claude-dispatch` whether Claude may start the workflow too.
+The engine does not enforce `claude-dispatch` yet: a run's OIDC token names who
+started it (`actor`), and a dispatch by Claude through a person's token reads as
+that person, so telling them apart needs its own mark first. ci.runs-on's default
+label is the job's runner.
+
 ## Terraform from CI
 
 `terraform.yml`, the reusable workflow that applies a stack from the default

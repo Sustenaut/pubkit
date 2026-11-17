@@ -74,7 +74,7 @@ SHIPPED = {
         "job-review.yml", "job-rust-audit.yml", "job-rust-cross.yml", "job-rust-functional.yml",
         "job-rust-fuzz.yml", "job-rust-gates.yml", "job-rust-msrv.yml", "job-rust-test.yml",
         "job-rust-toolchains.yml", "job-service-checks.yml", "job-service-terraform.yml",
-        "job-service-tests.yml", "job-sonar.yml", "job-tested.yml", "node-ci.yml",
+        "job-service-tests.yml", "job-sonar.yml", "job-tested.yml", "go-live.yml", "node-ci.yml",
         "python-ci.yml", "rust-ci.yml", "service-ci.yml",
     ),
     "terraform": (),
