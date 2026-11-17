@@ -44,9 +44,10 @@ RULES = {
     "TEST-03": "every feature file runs",
     "TEST-04": "every scenario has a When",
 }
-# The last release without TEST-04, and how long a repository that moved
-# from it failing the rule has to meet it.
-WHEN_AFTER = "0.43.2"
+# The release that brings TEST-04 (the one after 0.43.3, which the rename
+# cut without it), and how long a repository that moved to it failing the
+# rule has to meet it.
+WHEN_FROM = "0.43.4"
 WHEN_UNTIL = "2026-12-31"
 # Never the repository's own: tools, environments and what they fetched.
 SKIPPED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", "target",
@@ -284,13 +285,13 @@ def applies(config: dict) -> bool:
 
 
 def grandfather(root: Path, package: str | None, before: str | None) -> list[str]:
-    """On the move from a pubrules without TEST-04 (WHEN_AFTER or older, or
+    """On the move from a pubrules without TEST-04 (one before WHEN_FROM, or
     any pubkit, as pubrules was called before 0.43.0), the TEST-04
     exception a repository that fails the rule needs, written into its
     pubrules.json; what was written, or nothing."""
     from .conform import today  # noqa: PLC0415
     try:
-        older = bool(before) and (package == "pubkit" or _release(before) <= _release(WHEN_AFTER))
+        older = bool(before) and (package == "pubkit" or _release(before) < _release(WHEN_FROM))
     except ValueError:
         older = False
     path = root / "pubrules.json"
