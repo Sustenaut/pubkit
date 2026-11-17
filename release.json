@@ -1,7 +1,7 @@
 {
   "name": "pubrules",
   "package": "pkg.pubrules",
-  "tag": "PKG-PUBRUL-11-2026",
+  "tag": "PKG-PUBRLZ-11-2026",
   "corpus": "corpus",
   "manifest": {
     "kind": "pyproject",
