@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "A repository's suite runs on pubtest 0.2.0, which reads PUBRULES_FUZZ_RUNS, and deploy.providers' floors are pubsec 0.3.0 and pubdeploy 0.5.0, the first releases that read pubrules.json: sync moves an older pin up, and sync --check fails below them"
-}
