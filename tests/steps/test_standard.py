@@ -1,4 +1,4 @@
-"""Steps for the standard's rule IDs, `pubkit required` and `pubkit
+"""Steps for the standard's rule IDs, `pubrules required` and `pubrules
 doc-coverage`, run against scratch Rust crates. cargo reads them
 (`cargo metadata`) but builds nothing, so no network is needed."""
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import standard
+from pubrules import standard
 
 SOURCE = Path(__file__).resolve().parents[2]
 
@@ -30,7 +30,7 @@ def crate(repo: Path, name: str, lib: str | None, main: bool = False, tests: str
     if tests:
         (repo / "tests").mkdir()
         (repo / "tests" / "it.rs").write_text(tests)
-    (repo / "pubkit.json").write_text('{"kind": "rust"}\n')
+    (repo / "pubrules.json").write_text('{"kind": "rust"}\n')
 
 
 TWICE = '''//! A crate.
@@ -122,18 +122,18 @@ def ids_unique(text):
     standard.parse(text)  # raises on a repeated ID
 
 
-@when("I read the standard.json pubkit ships", target_fixture="shipped")
+@when("I read the standard.json pubrules ships", target_fixture="shipped")
 def shipped():
     return json.loads((SOURCE / standard.GENERATED).read_text())
 
 
-@then("the rust pubkit.mk defines every target it names")
+@then("the rust pubrules.mk defines every target it names")
 def makefile_has_targets(shipped):
-    mk = (SOURCE / "src" / "pubkit" / "templates" / "rust" / "pubkit.mk").read_text()
+    mk = (SOURCE / "src" / "pubrules" / "templates" / "rust" / "pubrules.mk").read_text()
     defined = set(re.findall(r"^([a-z-]+):", mk, re.M))
     named = {b["target"] for b in shipped["baseline"]}
     named |= {c["target"] for r in shipped["rules"] for c in r["checks"] if c["kind"] == "make"}
-    assert named <= defined, f"pubkit.mk lacks {sorted(named - defined)}"
+    assert named <= defined, f"pubrules.mk lacks {sorted(named - defined)}"
 
 
 @given(parsers.parse('the pull request changes "{paths}"'))
@@ -150,7 +150,7 @@ def plan_line(result, job, targets):
 
 @then(parsers.parse('it lists as many judged rules as the standard has "[judged" marks, and section 10'))
 def judged_count(shipped):
-    from pubkit.standard import SOURCE
+    from pubrules.standard import SOURCE
     text = (Path(__file__).resolve().parents[2] / SOURCE).read_text()
     # The legend above section 1 explains the mark; it marks no rule.
     text = text[text.index("\n## 1. "):]

@@ -19,17 +19,17 @@ venv: ## Hash-locked environment, with this checkout installed editable
 	.venv/bin/pip install --quiet --no-deps -e .
 
 # Made on first use, so `make protect` needs nothing run before it.
-.venv/bin/pubkit:
+.venv/bin/pubrules:
 	$(MAKE) venv
 
 lock: ## Pin tests/requirements.txt, with hashes
-	.venv/bin/pubkit lock
+	.venv/bin/pubrules lock
 
-standard: ## Regenerate src/pubkit/standard.json from the standard's [checked] tags
-	.venv/bin/python -m pubkit.standard
+standard: ## Regenerate src/pubrules/standard.json from the standard's [checked] tags
+	.venv/bin/python -m pubrules.standard
 
-standard-check: ## Fail if src/pubkit/standard.json differs from the standard's tags
-	.venv/bin/python -m pubkit.standard --check
+standard-check: ## Fail if src/pubrules/standard.json differs from the standard's tags
+	.venv/bin/python -m pubrules.standard --check
 
 functional: ## The Gherkin suite, with its coverage in coverage/coverage.xml
 	rm -rf coverage && mkdir coverage
@@ -43,11 +43,11 @@ check: standard-check functional ## Everything CI runs
 wheel: ## Build the wheel a release carries
 	.venv/bin/pip wheel --quiet --no-deps . -w dist
 
-protect: .venv/bin/pubkit ## Put the ruleset on this repository (or REPOS="o/r ..."), through gh as their admin
-	.venv/bin/pubkit protect $(REPOS)
+protect: .venv/bin/pubrules ## Put the ruleset on this repository (or REPOS="o/r ..."), through gh as their admin
+	.venv/bin/pubrules protect $(REPOS)
 
-protect-check: .venv/bin/pubkit ## Show how each repository differs from the ruleset, changing nothing
-	.venv/bin/pubkit protect --check $(REPOS)
+protect-check: .venv/bin/pubrules ## Show how each repository differs from the ruleset, changing nothing
+	.venv/bin/pubrules protect --check $(REPOS)
 
 clean: ## Remove build artifacts
 	rm -rf build dist coverage src/*.egg-info .pytest_cache tests/.pytest_cache

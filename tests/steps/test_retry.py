@@ -139,7 +139,7 @@ def init_runs(tmp_path, dir, args, tries, pause, how, url):
     work = tmp_path / "work"
     inits = work / "inits"
     inits.mkdir(parents=True)
-    (work / "pubkit.json").write_text(json.dumps({"kind": "service", **({"mirror": {"terraform": url}} if url else {})}))
+    (work / "pubrules.json").write_text(json.dumps({"kind": "service", **({"mirror": {"terraform": url}} if url else {})}))
     terraform = tmp_path / "terraform"
     terraform.write_text(TERRAFORM)
     terraform.chmod(0o755)

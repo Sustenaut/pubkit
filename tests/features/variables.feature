@@ -1,11 +1,11 @@
-Feature: A repository's pubkit.json names the GitHub variables it reads, in a block sync checks
+Feature: A repository's pubrules.json names the GitHub variables it reads, in a block sync checks
   The values are in the owner's state file, which pubfleet's variables command
-  keeps GitHub to; pubkit checks only the block's shape.
+  keeps GitHub to; pubrules checks only the block's shape.
 
   Scenario Outline: sync refuses a variables block of the wrong shape
     Given a repository initialised as "utility"
-    And its pubkit.json's variables block is "<block>"
-    When I run pubkit "sync" "--check"
+    And its pubrules.json's variables block is "<block>"
+    When I run pubrules "sync" "--check"
     Then the exit code is 1
     And it warns "<message>"
 

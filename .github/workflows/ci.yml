@@ -8,20 +8,20 @@ on:
   merge_group:
 
 jobs:
-  # pubkit is its own first consumer: its suite runs through the workflow it
+  # pubrules is its own first consumer: its suite runs through the workflow it
   # provides, from this checkout, so a change to it is tested before a
   # release carries it to anyone else. It installs itself from source, not
   # from a released wheel, so there are no managed files to check.
   #
-  # SonarQube Cloud looks for a lock beside each manifest. pubkit's own lock
+  # SonarQube Cloud looks for a lock beside each manifest. pubrules's own lock
   # is tests/requirements.lock (pip, with hashes), a format it does not
-  # read, and the crate templates under src/pubkit/templates get their
-  # Cargo.lock from `cargo generate-lockfile` when `pubkit new` starts a
+  # read, and the crate templates under src/pubrules/templates get their
+  # Cargo.lock from `cargo generate-lockfile` when `pubrules new` starts a
   # crate, so neither rule applies to these files. The suite's own steps
   # are not code it measures.
   #
-  # The jobs are the ones `pubkit sync` puts in a utility's generated
-  # workflows (src/pubkit/ci.py), from this checkout.
+  # The jobs are the ones `pubrules sync` puts in a utility's generated
+  # workflows (src/pubrules/ci.py), from this checkout.
   #
   # In the merge queue and on a push to main, tested asks whether an
   # earlier run already passed on this commit's tree (a pull request up to
@@ -67,7 +67,7 @@ jobs:
     name: ci
     uses: ./.github/workflows/job-review.yml
 
-  # cachecmd: `pubkit cache run ... -- COMMAND` exists to run the command
+  # cachecmd: `pubrules cache run ... -- COMMAND` exists to run the command
   # its caller typed, as make runs a recipe; S8705 reads that as injection.
   # The ignore names the rule and cache.py only.
   #
@@ -93,12 +93,12 @@ jobs:
         -Dsonar.issue.ignore.multicriteria.pylock.ruleKey=text:S8565
         -Dsonar.issue.ignore.multicriteria.pylock.resourceKey=pyproject.toml
         -Dsonar.issue.ignore.multicriteria.cargolock.ruleKey=text:S8570
-        -Dsonar.issue.ignore.multicriteria.cargolock.resourceKey=src/pubkit/templates/**/Cargo.toml
+        -Dsonar.issue.ignore.multicriteria.cargolock.resourceKey=src/pubrules/templates/**/Cargo.toml
         -Dsonar.issue.ignore.multicriteria.cachecmd.ruleKey=pythonsecurity:S8705
-        -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubkit/cache.py
+        -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubrules/cache.py
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
-  # The one check pubkit's ruleset requires. review is skipped on a push
+  # The one check pubrules's ruleset requires. review is skipped on a push
   # and in the merge queue, sonar in the merge queue, tested on a pull
   # request, and every testing job where an earlier run already passed on
   # the commit's tree.
@@ -148,7 +148,7 @@ jobs:
   # Consumers lock the wheel by URL and sha256, so each release carries it.
   # Built once, when the release appears, and never replaced, from the
   # release's tag, with the commit the tag names in it as release-commit:
-  # `pubkit sync` pins pubkit's workflows to that commit (src/pubkit/refs.py)
+  # `pubrules sync` pins pubrules's workflows to that commit (src/pubrules/refs.py)
   # without asking the network.
   wheel:
     needs: release
@@ -164,14 +164,14 @@ jobs:
         with: { python-version: '3.14' }
       - run: |
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
-          wheel="pubkit-$version-py3-none-any.whl"
+          wheel="pubrules-$version-py3-none-any.whl"
           gh release view "v$version" >/dev/null 2>&1 || { echo "v$version is not released"; exit 0; }
           gh release view "v$version" --json assets --jq '.assets[].name' | grep -qx "$wheel" && { echo "$wheel already attached"; exit 0; }
           git fetch --quiet --depth 1 origin tag "v$version"
           git checkout --quiet "v$version"
-          git rev-parse "v$version^{commit}" > src/pubkit/release-commit
+          git rev-parse "v$version^{commit}" > src/pubrules/release-commit
           python -m pip wheel --no-deps . -w dist
-          unzip -p "dist/$wheel" pubkit/release-commit | grep -qxE '[0-9a-f]{40}'
+          unzip -p "dist/$wheel" pubrules/release-commit | grep -qxE '[0-9a-f]{40}'
           gh release upload "v$version" "dist/$wheel"
         env:
           GH_TOKEN: ${{ github.token }}

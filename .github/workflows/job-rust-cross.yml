@@ -6,18 +6,18 @@
 #
 # A pull request that touches no Rust code, Cargo files, fuzz/ or workflow
 # files cannot change what this job tests, so it says so and passes at once
-# (`pubkit required` decides, as slow=false); a release pull request, a
+# (`pubrules required` decides, as slow=false); a release pull request, a
 # push and the nightly run it in full.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-rust-cross
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       cross-targets: { type: string, default: '["i686-unknown-linux-gnu", "s390x-unknown-linux-gnu"]', description: "JSON list of targets to test under emulation: i686-unknown-linux-gnu, s390x-unknown-linux-gnu, aarch64-unknown-linux-gnu. The standard asks for a 32-bit and a big-endian one (RS-PLAT-01)." }
       cross-test-args: { type: string, default: '', description: "Arguments to cargo test on each cross target, such as -p for the crates that matter." }
@@ -43,7 +43,7 @@ jobs:
         run: |
           make venv
           git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
-          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
+          .venv/bin/pubrules required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
             --changed-files "$RUNNER_TEMP/changed-files" > /dev/null
           if grep -qx 'slow=false' "$GITHUB_OUTPUT"; then
             echo "::notice::This pull request touches no Rust code, Cargo files, fuzz/ or workflow files, so the emulated tests have nothing new to test; releases and the nightly run it in full."

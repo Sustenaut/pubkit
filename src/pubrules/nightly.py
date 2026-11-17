@@ -1,0 +1,905 @@
+"""The nightly update of a pub* repository, as two commits' worth of change.
+
+`pubrules pins --pubrel V` moves every outdated pub* pin to its latest
+release: this pubrules (managed files, lock, `rust-ci.yml`), pubrel's release
+workflow and `pubrel-version`, each
+tool `ci.tools` pins by tag, to the latest release of its git repository,
+every other repository's reusable workflow a workflow pins at a release
+(a control plane's reusable workflow, say), to that repository's
+latest release, every Python package a requirements file or pyproject.toml
+pins by another repository's release wheel (`name @ https://github.com/OWNER/
+REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`) to that repository's
+latest release, forward only, with each `uv pip compile` lock made from a
+moved file compiled again, and the crates `nightly.pins.crates` names in
+`Cargo.lock`, within their requirements.
+
+`pubrules crates --report FILE` then tries each upgrade `cargo update` would
+make to the other crates, one at a time on top of those it kept, and keeps
+one only when `cargo vet` covers it with an audit, imported or by a trusted
+publisher, without adding an exemption, and `cargo deny` passes with it.
+Each update it drops is listed in the report with the audits cargo vet
+recommends for it, as `cargo vet suggest` prints them.
+
+`pubrules actions` moves each third-party GitHub Action the hand-written
+workflows and composite actions pin by commit to its latest release, by
+the commit of its tag, in place of Dependabot's version updates, whose pull
+requests can add no pubrel row and get no SonarQube Cloud token.
+
+`pubrules nightly` then updates the npm packages within their ranges and
+re-locks the Python requirements, when the repository has them. A
+repository turns each language's updates off with `update`, and the long
+nightly fuzz run with `security.fuzz`, in its pubrules.json (see
+`settings`); the pub* pins always come, and the advisory checks every CI
+run makes have no switch.
+
+Each prints what it changed, one line per change, for the commit message
+and the pull request.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import functools
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+from . import __version__
+from .paths import confined
+from .refs import (ANY_OWNER, AT, PUBRULES_PIN, RELEASE_PIN, TF_SOURCE, VERSION, owner_of, pubrel_commit, ref,
+                   release_commit, repin, shipped, tagged)
+
+# A row's text, which must not start with '-' (pubrel has no `--`, so it
+# would read that as an option) or a space.
+ROW = re.compile(r"[^-\s].*", re.S)
+
+# The categories `pubrel add` takes.
+CATEGORIES = ("changed", "removed", "added", "fixed", "security", "internal")
+
+# RELEASE_PIN (refs.py) is pubrel's release workflow, by commit or by tag.
+PUBREL_VERSION = re.compile(r"(pubrel-version:\s*v)(?P<version>[0-9][^\s,}'\"]*)")
+# Every pubrules reusable workflow a repository can call, not only rust-ci.
+CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrules/\.github/workflows/"
+                    r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
+# Any other repository's reusable workflow (.github/workflows/<name>) or
+# action (actions/<name>) at a release, the repository read from the line
+# itself, so pubrules names none of them. pubrules's and pubrel's move with
+# PUBRULES_PIN and RELEASE_PIN; a deploy.providers package's with its entry,
+# which its sustenaut.bump hook moves.
+OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
+                       r"(?P<path>/(?:\.github/workflows/[\w.-]+\.ya?ml|actions/[\w.-]+)@)"
+                       + AT + VERSION)
+RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
+# A Python package pinned by another repository's release wheel, in a requirements
+# file or pyproject.toml: the version is in the tag and in the file's name.
+WHEEL_PIN = re.compile(r"(?P<lead>[A-Za-z0-9][A-Za-z0-9_.-]*(?:\[[^\]]*\])?\s*@\s*)https://github\.com/"
+                       r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]*)/(?P<repo>[A-Za-z0-9_.-]+)/releases/download/"
+                       r"v(?P<version>[0-9]+\.[0-9]+\.[0-9]+)/(?P<file>[A-Za-z0-9_.+-]+\.whl)")
+# The command a `uv pip compile` lock was made with, in its header.
+UV_COMPILE = re.compile(r"^#\s+(uv pip compile .*)$", re.M)
+# A third-party action in a `uses:` line, pinned as Dependabot pins one: by
+# the commit of a release's tag, with the version in a comment. OWNER/REPO,
+# then any path inside it (actions/cache/restore), then `@COMMIT # vX.Y.Z`.
+# A pin by tag, or to a branch (`# main`), or of a pre-release, is left.
+ACTION_PIN = re.compile(r"(?P<lead>uses:[ \t]*['\"]?)" + ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
+                        r"(?P<path>(?:/[\w.-]+)*)@(?P<commit>[0-9a-f]{40})(?P<gap>[ \t]+#[ \t]*)"
+                        r"v(?P<version>[0-9]+(?:\.[0-9]+)*)(?=[\s'\"]|$)", re.M)
+# Directories a repository's own composite actions are never in.
+NOT_OWN = ("node_modules", "target")
+
+# The languages pubrules's settings name, each by the ecosystem pubrules works
+# with: crates, npm packages, and the hash-locked Python requirements.
+LANGUAGES = ("rust", "node", "python")
+
+# What `update` and `security.fuzz` default to for each language: all on.
+# `update` also takes `actions`, the third-party GitHub Actions the
+# repository's workflows and composite actions use (see `actions`).
+# Fuzzing is cargo-fuzz for Rust, and the property tests (Hypothesis,
+# fast-check) for Python and Node; on, a scheduled run fuzzes for longer.
+UPDATES = dict.fromkeys((*LANGUAGES, "actions"), True)
+FUZZ = dict.fromkeys(LANGUAGES, True)
+
+# The keys `security` takes (security.py reads dependabot and sonar). The
+# advisory checks have none: they always run.
+SECURITY = ("fuzz", "dependabot", "sonar")
+
+
+def by_language(name: str, given: object, defaults: dict[str, bool]) -> dict[str, bool]:
+    """A per-language switch: an object naming some languages, or one
+    boolean for all of them, over the defaults."""
+    if isinstance(given, bool):
+        return dict.fromkeys(defaults, given)
+    if not isinstance(given, dict):
+        sys.exit(f"pubrules: pubrules.json's {name} must be an object, such as "
+                 '{"rust": true, "python": false}, or true or false for every language')
+    unknown = sorted(set(given) - set(defaults))
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's {name} has no language {', '.join(unknown)}; "
+                 f"it takes {', '.join(defaults)}")
+    for key, value in given.items():
+        if not isinstance(value, bool):
+            sys.exit(f"pubrules: pubrules.json's {name}.{key} must be true or false, not {value!r}")
+    return {**defaults, **given}
+
+
+def named_crates(config: dict) -> tuple[str, ...] | None:
+    """The crates pubrules.json's `nightly.pins.crates` names, or None when it
+    names none. Anything else in the nightly block stops the command."""
+    from .ci import CRATE  # noqa: PLC0415
+    block = config.get("nightly", {})
+    if not isinstance(block, dict):
+        sys.exit('pubrules: pubrules.json\'s nightly must be an object, such as '
+                 '{"pins": {"crates": ["some-crate"]}}')
+    unknown = sorted(set(block) - {"pins"})
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's nightly has no setting {', '.join(unknown)}; "
+                 "it takes pins")
+    pinned = block.get("pins", {})
+    if not isinstance(pinned, dict):
+        sys.exit('pubrules: pubrules.json\'s nightly.pins must be an object, such as '
+                 '{"crates": ["some-crate"]}')
+    unknown = sorted(set(pinned) - {"crates"})
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's nightly.pins has no setting {', '.join(unknown)}; "
+                 "it takes crates")
+    if "crates" not in pinned:
+        return None
+    names = pinned["crates"]
+    if not isinstance(names, list) or not all(isinstance(n, str) and CRATE.fullmatch(n)
+                                              for n in names):
+        sys.exit("pubrules: pubrules.json's nightly.pins.crates must list crate names, "
+                 f"not {names!r}")
+    return tuple(names)
+
+
+def pin_crates(root: Path) -> tuple[str, ...]:
+    """The crates `pins` moves here rather than `crates`."""
+    path = root / "pubrules.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    named = named_crates(config)
+    return named or ()
+
+
+def settings(root: Path) -> dict[str, dict[str, bool]]:
+    """The repository's `update` and `security.fuzz`, per language, from
+    pubrules.json over the defaults. Anything else stops the nightly."""
+    path = root / "pubrules.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    security = config.get("security", {})
+    if not isinstance(security, dict):
+        sys.exit("pubrules: pubrules.json's security must be an object, such as "
+                 '{"fuzz": {"rust": true}}')
+    unknown = sorted(set(security) - set(SECURITY))
+    if unknown:
+        sys.exit(f"pubrules: pubrules.json's security has no setting {', '.join(unknown)}; "
+                 f"it takes {', '.join(SECURITY)} (the advisory checks always run)")
+    fuzz = by_language("security.fuzz", security.get("fuzz", {}), FUZZ)
+    from .security import dependabot_settings, sonar_settings  # noqa: PLC0415
+    dependabot_settings(config)
+    sonar_settings(config)
+    named_crates(config)
+    return {"update": by_language("update", config.get("update", {}), UPDATES), "fuzz": fuzz}
+
+
+def locked(root: Path) -> dict[str, str]:
+    """Crate name -> version, from Cargo.lock (the highest when several)."""
+    lock = root / "Cargo.lock"
+    if not lock.is_file():
+        return {}
+    out: dict[str, str] = {}
+    for m in re.finditer(r'\[\[package\]\]\nname = "([^"]+)"\nversion = "([^"]+)"',
+                         lock.read_text(encoding="utf-8")):
+        out[m.group(1)] = m.group(2)
+    return out
+
+
+def cargo(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["cargo", *args], cwd=root, capture_output=True, text=True, check=False)
+
+
+def refresh_reports(root: Path) -> None:
+    """Regenerate each published crate's SUPPLY-CHAIN.md, which names the
+    versions in Cargo.lock: an update otherwise leaves it stale."""
+    from .conform import packages  # noqa: PLC0415
+    from .supply_chain import run as supply_chain  # noqa: PLC0415
+
+    config = json.loads((root / "pubrules.json").read_text(encoding="utf-8"))
+    names = [p["name"] for p in packages(root, config)
+             if (Path(p["manifest_path"]).parent / "SUPPLY-CHAIN.md").is_file()]
+    if names:
+        supply_chain(root, names, check=False)
+
+
+def record(root: Path, text: str, category: str = "internal") -> list[str]:
+    """Record `text` for every package `pubrel check` says needs a row for the
+    committed change, and return the packages."""
+    if category not in CATEGORIES:
+        sys.exit(f"pubrules: pubrel has no category {category!r}; use one of "
+                 f"{', '.join(CATEGORIES)}")
+    row = ROW.fullmatch(text)
+    if not row:
+        sys.exit(f"pubrules: the row's text {text!r} is empty or starts with a space or "
+                 "'-', which pubrel would take for an option")
+    text = row.group(0)
+    out = subprocess.run(["pubrel", "check", "origin/main"], cwd=root, capture_output=True,
+                         text=True, check=False)
+    hints = re.findall(r"run `pubrel add( --package ([A-Za-z0-9_][A-Za-z0-9_-]*))? CATEGORY",
+                       out.stdout + out.stderr)
+    added = []
+    for flag, package in hints:
+        argv = ["pubrel", "add", *(["--package", package] if flag else []), category, text]
+        subprocess.run(argv, cwd=root, check=True, capture_output=True)
+        added.append(package or "(the package)")
+    return added
+
+
+def released_by_config(root: Path, pubrel: str, changes: list[str]) -> bool:
+    """Move the pubrel that pubrules.json's ci.release names to `pubrel`; True
+    when it moved. One the ci block leaves to pubrules moves with pubrules."""
+    path = root / "pubrules.json"
+    if not path.exists():
+        return False
+    config = json.loads(path.read_text(encoding="utf-8"))
+    release = config.get("ci", {}).get("release") if isinstance(config.get("ci"), dict) else None
+    if not isinstance(release, dict) or release.get("pubrel") in (None, pubrel):
+        return False
+    changes.append(f"pubrules.json: ci.release.pubrel {release['pubrel']} -> {pubrel}")
+    release["pubrel"] = pubrel
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def latest_release(repo: str) -> str | None:
+    """The tag of `repo`'s latest release, or None when GitHub does not say."""
+    try:
+        out = subprocess.run(["gh", "release", "view", "--repo", repo, "--json", "tagName",
+                              "--jq", ".tagName"], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def tools_by_config(root: Path, changes: list[str]) -> bool:
+    """Move each tool pubrules.json's ci.tools pins by tag to the latest release
+    of its git repository; True when one moved. One whose latest release
+    cannot be read stays as it is, with a warning."""
+    from .ci import GITHUB_REPO, TOOL_TAG, tools  # noqa: PLC0415
+
+    path = root / "pubrules.json"
+    if not path.is_file():
+        return False
+    config = json.loads(path.read_text(encoding="utf-8"))
+    listed = tools(config["ci"]) if isinstance(config.get("ci"), dict) else []
+    moved = False
+    for tool in listed:
+        m = GITHUB_REPO.fullmatch(tool["git"])
+        latest = latest_release(m["repo"]) if m else None
+        if not latest or not TOOL_TAG.fullmatch(latest):
+            print(f"pubrules: warning: no latest release of {tool['git']} to read, "
+                  f"so {tool['crate']} stays at {tool['tag']}", file=sys.stderr)
+        elif latest != tool["tag"]:
+            changes.append(f"pubrules.json: ci.tools {tool['crate']} {tool['tag']} -> {latest}")
+            tool["tag"] = latest
+            moved = True
+    if moved:
+        config["ci"]["tools"] = listed
+        path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return moved
+
+
+@functools.cache
+def latest_tag(slug: str) -> str | None:
+    """`slug`'s latest release tag, when it is vX.Y.Z; None, with a warning, when not."""
+    tag = latest_release(slug)
+    if tag and RELEASE_TAG.fullmatch(tag):
+        return tag
+    print(f"pubrules: warning: no latest release of {slug} to read, so its workflows and actions "
+          "stay where they are pinned", file=sys.stderr)
+    return None
+
+
+def provided(root: Path) -> set[str]:
+    """The repositories deploy.providers takes wheels from, by name in lower case."""
+    from .providers import WHEEL  # noqa: PLC0415
+    path = root / "pubrules.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    deploy = config.get("deploy") if isinstance(config, dict) else None
+    given = deploy.get("providers") if isinstance(deploy, dict) else None
+    return {m["repo"].split("/", 1)[1].lower() for p in given or [] if isinstance(p, dict)
+            and isinstance(p.get("wheel"), str) and (m := WHEEL.fullmatch(p["wheel"]))}
+
+
+def others_by_release(text: str, name: str, skip: set[str], changes: list[str]) -> str:
+    """`text` with each other repository's workflow pin (OTHER_PIN) moved to that
+    repository's latest release, by the commit of its tag; the moves said in
+    `changes`. One whose latest release cannot be read stays."""
+    def move(m: re.Match[str]) -> str:
+        if m["repo"].lower() in skip:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None:
+            return m.group(0)
+        version = latest[1:]
+        commit = tagged(f"{os.environ.get('PUBRULES_GIT_BASE', 'https://github.com')}/{slug}", latest)
+        if version == m["version"] and (commit is None or commit == m["commit"]):
+            return m.group(0)
+        changes.append(f"{name}: {slug} {m['version']} -> {version}" if version != m["version"]
+                       else f"{name}: {slug} {version} pinned to {commit}")
+        return f"{slug}{m['path']}{ref(version, commit)}"
+    return OTHER_PIN.sub(move, text)
+
+
+def wheel_files(root: Path) -> list[Path]:
+    """The files that can pin a release wheel: requirements files (*.txt, *.in
+    with "requirements" in the name) and pyproject.toml, outside dot-directories,
+    node_modules and target; never a lock, which follows its input, nor the
+    requirements pubrules sync writes."""
+    out = []
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root)
+        if any(part.startswith(".") or part in NOT_OWN for part in rel.parts[:-1]) or not path.is_file():
+            continue
+        base = path.name
+        if base == "pyproject.toml" or ("requirements" in base and base.endswith((".txt", ".in"))
+                                        and base != "requirements-pubrules.txt"):
+            out.append(path)
+    return out
+
+
+def wheels_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Path]:
+    """Each release wheel pin (WHEEL_PIN) of another repository moved to that
+    repository's latest release, when that release is newer: the tag and the
+    file's version both. The moves said in `changes`; the files moved returned.
+    One whose latest release cannot be read, or is not newer, stays."""
+    moved_files = []
+
+    def move(m: re.Match[str], rel: str) -> str:
+        if m["repo"].lower() in skip or m["version"] not in m["file"]:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None or release_key(latest[1:]) <= release_key(m["version"]):
+            return m.group(0)
+        version = latest[1:]
+        line = f"{rel}: {slug} {m['version']} -> {version}"
+        if line not in changes:
+            changes.append(line)
+        file = m["file"].replace(m["version"], version, 1)
+        return f"{m['lead']}https://github.com/{slug}/releases/download/v{version}/{file}"
+
+    for path in wheel_files(root):
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        new = WHEEL_PIN.sub(lambda m, rel=rel: move(m, rel), text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+            moved_files.append(path)
+    return moved_files
+
+
+def recompile(root: Path, moved: list[Path], changes: list[str]) -> None:
+    """Each `uv pip compile` lock (its header names the command) whose input
+    moved, compiled again with that command, so its hashes are the new wheels'.
+    One that fails is said, and left for the pull request's CI to show."""
+    import shlex  # noqa: PLC0415
+    names = {p.relative_to(root).as_posix() for p in moved}
+    for lock in sorted(root.rglob("*.lock")):
+        if any(part.startswith(".") or part in NOT_OWN for part in lock.relative_to(root).parts[:-1]):
+            continue
+        try:
+            found = UV_COMPILE.search(lock.read_text(encoding="utf-8")[:2000])
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not found:
+            continue
+        argv = shlex.split(found.group(1))
+        here = lock.parent.relative_to(root)
+        if not any((here / a).as_posix() in names for a in argv if a.endswith((".in", ".txt", ".toml"))):
+            continue
+        done = subprocess.run(argv, cwd=lock.parent, capture_output=True, text=True, check=False)
+        rel = lock.relative_to(root).as_posix()
+        if done.returncode != 0:
+            print(f"pubrules: warning: {rel} could not be compiled again: "
+                  f"{(done.stderr.strip().splitlines() or ['uv failed'])[-1]}", file=sys.stderr)
+            continue
+        changes.append(f"{rel}: compiled again")
+
+
+def modules_by_release(root: Path, skip: set[str], changes: list[str]) -> None:
+    """Each other repository's Terraform module source (TF_SOURCE) in the
+    repository's .tf files, moved to that repository's latest release by the
+    commit of its tag, with the version in a comment after the closing
+    quote; the moves said in `changes`. A source pinned by commit with no
+    version comment, or whose latest release cannot be read, stays."""
+    from .refs import tf_files  # noqa: PLC0415
+
+    def move(m: re.Match[str], name: str) -> str:
+        current = m["tag"] or m["version"]
+        if m["repo"].lower() in skip or current is None:
+            return m.group(0)
+        slug = f"{m['owner']}/{m['repo']}"
+        latest = latest_tag(slug)
+        if latest is None:
+            return m.group(0)
+        version = latest[1:]
+        commit = tagged(f"{os.environ.get('PUBRULES_GIT_BASE', 'https://github.com')}/{slug}", latest)
+        if version == current and (commit is None or commit == m["commit"]):
+            return m.group(0)
+        changes.append(f"{name}: {slug} {current} -> {version}" if version != current
+                       else f"{name}: {slug} {version} pinned to {commit}")
+        at = f'{commit}" # v{version}' if commit else f'v{version}"'
+        return f'{m["lead"]}"github.com/{slug}//{m["path"]}?ref={at}'
+
+    for path in tf_files(root):
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        new = TF_SOURCE.sub(lambda m, rel=rel: move(m, rel), text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+
+
+def action_files(root: Path) -> list[Path]:
+    """The repository's hand-written workflows and its own composite actions
+    (action.yml anywhere outside dot-directories other than .github, and
+    outside node_modules and target)."""
+    workflows = sorted((root / ".github" / "workflows").glob("*.y*ml"))
+    own = sorted(p for p in root.rglob("action.y*ml")
+                 if not any((part.startswith(".") and part != ".github") or part in NOT_OWN
+                            for part in p.relative_to(root).parts[:-1]))
+    return workflows + [p for p in own if p not in workflows]
+
+
+def release_key(version: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in version.split("."))
+
+
+@functools.cache
+def tag_commit(slug: str, tag: str) -> str | None:
+    """The commit `slug`'s tag names, or None. `tagged` would warn that it
+    pins by tag; `actions` never does, and says so itself."""
+    with contextlib.redirect_stderr(io.StringIO()):
+        return tagged(f"{os.environ.get('PUBRULES_GIT_BASE', 'https://github.com')}/{slug}", tag)
+
+
+def actions(root: Path) -> list[str]:
+    """Each third-party action (ACTION_PIN) in the repository's hand-written
+    workflows and composite actions moved to its repository's latest
+    release, by the commit of its tag, with the version in a comment: what
+    Dependabot's version updates did, but on the nightly's branch, with a
+    pubrel row and the nightly's token. One line per file and repository
+    moved. pubrules's and pubrel's pins, and a deploy.providers package's,
+    move with `pins`, as does any OWNER/REPO/actions/NAME or reusable
+    workflow (OTHER_PIN). An action only moves forward, and one whose
+    latest release or tag's commit cannot be read stays, with a warning.
+    Workflows `pubrules sync` writes move with pubrules."""
+    from .ci import is_generated  # noqa: PLC0415
+
+    skip = {"pubrules", "pubrel"} | provided(root)
+    changes: list[str] = []
+    for path in action_files(root):
+        text = path.read_text(encoding="utf-8")
+        if is_generated(text):
+            continue
+        rel = path.relative_to(root).as_posix()
+
+        def move(m: re.Match[str], rel: str = rel) -> str:
+            if m["repo"].lower() in skip or m["path"].startswith(("/actions/", "/.github/workflows/")):
+                return m.group(0)
+            slug = f"{m['owner']}/{m['repo']}"
+            latest = latest_tag(slug)
+            if latest is None or release_key(latest[1:]) <= release_key(m["version"]):
+                return m.group(0)
+            commit = tag_commit(slug, latest)
+            if commit is None:
+                print(f"pubrules: warning: could not read the commit of {slug}'s {latest}, so "
+                      f"{rel} stays at {m['version']}", file=sys.stderr)
+                return m.group(0)
+            line = f"{rel}: {slug} {m['version']} -> {latest[1:]}"
+            if line not in changes:
+                changes.append(line)
+            return f"{m['lead']}{slug}{m['path']}@{commit}{m['gap']}{latest}"
+
+        new = ACTION_PIN.sub(move, text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+    return changes
+
+
+def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
+    from .freshness import pinned  # noqa: PLC0415
+
+    changes = []
+    # What installed packages move, as `pubrules bump` has them do: pubdeploy's
+    # moves deploy.providers (pubsec and pubdeploy among them) and the uses of
+    # pubdeploy's workflows, before sync writes the launchers and the tests'
+    # requirements from them. A failing hook is said, and moves nothing.
+    from .hooks import bump as bump_hooks  # noqa: PLC0415
+    moved = []
+    for line in bump_hooks(root):
+        if line.startswith("updated"):
+            moved.append(line.removeprefix("updated").strip())
+        else:
+            print(line, file=sys.stderr)
+    changes += moved
+    before = pinned(root)
+    if before and RELEASE_TAG.fullmatch(f"v{before}") and release_key(before) > release_key(__version__):
+        # Never backwards: sync would write this older pubrules's managed files.
+        print(f"pubrules: warning: this repository runs pubrules {before}, newer than this {__version__}, "
+              "so pubrules's managed files and lock stay", file=sys.stderr)
+        before, moved = __version__, []
+    if (before and before != __version__) or moved:
+        from .cli import lock as lock_requirements, sync  # noqa: PLC0415
+        sync(root, check=False)
+        if lock:
+            lock_requirements(root)
+    if before and before != __version__:
+        changes.append(f"pubrules {before} -> {__version__}")
+    released = bool(pubrel) and released_by_config(root, pubrel, changes)
+    if tools_by_config(root, changes) or released:
+        from .cli import sync  # noqa: PLC0415
+        sync(root, check=False)
+    from .ci import is_generated  # noqa: PLC0415
+    calls = owner_of(root)
+    skip = {"pubrules", "pubrel"} | provided(root)
+    for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        text = path.read_text(encoding="utf-8")
+        if is_generated(text):  # pubrules sync writes these, from pubrules.json
+            continue
+        new = text
+        for pattern, version, what in ((PUBRULES_PIN, __version__, "pubrules"),
+                                       (RELEASE_PIN, pubrel, "pubrel release workflow"),
+                                       (PUBREL_VERSION, pubrel, "pubrel-version")):
+            if not version or not pattern.search(new):
+                continue
+            if pattern is PUBREL_VERSION:
+                commit = None
+                moved = pattern.sub(rf"\g<1>{version}", new)
+            else:
+                # A workflow's pin: the commit moves with the version. A pin
+                # of a pubrules action or workflow this pubrules does not ship
+                # stays on the commit that has it; sync --check says so.
+                commit = (pubrel_commit(version, new, calls) if pattern is RELEASE_PIN
+                          else release_commit())
+                moved = repin(pattern, new, calls, version, commit,
+                              keep=(lambda m: not shipped(m["name"])) if pattern is PUBRULES_PIN else None)
+            for m in pattern.finditer(new):
+                if pattern is PUBRULES_PIN and not shipped(m["name"]):
+                    changes.append(f"{path.name}: {m['name']} stays at pubrules {m['version']}: "
+                                   f"pubrules {version} has no {m['name']}")
+                    continue
+                # "pubrules A -> B" already says that pubrules's own pins moved.
+                if m["version"] != version and pattern is not PUBRULES_PIN:
+                    changes.append(f"{path.name}: {what} {m['version']} -> {version}")
+                elif m["version"] == version and commit and m["commit"] != commit:
+                    changes.append(f"{path.name}: {what} {version} pinned to {commit}")
+            new = moved
+        new = others_by_release(new, path.name, skip, changes)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+    modules_by_release(root, skip, changes)
+    # deploy.providers' wheels too: a hand-written requirement of one keeps up with
+    # the providers entry its package's hook moved. pubrules's are sync's to write.
+    wheels = wheels_by_release(root, {"pubrules"}, changes)
+    if wheels and lock:
+        from .cli import REQUIREMENTS, lock as lock_requirements  # noqa: PLC0415
+        if (root / REQUIREMENTS).is_file():
+            with contextlib.redirect_stdout(io.StringIO()):
+                lock_requirements(root)
+        recompile(root, wheels, changes)
+    old = locked(root)
+    moving = pin_crates(root)
+    for crate in moving:
+        if crate in old:
+            cargo(root, "update", "--quiet", "-p", crate)
+    new_lock = locked(root)
+    changes += [f"{c} {old[c]} -> {new_lock[c]}" for c in moving
+                if c in old and new_lock.get(c) != old[c]]
+    if new_lock != old:
+        refresh_reports(root)
+    return changes
+
+
+UPDATE = re.compile(r"^\s*Updating (\S+) v(\S+) -> v(\S+)", re.M)
+
+
+def npm_locked(root: Path) -> dict[str, str]:
+    """Direct dependency -> version, from package-lock.json."""
+    lock = root / "package-lock.json"
+    if not lock.is_file():
+        return {}
+    packages = json.loads(lock.read_text(encoding="utf-8")).get("packages", {})
+    top = packages.get("", {})
+    names = {**top.get("dependencies", {}), **top.get("devDependencies", {})}
+    return {n: packages[f"node_modules/{n}"]["version"] for n in sorted(names)
+            if "version" in packages.get(f"node_modules/{n}", {})}
+
+
+def changed(old: dict[str, str], new: dict[str, str]) -> list[str]:
+    """One line per package whose version moved, in name order."""
+    return [f"{n} {old[n]} -> {new[n]}" for n in sorted(old) if n in new and new[n] != old[n]]
+
+
+def npm(root: Path) -> list[str]:
+    """Every npm package updated to the newest version its range in
+    package.json allows, in package-lock.json only and without running an
+    install script. The direct dependencies that moved, one line each."""
+    if not (root / "package-lock.json").is_file():
+        return []
+    old = npm_locked(root)
+    subprocess.run(["npm", "update", "--package-lock-only", "--ignore-scripts",
+                    "--no-audit", "--no-fund"], cwd=root, check=True, capture_output=True)
+    return changed(old, npm_locked(root)) or (["indirect dependencies"]
+                                              if git(root, "status", "--porcelain") else [])
+
+
+def python_locked(root: Path) -> dict[str, str]:
+    """Package -> version, from tests/requirements.lock."""
+    from .cli import LOCK  # noqa: PLC0415
+
+    lock = root / LOCK
+    if not lock.is_file():
+        return {}
+    return dict(re.findall(r"^([A-Za-z0-9_.-]+)==(\S+)", lock.read_text(encoding="utf-8"), re.M))
+
+
+def python(root: Path) -> list[str]:
+    """tests/requirements.lock re-resolved, so each package moves to the
+    newest version requirements.txt allows. The packages that moved."""
+    from .cli import LOCK, REQUIREMENTS, lock  # noqa: PLC0415
+
+    if not (root / REQUIREMENTS).is_file() or not (root / LOCK).is_file():
+        return []
+    old = python_locked(root)
+    with contextlib.redirect_stdout(io.StringIO()):
+        lock(root)
+    return changed(old, python_locked(root))
+
+
+def candidates(root: Path) -> list[tuple[str, str, str]]:
+    """(crate, from, to) for every upgrade `cargo update` would make, the
+    crates `pins` moves aside. Downgrades (which the MSRV-aware resolver
+    proposes when a locked version needs a newer Rust) are not taken."""
+    return upgrades(cargo(root, "update", "--dry-run").stderr, pin_crates(root))
+
+
+def upgrades(dry_run: str, pinned: tuple[str, ...] = ()) -> list[tuple[str, str, str]]:
+    """The upgrades in `cargo update --dry-run`'s output, `pinned` aside."""
+    return [(m.group(1), m.group(2), m.group(3)) for m in UPDATE.finditer(dry_run)
+            if m.group(1) not in pinned]
+
+
+def recommended(vet_output: str) -> str:
+    """What cargo vet recommends auditing, from a failing run's output."""
+    lines = [line.rstrip() for line in vet_output.splitlines() if line.strip()]
+    at = next((i for i, line in enumerate(lines) if "recommended audits" in line), None)
+    return "\n".join(lines[at:] if at is not None else lines[-8:])
+
+
+def failing(vet_output: str) -> list[str]:
+    """The crates `cargo vet` reports missing audits for."""
+    return sorted({m.group(1) for m in re.finditer(r"^\s*([A-Za-z0-9_-]+):\S+ missing",
+                                                     vet_output, re.M)})
+
+
+def has(root: Path, crate: str, version: str) -> bool:
+    lock = root / "Cargo.lock"
+    return lock.is_file() and f'name = "{crate}"\nversion = "{version}"' in lock.read_text(
+        encoding="utf-8")
+
+
+def snapshot(root: Path) -> dict[Path, bytes]:
+    """Cargo.lock and supply-chain/, to restore if the updates do not pass."""
+    paths = [root / "Cargo.lock", *sorted((root / "supply-chain").glob("*"))]
+    return {p: p.read_bytes() for p in paths if p.is_file()}
+
+
+def restore(saved: dict[Path, bytes]) -> None:
+    for path, data in saved.items():
+        path.write_bytes(data)
+
+
+def own_packages(root: Path) -> set[str]:
+    meta = json.loads(cargo(root, "metadata", "--no-deps", "--format-version", "1").stdout
+                      or '{"packages": []}')
+    return {p["name"] for p in meta["packages"]}
+
+
+def first_party_policy(root: Path, vet_output: str) -> list[str]:
+    """When cargo vet stops because the repository's own crates now also
+    exist on crates.io, record that they are not audited as crates.io
+    crates: `[policy.NAME] audit-as-crates-io = false`. Returns the names."""
+    if "audit-as-crates-io" not in vet_output:
+        return []
+    named = set(re.findall(r"^[ \t]*(?:│[ \t]*)?([A-Za-z0-9_-]+):\S+[ \t]*$", vet_output, re.M))
+    own = sorted(named & own_packages(root))
+    config = root / "supply-chain" / "config.toml"
+    if not own or not config.is_file():
+        return []
+    text = config.read_text(encoding="utf-8").rstrip("\n")
+    for name in own:
+        text += (f"\n\n[policy.{name}]\naudit-as-crates-io = false\n"
+                 if f"[policy.{name}]" not in text else "")
+    config.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
+    return own
+
+
+def tail(proc: subprocess.CompletedProcess, n: int = 8) -> str:
+    return "\n".join((proc.stdout + proc.stderr).strip().splitlines()[-n:])
+
+
+def crates(root: Path, report: Path | None) -> int:
+    """Try each upgrade on its own, on top of those already kept, and keep
+    it only when `cargo vet` passes without a new exemption and `cargo deny`
+    passes. A repository with no Cargo.lock has no crates to update."""
+    target = confined(report, "the --report file") if report else None
+    lines, skipped = upgrade(root) if (root / "Cargo.lock").is_file() else ([], [])
+    for line in lines:
+        print(line)
+    if target:
+        target.write_text(json.dumps({"updated": lines, "skipped": skipped}, indent=2) + "\n",
+                          encoding="utf-8")
+    return 0
+
+
+def upgrade(root: Path) -> tuple[list[str], list[dict]]:
+    """The crate updates `crates` keeps, and those it skips with why."""
+    saved = snapshot(root)
+    notes: list[str] = []
+    updated: list[tuple[str, str, str]] = []
+    skipped: list[dict] = []
+    todo = candidates(root)
+
+    vet = cargo(root, "vet")
+    own = first_party_policy(root, vet.stdout + vet.stderr) if vet.returncode else []
+    if own:
+        notes.append("supply-chain/config.toml: " + ", ".join(own) + " (this repository's own) "
+                     "not audited as crates.io crates, now that they are published there")
+        vet = cargo(root, "vet")
+    deny = cargo(root, "deny", "--locked", "check", "--hide-inclusion-graph")
+    if vet.returncode or deny.returncode:
+        restore(saved)
+        why = "main itself does not pass " + ("cargo vet" if vet.returncode else "cargo deny") + \
+              ":\n" + tail(vet if vet.returncode else deny)
+        skipped = [{"crate": c, "from": a, "to": b, "why": why} for c, a, b in todo]
+        todo, notes = [], []
+
+    for crate, old, new in todo:
+        if has(root, crate, new):
+            # Another kept update brought it along, and vet and deny passed.
+            updated.append((crate, old, new))
+            continue
+        if not has(root, crate, old):
+            continue
+        before = snapshot(root)
+        step = cargo(root, "update", "--quiet", "-p", f"{crate}@{old}", "--precise", new)
+        why = ""
+        if step.returncode:
+            why = "cargo updates it only together with other crates:\n" + tail(step)
+        else:
+            vet = cargo(root, "vet")
+            if vet.returncode:
+                why = "not covered by an audit; cargo vet recommends:\n" + recommended(
+                    vet.stdout + vet.stderr)
+            else:
+                # The advisory database was fetched above: --frozen is
+                # --locked, offline.
+                deny = cargo(root, "deny", "--frozen", "check", "--hide-inclusion-graph")
+                if deny.returncode:
+                    why = "cargo deny fails with it:\n" + tail(deny)
+        if why:
+            restore(before)
+            skipped.append({"crate": crate, "from": old, "to": new, "why": why})
+        else:
+            updated.append((crate, old, new))
+
+    if updated and (cargo(root, "vet", "--locked").returncode
+                    or cargo(root, "deny", "--locked", "check").returncode):
+        # Each passed on its own but not all together: take none.
+        restore(saved)
+        skipped += [{"crate": c, "from": a, "to": b,
+                     "why": "the updates together did not pass cargo vet and cargo deny"}
+                    for c, a, b in updated]
+        updated, notes = [], []
+    if not updated and not notes:
+        restore(saved)
+    if updated:
+        refresh_reports(root)
+    return notes + [f"{c} {a} -> {b}" for c, a, b in updated], skipped
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                          check=True).stdout
+
+
+def commit(root: Path, title: str, lines: list[str]) -> bool:
+    """Commit everything changed as `title`, with `lines` as its body and an
+    internal pubrel row for each package that needs one. False when nothing
+    changed."""
+    if not git(root, "status", "--porcelain"):
+        return False
+    who = ["-c", "user.name=pubrules nightly", "-c", "user.email=noreply@github.com"]
+    git(root, "add", "-A")
+    git(root, *who, "commit", "-q", "-m", title, "-m", "\n".join(lines))
+    if record(root, title):
+        git(root, "add", "-A")
+        git(root, *who, "commit", "-q", "--amend", "--no-edit")
+    return True
+
+
+def body(pinned: list[str], updated: list[str], skipped: list[dict],
+         others: dict[str, list[str]] | None = None, update: bool = True) -> str:
+    """The pull request's body. `others` is each further section's lines,
+    by heading; with `update` off, the body says the repository takes no
+    third-party updates instead of listing them."""
+    out = ["Opened by pubrules's nightly workflow, which updates this pull request each night "
+           "rather than opening another. Nothing merges it: merge it when CI is green.", ""]
+    out += ["## 1. pub* pins", ""] + ([f"- {line}" for line in pinned] or ["Nothing outdated."])
+    if not update:
+        out += ["", "## Other dependencies", "",
+                "None: this repository takes no third-party updates; its pubrules.json sets `\"update\": false`."]
+        return "\n".join(out) + "\n"
+    number = 2
+    if updated or skipped:
+        out += ["", f"## {number}. Other crates", "",
+                "Updates within their requirements that `cargo vet` covers with an audit "
+                "(no new exemption) and `cargo deny` passes.", ""]
+        out += [f"- {line}" for line in updated] or ["None."]
+        number += 1
+    for heading, lines in (others or {}).items():
+        if lines:
+            out += ["", f"## {number}. {heading}", ""] + [f"- {line}" for line in lines]
+            number += 1
+    if skipped:
+        out += ["", "### Skipped", "",
+                "Each needs an audit before the nightly takes it. cargo vet recommends, as `cargo vet suggest` would:", ""]
+        for s in skipped:
+            out += [f"<details><summary>{s['crate']} {s['from']} -> {s['to']}</summary>", "",
+                    "```", s["why"], "```", "", "</details>", ""]
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+def nightly(root: Path, pubrel: str, body_path: Path) -> int:
+    """The nightly's commits on the current branch, and the pull request's
+    body. Prints the commits it made, in order: `pins` first when it made
+    that one, then any of `actions`, `crates`, `npm` and `python`, or nothing."""
+    import tempfile  # noqa: PLC0415
+
+    body_path = confined(body_path, "the --body file")
+    update = settings(root)["update"]
+    pinned = pins(root, pubrel)
+    made = ["pins"] if commit(root, "Move to the latest pub* releases", pinned) else []
+    result: dict = {"updated": [], "skipped": []}
+    others: dict[str, list[str]] = {}
+    if update["actions"]:
+        heading = "GitHub Actions, to their latest releases"
+        others[heading] = actions(root)
+        if commit(root, "Move GitHub Actions to their latest releases", others[heading]):
+            made.append("actions")
+    if update["rust"]:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "crates.json"
+            with contextlib.redirect_stdout(io.StringIO()):
+                crates(root, report)
+            result = json.loads(report.read_text(encoding="utf-8"))
+        if commit(root, "Update other crates the supply-chain audits cover", result["updated"]):
+            made.append("crates")
+    for language, heading, update_with, title, name in (
+            ("node", "npm packages, within their ranges in package.json", npm,
+             "Update npm packages within their ranges", "npm"),
+            ("python", "Python packages, re-locked from requirements.txt", python,
+             "Update the locked Python packages", "python")):
+        if update[language]:
+            others[heading] = update_with(root)
+            if commit(root, title, others[heading]):
+                made.append(name)
+    body_path.write_text(body(pinned, result["updated"], result["skipped"], others,
+                              any(update.values())),
+                         encoding="utf-8")
+    print(" ".join(made))
+    return 0

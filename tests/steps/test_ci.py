@@ -1,4 +1,4 @@
-"""Steps for the CI `pubkit sync` writes from pubkit.json's ci block."""
+"""Steps for the CI `pubrules sync` writes from pubrules.json's ci block."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pytest
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__, ci, cli, protect, refs
+from pubrules import __version__, ci, cli, protect, refs
 
 scenarios("ci.feature")
 scenarios("content.feature")
@@ -154,13 +154,13 @@ def _default_purls():
     return step["env"]["DEFAULT"]
 
 
-@then("job-review.yml's license exceptions name every reusable workflow and action pubkit has, "
+@then("job-review.yml's license exceptions name every reusable workflow and action pubrules has, "
       "and pubrel's release workflow")
 def review_exceptions():
     listed = {p.strip() for p in _default_purls().split(",")}
-    wanted = {f"pkg:githubactions/Sustenaut/pubkit/.github/workflows/{path.name}"
+    wanted = {f"pkg:githubactions/Sustenaut/pubrules/.github/workflows/{path.name}"
               for path in WORKFLOWS.glob("*.yml") if "workflow_call" in (yaml.safe_load(path.read_text()).get(True) or {})}
-    wanted |= {f"pkg:githubactions/Sustenaut/pubkit/actions/{path.parent.name}"
+    wanted |= {f"pkg:githubactions/Sustenaut/pubrules/actions/{path.parent.name}"
                for path in (WORKFLOWS.parents[1] / "actions").glob("*/action.yml")}
     wanted |= {"pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml"}
     assert listed == wanted, (sorted(wanted - listed), sorted(listed - wanted))
@@ -180,11 +180,11 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: ./actions/local
-      - uses: Sustenaut/pubkit/actions/cache@0123456789abcdef0123456789abcdef01234567 # v{__version__}
+      - uses: Sustenaut/pubrules/actions/cache@0123456789abcdef0123456789abcdef01234567 # v{__version__}
 """
 
 
-@given("a deploy workflow that calls integrations' scan, pubkit's cache action, actions/checkout and a local action")
+@given("a deploy workflow that calls integrations' scan, pubrules's cache action, actions/checkout and a local action")
 def deploy_workflow(repo):
     (repo / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
     (repo / ".github" / "workflows" / "deploy.yml").write_text(DEPLOY)
@@ -216,7 +216,7 @@ def run_exceptions(tmp_path, workflow, how):
     listing.unlink(missing_ok=True)
     if how != "without a list":
         listing.write_text(
-            "# a comment\npkg:githubactions/Sustenaut/pubkit/actions/cache\n"
+            "# a comment\npkg:githubactions/Sustenaut/pubrules/actions/cache\n"
             "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml\n"
             "pkg:githubactions/someone-else/thing/action\npkg:npm/left-pad\n")
     out = tmp_path / "output"
@@ -232,12 +232,12 @@ def run_exceptions(tmp_path, workflow, how):
 
 @then("it passes the owner's purls alone")
 def owners_alone(exceptions):
-    assert exceptions == ["pkg:githubactions/Sustenaut/pubkit/actions/cache",
+    assert exceptions == ["pkg:githubactions/Sustenaut/pubrules/actions/cache",
                           "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml"]
 
 
-@then("it passes pubkit's and pubrel's")
-def pubkits(exceptions):
+@then("it passes pubrules's and pubrel's")
+def pubruless(exceptions):
     assert exceptions == [p.strip() for p in _default_purls().split(",")]
 
 
@@ -267,14 +267,14 @@ def repository(repo, language, text):
             '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n')
         (repo / "src").mkdir()
         (repo / "src" / "lib.rs").write_text("")
-    (repo / "pubkit.json").write_text(json.dumps({"kind": KINDS[language], "ci": json.loads(text)}))
+    (repo / "pubrules.json").write_text(json.dumps({"kind": KINDS[language], "ci": json.loads(text)}))
 
 
-@given(parsers.parse('pubkit.json excepts "{rule}"'))
+@given(parsers.parse('pubrules.json excepts "{rule}"'))
 def excepts(repo, rule):
-    config = json.loads((repo / "pubkit.json").read_text())
+    config = json.loads((repo / "pubrules.json").read_text())
     config["exceptions"] = [{"rule": rule, "reason": "not yet", "until": "2099-01-01"}]
-    (repo / "pubkit.json").write_text(json.dumps(config))
+    (repo / "pubrules.json").write_text(json.dumps(config))
 
 
 @given(parsers.parse("the file \"{path}\" reads '{text}'"))
@@ -320,7 +320,7 @@ UNTESTED = "${{ needs.tested.outputs.tested != 'true' }}"
 def asks_tested(repo, name, queued):
     first, job = next(iter(jobs(repo, name).items()))
     assert first == "tested"
-    assert job["uses"].startswith(f"{refs.OWNER}/pubkit/.github/workflows/job-tested.yml@")
+    assert job["uses"].startswith(f"{refs.OWNER}/pubrules/.github/workflows/job-tested.yml@")
     assert job["permissions"] == {"actions": "read", "contents": "read"}
     assert job["with"] == {"workflow": f".github/workflows/{queued}"}
     data, _ = declared("job-tested.yml")
@@ -508,7 +508,7 @@ def on_main(repo, name):
     assert triggers(generated(repo, name)) == {"push": {"branches": ["main"]}}
 
 
-@when("I read pubkit's own ci.yml", target_fixture="own")
+@when("I read pubrules's own ci.yml", target_fixture="own")
 def own_ci():
     return yaml.safe_load((WORKFLOWS / "ci.yml").read_text())
 
@@ -557,7 +557,7 @@ def own_scan(own):
 @then("its wheel job runs only on a push to main")
 def own_wheel(own):
     # The release itself tags from a push to main alone: pubrel's
-    # release.yml runs `pubrel tag` only then. The wheel is pubkit's own.
+    # release.yml runs `pubrel tag` only then. The wheel is pubrules's own.
     condition = own["jobs"]["wheel"]["if"]
     assert "github.event_name == 'push'" in condition
     assert "github.ref == 'refs/heads/main'" in condition
@@ -580,11 +580,11 @@ def deploys(repo, name, folder):
                     f"        with:\n          dir: {folder}\n          deploy-key: ${{{{ secrets.KEY }}}}\n")
 
 
-@given(parsers.parse("pubkit.json's site block is '{text}'"))
+@given(parsers.parse("pubrules.json's site block is '{text}'"))
 def site_block(repo, text):
-    config = json.loads((repo / "pubkit.json").read_text())
+    config = json.loads((repo / "pubrules.json").read_text())
     config["site"] = json.loads(text)
-    (repo / "pubkit.json").write_text(json.dumps(config))
+    (repo / "pubrules.json").write_text(json.dumps(config))
 
 
 @then(parsers.parse('"{name}" checks the site in "{folder}" after running "{build}", deploying nothing'))
@@ -650,9 +650,9 @@ def app_secrets(repo, given):
             assert "secrets" not in release, (name, release)
 
 
-@then(parsers.parse('"{name}" pins pubrel\'s release workflow to the commit pubkit records'))
+@then(parsers.parse('"{name}" pins pubrel\'s release workflow to the commit pubrules records'))
 def recorded_pubrel(repo, name):
-    from pubkit.new import PUBREL_COMMIT, PUBREL_PIN  # noqa: PLC0415
+    from pubrules.new import PUBREL_COMMIT, PUBREL_PIN  # noqa: PLC0415
 
     text = (repo / ".github" / "workflows" / name).read_text()
     assert f"release.yml@{PUBREL_COMMIT} # v{PUBREL_PIN}\n" in text, text
@@ -660,7 +660,7 @@ def recorded_pubrel(repo, name):
 
 @when(parsers.parse('every pin reader reads "{line}"'), target_fixture="read")
 def read_pin(line):
-    from pubkit import conform, freshness, nightly  # noqa: PLC0415
+    from pubrules import conform, freshness, nightly  # noqa: PLC0415
 
     patterns = {"conform": conform.WORKFLOW_PIN, "bump": freshness.WORKFLOW_PIN,
                 "nightly": nightly.CI_PIN, "release": refs.RELEASE_PIN}
@@ -699,9 +699,9 @@ def inputs_match(table):
     for name, job in table.items():
         data, inputs = declared(job.workflow)
         passed = set(job.inputs) | set(job.fixed)
-        # Every input but those pubkit gives itself is the repository's.
+        # Every input but those pubrules gives itself is the repository's.
         assert set(job.fixed) <= set(job.internal), name
-        # runs-on is pubkit's too, from the ci block's runs-on, for every job
+        # runs-on is pubrules's too, from the ci block's runs-on, for every job
         # but one whose os-matrix gives its runners.
         own = {*job.internal, *(() if job.matrix else ("runs-on",))}
         assert job.matrix or "runs-on" in inputs, name
@@ -761,9 +761,9 @@ def not_there(repo, path):
 
 # tests/install-lock and the launcher's wheel mirror.
 
-PUBKIT_HASH = "a" * 64
-PUBKIT_WHEEL = f"pubkit-{__version__}-py3-none-any.whl"
-PUBKIT_URL = f"https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/{PUBKIT_WHEEL}"
+PUBRULES_HASH = "a" * 64
+PUBRULES_WHEEL = f"pubrules-{__version__}-py3-none-any.whl"
+PUBRULES_URL = f"https://github.com/Sustenaut/pubrules/releases/download/v{__version__}/{PUBRULES_WHEEL}"
 PYTEST_LINES = f"pytest==9.0.3 \\\n    --hash=sha256:{'b' * 64} \\\n    --hash=sha256:{'c' * 64}\n"
 
 
@@ -782,20 +782,20 @@ def _config(mirror, pypi=""):
     return {"kind": "utility", "mirror": block} if block else {"kind": "utility"}
 
 
-@given(parsers.parse('pubkit.json\'s PyPI mirror is "{url}"'), target_fixture="pypi")
+@given(parsers.parse('pubrules.json\'s PyPI mirror is "{url}"'), target_fixture="pypi")
 def pypi_mirror(url):
     return url
 
 
-@given(parsers.parse('pubkit.json\'s wheel mirror is "{url}"'), target_fixture="mirror")
+@given(parsers.parse('pubrules.json\'s wheel mirror is "{url}"'), target_fixture="mirror")
 def wheel_mirror(url):
     return url
 
 
-@given('a lock that pins "pubkit" by a GitHub release URL and "pytest" from PyPI', target_fixture="lock")
+@given('a lock that pins "pubrules" by a GitHub release URL and "pytest" from PyPI', target_fixture="lock")
 def lock_file(tmp_path):
     lock = tmp_path / "requirements.lock"
-    lock.write_text(f"pubkit @ {PUBKIT_URL} \\\n    --hash=sha256:{PUBKIT_HASH}\n{PYTEST_LINES}")
+    lock.write_text(f"pubrules @ {PUBRULES_URL} \\\n    --hash=sha256:{PUBRULES_HASH}\n{PYTEST_LINES}")
     return lock
 
 
@@ -835,10 +835,10 @@ def pip_ran(installed, times, how):
     assert (installed["code"] == 0) == (how == "passed"), installed
 
 
-@then('the last lock pinned "pubkit" at the mirror\'s address for its sha256, with its hash')
-def mirrored_pubkit(installed, mirror):
+@then('the last lock pinned "pubrules" at the mirror\'s address for its sha256, with its hash')
+def mirrored_pubrules(installed, mirror):
     assert installed["locks"][-1].startswith(
-        f"pubkit @ {mirror}/f/{PUBKIT_HASH}/{PUBKIT_WHEEL} \\\n    --hash=sha256:{PUBKIT_HASH}\n")
+        f"pubrules @ {mirror}/f/{PUBRULES_HASH}/{PUBRULES_WHEEL} \\\n    --hash=sha256:{PUBRULES_HASH}\n")
 
 
 @then('the last lock left "pytest" as it was')
@@ -846,7 +846,7 @@ def pytest_kept(installed):
     assert installed["locks"][-1].endswith(PYTEST_LINES)
 
 
-@given(parsers.parse("pubkit.json's mirror setting '{setting}'"), target_fixture="setting")
+@given(parsers.parse("pubrules.json's mirror setting '{setting}'"), target_fixture="setting")
 def mirror_setting(setting):
     return json.loads(setting)
 
@@ -859,21 +859,21 @@ def mirror_refused(setting):
         in str(stop.value)
 
 
-@given("a lock that pins this pubkit's wheel", target_fixture="repo_dir")
+@given("a lock that pins this pubrules's wheel", target_fixture="repo_dir")
 def pinned_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
     digest = hashlib.sha256(b"the wheel").hexdigest()
     (repo / "tests" / "requirements.lock").write_text(
-        f"pubkit @ {PUBKIT_URL} \\\n    --hash=sha256:{digest}\n{PYTEST_LINES}")
+        f"pubrules @ {PUBRULES_URL} \\\n    --hash=sha256:{digest}\n{PYTEST_LINES}")
     return repo
 
 
-@when(parsers.parse('the launcher fetches pubkit with GitHub failing and the mirror giving "{content}"'),
+@when(parsers.parse('the launcher fetches pubrules with GitHub failing and the mirror giving "{content}"'),
       target_fixture="launched")
 def launch(tmp_path, repo_dir, mirror, content):
-    launcher = repo_dir / "pubkit"
-    launcher.write_text(cli.render(cli.templates("utility")["pubkit"], cli.values(_config(mirror))))
+    launcher = repo_dir / "pubrules"
+    launcher.write_text(cli.render(cli.templates("utility")["pubrules"], cli.values(_config(mirror))))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     (bin_dir / "curl").write_text(
@@ -895,9 +895,9 @@ def launch(tmp_path, repo_dir, mirror, content):
 @then("uvx is given the cached wheel")
 def uvx_cached(launched, mirror):
     digest = hashlib.sha256(b"the wheel").hexdigest()
-    held = launched["cache"] / "pubkit" / "wheels" / digest / PUBKIT_WHEEL
-    assert launched["code"] == 0 and launched["stdout"].split() == ["--from", str(held), "pubkit", "--version"], launched
-    assert launched["asked"] == [PUBKIT_URL, f"{mirror}/f/{digest}/{PUBKIT_WHEEL}"]
+    held = launched["cache"] / "pubrules" / "wheels" / digest / PUBRULES_WHEEL
+    assert launched["code"] == 0 and launched["stdout"].split() == ["--from", str(held), "pubrules", "--version"], launched
+    assert launched["asked"] == [PUBRULES_URL, f"{mirror}/f/{digest}/{PUBRULES_WHEEL}"]
 
 
 @then(parsers.parse('the launcher stops with "{message}"'))
@@ -905,10 +905,10 @@ def launcher_stops(launched, message):
     assert launched["code"] == 1 and message in launched["stderr"], launched
 
 
-@then("the launcher without a mirror runs uvx on pubkit's GitHub release URL, with no fetch")
+@then("the launcher without a mirror runs uvx on pubrules's GitHub release URL, with no fetch")
 def launcher_plain():
-    text = cli.render(cli.templates("utility")["pubkit"], cli.values({"kind": "utility"}))
-    assert f'exec uvx --from "{PUBKIT_URL}" pubkit "$@"' in text and "fetch()" not in text
+    text = cli.render(cli.templates("utility")["pubrules"], cli.values({"kind": "utility"}))
+    assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text and "fetch()" not in text
 
 
 def _steps(workflow):
@@ -916,8 +916,8 @@ def _steps(workflow):
     return [s for job in data["jobs"].values() for s in job.get("steps", [])]
 
 
-# pubkit's own actions, as its reusable workflows pin them: by a release's commit.
-SELF_PIN = re.compile(r"^Sustenaut/pubkit/actions/(?P<name>[\w-]+)@(?P<commit>[0-9a-f]{40})$")
+# pubrules's own actions, as its reusable workflows pin them: by a release's commit.
+SELF_PIN = re.compile(r"^Sustenaut/pubrules/actions/(?P<name>[\w-]+)@(?P<commit>[0-9a-f]{40})$")
 
 
 def _self_pinned(step, name):
@@ -930,7 +930,7 @@ def _action_inputs(name):
     return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())["inputs"]
 
 
-@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubkit's "
+@then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubrules's "
                     "own pin, three times with 15 seconds between"))
 def setup_retried(workflow):
     steps = [s for s in _steps(workflow) if s.get("name", "").startswith("Set up, tried three times")]
@@ -943,7 +943,7 @@ def setup_retried(workflow):
         assert "run" not in step and "env" not in step, step
 
 
-@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubkit's own pin in the "
+@then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubrules's own pin in the "
                     "terraform-dir input, with \"{args}\" and the action's default pause"))
 def init_by_action(workflow, args):
     (step,) = [s for s in _steps(workflow) if s.get("name", "").startswith("terraform init, tried three times")]
@@ -954,24 +954,24 @@ def init_by_action(workflow, args):
     assert "run" not in step and "env" not in step, step
 
 
-@then("every use of pubkit's actions in pubkit's workflows pins one commit, at a release no later than this pubkit")
+@then("every use of pubrules's actions in pubrules's workflows pins one commit, at a release no later than this pubrules")
 def self_pins_released():
     """No self-pin at all passes too: the workflows may carry their own steps."""
     pins = set()
     for path in sorted(WORKFLOWS.glob("*.yml")):
         text = path.read_text()
-        uses = [u for u in refs.PUBKIT_USE.findall(text) if "/pubkit/actions/" in u]
-        pinned = [m for m in refs.PUBKIT_PIN.finditer(text) if m["name"].startswith("actions/")]
+        uses = [u for u in refs.PUBRULES_USE.findall(text) if "/pubrules/actions/" in u]
+        pinned = [m for m in refs.PUBRULES_PIN.finditer(text) if m["name"].startswith("actions/")]
         assert len(pinned) == len(uses) and all(m["commit"] for m in pinned), \
-            f"{path.name}: pin pubkit's actions by a release's commit, with its version: {uses}"
+            f"{path.name}: pin pubrules's actions by a release's commit, with its version: {uses}"
         pins |= {(m["commit"], m["version"]) for m in pinned}
-    assert len(pins) <= 1, f"pubkit's workflows pin its actions at more than one commit: {sorted(pins)}"
+    assert len(pins) <= 1, f"pubrules's workflows pin its actions at more than one commit: {sorted(pins)}"
     for _, version in pins:
         assert tuple(map(int, version.split("."))) <= tuple(map(int, __version__.split("."))), \
-            f"pubkit's workflows pin its actions at v{version}, later than this pubkit ({__version__})"
+            f"pubrules's workflows pin its actions at v{version}, later than this pubrules ({__version__})"
 
 
-@then("no reusable workflow of pubkit's uses an action by a local path")
+@then("no reusable workflow of pubrules's uses an action by a local path")
 def no_local_actions():
     reusable = 0
     for path in sorted(WORKFLOWS.glob("*.yml")):
@@ -983,9 +983,9 @@ def no_local_actions():
     assert reusable, "no reusable workflow found"
 
 
-@given(parsers.parse("pubkit.json's protect block is {block}"))
+@given(parsers.parse("pubrules.json's protect block is {block}"))
 def protect_block(repo, block):
-    path = repo / "pubkit.json"
+    path = repo / "pubrules.json"
     config = json.loads(path.read_text())
     config["protect"] = json.loads(block)
     path.write_text(json.dumps(config))
@@ -1049,7 +1049,7 @@ def _takes_runs_on(name):
         assert job["runs-on"] in ("${{ inputs.runs-on }}", "${{ matrix.os }}"), (name, job_name)
 
 
-@then("every job workflow pubkit calls, but Rust's test, takes runs-on, ubuntu-latest by default")
+@then("every job workflow pubrules calls, but Rust's test, takes runs-on, ubuntu-latest by default")
 def job_workflows_take_runs_on():
     called = {job.workflow for table in ci.JOBS.values() for job in table.values()
               if not job.matrix} | {"job-tested.yml"}
@@ -1067,7 +1067,7 @@ def whole_workflows_take_runs_on():
 
 @then("no workflow that runs in the merge queue scans there")
 def no_queue_scan(repo):
-    from pubkit import protect  # noqa: PLC0415
+    from pubrules import protect  # noqa: PLC0415
     for path in sorted((repo / ".github" / "workflows").glob("*.yml")):
         data = yaml.safe_load(path.read_text())
         if "merge_group" not in triggers(data):
@@ -1078,7 +1078,7 @@ def no_queue_scan(repo):
     assert not protect.reported(repo, "merge_group")[2]
 
 
-PUBKIT_ACTIONS = WORKFLOWS.parents[1] / "actions"
+PUBRULES_ACTIONS = WORKFLOWS.parents[1] / "actions"
 
 
 def _all_steps(data):
@@ -1087,7 +1087,7 @@ def _all_steps(data):
     yield from ((data.get("runs") or {}).get("steps") or [])
 
 
-@then("every upload-artifact and actions/cache step in pubkit's workflows continues on error, within five minutes")
+@then("every upload-artifact and actions/cache step in pubrules's workflows continues on error, within five minutes")
 def uploads_non_fatal():
     found = 0
     for path in sorted(WORKFLOWS.glob("*.yml")):
@@ -1099,9 +1099,9 @@ def uploads_non_fatal():
     assert found
 
 
-@then("every cache restore and save in pubkit's cache action continues on error")
+@then("every cache restore and save in pubrules's cache action continues on error")
 def cache_action_non_fatal():
-    steps = [s for s in _all_steps(yaml.safe_load((PUBKIT_ACTIONS / "cache" / "action.yml").read_text()))
+    steps = [s for s in _all_steps(yaml.safe_load((PUBRULES_ACTIONS / "cache" / "action.yml").read_text()))
              if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]
     assert len(steps) == 16
     assert all(s.get("continue-on-error") is True for s in steps)
@@ -1124,19 +1124,19 @@ def has_none(repo, paths):
         assert not (repo / path.strip('"')).exists(), path
 
 
-@then(parsers.parse("pubkit.json reads {text}"))
+@then(parsers.parse("pubrules.json reads {text}"))
 def config_reads(repo, text):
-    assert json.loads((repo / "pubkit.json").read_text()) == json.loads(text)
+    assert json.loads((repo / "pubrules.json").read_text()) == json.loads(text)
 
 
 @then(parsers.parse('in "{name}" the "{job}" job calls "{workflow}" with "{key}" "{value}"'))
 def job_calls_with(repo, name, job, workflow, key, value):
     spec = jobs(repo, name)[job]
-    assert f"/pubkit/.github/workflows/{workflow}@" in spec["uses"], spec
+    assert f"/pubrules/.github/workflows/{workflow}@" in spec["uses"], spec
     assert spec["with"][key] == value, spec
 
 
-@then("no workflow pubkit writes scans with SonarQube Cloud")
+@then("no workflow pubrules writes scans with SonarQube Cloud")
 def no_scan(repo):
     for path in sorted((repo / ".github" / "workflows").glob("*.yml")):
         assert "job-sonar.yml" not in path.read_text(), path
@@ -1145,12 +1145,12 @@ def no_scan(repo):
 
 @given(parsers.parse("a {kind} repository whose protect block is {block}"))
 def protected(repo, kind, block):
-    (repo / "pubkit.json").write_text(json.dumps({"kind": kind, "protect": json.loads(block)}))
+    (repo / "pubrules.json").write_text(json.dumps({"kind": kind, "protect": json.loads(block)}))
 
 
 @when("I read its protect entry", target_fixture="entry")
 def read_entry(repo):
-    return protect.entry("", json.loads((repo / "pubkit.json").read_text()), "pubkit.json")
+    return protect.entry("", json.loads((repo / "pubrules.json").read_text()), "pubrules.json")
 
 
 @then(parsers.parse("its entry has tags {tags} and no release app"))

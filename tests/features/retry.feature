@@ -1,10 +1,10 @@
-Feature: pubkit's retry and terraform-init actions try a flaky step again
+Feature: pubrules's retry and terraform-init actions try a flaky step again
   A release or provider download can time out, and pip retries no 504, so
   the reusable workflows try their setup and terraform init again. The two
   composite actions hold that loop once: retry runs a bash script up to a
   number of times, warning and waiting after each failed try but the last;
   terraform-init runs init through the same loop, then once from
-  pubkit.json's provider mirror. Each scenario runs the action's step as
+  pubrules.json's provider mirror. Each scenario runs the action's step as
   GitHub does, with its inputs in the environment, a sleep that only
   records how long it was asked to wait, and a stub terraform.
 
@@ -59,7 +59,7 @@ Feature: pubkit's retry and terraform-init actions try a flaky step again
     And every init ran "-chdir=infra init -backend=false -input=false"
     And no init was given a CLI configuration
 
-  Scenario: An init that fails is tried three times, then once from pubkit.json's provider mirror
+  Scenario: An init that fails is tried three times, then once from pubrules.json's provider mirror
     When the terraform-init action runs in "infra" with "-backend=false -input=false", with a terraform that fails unless given a provider mirror, and the mirror "https://storage.example/terraform"
     Then terraform init ran 4 times, and the step passed
     And the last init's CLI configuration installs every provider from "https://storage.example/terraform/"

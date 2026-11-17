@@ -1,5 +1,5 @@
 Feature: The reusable workflows parse as GitHub reads them
-  pubkit's own CI runs only python-ci.yml, so a malformed rust-ci.yml would
+  pubrules's own CI runs only python-ci.yml, so a malformed rust-ci.yml would
   first fail in someone else's repository. Every workflow it ships is parsed
   here instead.
 
@@ -44,24 +44,24 @@ Feature: The reusable workflows parse as GitHub reads them
       | service-ci.yml |
       | node-ci.yml   |
 
-  Scenario: rust-ci runs the targets pubkit required plans, in every job
+  Scenario: rust-ci runs the targets pubrules required plans, in every job
     When I parse the workflow "rust-ci.yml"
-    Then every job pubkit required plans for reads its targets from the plan job
+    Then every job pubrules required plans for reads its targets from the plan job
     And the gates and functional inputs only add targets
 
-  Scenario: rust-ci's plan hands the event, the branch and the changed files to pubkit
+  Scenario: rust-ci's plan hands the event, the branch and the changed files to pubrules
     When I parse the workflow "rust-ci.yml"
-    Then the plan job compares a pull request with its base and passes it to pubkit required
+    Then the plan job compares a pull request with its base and passes it to pubrules required
 
   Scenario: The sonar job's layout comes before sonar-args, so a repository's own properties win
     When I parse the workflow "job-sonar.yml"
-    Then the scan's layout comes before sonar-args and pubkit.json's sonar args
+    Then the scan's layout comes before sonar-args and pubrules.json's sonar args
 
   Scenario Outline: A package's reusable workflow sends its code to SonarQube Cloud when given a token
     When I parse the workflow "<workflow>"
     Then it takes an optional SONAR_TOKEN secret
     And its "sonar" job runs the pinned SonarQube scan only when the token is set
-    And the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubkit.json names it
+    And the scan names the project OWNER_REPO in the organization owner, lower-cased unless pubrules.json names it
     And without a token it warns, unless the pull request comes from a fork
     And the scan waits for the quality gate, so a failing gate fails the job
 
@@ -146,13 +146,13 @@ Feature: The reusable workflows parse as GitHub reads them
       | node-ci.yml   | npm audit --package-lock-only              |
       | python-ci.yml | pypa/gh-action-pip-audit                   |
 
-  Scenario: rust-ci fuzzes long on a schedule unless pubkit.json turns the long run off
+  Scenario: rust-ci fuzzes long on a schedule unless pubrules.json turns the long run off
     When I parse the workflow "rust-ci.yml"
-    Then its fuzz job reads security.fuzz.rust from pubkit.json on a scheduled run
+    Then its fuzz job reads security.fuzz.rust from pubrules.json on a scheduled run
 
-  Scenario Outline: A package's reusable workflow tries more property-test inputs on a schedule unless pubkit.json says not to
+  Scenario Outline: A package's reusable workflow tries more property-test inputs on a schedule unless pubrules.json says not to
     When I parse the workflow "<workflow>"
-    Then its "<job>" job sets PUBKIT_FUZZ_RUNS before its tests, from security.fuzz.<language> on a scheduled run
+    Then its "<job>" job sets PUBRULES_FUZZ_RUNS before its tests, from security.fuzz.<language> on a scheduled run
 
     Examples:
       | workflow      | job        | language |

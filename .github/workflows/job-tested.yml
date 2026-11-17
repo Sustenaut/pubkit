@@ -18,14 +18,14 @@
 # merged together, a commit pushed some other way) `tested` is "false",
 # and every job runs as it would without this.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py). The caller grants it actions: read.
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py). The caller grants it actions: read.
 name: job-tested
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       workflow: { type: string, default: .github/workflows/pr.yml, description: "The workflow the merge queue runs, by its path." }
     outputs:
       tested: { value: '${{ jobs.tested.outputs.tested }}', description: '"true" when an earlier run passed on this commit''s tree.' }

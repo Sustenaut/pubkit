@@ -1,24 +1,24 @@
 # Rust: `make fuzz-smoke FUZZ_SECONDS=<n>` on nightly Rust, briefly on
-# every change and longer on a schedule unless pubkit.json sets
+# every change and longer on a schedule unless pubrules.json sets
 # "security": { "fuzz": { "rust": false } }.
 #
 # A pull request that touches no Rust code, Cargo files, fuzz/ or workflow
 # files cannot change what this job tests, so it says so and passes at once
-# (`pubkit required` decides, as slow=false); a release pull request, a
+# (`pubrules required` decides, as slow=false); a release pull request, a
 # push and the nightly run it in full.
 #
-# One job of the CI `pubkit sync` writes from the ci block of pubkit.json
-# (src/pubkit/ci.py), so a repository runs only the jobs it asks for and
+# One job of the CI `pubrules sync` writes from the ci block of pubrules.json
+# (src/pubrules/ci.py), so a repository runs only the jobs it asks for and
 # none shows as skipped.
 name: job-rust-fuzz
 
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       fuzz-seconds: { type: number, default: 5, description: "Seconds per fuzz target in the merge queue or on a push: a smoke run, after the replay of fuzz/regressions/; the nightly searches for longer." }
-      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubkit.json sets "security": { "fuzz": { "rust": false } }.' }
+      fuzz-seconds-scheduled: { type: number, default: 900, description: 'Seconds per fuzz target on a scheduled run, unless pubrules.json sets "security": { "fuzz": { "rust": false } }.' }
       cargo-fuzz-version: { type: string, default: 0.13.2 }
 
 env:
@@ -38,7 +38,7 @@ jobs:
         run: |
           make venv
           git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
-          .venv/bin/pubkit required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
+          .venv/bin/pubrules required --github-output --event "$EVENT" --head-ref "$HEAD_REF" \
             --changed-files "$RUNNER_TEMP/changed-files" > /dev/null
           if grep -qx 'slow=false' "$GITHUB_OUTPUT"; then
             echo "::notice::This pull request touches no Rust code, Cargo files, fuzz/ or workflow files, so there is nothing new to fuzz; releases and the nightly run it in full."
@@ -58,13 +58,13 @@ jobs:
           command -v cargo-fuzz >/dev/null && cargo-fuzz --version | grep -q " ${VERSION}$" \
             || cargo install --locked cargo-fuzz --version "$VERSION"
         env: { VERSION: '${{ inputs.cargo-fuzz-version }}' }
-      # A scheduled run fuzzes for longer, unless pubkit.json sets
+      # A scheduled run fuzzes for longer, unless pubrules.json sets
       # "security": { "fuzz": { "rust": false } }; then it fuzzes as briefly
       # as any other.
       - if: steps.changes.outputs.slow != 'false'
         run: |
           seconds=$SHORT
-          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubkit.json 2>/dev/null || echo true)" = true ]; then
+          if [ "$EVENT" = schedule ] && [ "$(jq '.security.fuzz | (if type == "object" then .rust else . end) != false' pubrules.json 2>/dev/null || echo true)" = true ]; then
             seconds=$LONG
           fi
           make fuzz-smoke FUZZ_SECONDS="$seconds"

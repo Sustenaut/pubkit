@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # terraform init in $DIR with $ARGS, tried $TRIES times through the retry
-# action's script, then once more with every provider from pubkit.json's
+# action's script, then once more with every provider from pubrules.json's
 # mirror.terraform, when it names one. Exits 1 when init never passed,
 # and 2, as retry does, when TRIES or PAUSE is not a number.
 set -uo pipefail
@@ -14,7 +14,7 @@ WHAT="terraform init" RUN="$init" "$here/../retry/retry.sh"
 tried=$?
 # 2 is a TRIES or PAUSE that is not a number: no mirror mends that.
 [ "$tried" = 1 ] || exit "$tried"
-mirror="$(jq -r '.mirror.terraform // empty' pubkit.json 2>/dev/null || true)"
+mirror="$(jq -r '.mirror.terraform // empty' pubrules.json 2>/dev/null || true)"
 [ -n "$mirror" ] || exit 1
 echo "::warning::terraform init: trying the providers from $mirror"
 config="${RUNNER_TEMP:?}/provider-mirror.tfrc"

@@ -1,4 +1,4 @@
-"""Steps for pubkit-python.mk, the make targets every Python package shares."""
+"""Steps for pubrules-python.mk, the make targets every Python package shares."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pytest_bdd import given, parsers, scenarios, then
 
-from pubkit import cli
+from pubrules import cli
 
 scenarios("python.feature")
 
@@ -20,7 +20,7 @@ def package(repo, kind):
     config = {"kind": {"Python": "utility", "Node": "utility", "Rust": "rust"}[kind]}
     if kind == "Node":
         (repo / "package.json").write_text("{}\n")
-    (repo / "pubkit.json").write_text(json.dumps(config))
+    (repo / "pubrules.json").write_text(json.dumps(config))
 
 
 @given(parsers.parse("its pyproject.toml's [tool.coverage.run] is '{run}'"))
@@ -30,7 +30,7 @@ def coverage_run(repo, run):
         + run.replace("\\n", "\n") + "\n")
 
 
-@then("the Makefile includes pubkit-python.mk")
+@then("the Makefile includes pubrules-python.mk")
 def includes(repo):
     assert cli.INCLUDES_PYTHON_MK.search((repo / "Makefile").read_text())
 

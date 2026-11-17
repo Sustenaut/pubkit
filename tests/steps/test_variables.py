@@ -1,4 +1,4 @@
-"""Steps for the variables block's shape, which `pubkit sync --check` checks."""
+"""Steps for the variables block's shape, which `pubrules sync --check` checks."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from pytest_bdd import given, parsers, scenarios, then
 scenarios("variables.feature")
 
 
-@given(parsers.re(r"its pubkit.json's variables block is \"(?P<text>.+)\"$"))
+@given(parsers.re(r"its pubrules.json's variables block is \"(?P<text>.+)\"$"))
 def variables_block(repo, text):
-    path = repo / "pubkit.json"
+    path = repo / "pubrules.json"
     config = json.loads(path.read_text())
     path.write_text(json.dumps({**config, "variables": json.loads(text)}))
 

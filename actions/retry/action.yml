@@ -4,7 +4,7 @@
 # failed one it warns and waits, except after the last.
 #
 #   - name: Set up, tried three times (a release download can time out)
-#     uses: Sustenaut/pubkit/actions/retry@<commit> # vX.Y.Z
+#     uses: Sustenaut/pubrules/actions/retry@<commit> # vX.Y.Z
 #     with: { run: '${{ inputs.setup }}' }
 #
 # The inputs reach the script through its environment, never in its text,

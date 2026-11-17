@@ -1,4 +1,4 @@
-"""Steps for the managed ./pubkit wrapper, against a fake uvx on PATH that
+"""Steps for the managed ./pubrules wrapper, against a fake uvx on PATH that
 records its arguments and where it ran."""
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ import sys
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__
+from pubrules import __version__
 
 scenarios("wrapper.feature")
 
-WHEEL = (f"https://github.com/Sustenaut/pubkit/releases/download/v{__version__}/"
-         f"pubkit-{__version__}-py3-none-any.whl")
+WHEEL = (f"https://github.com/Sustenaut/pubrules/releases/download/v{__version__}/"
+         f"pubrules-{__version__}-py3-none-any.whl")
 
 FAKE_UVX = f"""#!{sys.executable}
 import json, os, sys
@@ -60,14 +60,14 @@ def executable(repo, path):
     assert (repo / path).stat().st_mode & stat.S_IXUSR
 
 
-@then(parsers.parse('"{path}" runs this pubkit\'s release wheel'))
+@then(parsers.parse('"{path}" runs this pubrules\'s release wheel'))
 def pins(repo, path):
-    assert f'uvx --from "{WHEEL}" pubkit "$@"' in (repo / path).read_text()
+    assert f'uvx --from "{WHEEL}" pubrules "$@"' in (repo / path).read_text()
 
 
-@then(parsers.parse('uvx ran pubkit from this pubkit\'s release wheel with "{args}"'))
+@then(parsers.parse('uvx ran pubrules from this pubrules\'s release wheel with "{args}"'))
 def ran(uvx_log, args):
-    assert json.loads(uvx_log.read_text())["args"] == ["--from", WHEEL, "pubkit", *args.split(" ")]
+    assert json.loads(uvx_log.read_text())["args"] == ["--from", WHEEL, "pubrules", *args.split(" ")]
 
 
 @then("uvx ran in the repository's root")

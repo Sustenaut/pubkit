@@ -44,7 +44,7 @@ items. It is never pasted from the README. In order:
 Longer documents live in a `_documentation` module of empty submodules, each
 `#[doc = include_str!("../X.md")]`, so they are versioned with the crate and
 render on docs.rs: `testing`, `supply_chain`, `security`, `changelog`.
-[checked: RS-DOC-01, make doc, pubkit conform, library; the build fails if a file is missing]
+[checked: RS-DOC-01, make doc, pubrules conform, library; the build fails if a file is missing]
 
 The README's examples are compiled as doctests through a `#[cfg(doctest)]`
 item that includes the README, so they cannot rot. [checked: RS-DOC-02,
@@ -54,7 +54,7 @@ rust-ci test, library]
 
 - **Every public item is documented.** `#![deny(missing_docs)]` and
   `#![warn(missing_debug_implementations)]` are set. [checked: RS-DOC-03,
-  make lint, pubkit conform, library]
+  make lint, pubrules conform, library]
 - **Every public function has at least one example**, as a doctest. The
   repository's doc-coverage guard (`make doc-coverage-check`, where there is
   one) enforces it. [checked: RS-DOC-04, make doc-coverage-check, library]
@@ -82,7 +82,7 @@ rust-ci test, library]
   RFCs, other implementations, published test suites. Every case names its
   source. They are read by `tests/vectors.rs`, and regenerated and compared
   in CI (`make vectors-check`). [checked: RS-TEST-01, make vectors-check,
-  pubkit conform; judged: are the sources really independent?]
+  pubrules conform; judged: are the sources really independent?]
 - **Property tests** (proptest) cover invariants over many inputs:
   round-trips, and consistency at random sizes. [judged]
 - **Oracles:** where an established crate implements the same standard, its
@@ -104,7 +104,7 @@ rust-ci test, library]
   is any entry point missing a target?]
 - Each input that ever found a bug is kept in `fuzz/regressions/<target>/`
   and replayed on every run. Each bug also gets a named regression test in
-  the crate's own tests. [checked: RS-FUZZ-01, make fuzz-smoke, pubkit
+  the crate's own tests. [checked: RS-FUZZ-01, make fuzz-smoke, pubrules
   conform]
 - Fuzzing runs on every change that can change what it runs, briefly, and
   for longer on a schedule. A pull request that touches no Rust code,
@@ -112,7 +112,7 @@ rust-ci test, library]
   and the nightly always run it.
   [checked: RS-FUZZ-02, rust-ci fuzz]
 - The crate forbids `unsafe` (`unsafe_code = "forbid"`) unless it needs it.
-  A crate that uses `unsafe` also runs miri. [checked: RS-SAFE-01, pubkit
+  A crate that uses `unsafe` also runs miri. [checked: RS-SAFE-01, pubrules
   conform]
 
 ## 5. Packaging and metadata
@@ -186,8 +186,8 @@ The make targets each kind of crate needs:
   records the evidence that does exist. `deny.toml` keeps the shared
   baseline: every advisory fails, wildcards are banned, and only crates.io
   is a source. `supply-chain/config.toml` imports the shared audit sets.
-  [checked: RS-SUP-01, make deny, make vet, pubkit conform]
-- **`SUPPLY-CHAIN.md`** is generated per crate by `pubkit supply-chain`
+  [checked: RS-SUP-01, make deny, make vet, pubrules conform]
+- **`SUPPLY-CHAIN.md`** is generated per crate by `pubrules supply-chain`
   (`make supply-chain`, for the crates in `SUPPLY_CHAIN_CRATES`), from that
   crate's own dependency tree for any target, not the workspace's. It ships
   in the package, renders as `_documentation::supply_chain`, and marks
@@ -195,23 +195,23 @@ The make targets each kind of crate needs:
   copy current]
 - **`SECURITY.md`** says how to report a vulnerability (private reporting),
   what is checked and when, and what fuzzing has found. [judged] Every
-  repository has one. [checked: RS-SUP-04, pubkit conform]
+  repository has one. [checked: RS-SUP-04, pubrules conform]
 - Releases carry a **signed security record** of the checks run, through
   pubrel's `security` section. [checked: RS-SUP-03, pubrel]
 - **The release key is labelled for what it releases, never with a
   person's name.** A key's label is public, in its key object, and stays
   in every release it signs. The key `release.json` names has a label that
   names the package and ends with "release key", such as "pubunit release
-  key". [checked: RS-SUP-05, pubkit conform]
+  key". [checked: RS-SUP-05, pubrules conform]
 
 - **Each release cites a current quality audit.** The rust-crate-quality
   agent writes its report for the version being released to
   `audit/<package>-<version>.md`. The report's header names the standard it
   audited against and how many of its findings block a release. A release
   needs a report made against the standard as it is now, with none that
-  block. `release.json` declares `pubkit audit --check` as a security check,
+  block. `release.json` declares `pubrules audit --check` as a security check,
   so `pubrel prepare` cuts no release without one, and the signed security
-  record cites it. [checked: RS-REL-01, pubrel, pubkit conform]
+  record cites it. [checked: RS-REL-01, pubrel, pubrules conform]
 
 ## 8. Cross-platform CI
 
@@ -263,7 +263,7 @@ the rules above apply with these differences:
   cargo-semver-checks does not apply, because there is no library API.
   [judged]
 - **Its behaviour is tested end to end.** That means a functional suite
-  (pubkit's Gherkin plugin) that runs the built binary as a user would, in
+  (pubrules's Gherkin plugin) that runs the built binary as a user would, in
   addition to unit tests. [judged]
 - **Its usage text is documentation.** The `--help` output, usually a
   string constant, is held to the same standard as the README. `--help`
@@ -301,16 +301,16 @@ the rules above apply with these differences:
 Each `[checked: ...]` tag gives a rule a stable ID, such as `RS-DOC-04`, and
 names what checks it:
 
-- `make TARGET`: a make target, which pubkit's `rust-ci.yml` runs on every
-  pull request. `pubkit.mk` provides each one.
+- `make TARGET`: a make target, which pubrules's `rust-ci.yml` runs on every
+  pull request. `pubrules.mk` provides each one.
 - `rust-ci JOB`: a job of `rust-ci.yml` that always runs, such as `test`
   (Linux, macOS and Windows) or `cross` (i686 and s390x).
-- `pubkit conform`: a repository check that `pubkit sync --check` runs:
+- `pubrules conform`: a repository check that `pubrules sync --check` runs:
   that a required file exists, or a setting such as `[lints]` holds.
 - `pubrel`: pubrel's release workflow.
 - `library`, last: the rule applies only to a crate with a library target.
 
-`pubkit` generates `standard.json` from these tags and ships it. `pubkit
+`pubrules` generates `standard.json` from these tags and ships it. `pubrules
 required` reads it to list the targets each `rust-ci.yml` job must run for
 a repository. A repository can add targets of its own, through the
 workflow's `gates` and `functional` inputs, but cannot drop a required one.
@@ -318,7 +318,7 @@ An ID is never reused for another rule. A rule removed from the standard
 leaves its ID unassigned.
 
 A repository that cannot meet a rule yet declares an exception in
-`pubkit.json`, with the rule's ID, the reason, and the date by which it will
+`pubrules.json`, with the rule's ID, the reason, and the date by which it will
 be met or reviewed:
 
 ```json
@@ -327,7 +327,7 @@ be met or reviewed:
     { "rule": "RS-TEST-01", "reason": "no independent source for pubrel's version arithmetic yet", "until": "2027-01-01" } ] }
 ```
 
-An excepted rule's checks are skipped, and `pubkit conform` lists every open
+An excepted rule's checks are skipped, and `pubrules conform` lists every open
 exception. An exception past its date, or naming no rule, fails the check.
 
 ## Deliberately not adopted

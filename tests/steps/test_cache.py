@@ -1,4 +1,4 @@
-"""Steps for pubkit cache: a repository's cache entries, and a build
+"""Steps for pubrules cache: a repository's cache entries, and a build
 command that counts its runs, so a scenario sees which units were made and
 which reused."""
 
@@ -10,7 +10,7 @@ import sys
 
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from conftest import pubkit
+from conftest import pubrules
 
 scenarios("../features/cache.feature")
 
@@ -24,7 +24,7 @@ BUILD = ("import sys, pathlib; a, src = sys.argv[1], pathlib.Path(sys.argv[2]); 
 
 
 def _config(repo, change):
-    path = repo / "pubkit.json"
+    path = repo / "pubrules.json"
     config = json.loads(path.read_text()) if path.exists() else {"kind": "utility"}
     change(config)
     path.write_text(json.dumps(config))
@@ -33,7 +33,7 @@ def _config(repo, change):
 @given(parsers.parse('a repository whose cache entry "{name}" is made per unit from "{unit}" '
                      'with the input "{input}" and the tool "{tool}"'))
 def cache_entry(repo, run, name, unit, input, tool):
-    assert run(pubkit(), "init", "--kind=utility", cwd=repo).code == 0
+    assert run(pubrules(), "init", "--kind=utility", cwd=repo).code == 0
     (repo / "tool.txt").write_text("1")
     _config(repo, lambda c: c.update(cache={name: {
         "path": ".packcache", "unit": unit, "inputs": [input], "tools": [tool]}}))
@@ -66,11 +66,11 @@ def odd_setting(repo, name, key):
 
 @given(parsers.parse('today is "{day}"'))
 def today(env, day):
-    env["PUBKIT_TODAY"] = day
+    env["PUBRULES_TODAY"] = day
 
 
 def _make(repo, run, env, area, src):
-    return run(pubkit(), "cache", "run", "packs", "--unit", area, "--output", f"out/{area}.pack",
+    return run(pubrules(), "cache", "run", "packs", "--unit", area, "--output", f"out/{area}.pack",
                "--", sys.executable, "-c", BUILD, area, str(src), cwd=repo, env=env)
 
 
@@ -127,7 +127,7 @@ def key_changed(result, noted, name):
 
 @given(parsers.parse("the cache block is {block}"))
 def cache_block(repo, run, block):
-    assert run(pubkit(), "init", "--kind=utility", cwd=repo).code == 0
+    assert run(pubrules(), "init", "--kind=utility", cwd=repo).code == 0
     _config(repo, lambda c: c.update(cache=json.loads(block)))
 
 
@@ -144,7 +144,7 @@ def made_entry_two(repo, name, a, b):
 @when(parsers.parse('I make "{name}" into "{output}"'), target_fixture="result")
 def make_entry(repo, run, env, name, output):
     write = f"import pathlib; p = pathlib.Path({output!r}); p.parent.mkdir(exist_ok=True); p.write_text('made')"
-    return run(pubkit(), "cache", "run", name, "--output", output, "--", sys.executable, "-c", write,
+    return run(pubrules(), "cache", "run", name, "--output", output, "--", sys.executable, "-c", write,
                cwd=repo, env=env)
 
 

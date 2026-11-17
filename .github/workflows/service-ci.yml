@@ -2,7 +2,7 @@
 # releases, and runs its secret-needing commands through ./with-secrets.
 #
 #   ci:
-#     uses: Sustenaut/pubkit/.github/workflows/service-ci.yml@vX.Y.Z
+#     uses: Sustenaut/pubrules/.github/workflows/service-ci.yml@vX.Y.Z
 #     with: { setup: make venv, test: .venv/bin/python -m pytest -q }
 #     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 #
@@ -16,13 +16,13 @@ name: service-ci
 on:
   workflow_call:
     inputs:
-      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubkit.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
+      runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
       setup: { type: string, default: '', description: 'Prepares the tests, for example make venv. Empty skips it.' }
       test: { type: string, default: '', description: 'Runs the tests. Empty skips it.' }
       terraform-dir: { type: string, default: '', description: 'Where the Terraform files are. Empty skips the Terraform checks.' }
       shellcheck: { type: string, default: with-secrets, description: 'Shell scripts to check: space-separated globs.' }
-      sync-check: { type: boolean, default: true, description: Fail if pubkit's managed files drifted. }
+      sync-check: { type: boolean, default: true, description: Fail if pubrules's managed files drifted. }
       coverage-report: { type: string, default: coverage/, description: "The coverage the test command writes, if any (Cobertura XML or LCOV lcov.info), which the sonar job reads." }
       sonar-args: { type: string, default: '', description: "Extra SonarQube Cloud properties for the sonar job, such as -Dsonar.exclusions=vendor/**." }
     secrets:
@@ -36,12 +36,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '${{ inputs.python-version }}' }
       - if: inputs.sync-check
-        name: pubkit's managed files are in step
+        name: pubrules's managed files are in step
         run: |
-          python3 -m venv .pubkit
+          python3 -m venv .pubrules
           # Tried three times, then from the wheel mirror: a release download can time out.
-          tests/install-lock .pubkit/bin/pip
-          .pubkit/bin/pubkit sync --check
+          tests/install-lock .pubrules/bin/pip
+          .pubrules/bin/pubrules sync --check
       - name: shell scripts pass shellcheck
         run: |
           shopt -s globstar nullglob
@@ -59,7 +59,7 @@ jobs:
       - run: terraform -chdir="$DIR" fmt -check -recursive
         env: { DIR: '${{ inputs.terraform-dir }}' }
       - name: terraform init, tried three times, then from the provider mirror
-        uses: Sustenaut/pubkit/actions/terraform-init@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/terraform-init@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with:
           dir: ${{ inputs.terraform-dir }}
           args: -backend=false -input=false
@@ -88,7 +88,7 @@ jobs:
           restore-keys: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-
       - if: inputs.setup != ''
         name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubkit/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
         with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.
@@ -130,14 +130,14 @@ jobs:
         with:
           pattern: coverage*
           path: coverage-download
-      # Properties pubkit.json adds (security.sonar.args), after the input's.
+      # Properties pubrules.json adds (security.sonar.args), after the input's.
       - if: env.SONAR_TOKEN != ''
         id: settings
         # The organization: security.sonar.organization, or the owner in
         # lower case, since SonarQube Cloud's organization keys are.
         run: |
-          echo "args=$(jq -r '.security.sonar.args // ""' pubkit.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
-          organization=$(jq -r '.security.sonar.organization // ""' pubkit.json 2>/dev/null || true)
+          echo "args=$(jq -r '.security.sonar.args // ""' pubrules.json 2>/dev/null)" >> "$GITHUB_OUTPUT"
+          organization=$(jq -r '.security.sonar.organization // ""' pubrules.json 2>/dev/null || true)
           echo "organization=${organization:-${OWNER,,}}" >> "$GITHUB_OUTPUT"
         env: { OWNER: '${{ github.repository_owner }}' }
       - if: env.SONAR_TOKEN != ''

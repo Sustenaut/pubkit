@@ -1,4 +1,4 @@
-"""Steps for `pubkit protect`: the ruleset itself, and the command against a fake `gh` that keeps each
+"""Steps for `pubrules protect`: the ruleset itself, and the command against a fake `gh` that keeps each
 repository's rulesets in a JSON file and records what it was sent."""
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import protect
+from pubrules import protect
 
 scenarios("protect.feature")
 
@@ -25,7 +25,7 @@ path = os.environ["FAKE_GH"]
 state = json.load(open(path))
 args = sys.argv[1:]
 method, url = args[args.index("-X") + 1], args[-1] if "--input" not in args else args[args.index("--input") - 1]
-f = re.match(r"repos/([^/]+/[^/]+)/contents/pubkit.json$", url)
+f = re.match(r"repos/([^/]+/[^/]+)/contents/pubrules.json$", url)
 if f:
     if f.group(1) not in state.get("files", {{}}):
         print(json.dumps({{"message": "Not Found"}}))
@@ -208,38 +208,38 @@ def _block(checks, setting):
     return {"kind": "service", "protect": block}
 
 
-@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubkit.json on GitHub requires "(?P<checks>[^"]+)"'
+@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubrules.json on GitHub requires "(?P<checks>[^"]+)"'
                   r'(?:, (?P<setting>without tags|without the merge queue|with auto-merge))?$'))
 def remote_config(github, slug, checks, setting):
     content = base64.b64encode(json.dumps(_block(checks, setting)).encode()).decode()
     _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
 
 
-@given(parsers.re(r'the working directory is a clone of "(?P<slug>[^"]+)" whose pubkit.json '
+@given(parsers.re(r'the working directory is a clone of "(?P<slug>[^"]+)" whose pubrules.json '
                   r'requires "(?P<checks>[^"]+)"(?:, (?P<setting>without tags))?$'))
 def local_config(repo, slug, checks, setting):
-    (repo / "pubkit.json").write_text(json.dumps(_block(checks, setting)))
+    (repo / "pubrules.json").write_text(json.dumps(_block(checks, setting)))
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
                     f"git@github.com:{slug}.git"], check=True)
 
 
-@given("its pubkit.json has no protect block")
+@given("its pubrules.json has no protect block")
 def no_block(repo):
-    (repo / "pubkit.json").write_text(json.dumps({"kind": "service"}))
+    (repo / "pubrules.json").write_text(json.dumps({"kind": "service"}))
 
 
-@given(parsers.parse("its pubkit.json's protect block is {block}"))
+@given(parsers.parse("its pubrules.json's protect block is {block}"))
 def raw_block(repo, block):
-    (repo / "pubkit.json").write_text(json.dumps({"kind": "service", "protect": json.loads(block)}))
+    (repo / "pubrules.json").write_text(json.dumps({"kind": "service", "protect": json.loads(block)}))
 
 
-@given(parsers.parse('its pubkit.json is "{text}"'))
+@given(parsers.parse('its pubrules.json is "{text}"'))
 def raw_local(repo, text):
-    (repo / "pubkit.json").write_text(text)
+    (repo / "pubrules.json").write_text(text)
 
 
-@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubkit.json on GitHub is "(?P<text>.*)"$'))
+@given(parsers.re(r'"(?P<slug>[^"]+)"\'s pubrules.json on GitHub is "(?P<text>.*)"$'))
 def raw_remote(github, slug, text):
     content = base64.b64encode(text.encode()).decode()
     _edit(github, lambda s: s.setdefault("files", {}).__setitem__(slug, content))
@@ -263,7 +263,7 @@ def has_ruleset(github, name, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(slug, [rs, _tags()]))
 
 
-def _pubkit_ruleset(slug, checks, queue=True):
+def _pubrules_ruleset(slug, checks, queue=True):
     rs = protect.ruleset(_checks(checks), queue)
     rs.update(id=7, source=slug, current_user_can_bypass="never")
     # Settings GitHub adds with its own default are no difference.
@@ -271,21 +271,21 @@ def _pubkit_ruleset(slug, checks, queue=True):
     return rs
 
 
-@given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}"'))
-def has_pubkit_ruleset(github, slug, checks):
-    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubkit_ruleset(slug, checks), _tags()]))
+@given(parsers.parse('GitHub has pubrules\'s ruleset in "{slug}" requiring "{checks}"'))
+def has_pubrules_ruleset(github, slug, checks):
+    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubrules_ruleset(slug, checks), _tags()]))
 
 
-@given(parsers.parse('GitHub has pubkit\'s ruleset in "{slug}" requiring "{checks}", '
+@given(parsers.parse('GitHub has pubrules\'s ruleset in "{slug}" requiring "{checks}", '
                      'without the merge queue'))
 def has_unqueued_ruleset(github, slug, checks):
     _edit(github, lambda s: s["rulesets"].__setitem__(
-        slug, [_pubkit_ruleset(slug, checks, queue=False), _tags()]))
+        slug, [_pubrules_ruleset(slug, checks, queue=False), _tags()]))
 
 
 @given(parsers.parse('GitHub has only main\'s ruleset in "{slug}" requiring "{checks}"'))
 def has_main_only(github, slug, checks):
-    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubkit_ruleset(slug, checks)]))
+    _edit(github, lambda s: s["rulesets"].__setitem__(slug, [_pubrules_ruleset(slug, checks)]))
 
 
 @given(parsers.parse('GitHub rejects the ruleset for "{slug}" because "{reason}"'))
@@ -400,19 +400,19 @@ def no_auto_merge_note(result):
     assert "auto-merge" not in out, out
 
 
-@given("pubkit's ruleset as a read-only token sees it, with no bypass_actors", target_fixture="seen")
+@given("pubrules's ruleset as a read-only token sees it, with no bypass_actors", target_fixture="seen")
 def read_only_ruleset():
     have = protect.ruleset(["ci / passed"])
     del have["bypass_actors"]
     return have
 
 
-@given("pubkit's ruleset, with a bypass actor added", target_fixture="seen")
+@given("pubrules's ruleset, with a bypass actor added", target_fixture="seen")
 def bypassed_ruleset():
     return {**protect.ruleset(["ci / passed"]), "bypass_actors": [{"actor_id": 1}]}
 
 
-@when("I compare it with pubkit's ruleset", target_fixture="found")
+@when("I compare it with pubrules's ruleset", target_fixture="found")
 def compare(seen):
     return protect.differences(protect.ruleset(["ci / passed"]), seen)
 
@@ -435,7 +435,7 @@ def scanning_settings(github, slug, scanning, push):
                                       "secret_scanning_push_protection": {"status": push}}))
 
 
-@given(parsers.parse('"{slug}"\'s pubkit.json on GitHub says secret_scanning is false, requiring "{check}"'))
+@given(parsers.parse('"{slug}"\'s pubrules.json on GitHub says secret_scanning is false, requiring "{check}"'))
 def opt_out(github, slug, check):
     text = json.dumps({"kind": "utility", "protect": {"checks": [check], "secret_scanning": False}})
     _edit(github, lambda s: s.setdefault("files", {}).__setitem__(

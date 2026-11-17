@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pubkit"
+name = "pubrules"
 version = "0.42.0"
 description = "The setup every package shares: managed files, reusable CI, the Rust crate standard and the Gherkin rule."
 readme = "README.md"
@@ -14,17 +14,17 @@ authors = [{ name = "David Schryer", email = "schryer@gmail.com" }]
 dependencies = ["PyYAML>=6"]
 
 [project.urls]
-Repository = "https://github.com/Sustenaut/pubkit"
+Repository = "https://github.com/Sustenaut/pubrules"
 
 [project.scripts]
-pubkit = "pubkit.cli:main"
+pubrules = "pubrules.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 # Globs skip dot-directories, so each one templates use is named.
-pubkit = [
+pubrules = [
     "standard.json",
     "ruleset.json",
     "tag-ruleset.json",
@@ -36,10 +36,10 @@ pubkit = [
     "templates/**/.github/workflows/*",
 ]
 
-# `make functional` measures the suite, the `pubkit` processes it starts
+# `make functional` measures the suite, the `pubrules` processes it starts
 # included, into coverage/coverage.xml for SonarQube Cloud.
 [tool.coverage.run]
-source = ["pubkit"]
+source = ["pubrules"]
 patch = ["subprocess", "execv"]
 parallel = true
 

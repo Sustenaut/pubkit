@@ -1,4 +1,4 @@
-"""Steps for the repos file `pubkit protect --repos` reads, against a small
+"""Steps for the repos file `pubrules protect --repos` reads, against a small
 fake `gh` that answers from a JSON file and logs what it was asked."""
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ if c:
     else:
         print(json.dumps({{"statuses": [{{"context": n}} for n in found.get("statuses", [])]}}))
     sys.exit(0)
-f = re.match(r"repos/([^/]+/[^/]+)/contents/pubkit.json$", url)
+f = re.match(r"repos/([^/]+/[^/]+)/contents/pubrules.json$", url)
 if f:
     if f.group(1) not in state["files"]:
         missing()

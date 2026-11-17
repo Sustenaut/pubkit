@@ -1,38 +1,38 @@
 Feature: A service runs its secret-needing commands through ./with-secrets
   A service is a private repository that deploys rather than releases.
-  `pubkit init --kind=service` gives it a managed `with-secrets`, which reads
+  `pubrules init --kind=service` gives it a managed `with-secrets`, which reads
   a Bitwarden Secrets Manager project with bws and runs one command with the
   secrets in its environment, set up by the repository's with-secrets.json.
   That script is one line that runs `./pubsec run`, and ./pubsec, which
-  pubkit writes beside it, runs the pubsec release pubkit pins, its wheel
+  pubrules writes beside it, runs the pubsec release pubrules pins, its wheel
   checked against its sha256: what `pubsec run` does is pubsec's suite's.
 
   Scenario: init writes the wrapper, its settings and the CI its ci block gives
     Given an empty repository
-    When I run pubkit "init" "--kind=service" "--project=infra"
+    When I run pubrules "init" "--kind=service" "--project=infra"
     Then it succeeds
-    And the repository has "with-secrets", "with-secrets.json", ".github/workflows/pr.yml", ".github/workflows/main.yml", "tests/requirements-pubkit.txt"
+    And the repository has "with-secrets", "with-secrets.json", ".github/workflows/pr.yml", ".github/workflows/main.yml", "tests/requirements-pubrules.txt"
     And "with-secrets" is executable
     And "with-secrets.json" contains ""project": "infra""
     And ".github/workflows/pr.yml" contains "job-service-checks.yml@v"
   Scenario: A service names the project its secrets are in
     Given an empty repository
-    When I run pubkit "init" "--kind=service"
+    When I run pubrules "init" "--kind=service"
     Then it fails
     And stderr mentions "--project=NAME"
   Scenario: with-secrets is managed, so an edited copy fails the check
     Given a repository initialised as service for the project "infra"
     And the file "with-secrets" reads "edited"
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "with-secrets differs"
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then it succeeds
     And "with-secrets" is executable
-  Scenario Outline: A kind pubkit no longer has names the one to use
+  Scenario Outline: A kind pubrules no longer has names the one to use
     Given an empty repository
-    And the file "pubkit.json" reads "{"kind": "<old>"}"
-    When I run pubkit "sync" "--check"
+    And the file "pubrules.json" reads "{"kind": "<old>"}"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "the kind "<old>" is now "utility""
 
@@ -43,39 +43,39 @@ Feature: A service runs its secret-needing commands through ./with-secrets
   Scenario: sync moves a Bitwarden use declared on with-secrets to with-secrets.json
     Given a repository initialised as service for the project "infra"
     And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets", "push-secrets.sh"], "mode": "required"}]}"
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "or with-secrets.json for Bitwarden"
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then "integrations.json" contains ""push-secrets.sh""
     And "integrations.json" contains ""with-secrets.json""
     And "integrations.json" does not contain ""with-secrets","
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it succeeds
-  Scenario: A repository that does not run pubkit's with-secrets keeps its declaration
+  Scenario: A repository that does not run pubrules's with-secrets keeps its declaration
     Given a repository initialised as "utility"
     And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets"], "mode": "required"}]}"
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then "integrations.json" does not contain "with-secrets.json"
 
   Scenario: deploy.providers' wheels join the tests' requirements, where sync --check reads their need types
     Given a repository initialised as "utility"
-    And pubkit.json has a deploy block
-    When I run pubkit "sync"
+    And pubrules.json has a deploy block
+    When I run pubrules "sync"
     Then it succeeds
-    And "tests/requirements-pubkit.txt" lists the pubsec and pubdeploy of deploy.providers by their wheels
+    And "tests/requirements-pubrules.txt" lists the pubsec and pubdeploy of deploy.providers by their wheels
 
   Scenario: Without a deploy block the tests' requirements name no provider
     Given a repository initialised as "utility"
-    Then "tests/requirements-pubkit.txt" does not contain "pubsec"
+    Then "tests/requirements-pubrules.txt" does not contain "pubsec"
 
   Scenario: init writes ./pubsec beside ./with-secrets, which runs it
     Given an empty repository
-    When I run pubkit "init" "--kind=service" "--project=infra"
+    When I run pubrules "init" "--kind=service" "--project=infra"
     Then it succeeds
     And "pubsec" is executable
     And "with-secrets" contains "/pubsec" run --cwd "$PWD" -- "$@""
-    And "pubsec" runs the oldest pubsec this pubkit works with
+    And "pubsec" runs the oldest pubsec this pubrules works with
 
   Scenario: ./with-secrets runs ./pubsec run in the directory it is called from, from the checked wheel
     Given a repository initialised as service for the project "infra"
@@ -98,9 +98,9 @@ Feature: A service runs its secret-needing commands through ./with-secrets
   Scenario: Any repository with a with-secrets.json gets ./pubsec
     Given a repository initialised as "utility"
     And the file "with-secrets.json" reads "{"project": "infra"}"
-    When I run pubkit "sync" "--check"
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "pubsec differs"
-    When I run pubkit "sync"
+    When I run pubrules "sync"
     Then "pubsec" is executable
     And "with-secrets" is executable

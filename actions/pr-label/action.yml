@@ -4,8 +4,8 @@
 # (actions/cache's refresh), or anything else a repository wires to it.
 #
 #   - id: refresh
-#     uses: Sustenaut/pubkit/actions/pr-label@vX.Y.Z
-#   - uses: Sustenaut/pubkit/actions/cache@vX.Y.Z
+#     uses: Sustenaut/pubrules/actions/pr-label@vX.Y.Z
+#   - uses: Sustenaut/pubrules/actions/cache@vX.Y.Z
 #     with: { step: restore, refresh: "${{ steps.refresh.outputs.present }}" }
 #
 # The pull request is the event's own (pull_request, pull_request_target),

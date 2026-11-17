@@ -1,5 +1,5 @@
-"""Steps for the nightly: `pubkit pins`, the parts of `pubkit crates` and
-`pubkit nightly` that need no network, and `pubkit new` without a key."""
+"""Steps for the nightly: `pubrules pins`, the parts of `pubrules crates` and
+`pubrules nightly` that need no network, and `pubrules new` without a key."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import cbor, conform, new, nightly
+from pubrules import cbor, conform, new, nightly
 
 scenarios("nightly.feature")
 
@@ -59,7 +59,7 @@ def reason(reason, start, line):
 @when(parsers.parse('the nightly writes a body with "{crate}" skipped because "{why}"'),
       target_fixture="body")
 def writes_body(crate, why):
-    return nightly.body(["pubkit 0.8.0 -> 0.9.0"], ["syn 3.0.6 -> 3.0.9"],
+    return nightly.body(["pubrules 0.8.0 -> 0.9.0"], ["syn 3.0.6 -> 3.0.9"],
                         [{"crate": crate, "from": "1.9.0", "to": "1.9.1", "why": why}])
 
 
@@ -74,9 +74,9 @@ def body_shows(body, heading, why):
     assert why in body.split(heading, 1)[1]
 
 
-@when(parsers.parse("the repository's pubkit.json reads '{text}'"))
-def pubkit_json(repo, text):
-    (repo / "pubkit.json").write_text(text)
+@when(parsers.parse("the repository's pubrules.json reads '{text}'"))
+def pubrules_json(repo, text):
+    (repo / "pubrules.json").write_text(text)
 
 
 @then(parsers.parse('the settings are update "{update}" and fuzz "{fuzz}"'))
@@ -121,7 +121,7 @@ def moved(old, new, expected):
 
 @when("the nightly writes a body for a repository that takes no updates", target_fixture="body")
 def body_no_updates():
-    return nightly.body(["pubkit 0.8.0 -> 0.9.0"], [], [], {"npm": ["marked 18.1.0 -> 18.2.0"]},
+    return nightly.body(["pubrules 0.8.0 -> 0.9.0"], [], [], {"npm": ["marked 18.1.0 -> 18.2.0"]},
                         update=False)
 
 
@@ -155,10 +155,10 @@ def git_repository(repo):
         subprocess.run(["git", *argv], cwd=repo, check=True)
 
 
-@given("its pubkit.json turns every language's updates off")
+@given("its pubrules.json turns every language's updates off")
 def updates_off(repo):
-    (repo / "pubkit.json").write_text('{"update": false}')
-    subprocess.run(["git", "add", "pubkit.json"], cwd=repo, check=True)
+    (repo / "pubrules.json").write_text('{"update": false}')
+    subprocess.run(["git", "add", "pubrules.json"], cwd=repo, check=True)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "off"],
                    cwd=repo, check=True)
 
@@ -166,7 +166,7 @@ def updates_off(repo):
 @when(parsers.parse('the nightly runs with npm moving "{name}" to {version} and the lock moving '
                     '"{package}" to {new}'), target_fixture="ran")
 def nightly_runs(repo, monkeypatch, capsys, name, version, package, new):
-    from pubkit import cli  # noqa: PLC0415
+    from pubrules import cli  # noqa: PLC0415
 
     real = subprocess.run
 
@@ -338,7 +338,7 @@ def start(repo, monkeypatch, name):
 
 @then(parsers.parse('it conforms to the standard but for "{rule}"'))
 def conforms_but(repo, rule):
-    _, problems = conform.run(repo, json.loads((repo / "pubkit.json").read_text()))
+    _, problems = conform.run(repo, json.loads((repo / "pubrules.json").read_text()))
     assert problems and all(p.startswith(f"{rule}:") for p in problems), problems
 
 
@@ -369,12 +369,12 @@ def releases(tmp_path, env, released, slug, tag):
     fake.write_text(f'#!/bin/sh\n[ "$4" = "{slug}" ] || exit 1\nprintf "%s\\n" "{tag}"\n')
     fake.chmod(0o755)
     env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
-    env["PUBKIT_GIT_BASE"] = str(tmp_path / "remotes")
+    env["PUBRULES_GIT_BASE"] = str(tmp_path / "remotes")
 
 
-@given(parsers.parse('pubkit.json lists "{wheel}" in deploy.providers'))
+@given(parsers.parse('pubrules.json lists "{wheel}" in deploy.providers'))
 def lists_provider(repo, wheel):
-    (repo / "pubkit.json").write_text(json.dumps(
+    (repo / "pubrules.json").write_text(json.dumps(
         {"kind": "utility", "deploy": {"providers": [{"distribution": "somedeploy", "wheel": wheel,
                                                       "sha256": "0" * 64}]}}) + "\n")
 
@@ -393,7 +393,7 @@ def sources_at(repo, released, path, module, tag):
     assert f'"github.com/{module}?ref={released[slug]}" # {tag}' in text, text
 
 
-# Third-party actions: `pubkit actions`.
+# Third-party actions: `pubrules actions`.
 
 @given(parsers.parse('the workflow "{name}" uses "{first}" and "{second}" at "{pin}"'))
 def workflow_uses_both(repo, name, first, second, pin):
@@ -404,7 +404,7 @@ def workflow_uses_both(repo, name, first, second, pin):
 
 @given(parsers.parse('the generated workflow "{name}" uses "{pin}"'))
 def generated_uses(repo, name, pin):
-    from pubkit.ci import HEADER
+    from pubrules.ci import HEADER
     path = repo / ".github" / "workflows" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"{HEADER}      - uses: {pin}\n")
@@ -437,7 +437,7 @@ def committed_action(repo, monkeypatch, slug, old, latest):
 
 @then("a uv lock made from a moved file is compiled again")
 def a_uv_lock_made_from_a_moved_file_is_compiled_again(tmp_path, monkeypatch):
-    from pubkit import nightly
+    from pubrules import nightly
     (tmp_path / "requirements.in").write_text("x\n")
     (tmp_path / "requirements.lock").write_text(
         "# This file was autogenerated by uv via the following command:\n"
@@ -457,7 +457,7 @@ def a_uv_lock_made_from_a_moved_file_is_compiled_again(tmp_path, monkeypatch):
 
 @then("a uv lock that fails to compile is said and left")
 def a_uv_lock_that_fails_to_compile_is_said_and_left(tmp_path, monkeypatch, capsys):
-    from pubkit import nightly
+    from pubrules import nightly
     (tmp_path / "requirements.in").write_text("x\n")
     (tmp_path / "requirements.lock").write_text("#    uv pip compile requirements.in -o requirements.lock\n")
     bin_dir = tmp_path / "bin"

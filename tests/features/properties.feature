@@ -1,6 +1,6 @@
 Feature: What holds for every input, tried by Hypothesis
   Each scenario states a property and lets Hypothesis generate the inputs
-  that would break it, PUBKIT_FUZZ_RUNS of them: a few on every push, many
+  that would break it, PUBRULES_FUZZ_RUNS of them: a few on every push, many
   on the nightly schedule.
 
   Scenario: Canonical CBOR decodes back to every value it encodes

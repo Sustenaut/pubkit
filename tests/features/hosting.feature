@@ -1,23 +1,23 @@
-Feature: pubkit.json's hosting block holds the providers and the zones
+Feature: pubrules.json's hosting block holds the providers and the zones
   The hosting modules read the hosting block: the providers a repository
   uses, each with its type and its own facts, and the zones, each naming
   the providers that serve its DNS, its email and its sites. Terraform
-  ignores a setting it does not know, so pubkit sync checks the block first
+  ignores a setting it does not know, so pubrules sync checks the block first
   and stops on anything it cannot use.
 
-  Scenario: The Terraform modules' test setup is a hosting block pubkit accepts
-    Given the pubkit.json the Terraform modules are tested with
-    Then pubkit accepts its hosting block
+  Scenario: The Terraform modules' test setup is a hosting block pubrules accepts
+    Given the pubrules.json the Terraform modules are tested with
+    Then pubrules accepts its hosting block
 
   Scenario: A repository without a hosting block has nothing to check
     Given the hosting settings '{"kind": "service"}'
-    Then pubkit accepts its hosting block
+    Then pubrules accepts its hosting block
 
-  Scenario: Any name can be a provider of a type pubkit knows
+  Scenario: Any name can be a provider of a type pubrules knows
     Given the hosting settings '{"hosting": {"providers": {"main-hetzner": {"type": "hetzner"}, "other-hetzner": {"type": "hetzner"}}, "zones": {"example.eu": {"dns": ["other-hetzner"]}}}}'
-    Then pubkit accepts its hosting block
+    Then pubrules accepts its hosting block
 
-  Scenario Outline: A provider pubkit cannot use stops it with a message
+  Scenario Outline: A provider pubrules cannot use stops it with a message
     Given the hosting settings '{"hosting": {"providers": {"p": <provider>}}}'
     Then reading them stops with "<message>"
 
@@ -40,7 +40,7 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"type": "desec", "dns": {"external_nameservers": []}}            | external_nameservers must list the names deSEC |
       | {"type": "desec", "account_id": "x"}                              | providers.p has no setting account_id         |
 
-  Scenario Outline: A zone pubkit cannot use stops it with a message
+  Scenario Outline: A zone pubrules cannot use stops it with a message
     Given the providers of the modules' test setup with the zone '<zone>'
     Then reading them stops with "<message>"
 
@@ -71,9 +71,9 @@ Feature: pubkit.json's hosting block holds the providers and the zones
 
   Scenario: A zone deSEC and Cloudflare serve can be signed by both
     Given the providers of the modules' test setup with the zone '{"dns": ["desec", "cloudflare"], "dnssec": {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["257 3 13 BBBB", "256 3 13 CCCC"]}}}'
-    Then pubkit accepts its hosting block
+    Then pubrules accepts its hosting block
 
-  Scenario Outline: A dnssec block pubkit cannot use stops it with a message
+  Scenario Outline: A dnssec block pubrules cannot use stops it with a message
     Given the providers of the modules' test setup with the zone '{"dns": <dns>, "dnssec": <dnssec>}'
     Then reading them stops with "<message>"
 
@@ -105,9 +105,9 @@ Feature: pubkit.json's hosting block holds the providers and the zones
       | {"hosting": {"ttl": {"sites": 30}}}              | ttl.sites must be a number of seconds        |
       | {"hosting": {"ttl": {"mx": 300}}}                | hosting.ttl has no setting mx                |
 
-  Scenario: pubkit sync --check stops on a hosting block it cannot use
+  Scenario: pubrules sync --check stops on a hosting block it cannot use
     Given a repository initialised as "utility"
-    When the file "pubkit.json" reads "{"kind": "utility", "hosting": {"provider": {}}}"
-    And I run pubkit "sync" "--check"
+    When the file "pubrules.json" reads "{"kind": "utility", "hosting": {"provider": {}}}"
+    And I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "hosting has no setting provider"

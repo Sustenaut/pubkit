@@ -1,13 +1,13 @@
-Feature: pubkit reads what pubkit.json says about secrets, and never a value
+Feature: pubrules reads what pubrules.json says about secrets, and never a value
   The github_app and secrets blocks name the values a repository needs and
   where they go on GitHub, and signing_keys each signing key and where it is
-  backed up. `pubkit sync --check` refuses a block it can't use; the
+  backed up. `pubrules sync --check` refuses a block it can't use; the
   commands that send, write or back up those values are pubsec's, and the
-  ones that were pubkit's say so.
+  ones that were pubrules's say so.
 
   Scenario Outline: A wrong secrets list is refused by sync
-    Given the file "pubkit.json" reads "{"kind": "utility", "secrets": <list>}"
-    When I run pubkit "sync" "--check"
+    Given the file "pubrules.json" reads "{"kind": "utility", "secrets": <list>}"
+    When I run pubrules "sync" "--check"
     Then the exit code is 1
     And stderr mentions "<message>"
 
@@ -27,9 +27,9 @@ Feature: pubkit reads what pubkit.json says about secrets, and never a value
       | [{"from": 1, "to": 2, "kind": "secret"}]                | 2's "from" is not         |
       | [{"from": "a", "to": "A", "kind": "secret"}, {"from": "b", "to": "A", "kind": "secret"}] | two of them have the same |
 
-  Scenario Outline: pubkit sync refuses a bad github_app block
-    Given the file "pubkit.json" reads "{"kind": "utility", "github_app": <block>}"
-    When I run pubkit "sync" "--check"
+  Scenario Outline: pubrules sync refuses a bad github_app block
+    Given the file "pubrules.json" reads "{"kind": "utility", "github_app": <block>}"
+    When I run pubrules "sync" "--check"
     Then the exit code is 1
     And stderr mentions "<message>"
 
@@ -45,16 +45,16 @@ Feature: pubkit reads what pubkit.json says about secrets, and never a value
       | {"id": {"from": "a", "to": "A"}, "installation_id": {"from": "b", "to": "A"}, "key": {"from": "c", "to": "C"}}             | two of them have the same     |
       | {"id": {"from": 1, "to": 2}, "installation_id": {"from": "b", "to": "B"}, "key": {"from": "c", "to": "C"}}                 | id's "from" is not            |
 
-  Scenario: pubkit sync takes a sound block
+  Scenario: pubrules sync takes a sound block
     Given a repository initialised as "utility"
-    And its pubkit.json has a sound github_app block
-    When I run pubkit "sync" "--check"
+    And its pubrules.json has a sound github_app block
+    When I run pubrules "sync" "--check"
     Then it prints "in step"
 
   Scenario Outline: sync --check refuses a signing_keys block it can't use
     Given a repository initialised as "utility"
-    And its pubkit.json's signing_keys is <block>
-    When I run pubkit "sync" "--check"
+    And its pubrules.json's signing_keys is <block>
+    When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "<problem>"
 
@@ -71,9 +71,9 @@ Feature: pubkit reads what pubkit.json says about secrets, and never a value
 
   Scenario Outline: A command that moved to pubsec says where, and fails
     Given a repository initialised as "utility"
-    When I run pubkit <command>
+    When I run pubrules <command>
     Then the exit code is 2
-    And stderr mentions "pubkit: this is now ./pubsec <then>; run pubkit sync to get the launcher"
+    And stderr mentions "pubrules: this is now ./pubsec <then>; run pubrules sync to get the launcher"
 
     Examples:
       | command                                              | then                                     |

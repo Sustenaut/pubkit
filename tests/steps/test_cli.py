@@ -1,4 +1,4 @@
-"""Steps for the `pubkit` command, run as a user would, in a scratch
+"""Steps for the `pubrules` command, run as a user would, in a scratch
 repository, through the plugin's own `run` fixture."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubkit import __version__
+from pubrules import __version__
 
 SOURCE = Path(__file__).resolve().parents[2]
 
@@ -39,13 +39,13 @@ def indexed(tmp_path, env, name, version, a, b):
     (api / "json").write_text(json.dumps(
         {"urls": [{"digests": {"sha256": a}}, {"digests": {"sha256": b}}]}))
     env.update(PIP_NO_INDEX="1", PIP_FIND_LINKS=str(links),
-               PUBKIT_INDEX_JSON=(tmp_path / "index").as_uri())
+               PUBRULES_INDEX_JSON=(tmp_path / "index").as_uri())
     env["resolved"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
 
 
 @given("pip can't be imported")
 def no_pip(tmp_path, env):
-    """A sitecustomize that hides pip from pubkit's own process, as in an
+    """A sitecustomize that hides pip from pubrules's own process, as in an
     environment uvx made; the pip it starts still runs."""
     hide = tmp_path / "hide-pip"
     hide.mkdir()
@@ -54,9 +54,9 @@ def no_pip(tmp_path, env):
     env.update(PYTHONPATH=str(hide), HIDE_PIP="1")
 
 
-@then(parsers.parse('"{path}" pins this pubkit\'s wheel'))
+@then(parsers.parse('"{path}" pins this pubrules\'s wheel'))
 def pins_wheel(repo, path):
-    assert f"/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl" in (
+    assert f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl" in (
         repo / path).read_text()
 
 
@@ -70,7 +70,7 @@ def pins_hashes(repo, env, path, pin, a, b):
 
 
 
-@when("pubkit's wheel is built", target_fixture="wheel")
+@when("pubrules's wheel is built", target_fixture="wheel")
 def built_wheel(tmp_path):
     # Templates are package data, and a glob that misses one (a
     # dot-directory, say) passes every test run from source while the
@@ -83,16 +83,16 @@ def built_wheel(tmp_path):
         ".git", ".venv", "build", "dist", "*.egg-info", "__pycache__"))
     subprocess.run([sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps",
                     str(copy), "-w", str(tmp_path)], check=True)
-    return next(tmp_path.glob("pubkit-*.whl"))
+    return next(tmp_path.glob("pubrules-*.whl"))
 
 
-@then("it holds every file under src/pubkit/templates, and standard.json")
+@then("it holds every file under src/pubrules/templates, and standard.json")
 def wheel_holds_templates(wheel):
     names = set(zipfile.ZipFile(wheel).namelist())
     src = SOURCE / "src"
-    missing = [p.relative_to(src).as_posix() for p in (src / "pubkit" / "templates").rglob("*")
+    missing = [p.relative_to(src).as_posix() for p in (src / "pubrules" / "templates").rglob("*")
                if p.is_file() and "__pycache__" not in p.parts and p.relative_to(src).as_posix() not in names]
-    missing += [] if "pubkit/standard.json" in names else ["pubkit/standard.json"]
+    missing += [] if "pubrules/standard.json" in names else ["pubrules/standard.json"]
     assert not missing, f"the wheel lacks {missing}"
 
 
@@ -125,10 +125,10 @@ def run_make(repo, run, args):
     return run("make", *args.strip().strip('"').split('" "'), cwd=repo)
 
 
-@given("the lock pins this pubkit")
+@given("the lock pins this pubrules")
 def lock_pins_this(repo):
     (repo / "tests" / "requirements.lock").write_text(
-        f"pubkit @ https://example.org/download/v{__version__}/pubkit-{__version__}-py3-none-any.whl\n")
+        f"pubrules @ https://example.org/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl\n")
 
 
 @given(".venv was built from the current lock")
@@ -142,10 +142,10 @@ def venv_built(repo):
     os.utime(stamp, (later, later))
 
 
-@given("the lock moves to another pubkit")
+@given("the lock moves to another pubrules")
 def lock_moves(repo):
     lock = repo / "tests" / "requirements.lock"
-    lock.write_text("pubkit @ https://example.org/download/v0.0.1/pubkit-0.0.1-py3-none-any.whl\n")
+    lock.write_text("pubrules @ https://example.org/download/v0.0.1/pubrules-0.0.1-py3-none-any.whl\n")
     later = (repo / ".venv" / "requirements.lock").stat().st_mtime + 10
     os.utime(lock, (later, later))
 

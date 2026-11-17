@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Managed by pubrules {version}: `pubrules sync` rewrites this file, and
+# `pubrules sync --check` fails when it differs.
+#
+# Run this repository's pubrules: the version its managed files and
+# tests/requirements.lock pin, whichever pubrules is installed, if any.
+#
+#   ./pubrules sync --check
+#
+# uvx fetches that release's wheel once and keeps it in uv's cache; nothing
+# is installed into the repository or the system. pubrules runs in the
+# repository's root, where pubrules.json is, from whichever directory this is
+# called.
+#
+# With a wheel mirror in pubrules.json (mirror.wheels), the wheel is fetched
+# here instead, checked against the sha256 tests/requirements.lock pins, and
+# taken from the mirror when GitHub's release download fails.
+set -euo pipefail
+
+if ! command -v uvx >/dev/null 2>&1; then
+  echo "pubrules: ./pubrules runs pubrules {version} with uv, which is not installed: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+  exit 127
+fi
+
+cd "$(dirname "$0")"
+{providers}{launch}{with}pubrules "$@"

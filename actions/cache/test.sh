@@ -7,7 +7,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 cd "$work"
-cat > pubkit.json <<'JSON'
+cat > pubrules.json <<'JSON'
 {"kind": "utility", "cache": {
   "data": {"path": "data", "refresh": "week"},
   "packs": {"path": ".packcache", "unit": "data/{unit}/", "inputs": ["build.py"]}}}
@@ -17,14 +17,14 @@ expect() {
   if grep -qE -- "$2" "$GITHUB_OUTPUT"; then echo "ok: $1"; else
     echo "FAIL: $1: no line matching $2"; cat "$GITHUB_OUTPUT"; failures=$((failures + 1)); fi
 }
-export GITHUB_RUN_ID=7 GITHUB_RUN_ATTEMPT=2 PUBKIT_TODAY=2026-10-29
+export GITHUB_RUN_ID=7 GITHUB_RUN_ATTEMPT=2 PUBRULES_TODAY=2026-10-29
 export GITHUB_OUTPUT="$work/out"
 STEP=restore "$here/plan.sh" > /dev/null
 expect "the fetched entry first, by name" '^path-1=data$'
-expect "a key for this week's data" '^key-1=pubkit-cache-data-[0-9a-f]{16}-2026-W44-[0-9a-f]{16}$'
+expect "a key for this week's data" '^key-1=pubrules-cache-data-[0-9a-f]{16}-2026-W44-[0-9a-f]{16}$'
 expect "the data restored exactly" '^prefix-1=$'
-expect "a key for this run's packs" '^key-2=pubkit-cache-packs-[0-9a-f]{16}-7-2$'
-expect "the packs restored from the latest run" '^prefix-2=pubkit-cache-packs-[0-9a-f]{16}-$'
+expect "a key for this run's packs" '^key-2=pubrules-cache-packs-[0-9a-f]{16}-7-2$'
+expect "the packs restored from the latest run" '^prefix-2=pubrules-cache-packs-[0-9a-f]{16}-$'
 expect "no third entry" '^key-3=$'
 export GITHUB_OUTPUT="$work/fresh"
 STEP=restore FRESH=true "$here/plan.sh" > /dev/null

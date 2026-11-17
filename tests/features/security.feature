@@ -1,5 +1,5 @@
-Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
-  `pubkit sync` writes .github/dependabot.yml from security.dependabot, and
+Feature: pubrules.json's security block configures Dependabot and SonarQube Cloud
+  `pubrules sync` writes .github/dependabot.yml from security.dependabot, and
   every sonar job adds security.sonar.args and sends the code to
   security.sonar.organization. The advisory checks have no
   setting.
@@ -8,7 +8,7 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
     Given the security settings '{"kind": "utility"}'
     Then dependabot.yml updates "github-actions" at "/" "weekly"
 
-  Scenario: The ecosystems, schedule and options come from pubkit.json
+  Scenario: The ecosystems, schedule and options come from pubrules.json
     Given the security settings '{"kind": "utility", "security": {"dependabot": {"schedule": "daily", "ecosystems": ["npm", {"package-ecosystem": "pip", "directory": "/tests"}], "options": {"open-pull-requests-limit": 3}}}}'
     Then dependabot.yml updates "npm" at "/" "daily"
     And dependabot.yml updates "pip" at "/tests" "daily"
@@ -28,23 +28,23 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
       | {"kind": "utility", "update": {"actions": false}}       |
       | {"kind": "utility", "update": false}                    |
 
-  Scenario: Dependabot leaves the pins pubkit moves to pubkit
+  Scenario: Dependabot leaves the pins pubrules moves to pubrules
     Given the security settings '{"kind": "utility"}'
-    Then the "github-actions" entry ignores "Sustenaut/pubkit/*" and "Sustenaut/pubrel/*"
+    Then the "github-actions" entry ignores "Sustenaut/pubrules/*" and "Sustenaut/pubrel/*"
     And Dependabot would not bump "Sustenaut/pubrel/.github/workflows/release.yml"
-    And Dependabot would not bump "Sustenaut/pubkit/actions/deploy-static"
+    And Dependabot would not bump "Sustenaut/pubrules/actions/deploy-static"
     And Dependabot would bump "actions/setup-python"
 
   Scenario: The ignored pins follow workflows_owner, and ignores in options are kept
     Given the security settings '{"kind": "utility", "workflows_owner": "example-org", "security": {"dependabot": {"ecosystems": ["github-actions", "npm"], "options": {"ignore": [{"dependency-name": "actions/cache"}]}}}}'
-    Then the "github-actions" entry ignores "example-org/pubkit/*", "example-org/pubrel/*" and "actions/cache"
+    Then the "github-actions" entry ignores "example-org/pubrules/*", "example-org/pubrel/*" and "actions/cache"
     And the "npm" entry ignores "actions/cache"
 
   Scenario: Dependabot set to false leaves dependabot.yml to the repository
     Given the security settings '{"kind": "utility", "security": {"dependabot": false}}'
-    Then pubkit writes no dependabot.yml
+    Then pubrules writes no dependabot.yml
 
-  Scenario Outline: A security setting pubkit cannot use stops it with a message
+  Scenario Outline: A security setting pubrules cannot use stops it with a message
     Given the security settings '<config>'
     Then reading them stops with "<message>"
 
@@ -61,16 +61,16 @@ Feature: pubkit.json's security block configures Dependabot and SonarQube Cloud
       | {"security": {"sonar": {"organization": "Example-Org"}}}         | security.sonar.organization must be a     |
       | {"security": {"sonar": {"organization": 7}}}                   | security.sonar.organization must be a     |
 
-  Scenario: pubkit sync writes dependabot.yml and sync --check sees it drift
+  Scenario: pubrules sync writes dependabot.yml and sync --check sees it drift
     Given a repository initialised as "utility"
-    Then "pubkit.json" exists beside ".github/dependabot.yml" naming "github-actions"
+    Then "pubrules.json" exists beside ".github/dependabot.yml" naming "github-actions"
     When the file ".github/dependabot.yml" reads "version: 2"
-    And I run pubkit "sync" "--check"
+    And I run pubrules "sync" "--check"
     Then it fails
 
-  Scenario Outline: Every sonar job adds the properties pubkit.json gives
+  Scenario Outline: Every sonar job adds the properties pubrules.json gives
     When I parse the workflow "<workflow>"
-    Then its sonar job reads security.sonar.args from pubkit.json into the scan
+    Then its sonar job reads security.sonar.args from pubrules.json into the scan
 
     Examples:
       | workflow      |

@@ -1,4 +1,4 @@
-"""Steps for `pubkit conform`, against a scratch crate that meets the
+"""Steps for `pubrules conform`, against a scratch crate that meets the
 standard and is then changed one way at a time."""
 
 from __future__ import annotations
@@ -8,8 +8,8 @@ import shutil
 
 from pytest_bdd import given, parsers, scenarios
 
-from pubkit import __version__, security
-from pubkit.conform import DENY_BASELINE, SHARED_IMPORTS
+from pubrules import __version__, security
+from pubrules.conform import DENY_BASELINE, SHARED_IMPORTS
 
 scenarios("conform.feature")
 
@@ -43,8 +43,8 @@ def vet_config(skip: str | None = None) -> str:
 
 
 KEY = "pub:sha2-256:demokey"
-AUDIT_CHECK = {"name": "quality audit current", "run": ".venv/bin/pubkit audit --check",
-               "version": ".venv/bin/pubkit --version"}
+AUDIT_CHECK = {"name": "quality audit current", "run": ".venv/bin/pubrules audit --check",
+               "version": ".venv/bin/pubrules --version"}
 
 
 def key_object(label: str) -> bytes:
@@ -58,13 +58,13 @@ def key_object(label: str) -> bytes:
 
 def workflow(version: str, owner: str = "example-org") -> str:
     return ("jobs:\n  ci:\n    uses: "
-            f"{owner}/pubkit/.github/workflows/rust-ci.yml@{version}\n")
+            f"{owner}/pubrules/.github/workflows/rust-ci.yml@{version}\n")
 
 
 @given("a Rust crate that meets the standard")
 def conforming(repo, env):
     files = {
-        "pubkit.json": '{"kind": "rust"}\n',
+        "pubrules.json": '{"kind": "rust"}\n',
         "Cargo.toml": MANIFEST,
         "src/lib.rs": LIB,
         "SECURITY.md": "# Security\n",
@@ -84,12 +84,12 @@ def conforming(repo, env):
     key_path(repo).parent.mkdir(parents=True)
     key_path(repo).write_bytes(key_object("demo release key"))
     # The managed files, so `sync --check` gets as far as conform.
-    from pubkit.cli import managed, render, templates, values
+    from pubrules.cli import managed, render, templates, values
     every = templates("rust")
     for path in managed("rust"):
         (repo / path).parent.mkdir(parents=True, exist_ok=True)
         (repo / path).write_text(render(every[path], values({"kind": "rust"})))
-    env["PUBKIT_TODAY"] = "2026-10-12"
+    env["PUBRULES_TODAY"] = "2026-10-12"
 
 
 @given(parsers.parse('the file "{path}" is removed'))
@@ -137,19 +137,19 @@ def pinned(repo, version):
 
 @given(parsers.parse('the workflow calls "{owner}"\'s rust-ci.yml at "{version}"'))
 def pinned_by_owner(repo, owner, version):
-    version = f"v{__version__}" if version == "this pubkit" else version
+    version = f"v{__version__}" if version == "this pubrules" else version
     (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(version, owner))
 
 
 @given(parsers.parse('the workflow calls rust-ci.yml at commit "{commit}" of "{version}"'))
 def pinned_by_commit(repo, commit, version):
-    version = __version__ if version == "this pubkit" else version
+    version = __version__ if version == "this pubrules" else version
     (repo / ".github" / "workflows" / "ci.yml").write_text(workflow(f"{commit} # v{version}"))
 
 
 @given(parsers.parse('an exception for "{rule}" until "{until}" because "{reason}"'))
 def exception(repo, rule, until, reason):
-    path = repo / "pubkit.json"
+    path = repo / "pubrules.json"
     config = json.loads(path.read_text())
     config.setdefault("exceptions", []).append({"rule": rule, "reason": reason, "until": until})
     path.write_text(json.dumps(config, indent=2) + "\n")
