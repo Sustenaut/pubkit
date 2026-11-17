@@ -7,7 +7,7 @@ so the pin cannot move with the tag (SonarQube Cloud's S7637) and still
 reads as a version. Every reader here also takes the tag alone, `@v0.15.2`,
 as workflows written before pinned.
 
-pubrules's own commit is in its wheel: the release CI writes the tag's
+pubrules' own commit is in its wheel: the release CI writes the tag's
 commit into the package, as `release-commit`, before it builds the wheel,
 so `pubrules sync` needs no network for it. A source tree has none, and pins
 by tag. pubrel's is the one recorded beside the pubrel pubrules pins
@@ -34,7 +34,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-# The owner of pubrules's and pubrel's repositories, whose workflows a
+# The owner of pubrules' and pubrel's repositories, whose workflows a
 # repository calls, since their transfer from schryer.
 OWNER = "Sustenaut"
 OWNER_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
@@ -51,11 +51,11 @@ RELEASE_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrel/\.github/workflows/releas
 # Any use of pubrules at a release: one of its actions (actions/<name>, such
 # as cache) or of its reusable workflows (.github/workflows/<name>,
 # such as service-ci.yml or job-sonar.yml), by commit with the version in a
-# comment, or by tag. It runs that pubrules's code, so it moves with the
+# comment, or by tag. It runs that pubrules' code, so it moves with the
 # pubrules the lock pins, written by sync or by hand.
 PUBRULES_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrules/(?P<name>actions/[\w.-]+|"
                         r"\.github/workflows/[\w.-]+\.ya?ml)@)" + AT + VERSION)
-# Any use of pubrules's actions or reusable workflows, versioned or not.
+# Any use of pubrules' actions or reusable workflows, versioned or not.
 PUBRULES_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubrules/(?:actions/[\w.-]+|"
                         r"\.github/workflows/[\w.-]+\.ya?ml)@[^\s'\"]+")
 
@@ -102,7 +102,7 @@ def tf_files(root: Path) -> list[Path]:
 
 
 def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str], list[str]]:
-    """(the uses of pubrules's actions and reusable workflows in the
+    """(the uses of pubrules' actions and reusable workflows in the
     repository's workflows that pin another pubrules than `version`, or
     another commit than `commit`; those that name no version, which nothing
     here moves)."""
@@ -114,7 +114,7 @@ def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str],
             name = m["name"].rsplit("/", 1)[-1]
             if not shipped(m["name"]):
                 stale.append(f"{rel}: pubrules {version} has no {m['name']}; it moved out of "
-                             f"pubrules (pubrules's README says where), so pin it from there")
+                             f"pubrules (pubrules' README says where), so pin it from there")
             elif m["version"] != version:
                 stale.append(f"{rel}: {name}@v{m['version']} is not pubrules {version}, which "
                              f"tests/requirements.lock pins; run `pubrules bump`, or pin it "
@@ -131,7 +131,7 @@ def stale_pins(root: Path, version: str, commit: str | None) -> tuple[list[str],
             if m["repo"].lower() == "pubrules" and not (
                     len(module) == 2 and module[0] == "terraform" and module[1] in SHIPPED["terraform"]):
                 stale.append(f"{rel}: pubrules {version} has no {m['path']}; it moved out of pubrules "
-                             f"(pubrules's README says where), so take the module from there")
+                             f"(pubrules' README says where), so take the module from there")
     return stale, unversioned
 
 
@@ -166,7 +166,7 @@ def repin(pattern: re.Pattern[str], text: str, owner: str, version: str,
 
 
 def release_commit() -> str | None:
-    """The commit of this pubrules's release tag, from the wheel; None from a
+    """The commit of this pubrules' release tag, from the wheel; None from a
     source tree. PUBRULES_RELEASE_COMMIT, which tests set, stands in for it."""
     given = os.environ.get("PUBRULES_RELEASE_COMMIT")
     if given is None:

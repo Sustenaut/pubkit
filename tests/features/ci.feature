@@ -3,7 +3,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
   not use, and GitHub shows each as skipped. With a ci block, pubrules.json
   says which jobs run on which events, and `pubrules sync` writes one
   workflow per event that calls only those, each job its own reusable
-  workflow, pinned to the commit of this pubrules's tag with the version in
+  workflow, pinned to the commit of this pubrules' tag with the version in
   a comment, as SonarQube Cloud's S7637 asks.
 
   Scenario: A Node package's pull requests and pushes each run only their jobs
@@ -117,14 +117,14 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And "queue.yml" checks the site in "public" after running "nothing", deploying nothing
     And "main.yml" has no site job
 
-  Scenario: pubrules's own CI runs in the merge queue, and builds the wheel from a push to main alone
-    When I read pubrules's own ci.yml
+  Scenario: pubrules' own CI runs in the merge queue, and builds the wheel from a push to main alone
+    When I read pubrules' own ci.yml
     Then it runs on pull requests, in the merge queue and on pushes to main
     And its wheel job runs only on a push to main
     And in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree
     And it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip
 
-  Scenario Outline: The token reaches pubrules's jobs by name, which works across owners
+  Scenario Outline: The token reaches pubrules' jobs by name, which works across owners
     Given a <language> repository whose ci block is '{}'
     When I run pubrules "sync"
     Then it succeeds
@@ -331,8 +331,8 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | rust-ci.yml             |
 
 
-  Scenario Outline: A setup that fails is tried again, three times at most, by pubrules's retry action
-    Then every setup step of "<workflow>" runs its setup input through actions/retry at pubrules's own pin, three times with 15 seconds between
+  Scenario Outline: A setup that fails is tried again, three times at most, by pubrules' retry action
+    Then every setup step of "<workflow>" runs its setup input through actions/retry at pubrules' own pin, three times with 15 seconds between
 
     Examples:
       | workflow                  |
@@ -385,38 +385,38 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | {"terraform": "https://storage.example/tf/"}   |
       | "https://storage.example/wheels"                |
 
-  Scenario: The launcher takes pubrules's own wheel from the mirror when GitHub fails, checked against the lock's sha256
+  Scenario: The launcher takes pubrules' own wheel from the mirror when GitHub fails, checked against the lock's sha256
     Given pubrules.json's wheel mirror is "https://storage.example/wheels"
-    And a lock that pins this pubrules's wheel
+    And a lock that pins this pubrules' wheel
     When the launcher fetches pubrules with GitHub failing and the mirror giving "the wheel"
     Then uvx is given the cached wheel
     When the launcher fetches pubrules with GitHub failing and the mirror giving "another file"
     Then the launcher stops with "is not the wheel tests/requirements.lock pins"
 
   Scenario: Without a wheel mirror, the launcher is as it was
-    Then the launcher without a mirror runs uvx on pubrules's GitHub release URL, with no fetch
-  Scenario Outline: A Terraform init that fails is tried three times, then once from pubrules.json's provider mirror, by pubrules's terraform-init action
-    Then the "<workflow>" init step runs actions/terraform-init at pubrules's own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause
+    Then the launcher without a mirror runs uvx on pubrules' GitHub release URL, with no fetch
+  Scenario Outline: A Terraform init that fails is tried three times, then once from pubrules.json's provider mirror, by pubrules' terraform-init action
+    Then the "<workflow>" init step runs actions/terraform-init at pubrules' own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause
 
     Examples:
       | workflow                  |
       | job-service-terraform.yml |
       | service-ci.yml            |
 
-  Scenario: pubrules's workflows use pubrules's actions at one released commit, never by a local path
+  Scenario: pubrules' workflows use pubrules' actions at one released commit, never by a local path
     A reusable workflow runs in the caller's repository, where ./actions/ is
-    the caller's own, so pubrules's workflows name pubrules's actions as any
+    the caller's own, so pubrules' workflows name pubrules' actions as any
     other repository does: by a release's commit, no later than this pubrules.
-    Then every use of pubrules's actions in pubrules's workflows pins one commit, at a release no later than this pubrules
-    And no reusable workflow of pubrules's uses an action by a local path
+    Then every use of pubrules' actions in pubrules' workflows pins one commit, at a release no later than this pubrules
+    And no reusable workflow of pubrules' uses an action by a local path
 
-  Scenario: Without a list, the review leaves pubrules's and pubrel's workflows and actions out of the license check alone
+  Scenario: Without a list, the review leaves pubrules' and pubrel's workflows and actions out of the license check alone
     Then job-review.yml's license exceptions name every reusable workflow and action pubrules has, and pubrel's release workflow
     And job-review.yml sets no other input, so advisories apply to everything
 
   Scenario: sync lists the owner's workflows and actions the repository calls, for the review's license check
     Given a Node repository whose ci block is '{}'
-    And a deploy workflow that calls integrations' scan, pubrules's cache action, actions/checkout and a local action
+    And a deploy workflow that calls integrations' scan, pubrules' cache action, actions/checkout and a local action
     When I run pubrules "sync"
     Then ".github/dependency-review-licenses.txt" lists "pkg:githubactions/Sustenaut/integrations/.github/workflows/scan.yml"
     And ".github/dependency-review-licenses.txt" lists "pkg:githubactions/Sustenaut/pubrules/actions/cache"
@@ -430,11 +430,11 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     When I run pubrules "sync"
     Then ".github/dependency-review-licenses.txt" is not there
 
-  Scenario Outline: The review takes only the owner's purls from the list, and pubrules's and pubrel's without one
+  Scenario Outline: The review takes only the owner's purls from the list, and pubrules' and pubrel's without one
     When the "<workflow>" review exceptions step runs on a list holding another owner's purl
     Then it passes the owner's purls alone
     When the "<workflow>" review exceptions step runs without a list
-    Then it passes pubrules's and pubrel's
+    Then it passes pubrules' and pubrel's
 
     Examples:
       | workflow        |
@@ -574,13 +574,13 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     When I run pubrules "sync"
     Then it succeeds
-    And ".github/workflows/pr.yml" pins pubrules's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And ".github/workflows/main.yml" pins pubrules's workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And ".github/workflows/pr.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And ".github/workflows/main.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And "pr.yml" pins pubrel's release workflow to the commit pubrules records
     When I run pubrules "sync" "--check"
     Then it succeeds
 
-  Scenario: A source tree, with no release commit, pins pubrules's jobs by tag
+  Scenario: A source tree, with no release commit, pins pubrules' jobs by tag
     Given a Node repository whose ci block is '{}'
     When I run pubrules "sync"
     Then it succeeds
@@ -706,7 +706,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     And I run pubrules "sync" "--check"
     Then it succeeds
-    And ".github/workflows/ci-extra.yml" calls "Sustenaut"'s pubrules workflow "service-ci.yml" at "this pubrules's commit"
+    And ".github/workflows/ci-extra.yml" calls "Sustenaut"'s pubrules workflow "service-ci.yml" at "this pubrules' commit"
 
   Scenario: A stale pubrules action pin fails sync --check until it is moved, then passes
     Given a Node repository whose ci block is '{}'
@@ -720,9 +720,9 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And I run pubrules "sync"
     And I run pubrules "sync" "--check"
     Then it succeeds
-    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "this pubrules's commit"
+    And ".github/workflows/deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "this pubrules' commit"
 
-  Scenario Outline: sync --check takes this pubrules's pin of an action, and reports one with no version
+  Scenario Outline: sync --check takes this pubrules' pin of an action, and reports one with no version
     Given a Node repository whose ci block is '{}'
     And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow "deploy.yml" uses "Sustenaut"'s pubrules action "cache" at "<pin>"
@@ -734,8 +734,8 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
     Examples:
       | pin                  | reports                                                    |
-      | this pubrules's commit | does not mention "cache@"                                  |
-      | this pubrules's tag    | does not mention "cache@"                                  |
+      | this pubrules' commit | does not mention "cache@"                                  |
+      | this pubrules' tag    | does not mention "cache@"                                  |
       | main                 | mentions "Sustenaut/pubrules/actions/cache@main names no pubrules version" |
 
   Scenario: sync --check fails on a pubrules action this pubrules does not ship, and pins leaves it where it is
@@ -1031,6 +1031,6 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default
 
   Scenario: A refused report upload or cache never fails a job, and a failing test still does
-    Then every upload-artifact and actions/cache step in pubrules's workflows continues on error, within five minutes
-    And every cache restore and save in pubrules's cache action continues on error
+    Then every upload-artifact and actions/cache step in pubrules' workflows continues on error, within five minutes
+    And every cache restore and save in pubrules' cache action continues on error
     And no step that runs a test command continues on error

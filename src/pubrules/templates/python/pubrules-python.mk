@@ -37,7 +37,7 @@ functional: ## The Gherkin suite on every core, with its coverage in coverage/co
 lock: ## Pin tests/requirements.txt, with hashes, in tests/requirements.lock
 	./pubrules lock
 
-sync-check: ## Fail if pubrules's managed files differ from the pinned version's
+sync-check: ## Fail if pubrules' managed files differ from the pinned version's
 	./pubrules sync --check
 
 wheel: ## Build the wheel a release carries

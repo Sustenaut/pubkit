@@ -1,4 +1,4 @@
-Feature: pubrules's retry and terraform-init actions try a flaky step again
+Feature: pubrules' retry and terraform-init actions try a flaky step again
   A release or provider download can time out, and pip retries no 504, so
   the reusable workflows try their setup and terraform init again. The two
   composite actions hold that loop once: retry runs a bash script up to a

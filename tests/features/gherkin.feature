@@ -188,7 +188,7 @@ Feature: Every test is a Gherkin scenario
     And it prints "the Gherkin rule does not apply to a content repository"
 
   Scenario: A seeded template compiled by the installer is not a template
-    Given pubrules's templates hold a compiled copy of a seeded .py file, as pip leaves one
+    Given pubrules' templates hold a compiled copy of a seeded .py file, as pip leaves one
     When I run pubrules "sync" "--check"
     Then it reads every template, with no traceback
 

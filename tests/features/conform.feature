@@ -66,21 +66,21 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "rust-ci.yml@v0.0.1 is not pubrules"
 
-  Scenario: A workflow pinning this pubrules's tag's commit conforms
+  Scenario: A workflow pinning this pubrules' tag's commit conforms
     Given a Rust crate that meets the standard
     And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow calls rust-ci.yml at commit "0f3574a72707a46bae149d3ed7a4644b4837795a" of "this pubrules"
     When I run pubrules "conform"
     Then it succeeds
 
-  Scenario: A workflow pinning another pubrules's commit fails
+  Scenario: A workflow pinning another pubrules' commit fails
     Given a Rust crate that meets the standard
     And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "0.0.1"
     When I run pubrules "conform"
     Then it fails
     And stderr mentions "rust-ci.yml@v0.0.1 is not pubrules"
 
-  Scenario: A workflow pinning a commit other than this pubrules's tag's fails
+  Scenario: A workflow pinning a commit other than this pubrules' tag's fails
     Given a Rust crate that meets the standard
     And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And the workflow calls rust-ci.yml at commit "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" of "this pubrules"
@@ -109,7 +109,7 @@ Feature: A Rust repository conforms to the standard, or says why not
     Then it fails
     And stderr mentions "cache@v0.0.1 is not pubrules"
 
-  Scenario: A hand-written call of another pubrules's workflow fails
+  Scenario: A hand-written call of another pubrules' workflow fails
     Given a Rust crate that meets the standard
     And the workflow "extra.yml" calls "Sustenaut"'s pubrules workflow "job-osv.yml" at "another pubrules"
     When I run pubrules "conform"

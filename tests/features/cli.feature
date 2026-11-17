@@ -1,6 +1,6 @@
 Feature: Keeping a repository's shared files in step
   `pubrules init` writes the shared files; `pubrules sync --check` fails when a
-  managed one differs from the installed pubrules's, so copies cannot drift.
+  managed one differs from the installed pubrules', so copies cannot drift.
 
   Scenario: init writes managed and seeded files for a Rust package
     Given an empty repository
@@ -8,7 +8,7 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And the repository has "AGENTS.md", "pubrules.mk", "rust-toolchain.toml", "tests/requirements-pubrules.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/pr.yml", ".github/workflows/main.yml", ".github/workflows/nightly.yml"
     And "Makefile" contains "DEMO_BIN_DIR"
-    And "tests/requirements-pubrules.txt" pins this pubrules's wheel
+    And "tests/requirements-pubrules.txt" pins this pubrules' wheel
 
   Scenario: every repository gets the managed AGENTS.md, with the draft and up-to-date rules
     Given an empty repository
@@ -140,7 +140,7 @@ Feature: Keeping a repository's shared files in step
 
   Scenario: pubrules does not judge a repository that pins another release
     A stale .venv ran pubrules 0.9.x in repositories pinning 0.14.6, and
-    those runs were taken for the pinned pubrules's.
+    those runs were taken for the pinned pubrules'.
     Given a repository initialised as "utility"
     And the file "tests/requirements.lock" reads "pubrules @ https://example.org/download/v0.0.0/pubrules-0.0.0-py3-none-any.whl"
     When I run pubrules "sync" "--check"
@@ -200,7 +200,7 @@ Feature: Keeping a repository's shared files in step
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
   Scenario: The built wheel carries every template, and the standard's rules
-    When pubrules's wheel is built
+    When pubrules' wheel is built
     Then it holds every file under src/pubrules/templates, and standard.json
 
   Scenario: supply-chain writes each crate's report beside its manifest

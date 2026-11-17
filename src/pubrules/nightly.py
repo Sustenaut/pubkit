@@ -67,7 +67,7 @@ CI_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrules/\.github/workflows/"
                     r"(?:rust|python|node|service)-ci\.yml@)" + AT + VERSION)
 # Any other repository's reusable workflow (.github/workflows/<name>) or
 # action (actions/<name>) at a release, the repository read from the line
-# itself, so pubrules names none of them. pubrules's and pubrel's move with
+# itself, so pubrules names none of them. pubrules' and pubrel's move with
 # PUBRULES_PIN and RELEASE_PIN; a deploy.providers package's with its entry,
 # which its sustenaut.bump hook moves.
 OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
@@ -91,7 +91,7 @@ ACTION_PIN = re.compile(r"(?P<lead>uses:[ \t]*['\"]?)" + ANY_OWNER + r"(?P<repo>
 # Directories a repository's own composite actions are never in.
 NOT_OWN = ("node_modules", "target")
 
-# The languages pubrules's settings name, each by the ecosystem pubrules works
+# The languages pubrules' settings name, each by the ecosystem pubrules works
 # with: crates, npm packages, and the hash-locked Python requirements.
 LANGUAGES = ("rust", "node", "python")
 
@@ -472,7 +472,7 @@ def actions(root: Path) -> list[str]:
     release, by the commit of its tag, with the version in a comment: what
     Dependabot's version updates did, but on the nightly's branch, with a
     pubrel row and the nightly's token. One line per file and repository
-    moved. pubrules's and pubrel's pins, and a deploy.providers package's,
+    moved. pubrules' and pubrel's pins, and a deploy.providers package's,
     move with `pins`, as does any OWNER/REPO/actions/NAME or reusable
     workflow (OTHER_PIN). An action only moves forward, and one whose
     latest release or tag's commit cannot be read stays, with a warning.
@@ -528,9 +528,9 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     changes += moved
     before = pinned(root)
     if before and RELEASE_TAG.fullmatch(f"v{before}") and release_key(before) > release_key(__version__):
-        # Never backwards: sync would write this older pubrules's managed files.
+        # Never backwards: sync would write this older pubrules' managed files.
         print(f"pubrules: warning: this repository runs pubrules {before}, newer than this {__version__}, "
-              "so pubrules's managed files and lock stay", file=sys.stderr)
+              "so pubrules' managed files and lock stay", file=sys.stderr)
         before, moved = __version__, []
     if (before and before != __version__) or moved:
         from .cli import lock as lock_requirements, sync  # noqa: PLC0415
@@ -577,7 +577,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
                     changes.append(f"{path.name}: {m['name']} stays at pubrules {m['version']}: "
                                    f"pubrules {version} has no {m['name']}")
                     continue
-                # "pubrules A -> B" already says that pubrules's own pins moved.
+                # "pubrules A -> B" already says that pubrules' own pins moved.
                 if m["version"] != version and pattern is not PUBRULES_PIN:
                     changes.append(f"{path.name}: {what} {m['version']} -> {version}")
                 elif m["version"] == version and commit and m["commit"] != commit:
@@ -588,7 +588,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
             path.write_text(new, encoding="utf-8")
     modules_by_release(root, skip, changes)
     # deploy.providers' wheels too: a hand-written requirement of one keeps up with
-    # the providers entry its package's hook moved. pubrules's are sync's to write.
+    # the providers entry its package's hook moved. pubrules' are sync's to write.
     wheels = wheels_by_release(root, {"pubrules"}, changes)
     if wheels and lock:
         from .cli import REQUIREMENTS, lock as lock_requirements  # noqa: PLC0415
@@ -842,7 +842,7 @@ def body(pinned: list[str], updated: list[str], skipped: list[dict],
     """The pull request's body. `others` is each further section's lines,
     by heading; with `update` off, the body says the repository takes no
     third-party updates instead of listing them."""
-    out = ["Opened by pubrules's nightly workflow, which updates this pull request each night "
+    out = ["Opened by pubrules' nightly workflow, which updates this pull request each night "
            "rather than opening another. Nothing merges it: merge it when CI is green.", ""]
     out += ["## 1. pub* pins", ""] + ([f"- {line}" for line in pinned] or ["Nothing outdated."])
     if not update:

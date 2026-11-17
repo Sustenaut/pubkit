@@ -61,7 +61,7 @@ def launched(config: dict[str, Any], name: str) -> dict[str, str]:
 
 def ensure(root: Path, config: dict[str, Any], check: bool) -> tuple[list[str], bool]:
     """A repository with a deploy block lists pubsec and pubdeploy in
-    deploy.providers, each at this pubrules's floor or newer. The pins are the
+    deploy.providers, each at this pubrules' floor or newer. The pins are the
     repository's own (`pubrules bump` moves them, through pubdeploy's hook):
     `sync` adds the floor where none is listed, or moves one below it up,
     changing nothing else of pubrules.json; `--check` fails instead. Lines to

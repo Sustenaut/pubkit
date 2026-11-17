@@ -5,7 +5,7 @@ through two entry-point groups, so pubrules imports none of their code:
   `pubrules sync`'s own work; `--check` fails when one says so. pubdeploy's is
   the deploy block's offline check and the scheduled walk's caller.
 - `sustenaut.bump`: `bump(root) -> lines`, after `pubrules bump` has moved
-  pubrules's own pins. pubdeploy's moves deploy.providers and the uses of
+  pubrules' own pins. pubdeploy's moves deploy.providers and the uses of
   pubdeploy's workflows.
 
 A hook that raises is said by its name and the error's type alone, never

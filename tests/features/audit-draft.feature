@@ -67,3 +67,10 @@ Feature: pubrules audit draft has Claude draft the rules left for review
     Then it succeeds
     And it prints "nothing to draft"
     And the API was asked nothing
+
+  Scenario: A report that marks a rule the standard does not have is refused
+    Given the report "demo" "0.1.1" marks the rule "9.9" for review, which the standard does not have
+    When I run pubrules "audit" "draft" "--package" "demo"
+    Then it fails
+    And stderr mentions "marks rules 9.9, which this pubrules' standard does not have: prepare the report again"
+    And the API was asked nothing

@@ -170,7 +170,7 @@ def pinned(workflow):
         if not match or match.group(1).startswith("./") or line.lstrip().startswith("#"):
             continue
         action, rest = match.groups()
-        # pubrel's and pubrules's own reusable workflows too (SonarQube's S7637).
+        # pubrel's and pubrules' own reusable workflows too (SonarQube's S7637).
         assert re.search(r"@[0-9a-f]{40}$", action), f"not pinned to a commit: {line.strip()}"
         assert re.match(r"\s+# v\d+\.\d+\.\d+$", rest), f"no version comment: {line.strip()}"
 

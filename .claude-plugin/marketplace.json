@@ -8,7 +8,7 @@
     {
       "name": "rust-crate-quality",
       "source": "./plugins/rust-crate-quality",
-      "description": "Audit a Rust crate against pubrules's crate standard, and write the docs it needs.",
+      "description": "Audit a Rust crate against pubrules' crate standard, and write the docs it needs.",
       "category": "development"
     }
   ]

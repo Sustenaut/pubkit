@@ -13,7 +13,7 @@ jobs:
   # release carries it to anyone else. It installs itself from source, not
   # from a released wheel, so there are no managed files to check.
   #
-  # SonarQube Cloud looks for a lock beside each manifest. pubrules's own lock
+  # SonarQube Cloud looks for a lock beside each manifest. pubrules' own lock
   # is tests/requirements.lock (pip, with hashes), a format it does not
   # read, and the crate templates under src/pubrules/templates get their
   # Cargo.lock from `cargo generate-lockfile` when `pubrules new` starts a
@@ -98,7 +98,7 @@ jobs:
         -Dsonar.issue.ignore.multicriteria.cachecmd.resourceKey=src/pubrules/cache.py
     secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }
 
-  # The one check pubrules's ruleset requires. review is skipped on a push
+  # The one check pubrules' ruleset requires. review is skipped on a push
   # and in the merge queue, sonar in the merge queue, tested on a pull
   # request, and every testing job where an earlier run already passed on
   # the commit's tree.
@@ -148,7 +148,7 @@ jobs:
   # Consumers lock the wheel by URL and sha256, so each release carries it.
   # Built once, when the release appears, and never replaced, from the
   # release's tag, with the commit the tag names in it as release-commit:
-  # `pubrules sync` pins pubrules's workflows to that commit (src/pubrules/refs.py)
+  # `pubrules sync` pins pubrules' workflows to that commit (src/pubrules/refs.py)
   # without asking the network.
   wheel:
     needs: release

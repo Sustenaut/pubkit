@@ -130,7 +130,7 @@ def exception(repo, rule, until):
     write(repo, "pubrules.json", json.dumps(config) + "\n")
 
 
-@given("pubrules's templates hold a compiled copy of a seeded .py file, as pip leaves one")
+@given("pubrules' templates hold a compiled copy of a seeded .py file, as pip leaves one")
 def compiled_template(repo, ctx):
     """What `pip install` does to the installed wheel: a __pycache__ beside
     templates/common/tests/steps/test_repository.py, which is not text."""

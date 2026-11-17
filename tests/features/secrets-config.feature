@@ -3,7 +3,7 @@ Feature: pubrules reads what pubrules.json says about secrets, and never a value
   where they go on GitHub, and signing_keys each signing key and where it is
   backed up. `pubrules sync --check` refuses a block it can't use; the
   commands that send, write or back up those values are pubsec's, and the
-  ones that were pubrules's say so.
+  ones that were pubrules' say so.
 
   Scenario Outline: A wrong secrets list is refused by sync
     Given the file "pubrules.json" reads "{"kind": "utility", "secrets": <list>}"

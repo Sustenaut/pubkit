@@ -1,6 +1,6 @@
 ---
 name: rust-crate-quality
-description: Audits a Rust crate meant for crates.io, library or command-line tool, against pubrules's Rust crate standard, and writes or fixes its documentation to meet it. Use before a crate's first release or any release, when its docs or public API change, or when asked whether a crate is ready to publish. Reports findings with evidence; edits only documentation.
+description: Audits a Rust crate meant for crates.io, library or command-line tool, against pubrules' Rust crate standard, and writes or fixes its documentation to meet it. Use before a crate's first release or any release, when its docs or public API change, or when asked whether a crate is ready to publish. Reports findings with evidence; edits only documentation.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 

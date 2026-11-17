@@ -66,7 +66,7 @@ rebuilds `.venv` first when the lock has changed since `make venv` last
 ran, so a moved pin never runs the old pubrules.
 Its `functional` and `coverage` run the Gherkin suite on every core
 (`PYTEST_ARGS ?= -n auto`, pytest-xdist, which the shared requirements
-pin); `PYTEST_ARGS =` in the Makefile runs it on one. pubrules's own
+pin); `PYTEST_ARGS =` in the Makefile runs it on one. pubrules' own
 `make functional` does the same.
 
 **`./pubrules`** runs the pubrules this repository pins, whichever (if any) is
@@ -89,9 +89,9 @@ command with the secrets in its environment only:
 
 That script, managed in every repository with a `with-secrets.json`, is one
 line: `./pubsec run --cwd "$PWD" -- COMMAND`. Holding a secret's value is
-[pubsec](https://github.com/Sustenaut/pubsec)'s, not pubrules's, so `pubrules
+[pubsec](https://github.com/Sustenaut/pubsec)'s, not pubrules', so `pubrules
 sync` writes `./pubsec` beside it, which runs the repository's pubsec
-(`deploy.providers`' entry, or pubrules's floor where a repository has no
+(`deploy.providers`' entry, or pubrules' floor where a repository has no
 deploy block), its wheel checked against its sha256 on every run. pubsec's README, "Services:
 ./with-secrets", explains `with-secrets.json` and `pubsec run`.
 
@@ -129,7 +129,7 @@ removed in the next minor.
 A content repository holds authored information, documents or data, and is
 private. pubrules neither releases nor deploys it: it has no release, no
 release tags and no secrets wrapper, and any versioning of what it holds is
-its own tooling's, never pubrules's or pubrel's. What that looks like depends
+its own tooling's, never pubrules' or pubrel's. What that looks like depends
 on the content: one body of content with no versions, or a monorepo of
 content projects, each versioned on its own (as publets are, each a version
 of its project). pubrules sees one repository either way, and its CI runs
@@ -172,7 +172,7 @@ here first, then by pubhost's modules. pubrules also keeps
 `job-service-terraform.yml`, which checks a stack without a backend, and the
 `ci / site` job ("Generated CI" below).
 
-## pubrules's actions
+## pubrules' actions
 
 - **`actions/cache`:** keeps what a build fetched or made between runs,
   by the entries of pubrules.json's `cache` block (see "Caching a build"
@@ -213,7 +213,7 @@ here first, then by pubhost's modules. pubrules also keeps
     with: { dir: infra, args: -backend=false -input=false }
   ```
 
-pubrules's own reusable workflows run their setup and terraform init through
+pubrules' own reusable workflows run their setup and terraform init through
 these two, pinned by a release's commit as any caller pins them: a reusable
 workflow runs in the caller's checkout, where `./actions/` is the caller's.
 So a change to either action reaches the workflows one release later, when
@@ -266,7 +266,7 @@ A step that used to be a per-repository `scripts/go-live*.sh` is a declared need
 fulfils it once a person approves its plan on the engine's page. In a repository
 with a deploy block, `pubrules sync` writes `.github/workflows/go-live.yml`: run by
 hand (Actions, "go-live", Run workflow), with the unit to fulfil chosen from the
-block's units, it calls pubrules's reusable `go-live.yml` at this release, which
+block's units, it calls pubrules' reusable `go-live.yml` at this release, which
 runs `pubrules go-live`:
 
 1. It asks GitHub for the run's OIDC token for the engine's address (`id-token:
@@ -622,7 +622,7 @@ Each rule is marked *checked* (a tool enforces it) or *judged* (it needs
 reading). The standard ends with what was deliberately not adopted.
 
 The **`rust-crate-quality` agent** audits a crate against that standard, and
-writes or fixes its docs to meet it. pubrules's repository is a Claude Code
+writes or fixes its docs to meet it. pubrules' repository is a Claude Code
 plugin marketplace, so the agent installs once for every repository, and
 none of them needs a `.claude/` folder. In Claude Code:
 
@@ -835,7 +835,7 @@ The board that grades every repository A to E, and the commands a control
 plane runs across many repositories (state files, their GitHub variables,
 freshness, and the nightly's loop), are
 [pubfleet](https://github.com/Sustenaut/pubfleet)'s. It grades protection
-against this pubrules's rulesets, as `pubrules protect --check` does.
+against this pubrules' rulesets, as `pubrules protect --check` does.
 
 ## The repos file
 
@@ -848,7 +848,7 @@ Which repositories `pubrules protect` acts on can come from outside it, in one f
 ] }
 ```
 
-`protect` says it should carry pubrules's rulesets, and `govern` that a nightly
+`protect` says it should carry pubrules' rulesets, and `govern` that a nightly
 keeps it current; each is false when left out. `project`, optional, labels it on
 the board. How a repository is protected stays in its own `pubrules.json`'s
 protect block. `pubrules protect [--check] --repos FILE` reads it; pubfleet reads
@@ -973,7 +973,7 @@ which `tests/requirements-pubrules.txt` pins for every package; Node's is
 Each property tries `PUBRULES_FUZZ_RUNS` inputs, which `python-ci.yml` and
 `node-ci.yml` set: `fuzz-runs` (100) on every push and pull request, and
 `fuzz-runs-scheduled` (10000) on a scheduled run unless
-`security.fuzz.<language>` is `false`. pubrules's pytest plugin reads it for
+`security.fuzz.<language>` is `false`. pubrules' pytest plugin reads it for
 Hypothesis, with no deadline. fast-check reads no variable of its own, so a
 setup file the test command loads (`node --test --import ./tests/setup.mjs`,
 or Vitest's `setupFiles`) does:
@@ -1042,7 +1042,7 @@ jobs:
     permissions: { contents: write }
 ```
 
-Pin each one to the full commit its release's tag names, with the version in a comment, as above, rather than to the tag (`@v0.1.0`), which can be moved: SonarQube Cloud flags a tag pin (S7637). `pubrules bump` and the nightly write pubrules's pins this way, and every reader still takes a pin by tag.
+Pin each one to the full commit its release's tag names, with the version in a comment, as above, rather than to the tag (`@v0.1.0`), which can be moved: SonarQube Cloud flags a tag pin (S7637). `pubrules bump` and the nightly write pubrules' pins this way, and every reader still takes a pin by tag.
 
 - **`rust-ci.yml`:** runs every check the standard requires. A `plan` job builds the hash-locked venv, runs `make sync-check`, and asks `pubrules required` which make targets each job runs. Then:
   - `gates` runs the required gate targets, then any the `gates` input adds;
@@ -1058,11 +1058,11 @@ Pin each one to the full commit its release's tag names, with the version in a c
 
   The `gates` and `functional` inputs can only add targets. The `msrv` and `fuzz` inputs are ignored: those jobs run because the standard requires them. Every job reports through `passed`, the one check a ruleset needs. The `sonar` job, in every workflow that has one and in `job-sonar.yml`, waits for SonarQube Cloud's quality gate (`sonar.qualitygate.wait`, for at most 300 seconds), so a failing gate fails the job and `passed` with it, rather than showing only on the SonarCloud app's own check. Without a `SONAR_TOKEN` it still passes with a notice.
 - **`python-ci.yml`:** takes its commands as inputs (`setup`, `test`, `browser-test`), so a repository with its own entry point keeps it. A non-empty `browser-test` adds a job that installs Playwright's Chromium. The coverage it writes to `browser-coverage-report` (by default `coverage/`) reaches SonarQube Cloud with the functional job's, and the sonar job waits for it. The `audit` job checks `audit-requirements` (by default `tests/requirements.lock`) with pip-audit on every run.
-- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubrules's managed files from `tests/requirements.lock`, and runs `npm test`. The `audit` job runs `npm audit --package-lock-only` on every run and fails on any advisory, development dependencies included. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The coverage it writes to `browser-coverage-report` (by default `coverage/`, LCOV) reaches SonarQube Cloud with the test job's, and the sonar job waits for it. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). A repository with a `ci` block in pubrules.json gets the same jobs generated instead (below).
+- **`node-ci.yml`:** for a Node package. It installs from `package-lock.json` with `npm ci --ignore-scripts`, so no dependency runs code by being installed, checks pubrules' managed files from `tests/requirements.lock`, and runs `npm test`. The `audit` job runs `npm audit --package-lock-only` on every run and fails on any advisory, development dependencies included. A non-empty `browser-test` adds a job that installs Playwright's Chromium with `npx --no-install`, which runs only what the lock installed. The coverage it writes to `browser-coverage-report` (by default `coverage/`, LCOV) reaches SonarQube Cloud with the test job's, and the sonar job waits for it. The commands are inputs (`setup`, `test`, `browser-test`, `browser-setup`). A repository with a `ci` block in pubrules.json gets the same jobs generated instead (below).
 
 ### Generated CI: only the jobs a repository runs
 
-A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubrules.json`. `pubrules sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubrules's release, so the Actions pins still live in pubrules. `pubrules init` and `pubrules new` write `"ci": {}`.
+A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubrules.json`. `pubrules sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubrules' release, so the Actions pins still live in pubrules. `pubrules init` and `pubrules new` write `"ci": {}`.
 
 Sync pins each one, and pubrel's release workflow, to the full commit of the release's tag, with the version in a comment, so SonarQube Cloud's S7637 (a reusable workflow pinned to a tag, which can move) needs no exception:
 
@@ -1070,7 +1070,7 @@ Sync pins each one, and pubrel's release workflow, to the full commit of the rel
     uses: Sustenaut/pubrules/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2
 ```
 
-Usually neither needs the network. pubrules's commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubrules has none, and pins by tag. pubrel's commit is the one pubrules records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
+Usually neither needs the network. pubrules' commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubrules has none, and pins by tag. pubrel's commit is the one pubrules records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
 Whose pubrules and pubrel these are is set in one place, `OWNER` in `src/pubrules/refs.py`: `Sustenaut`, since both moved there from `schryer`. Every repository moves to it on its next `pubrules sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubrules pins` (`pubrules bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubrules.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, the nightly and the audit read a pin under any owner, so one still under the old owner keeps working.
 
@@ -1092,13 +1092,13 @@ Whose pubrules and pubrel these are is set in one place, `OWNER` in `src/pubrule
 - **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release.
 - **`runs-on`:** the runners, for a repository with self-hosted ones. A label (`"runs-on": "my-runners"`) runs every job there; an object of labels by job name, with `default` for the rest (`{"default": "my-runners", "review": "ubuntu-latest"}`), places them one by one. Sync passes it to each job as its `runs-on` input (every reusable workflow, `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` too, takes one, `ubuntu-latest` by default) and writes it into `tested`, `passed` and `site`. Rust's `test` runs on its `os-matrix` instead. pubrel's release workflow takes it (`release` places it on its own) from pubrel 0.7.0, which installs Rust on a runner without it. An older pubrel's runs on GitHub's runners. Without it nothing is written, and every job runs on `ubuntu-latest`. The runner must have what `ubuntu-latest` gives these jobs (git, curl, jq, python3 with venv, gh, shellcheck, unzip, a C toolchain, Docker).
 - **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust, service or content repository's CI is its kind's.
-- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubrules's pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none, and a content repository, which pubrules neither releases nor deploys, has none either. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubrules.json, then runs `pubrules sync`.
+- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubrules' pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none, and a content repository, which pubrules neither releases nor deploys, has none either. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubrules.json, then runs `pubrules sync`.
 
 Neither the merge queue nor `main.yml` tests again what an earlier run already tested. A pull request up to date with main merges as the very files its own run tested, and merging moves main to the very commit the queue tested. So `main.yml`, and `pr.yml` where the queue runs it (there is no `queue.yml`), start with `tested` (`job-tested.yml`, `ci / tested`). In the queue and on main, it looks for a successful run of that workflow, on a pull request or in the queue, whose commit has this commit's tree. A run that skipped its own tests names, in a notice, the run it took them from, and that run counts, so long as its artifacts have not expired. When there is one, every job that run ran is skipped (a job only main runs still runs), and `passed` and the release follow. On main, `sonar` still runs, reading the coverage that run uploaded, because SonarQube Cloud measures main from a push to it. The merge queue never scans: SonarQube Cloud analyses pull requests and main, and refuses the queue's `gh-readonly-queue` branch. The pull request's run scanned the change, and main's push scans the merge, so `sonar` does not run on `merge_group` in `pr.yml`, `passed` takes that skip, and a Rust `queue.yml` has no `sonar` at all. So a ruleset with a merge queue must not require SonarQube Cloud's own check, `SonarCloud Code Analysis` (sync refuses it), or the queue waits for that check forever; `ci / sonar` still fails `ci / passed` on a pull request's quality gate. `ci / passed` already takes the skip. When there is none (a pull request's own run, main moved on in between, several pull requests merged together, a repository without the queue, or a commit that reached main some other way) every job runs as it would without `tested`. A Rust crate's `queue.yml` runs jobs its pull requests do not, so its queue tests everything. The nightly always runs everything.
 
 A Rust repository runs the jobs the Rust crate standard asks for here, worked out at sync time from the rules and `pubrules.json`'s exceptions: `gates`, `test`, `functional`, `msrv`, `fuzz`, `cross` and `audit` as required, beside `osv`, `review` and `sonar`, and `toolchains` (the latest stable and beta Rust) on the nightly. Sync writes each job's required make targets into the workflow (`required`), so an exception added or expired shows as a change there, and `make sync-check` in `gates` fails until `pubrules sync` writes it. An empty `cross-targets` (`"[]"`) drops `cross`. `msrv`, `fuzz` and `cross` run in the merge queue rather than on each push to a pull request (unless `events` leaves out `queue`). On a pull request that touches no Rust code, Cargo files, `fuzz/` or workflow files, `fuzz` and `cross` pass at once with a notice (from `pubrules required`, which says `slow=false`) rather than being skipped; release pull requests, pushes and the nightly run them in full.
 
-Uploading a coverage report and restoring or saving a cache only help a run: none of them fails a job. GitHub's artifact and cache services can refuse a run (when the account's Actions billing is blocked they answer with an HTML page, on self-hosted runners too), so every `upload-artifact` of a report and every `actions/cache` step in pubrules's workflows, and every restore and save in `actions/cache`, runs with `continue-on-error`, and the workflow steps stop trying after five minutes. A test that fails still fails its job; a refused upload only leaves the scan without that coverage.
+Uploading a coverage report and restoring or saving a cache only help a run: none of them fails a job. GitHub's artifact and cache services can refuse a run (when the account's Actions billing is blocked they answer with an HTML page, on self-hosted runners too), so every `upload-artifact` of a report and every `actions/cache` step in pubrules' workflows, and every restore and save in `actions/cache`, runs with `continue-on-error`, and the workflow steps stop trying after five minutes. A test that fails still fails its job; a refused upload only leaves the scan without that coverage.
 
 A service runs `checks` (the sync check and shellcheck) and `sonar`, and `terraform` and `tests` when `with` gives a `terraform-dir` and a `test`. Its tests hand `sonar` the coverage they write to `coverage-report` (by default `coverage/`, Cobertura XML or LCOV `lcov.info`). A private service drops the scan with `"jobs": {"sonar": false}`. A content repository runs `checks` (shellcheck on `**/*.sh` unless `with` gives `shellcheck`) and, when `with` gives a `test`, `tests`, and has no `sonar`.
 
@@ -1119,7 +1119,7 @@ The checks keep the names a ruleset requires: each job is named `ci`, so its che
 
 ### SonarQube Cloud
 
-Public code integrates with SonarQube Cloud, whatever its kind: `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` and `service-ci.yml` each run a `sonar` job, part of `passed`, and so does the CI `pubrules sync` writes for every kind but content, which holds no code. Only a private repository, which SonarQube Cloud does not analyse for free, leaves it out (`"jobs": {"sonar": false}`). Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubrules's once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubrules.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
+Public code integrates with SonarQube Cloud, whatever its kind: `rust-ci.yml`, `python-ci.yml`, `node-ci.yml` and `service-ci.yml` each run a `sonar` job, part of `passed`, and so does the CI `pubrules sync` writes for every kind but content, which holds no code. Only a private repository, which SonarQube Cloud does not analyse for free, leaves it out (`"jobs": {"sonar": false}`). Given a `SONAR_TOKEN` secret, passed by name (`secrets: { SONAR_TOKEN: '${{ secrets.SONAR_TOKEN }}' }`, since `secrets: inherit` reaches only a workflow of the caller's own owner and GitHub drops it without a word for pubrules' once the owners differ), it sends the code to SonarQube Cloud as the project `OWNER_REPO` (the owner as GitHub spells it) in the organization whose key is the owner in lower case, or `security.sonar.organization` in pubrules.json, with the full history so it can tell new code from old; `sonar-args` adds properties. Without a token, as in a private repository or a pull request from a fork, it passes with a notice. To turn it on for a public repository:
 
 1. In SonarQube Cloud, analyse the repository as a new project in the organization whose key is its GitHub owner in lower case (or the one `security.sonar.organization` names), keeping the key `OWNER_REPO`.
 2. Under the project's Administration, Analysis Method, turn Automatic Analysis off: the two cannot run together.
@@ -1131,7 +1131,7 @@ The default quality gate asks for 80% coverage on new code, and a scan without a
 |---|---|---|
 | `rust-ci.yml` | `coverage/lcov.info` | `make coverage`, which the functional job runs in place of `make functional` when there is a token: the Rust tests and the Gherkin suite on a build cargo-llvm-cov instruments (`cargo-llvm-cov-version`) |
 | `rust-ci.yml` | `coverage/*.xml` (Cobertura) | any of the `functional` targets, for a repository's Python, such as coverage.py's `coverage xml -o coverage/scripts.xml` (run it after `make coverage`, which empties `coverage/`) |
-| `python-ci.yml` | `coverage-report`, by default `coverage/coverage.xml` (Cobertura) | the `test` command, such as coverage.py with `patch = ["subprocess"]`, which also measures the programs the suite starts (pubrules's own `make functional` does this) |
+| `python-ci.yml` | `coverage-report`, by default `coverage/coverage.xml` (Cobertura) | the `test` command, such as coverage.py with `patch = ["subprocess"]`, which also measures the programs the suite starts (pubrules' own `make functional` does this) |
 | `node-ci.yml` | `coverage-report`, by default `coverage/lcov.info` | the `test` command, such as `node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info` |
 | `service-ci.yml` | `coverage-report`, by default `coverage/`: Cobertura `*.xml` or LCOV `lcov.info` | the `test` command, as for Python or Node |
 

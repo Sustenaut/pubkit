@@ -1,4 +1,4 @@
-"""pubrules's own suite. It is also pubrules's first consumer: the steps it
+"""pubrules' own suite. It is also pubrules' first consumer: the steps it
 does not define here (`it succeeds`, `it prints ...`) are the plugin's.
 
 Steps and fixtures more than one steps module uses live here: the scratch
@@ -18,7 +18,7 @@ from pytest_bdd import given, parsers, then, when
 
 @pytest.fixture(scope="session", autouse=True)
 def rust_toolchain(tmp_path_factory):
-    """The Rust toolchain pubrules's rust-toolchain.toml pins, installed once
+    """The Rust toolchain pubrules' rust-toolchain.toml pins, installed once
     before any test runs cargo. rustup installs it on first use, but under
     pytest-xdist several workers' first cargo runs at once, and rustup's
     concurrent installs of one toolchain fail; each worker takes a lock in
@@ -156,7 +156,7 @@ def pins_pubrel(repo, pubrel_tags, path, tag):
     assert f"{OWNER}/pubrel/.github/workflows/release.yml@{pubrel_tags[tag]} # {tag}\n" in text, text
 
 
-@then(parsers.parse('"{path}" pins pubrules\'s workflows to "{commit}"'))
+@then(parsers.parse('"{path}" pins pubrules\' workflows to "{commit}"'))
 def pins_pubrules(repo, path, commit):
     from pubrules import __version__  # noqa: PLC0415
     from pubrules.refs import OWNER  # noqa: PLC0415
@@ -190,8 +190,8 @@ def calls_owner(repo, path, owner):
 
 # A pubrules action's pin, by what it is to the pubrules under test.
 ACTION_PINS = {
-    "this pubrules's commit": lambda v: "0f3574a72707a46bae149d3ed7a4644b4837795a # v" + v,
-    "this pubrules's tag": lambda v: "v" + v,
+    "this pubrules' commit": lambda v: "0f3574a72707a46bae149d3ed7a4644b4837795a # v" + v,
+    "this pubrules' tag": lambda v: "v" + v,
     "another commit": lambda v: "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v" + v,
     "another pubrules": lambda v: "1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1",
     "main": lambda v: "main",

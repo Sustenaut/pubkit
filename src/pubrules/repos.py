@@ -4,7 +4,7 @@
       {"repo": "example-org/some-tool", "protect": true, "govern": false, "project": "tools"}
     ]}
 
-`protect` says it should carry pubrules's rulesets, `govern` that a nightly
+`protect` says it should carry pubrules' rulesets, `govern` that a nightly
 keeps it current, and `project` (optional) names a group on the board. How it
 is protected stays in its own pubrules.json's protect block. `pubrules board`,
 `pubrules protect` and `pubrules freshness` take one with `--repos FILE`, and the
