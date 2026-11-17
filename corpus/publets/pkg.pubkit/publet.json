@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.41.1 is released as v0.41.1 from commit 218714c3219dad849c7a1f33fc99026284b13a95.",
+      "content": "pubkit 0.42.0 is released as v0.42.0 from commit d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubkit",
-            "0.41.1",
+            "0.42.0",
             "pubkit --version",
-            "pubkit 0.41.1",
-            "v0.41.1",
-            "218714c3219dad849c7a1f33fc99026284b13a95"
+            "pubkit 0.42.0",
+            "v0.42.0",
+            "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
           ]
         ]
       },
-      "scope": "the published release v0.41.1 of pubkit",
+      "scope": "the published release v0.42.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "218714c3219dad849c7a1f33fc99026284b13a95"
+          "revision": "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.41.1 was released on 2026-11-16 from commit 218714c3219dad849c7a1f33fc99026284b13a95 with these changes.",
+      "content": "pubkit 0.42.0 was released on 2026-11-17 from commit d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,28 +57,28 @@
         ],
         "rows": [
           [
-            "fixed",
-            "sync reads no compiled file as a template: pip compiles the seeded tests/steps/test_repository.py into a __pycache__ inside the installed package, which 0.41.0 then read as text and failed on (UnicodeDecodeError) in every repository's sync --check"
+            "added",
+            "protect turns on a public repository's dependency graph and Dependabot alerts, which the review job's dependency review needs and GitHub leaves off on a new repository; protect --check reports them off"
           ],
           [
-            "fixed",
-            "pubkit gherkin no longer says every test is a Gherkin scenario when open exceptions waive a rule: it says how many are open, then lists them"
+            "changed",
+            "The pytest plugin is pubtest's: pubkit no longer carries pubkit.plugin or a pytest11 entry point, nor depends on pytest, and the managed tests/requirements-pubkit.txt pins pubtest 0.1.0, which gives every suite the same fixtures (ctx, binary, run), the same steps and the rest of GRAMMAR.md; a suite that imported pubkit.plugin imports pubtest.core"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.41.1 of pubkit",
+      "scope": "the published release v0.42.0 of pubkit",
       "sources": [
         {
           "ref": "pubkit",
-          "revision": "218714c3219dad849c7a1f33fc99026284b13a95"
+          "revision": "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
         }
       ]
     }
   },
-  "created": "2026-11-16T00:00:00Z",
+  "created": "2026-11-17T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",

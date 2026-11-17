@@ -1,4 +1,0 @@
-{
-  "category": "added",
-  "change": "protect turns on a public repository's dependency graph and Dependabot alerts, which the review job's dependency review needs and GitHub leaves off on a new repository; protect --check reports them off"
-}
