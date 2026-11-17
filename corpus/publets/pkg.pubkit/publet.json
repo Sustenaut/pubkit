@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubkit 0.42.0 is released as v0.42.0 from commit d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8.",
+      "content": "pubrules 0.43.0 is released as v0.43.0 from commit b6162f0e772ef6563a5eb366b940b90dfb4c013d.",
       "data": {
         "columns": [
           {
@@ -26,26 +26,26 @@
         ],
         "rows": [
           [
-            "pubkit",
-            "0.42.0",
-            "pubkit --version",
-            "pubkit 0.42.0",
-            "v0.42.0",
-            "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
+            "pubrules",
+            "0.43.0",
+            "pubrules --version",
+            "pubrules 0.43.0",
+            "v0.43.0",
+            "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
           ]
         ]
       },
-      "scope": "the published release v0.42.0 of pubkit",
+      "scope": "the published release v0.43.0 of pubrules",
       "sources": [
         {
-          "ref": "pubkit",
-          "revision": "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
+          "ref": "pubrules",
+          "revision": "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubkit 0.42.0 was released on 2026-11-17 from commit d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8 with these changes.",
+      "content": "pubrules 0.43.0 was released on 2026-11-17 from commit b6162f0e772ef6563a5eb366b940b90dfb4c013d with these changes.",
       "data": {
         "columns": [
           {
@@ -57,23 +57,19 @@
         ],
         "rows": [
           [
-            "added",
-            "protect turns on a public repository's dependency graph and Dependabot alerts, which the review job's dependency review needs and GitHub leaves off on a new repository; protect --check reports them off"
-          ],
-          [
             "changed",
-            "The pytest plugin is pubtest's: pubkit no longer carries pubkit.plugin or a pytest11 entry point, nor depends on pytest, and the managed tests/requirements-pubkit.txt pins pubtest 0.1.0, which gives every suite the same fixtures (ctx, binary, run), the same steps and the rest of GRAMMAR.md; a suite that imported pubkit.plugin imports pubtest.core"
+            "pubkit is now pubrules, at Sustenaut/pubrules: the package, the command and its module are pubrules, a repository's config is pubrules.json, the managed files are ./pubrules, pubrules.mk, pubrules-python.mk and tests/requirements-pubrules.txt, the environment variables are PUBRULES_*, and sync pins Sustenaut/pubrules/.github/workflows/... and Sustenaut/pubrules/actions/...; nothing reads the old names, so a repository moves over in one migration pull request"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.42.0 of pubkit",
+      "scope": "the published release v0.43.0 of pubrules",
       "sources": [
         {
-          "ref": "pubkit",
-          "revision": "d5f9af07353bbc26a11aaf4dd60e8b3b2532f7b8"
+          "ref": "pubrules",
+          "revision": "b6162f0e772ef6563a5eb366b940b90dfb4c013d"
         }
       ]
     }
@@ -99,5 +95,5 @@
   ],
   "slug": "pkg.pubkit",
   "tag": "PKG-PUBKIT-10-2026",
-  "title": "pubkit"
+  "title": "pubrules"
 }
