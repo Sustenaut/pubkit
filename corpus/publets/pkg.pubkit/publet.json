@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.43.1 is released as v0.43.1 from commit 860e9b32edd09f098c8f98f188820b0cd040cf96.",
+      "content": "pubrules 0.43.2 is released as v0.43.2 from commit 9e5a31853fd5891ec15a381efd997a9d66369ef5.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.43.1",
+            "0.43.2",
             "pubrules --version",
-            "pubrules 0.43.1",
-            "v0.43.1",
-            "860e9b32edd09f098c8f98f188820b0cd040cf96"
+            "pubrules 0.43.2",
+            "v0.43.2",
+            "9e5a31853fd5891ec15a381efd997a9d66369ef5"
           ]
         ]
       },
-      "scope": "the published release v0.43.1 of pubrules",
+      "scope": "the published release v0.43.2 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "860e9b32edd09f098c8f98f188820b0cd040cf96"
+          "revision": "9e5a31853fd5891ec15a381efd997a9d66369ef5"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.43.1 was released on 2026-11-17 from commit 860e9b32edd09f098c8f98f188820b0cd040cf96 with these changes.",
+      "content": "pubrules 0.43.2 was released on 2026-11-17 from commit 9e5a31853fd5891ec15a381efd997a9d66369ef5 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,19 @@
         ],
         "rows": [
           [
-            "fixed",
-            "A repository's suite runs on pubtest 0.2.0, which reads PUBRULES_FUZZ_RUNS, and deploy.providers' floors are pubsec 0.3.0 and pubdeploy 0.5.0, the first releases that read pubrules.json: sync moves an older pin up, and sync --check fails below them"
+            "added",
+            "Go-live from GitHub Actions: in a repository with a deploy block, sync writes .github/workflows/go-live.yml, run by hand with a unit, calling the reusable go-live.yml, whose pubrules go-live asks the convergence engine with the run's OIDC token, waits for a person's approval and ends as the request ends; pubrules.json's go-live block (engine, timeout-minutes, claude-dispatch)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.43.1 of pubrules",
+      "scope": "the published release v0.43.2 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "860e9b32edd09f098c8f98f188820b0cd040cf96"
+          "revision": "9e5a31853fd5891ec15a381efd997a9d66369ef5"
         }
       ]
     }
