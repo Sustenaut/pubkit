@@ -199,6 +199,15 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
+  Scenario: lock keeps the #sha256 of a URL pin only a package requires, so the lock installs with --require-hashes
+    Given an empty repository
+    And a wheel "outer" 1.0 that requires the wheel "inner" 1.0 by its URL and sha256
+    And tests/requirements.txt names "outer" by its URL
+    When I run pubrules "lock"
+    Then it succeeds
+    And "tests/requirements.lock" pins "inner" by its URL with its #sha256, and "outer" by its URL as named
+    And pip installs the lock with --require-hashes
+
   Scenario: The built wheel carries every template, and the standard's rules
     When pubrules' wheel is built
     Then it holds every file under src/pubrules/templates, and standard.json
