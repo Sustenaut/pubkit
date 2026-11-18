@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "Suites run on pubtest 0.2.1, with its new steps (printed JSON, patterns, YAML, headers, git, stand-ins that read their input)"
-}
