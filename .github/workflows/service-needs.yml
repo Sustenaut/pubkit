@@ -1,19 +1,21 @@
-# Go-live from GitHub Actions: ask the convergence engine to fulfil one deploy
-# unit, wait while a person approves its plan on the engine's page, and end as
-# the request ends (src/pubrules/golive.py, `pubrules go-live`).
+# A service's needs from GitHub Actions: ask the convergence engine to check one deploy
+# unit's needs (read-only), or to fulfil them once a person approves the plan on the
+# engine's page, and end as the request ends (src/pubrules/service_needs.py,
+# `pubrules service-needs`). Each need shows on a line of its own: a log group, an
+# annotation when it is not ready, and a row of the summary's table.
 #
-# `pubrules sync` writes the caller, .github/workflows/go-live.yml, in a
-# repository with a deploy block: run by hand, with the unit to fulfil. The run's
+# `pubrules sync` writes the caller, .github/workflows/service-needs.yml, in a
+# repository with a deploy block: run by hand, with check or fulfil and the unit. The run's
 # identity is its OIDC token for the engine's address, so the caller grants
 # `id-token: write` and passes no secret. The engine only takes a run on the
 # default branch of a repository of an owner it lists.
-name: go-live
+name: service-needs
 
 on:
   workflow_call:
     inputs:
-      unit: { type: string, required: true, description: "The deploy unit the engine fulfils, once a person approves its plan." }
-      kind: { type: string, default: fulfil, description: "fulfil: the engine runs the unit's walk --fulfil; gate: the run only waits for an approval." }
+      unit: { type: string, required: true, description: "The deploy unit whose needs the engine checks or fulfils." }
+      kind: { type: string, default: check, description: "check: each need's state, read-only, asking no one; fulfil: the engine runs the unit's walk --fulfil once a person approves its plan; gate: the run only waits for an approval." }
       plan: { type: string, default: '', description: "A gate's plan, which the approver reads." }
       timeout-minutes: { type: number, default: 300, description: "How long the run waits; past it the run ends, and the engine still acts once approved." }
       engine: { type: string, default: 'https://convergence.sustenaut.eu', description: "The convergence engine's address, which is also the OIDC token's audience." }
@@ -24,7 +26,7 @@ permissions:
   contents: read
 
 jobs:
-  go-live:
+  service-needs:
     runs-on: ${{ inputs.runs-on }}
     # The run's own limit is timeout-minutes (at most 340); the job's leaves room for the setup.
     timeout-minutes: 360
@@ -40,13 +42,26 @@ jobs:
           python3 -m venv .pubrules
           # Tried three times, then from the wheel mirror: a release download can time out.
           tests/install-lock .pubrules/bin/pip
-      - name: the engine fulfils ${{ inputs.unit }}, once approved
+      - name: ask the engine
+        id: ask
         run: >-
-          .pubrules/bin/pubrules go-live --unit "$UNIT" --kind "$KIND" --plan "$PLAN"
+          .pubrules/bin/pubrules service-needs --stage ask --unit "$UNIT" --kind "$KIND" --plan "$PLAN"
           --minutes "$MINUTES" --engine "$ENGINE"
         env:
           UNIT: ${{ inputs.unit }}
           KIND: ${{ inputs.kind }}
           PLAN: ${{ inputs.plan }}
+          MINUTES: ${{ inputs.timeout-minutes }}
+          ENGINE: ${{ inputs.engine }}
+      # The ask step's summary (the approval box, when a person must approve a fulfil) shows
+      # on the run's page from here on, while this step waits for the end.
+      - name: the needs of ${{ inputs.unit }}
+        run: >-
+          .pubrules/bin/pubrules service-needs --stage wait --request "$REQUEST" --unit "$UNIT" --kind "$KIND"
+          --minutes "$MINUTES" --engine "$ENGINE"
+        env:
+          REQUEST: ${{ steps.ask.outputs.request }}
+          UNIT: ${{ inputs.unit }}
+          KIND: ${{ inputs.kind }}
           MINUTES: ${{ inputs.timeout-minutes }}
           ENGINE: ${{ inputs.engine }}

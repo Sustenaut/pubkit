@@ -397,9 +397,12 @@ def sync(root: Path, check: bool) -> int:
         if bad := block_problems(config["variables"]):
             sys.exit(f"pubrules: {CONFIG}'s variables block: {'; '.join(bad)}")
     if "go-live" in config:
-        from .golive import block_problems as go_live_problems  # noqa: PLC0415
-        if bad := go_live_problems(config["go-live"]):
-            sys.exit(f"pubrules: {CONFIG}'s go-live block: {'; '.join(bad)}")
+        sys.exit(f"pubrules: {CONFIG}'s go-live block is now service-needs (pubrules 0.44.0), with the same "
+                 f"keys: rename it")
+    if "service-needs" in config:
+        from .service_needs import block_problems as service_needs_problems  # noqa: PLC0415
+        if bad := service_needs_problems(config["service-needs"]):
+            sys.exit(f"pubrules: {CONFIG}'s service-needs block: {'; '.join(bad)}")
     deploy_failed = False
     if "deploy" in config:
         # pubsec and pubdeploy, whose types and walk a deploy block needs, in
@@ -444,10 +447,10 @@ def sync(root: Path, check: bool) -> int:
             print("seeded   Makefile")
     wanted = [(path, render(every[path], values(config))) for path in owned]
     wanted += workflows(config, root)
-    from .golive import CALLER, caller, is_caller  # noqa: PLC0415
+    from .service_needs import CALLER, OLD_CALLER, caller, is_caller  # noqa: PLC0415
     from .refs import owner, ref, release_commit  # noqa: PLC0415
-    if (go_live := caller(config, owner(config), ref(__version__, release_commit()))) is not None:
-        wanted.append((CALLER, go_live))
+    if (service_needs := caller(config, owner(config), ref(__version__, release_commit()))) is not None:
+        wanted.append((CALLER, service_needs))
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
     if (integrations := declared(root, wanted)) is not None:
@@ -455,8 +458,18 @@ def sync(root: Path, check: bool) -> int:
     if (licenses := review_licenses(config, root, wanted)) is not None:
         wanted.append(licenses)
     replaced = leftovers(config, root)
-    if go_live is None and (root / CALLER).is_file() and is_caller((root / CALLER).read_text(encoding="utf-8")):
+    if service_needs is None and (root / CALLER).is_file() and is_caller((root / CALLER).read_text(encoding="utf-8")):
         replaced.append(CALLER)
+    # The go-live workflow pubrules 0.43.2 wrote is the service-needs workflow now: sync takes it away.
+    old = root / OLD_CALLER
+    if old.is_file() and is_caller(old.read_text(encoding="utf-8")):
+        if check:
+            print(f"pubrules: {OLD_CALLER} is the service-needs workflow now; run `pubrules sync`, which removes it",
+                  file=sys.stderr)
+            stale.append(OLD_CALLER)
+        else:
+            old.unlink()
+            print(f"removed  {OLD_CALLER} (now {CALLER})")
     from .ignores import GITIGNORE, heal, missing  # noqa: PLC0415
     unignored = missing(root) if check else heal(root)
     if unignored and not check:
@@ -477,7 +490,7 @@ def sync(root: Path, check: bool) -> int:
     wheel = f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl"
     lock_stale = lock.exists() and wheel not in lock.read_text(encoding="utf-8")
     for path in replaced:
-        why = ("pubrules.json has no deploy block, so nothing goes live" if path == CALLER
+        why = ("pubrules.json has no deploy block, so it has no needs to check" if path == CALLER
                else "pubrules.json's ci block writes the workflows now")
         print(f"pubrules: delete {path}: {why}", file=sys.stderr)
     if check:
@@ -489,6 +502,8 @@ def sync(root: Path, check: bool) -> int:
                       f"say which Bitwarden project it read (PUBRULES_SECRETS_PROJECT), so pubdeploy finds every bitwarden.* need "
                       f"unknown through it; run `pubrules sync`, which writes the managed one", file=sys.stderr)
                 continue
+            if path == OLD_CALLER:
+                continue  # said above
             if path == INTEGRATIONS:
                 print(f"pubrules: {path} doesn't declare what the files pubrules writes use (the "
                       f"sonar job's token, or with-secrets.json for Bitwarden); run `pubrules sync`",
@@ -728,10 +743,10 @@ def main(argv: list[str] | None = None) -> int:
         # Its own parser: `run` passes everything after -- to the command.
         from .cache import main as cache
         return cache(given[1:])
-    if given[:1] == ["go-live"]:
-        # Its own parser too: the go-live workflow's step (golive.py).
-        from .golive import main as go_live  # noqa: PLC0415
-        return go_live(given[1:])
+    if given[:1] == ["service-needs"]:
+        # Its own parser too: the service-needs workflow's step (service_needs.py).
+        from .service_needs import main as service_needs  # noqa: PLC0415
+        return service_needs(given[1:])
     if given[:1] in (["secrets"], *([c] for c in MOVED)):
         # Moved to pubsec: say where, whatever the arguments.
         print(f"pubrules: this is now ./pubsec {' '.join(given[1:] if given[0] == 'secrets' else given)}; "
@@ -742,8 +757,9 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("cache", help="keep what a build fetched or made, by pubrules.json's cache rules "
                                       "(pubrules cache --help)")
-    commands.add_parser("go-live", help="in a go-live workflow: ask the convergence engine to fulfil a unit, "
-                                        "and wait for a person's approval and the end (pubrules go-live --help)")
+    commands.add_parser("service-needs", help="in the service-needs workflow: ask the convergence engine to check "
+                                              "a unit's needs, or fulfil them once a person approves, and wait for "
+                                              "the end (pubrules service-needs --help)")
     for moved in ("secrets", *MOVED):
         commands.add_parser(moved, help="deprecated: now ./pubsec, with the same arguments")
     p = commands.add_parser("init", help="write the shared files into this repository")

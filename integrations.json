@@ -34,9 +34,9 @@
     {
       "plugin": "github.actions-oidc",
       "paths": [
-        ".github/workflows/go-live.yml",
+        ".github/workflows/service-needs.yml",
         "src/pubrules/ci.py",
-        "src/pubrules/golive.py"
+        "src/pubrules/service_needs.py"
       ],
       "mode": "required"
     },
@@ -100,7 +100,7 @@
     },
     {
       "host": "convergence.sustenaut.eu",
-      "reason": "The convergence engine, which the go-live workflow asks to fulfil a unit (Sustenaut/convergence-engine); a repository may name another in pubrules.json's go-live block"
+      "reason": "The convergence engine, which the service-needs workflow asks to fulfil a unit (Sustenaut/convergence-engine); a repository may name another in pubrules.json's service-needs block"
     }
   ],
   "exclude": [

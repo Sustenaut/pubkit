@@ -258,48 +258,60 @@ contract"). pubrules keeps three things of it:
   installs it from the lock, since `tests/requirements-pubrules.txt` lists
   every deploy.providers wheel, and `./pubrules` runs with each.
 
-## Go-live from GitHub Actions
+## A service's needs from GitHub Actions
 
 A step that used to be a per-repository `scripts/go-live*.sh` is a declared need
 (pubdeploy's README), and the convergence engine
 ([Sustenaut/convergence-engine](https://github.com/Sustenaut/convergence-engine))
-fulfils it once a person approves its plan on the engine's page. In a repository
-with a deploy block, `pubrules sync` writes `.github/workflows/go-live.yml`: run by
-hand (Actions, "go-live", Run workflow), with the unit to fulfil chosen from the
-block's units, it calls pubrules' reusable `go-live.yml` at this release, which
-runs `pubrules go-live`:
+checks it, or fulfils it once a person approves the plan on the engine's page. In a
+repository with a deploy block, `pubrules sync` writes `.github/workflows/service-needs.yml`:
+run by hand (Actions, "service-needs", Run workflow) with an `action`, `check` (the
+default) or `fulfil`, and a `unit` chosen from the block's units, it calls pubrules'
+reusable `service-needs.yml` at this release, which runs `pubrules service-needs` in two
+steps:
 
-1. It asks GitHub for the run's OIDC token for the engine's address (`id-token:
-   write`, the one permission the caller grants; no secret), masks it, and asks the
-   engine, `POST /requests {"kind": "fulfil", "unit": U}`. The engine takes a run
-   on the default branch of a repository of an owner it lists, walks the unit
-   read-only for its plan, and waits for a person.
-2. It polls `GET /requests/ID` every 15 seconds, with a fresh token each time;
-   after a 5xx or no answer it waits 15, 30, 60, then 120 seconds before asking
-   again. Each state is printed once, and while the request awaits a decision the
-   job summary links the approval page.
-3. It ends as the request ends: done, a success, with each need's end state in the
-   job summary; declined, expired or failed (a plan that changed since its approval
-   among them), a failure with the engine's reason. Still awaiting (or still
-   running) when `timeout-minutes` (300) is up, it ends as a success, saying so:
-   the engine runs it once approved, whether or not the run still waits.
+1. **ask the engine.** It asks GitHub for the run's OIDC token for the engine's address
+   (`id-token: write`, the one permission the caller grants; no secret), masks it, and
+   asks the engine, `POST /requests {"kind": "check"|"fulfil", "unit": U}`. The engine
+   takes a run on the default branch of a repository of an owner it lists, and walks the
+   unit read-only for its plan; this step follows the request until that walk ends. When a
+   fulfil awaits a person, it writes a box to the job summary, "Approval needed", with the
+   link to the request on the engine's page and the plan's needs, and an `Approval needed`
+   notice, then ends: the box shows on the run's page while the next step waits.
+2. **the needs of U.** It polls `GET /requests/ID` every 15 seconds, with a fresh token
+   each time; after a 5xx or no answer it waits 15, 30, 60, then 120 seconds before asking
+   again. At the end every need of the unit is shown on a line of its own: a log group
+   titled with an icon, the need and its state (holding what the walk found and, for a
+   fulfil, what it changes), an error annotation for a need missing, drifted or blocked and
+   a warning for one unknown, and a row of the summary's table (icon, need, type, grade,
+   state, found).
 
-Nothing it prints holds an email or other value: the engine names no approver to a
-caller, and what it says is printed with any email-shaped text taken out. `sync`
-also lists the caller under `github.actions-oidc` in integrations.json, and
-`sync --check` fails when the caller differs or is left behind without a deploy
-block. pubrules.json's `go-live` block, all optional, reaches the caller:
+How the run ends:
+
+| Action | The request ends | The run |
+| --- | --- | --- |
+| check | done | fails when a need is missing, drifted or blocked, naming them; otherwise succeeds |
+| fulfil | done | succeeds, with each need's end state |
+| fulfil | declined, expired or failed (a plan that changed since its approval, or one with nothing the engine can fulfil, among them) | fails, with the engine's reason |
+| fulfil | still awaiting, or still running, when `timeout-minutes` (300) is up | succeeds, saying so: the engine runs it once approved |
+
+A check asks no one and changes nothing. Nothing the run prints holds an email or other
+value: the engine names no approver to a caller, the needs come by name, state and what
+was found, and any email-shaped text is taken out. `sync` also lists the caller under
+`github.actions-oidc` in integrations.json, removes the `go-live.yml` pubrules 0.43.2
+wrote, and `sync --check` fails when the caller differs or is left behind without a deploy
+block. pubrules.json's `service-needs` block, all optional, reaches the caller:
 
 ```json
-"go-live": {"engine": "https://convergence.sustenaut.eu", "timeout-minutes": 300, "claude-dispatch": false}
+"service-needs": {"engine": "https://convergence.sustenaut.eu", "timeout-minutes": 300, "claude-dispatch": false}
 ```
 
-`engine` is the engine's address (and the token's audience), `timeout-minutes` how
-long a run waits, and `claude-dispatch` whether Claude may start the workflow too.
-The engine does not enforce `claude-dispatch` yet: a run's OIDC token names who
-started it (`actor`), and a dispatch by Claude through a person's token reads as
-that person, so telling them apart needs its own mark first. ci.runs-on's default
-label is the job's runner.
+`engine` is the engine's address (and the token's audience), `timeout-minutes` how long a
+run waits, and `claude-dispatch` whether Claude may start the workflow too. The engine does
+not enforce `claude-dispatch` yet: a run's OIDC token names who started it (`actor`), and a
+dispatch by Claude through a person's token reads as that person, so telling them apart
+needs its own mark first. ci.runs-on's default label is the job's runner. The scheduled
+`deploy-check.yml` (pubdeploy's) stays until a check from here serves in its place.
 
 ## Terraform from CI
 
