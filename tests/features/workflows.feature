@@ -57,6 +57,10 @@ Feature: The reusable workflows parse as GitHub reads them
     When I parse the workflow "job-sonar.yml"
     Then the scan's layout comes before sonar-args and pubrules.json's sonar args
 
+  Scenario: The sonar job keeps the coverage reports out of the code it analyses
+    When I parse the workflow "job-sonar.yml"
+    Then the coverage reports are downloaded outside the checkout, and the scan finds them there
+
   Scenario Outline: A package's reusable workflow sends its code to SonarQube Cloud when given a token
     When I parse the workflow "<workflow>"
     Then it takes an optional SONAR_TOKEN secret
