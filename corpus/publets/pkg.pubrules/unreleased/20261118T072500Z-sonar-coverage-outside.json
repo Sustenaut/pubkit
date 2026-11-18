@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "The sonar job downloads the coverage reports outside the checkout, so SonarQube Cloud no longer analyses an HTML coverage report as the repository's code"
-}

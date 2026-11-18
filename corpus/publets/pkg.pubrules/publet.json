@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.43.3 is released as v0.43.3 from commit 3f8e0d8f9cfe1317d61e74a24ff3f6fbfc8d045e.",
+      "content": "pubrules 0.44.0 is released as v0.44.0 from commit ec42d13f43677adab6510d0ba8d3d0fca315acc5.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.43.3",
+            "0.44.0",
             "pubrules --version",
-            "pubrules 0.43.3",
-            "v0.43.3",
-            "3f8e0d8f9cfe1317d61e74a24ff3f6fbfc8d045e"
+            "pubrules 0.44.0",
+            "v0.44.0",
+            "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
           ]
         ]
       },
-      "scope": "the published release v0.43.3 of pubrules",
+      "scope": "the published release v0.44.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "3f8e0d8f9cfe1317d61e74a24ff3f6fbfc8d045e"
+          "revision": "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.43.3 was released on 2026-11-17 from commit 3f8e0d8f9cfe1317d61e74a24ff3f6fbfc8d045e with these changes.",
+      "content": "pubrules 0.44.0 was released on 2026-11-18 from commit ec42d13f43677adab6510d0ba8d3d0fca315acc5 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,32 +57,28 @@
         ],
         "rows": [
           [
-            "added",
-            "TEST-04: every scenario has a When among its own steps, checked by `pubrules gherkin` and `sync --check`; the move to this pubrules (`pubrules bump`, the nightly's pins) writes a TEST-04 exception until 2026-12-31 into a repository that fails it, and the seeded repository.feature takes its When and pubtest's Thens"
-          ],
-          [
             "fixed",
-            "Managed files, workflow descriptions, step names and messages say pubrules' where the rename left pubrules's"
+            "The sonar job downloads the coverage reports outside the checkout, so SonarQube Cloud no longer analyses an HTML coverage report as the repository's code"
           ],
           [
-            "internal",
-            "TEST-04's waiver counts a move from any pubrules before 0.43.3, the release that brings the rule"
+            "changed",
+            "go-live is service-needs: the reusable workflow, the caller sync writes (.github/workflows/service-needs.yml, with action check or fulfil, check the default; sync removes the go-live.yml 0.43.2 wrote), the command pubrules service-needs and pubrules.json's service-needs block; a check asks the engine read-only and fails naming each need missing, drifted or blocked; a fulfil asks in a step of its own, whose summary box says where a person approves it; every need ends on a line of its own (a log group, an annotation when not ready, a summary row); no email or link is printed"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.43.3 of pubrules",
+      "scope": "the published release v0.44.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "3f8e0d8f9cfe1317d61e74a24ff3f6fbfc8d045e"
+          "revision": "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
         }
       ]
     }
   },
-  "created": "2026-11-17T00:00:00Z",
+  "created": "2026-11-18T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
