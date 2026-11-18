@@ -770,14 +770,16 @@ OIDC = "github.actions-oidc"
 SERVICE_NEEDS = ".github/workflows/service-needs.yml"  # service_needs.CALLER
 
 
-def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
+def declared(root: Path, wanted: list[tuple[str, str]], gone: frozenset[str] = frozenset()) -> tuple[str, str] | None:
     """integrations.json as it must read for the integrations scan to pass: every
     workflow pubrules writes that takes SONAR_TOKEN listed under a sonarcloud use, adding
     them to "sonarcloud.scan" where none lists them, and the service-needs caller, whose OIDC
     token is GitHub's identity, under "github.actions-oidc". None where the repository keeps no
     integrations.json, or one that isn't JSON, which the scan reports itself. A path
     already listed, by name or by a pattern, leaves the file as it is, byte for byte;
-    nothing else is taken out, since something else may need it.
+    nothing else is taken out, since something else may need it, but for the paths this
+    sync removes (`gone`, such as the go-live caller service-needs replaced), which come
+    out of the OIDC use, so one sync leaves the file as the scan wants it.
 
     The one path moved: the with-secrets pubrules writes runs `./pubsec run` and
     no longer calls bws, so the scan calls a Bitwarden use declared on it stale. Where
@@ -811,6 +813,11 @@ def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | Non
     oidc = [p for u in uses if u.get("plugin") == OIDC for p in u.get("paths") or [] if isinstance(p, str)]
     identity = [name for name, body in wanted if name == SERVICE_NEEDS and "id-token: write" in body
                 and not any(name == p or fnmatch(name, p) for p in oidc)]
+    for use in uses:
+        paths = use.get("paths")
+        if use.get("plugin") == OIDC and isinstance(paths, list) and set(paths) & gone:
+            use["paths"] = [p for p in paths if p not in gone]
+            moved = True
     if not missing and not moved and not identity:
         return INTEGRATIONS, text
     for plugin, paths in (("sonarcloud.scan", missing), (OIDC, identity)):
@@ -829,18 +836,20 @@ REVIEW_LICENSES = ".github/dependency-review-licenses.txt"
 CALLED = re.compile(r"""^[ \t-]*uses:[ \t]*['"]?(?P<owner>[A-Za-z0-9-]+)/(?P<path>[^@\s'"]+)@""", re.M)
 
 
-def review_licenses(config: dict[str, Any], root: Path,
-                    wanted: list[tuple[str, str]]) -> tuple[str, str] | None:
+def review_licenses(config: dict[str, Any], root: Path, wanted: list[tuple[str, str]],
+                    gone: frozenset[str] = frozenset()) -> tuple[str, str] | None:
     """The review job's license exceptions, where a workflow pubrules writes runs
     job-review.yml: every reusable workflow and action of the owner's that this
     repository's workflows call, as the purl GitHub's dependency graph gives it,
     without its version. GitHub reads no license for them, and the action takes
-    no wildcard, so each is named; the job keeps only the owner's."""
+    no wildcard, so each is named; the job keeps only the owner's. A workflow this
+    sync removes (`gone`) calls nothing any more."""
     bodies = {p: b for p, b in wanted if p.startswith(".github/workflows/")}
     if not any("/job-review.yml@" in b for b in bodies.values()):
         return None
     for found in sorted((root / ".github" / "workflows").glob("*.y*ml")):
-        bodies.setdefault(f".github/workflows/{found.name}", found.read_text(encoding="utf-8"))
+        if f".github/workflows/{found.name}" not in gone:
+            bodies.setdefault(f".github/workflows/{found.name}", found.read_text(encoding="utf-8"))
     own = owner(config)
     purls = sorted({f"pkg:githubactions/{m['owner']}/{m['path']}" for body in bodies.values()
                     for m in CALLED.finditer(body) if m["owner"] == own})

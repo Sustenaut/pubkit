@@ -73,6 +73,13 @@ def in_step(result):
     assert "service-needs.yml" not in result.stderr and "integrations.json" not in result.stderr, result.stderr
 
 
+@then("the caller, integrations.json and the review's list are in step")
+def all_in_step(result):
+    # The deploy block itself is pubdeploy's to check, which this suite does not install.
+    assert not any(name in result.stderr for name in ("service-needs.yml", "go-live.yml", "integrations.json",
+                                                       "dependency-review-licenses.txt")), result.stderr
+
+
 @then(parsers.parse('the repository has no "{path}"'))
 def has_no(repo, path):
     assert not (repo / path).exists()
@@ -420,6 +427,14 @@ def old_caller(repo):
     target = repo / golive.OLD_CALLER
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(golive.HEADER + "name: go-live\n")
+
+
+@given("the go-live workflow pubrules 0.43.2 wrote is there, calling pubrules' go-live.yml")
+def old_caller_calling(repo):
+    target = repo / golive.OLD_CALLER
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(golive.HEADER + "name: go-live\njobs:\n  go-live:\n"
+                      "    uses: Sustenaut/pubrules/.github/workflows/go-live.yml@0123456789abcdef0123456789abcdef01234567\n")
 
 
 @then("the ask step fails")

@@ -161,6 +161,21 @@ Feature: A service's needs from GitHub Actions
     When I run pubrules "sync"
     Then the repository has no ".github/workflows/go-live.yml"
 
+  Scenario: One sync after the rename leaves integrations.json and the review's list without the go-live workflow
+    Given a repository initialised as "utility"
+    And pubrules.json has a deploy block for "example" and the unit "other"
+    And the go-live workflow pubrules 0.43.2 wrote is there, calling pubrules' go-live.yml
+    And the file "integrations.json" reads "{"uses": [{"plugin": "github.actions-oidc", "paths": [".github/workflows/go-live.yml"], "mode": "required"}]}"
+    When I run pubrules "sync"
+    Then it succeeds
+    And the repository has no ".github/workflows/go-live.yml"
+    And "integrations.json" lists ".github/workflows/service-needs.yml" under "github.actions-oidc"
+    And "integrations.json" does not contain "go-live.yml"
+    And ".github/dependency-review-licenses.txt" contains "pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-needs.yml"
+    And ".github/dependency-review-licenses.txt" does not contain "go-live.yml"
+    When I run pubrules "sync" "--check"
+    Then the caller, integrations.json and the review's list are in step
+
   Scenario: sync renames a go-live block service-needs, and the check says it is stale
     Given a repository initialised as "utility"
     And the pubrules.json key "go-live" is {"claude-dispatch": false}

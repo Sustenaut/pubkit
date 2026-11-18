@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubrules lock keeps the #sha256 of a URL pin only a package requires, so pip --require-hashes installs the lock"
+}

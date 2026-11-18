@@ -461,16 +461,18 @@ def sync(root: Path, check: bool) -> int:
         wanted.append((CALLER, service_needs))
     if (generated := dependabot(config)) is not None:
         wanted.append((DEPENDABOT_PATH, generated))
-    if (integrations := declared(root, wanted)) is not None:
+    # The go-live workflow pubrules 0.43.2 wrote is the service-needs workflow now: sync takes it
+    # away below, and what names it (integrations.json, the review's exceptions) forgets it now.
+    old = root / OLD_CALLER
+    gone = frozenset({OLD_CALLER} if old.is_file() and is_caller(old.read_text(encoding="utf-8")) else ())
+    if (integrations := declared(root, wanted, gone)) is not None:
         wanted.append(integrations)
-    if (licenses := review_licenses(config, root, wanted)) is not None:
+    if (licenses := review_licenses(config, root, wanted, gone)) is not None:
         wanted.append(licenses)
     replaced = leftovers(config, root)
     if service_needs is None and (root / CALLER).is_file() and is_caller((root / CALLER).read_text(encoding="utf-8")):
         replaced.append(CALLER)
-    # The go-live workflow pubrules 0.43.2 wrote is the service-needs workflow now: sync takes it away.
-    old = root / OLD_CALLER
-    if old.is_file() and is_caller(old.read_text(encoding="utf-8")):
+    if gone:
         if check:
             print(f"pubrules: {OLD_CALLER} is the service-needs workflow now; run `pubrules sync`, which removes it",
                   file=sys.stderr)
@@ -644,7 +646,11 @@ def lock(root: Path) -> int:
         digest = info.get("archive_info", {}).get("hashes", {}).get("sha256")
         if item.get("is_direct"):
             digest = digest or sha256_of(info["url"])
-            out.append(f"{name} @ {info['url']} \\\n    --hash=sha256:{digest}")
+            # pip's report drops a URL's #sha256= fragment. A package that requires this one by URL
+            # names it with one (pubdeploy's python-statemachine), and --require-hashes counts the
+            # two as different requirements: a pin only a package requires keeps its fragment.
+            url = info["url"] if item.get("requested") else info["url"].split("#", 1)[0] + f"#sha256={digest}"
+            out.append(f"{name} @ {url} \\\n    --hash=sha256:{digest}")
         else:
             version = item["metadata"]["version"]
             digests = sorted(set(published_hashes(name, version)) | ({digest} if digest else set()))

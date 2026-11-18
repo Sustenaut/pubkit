@@ -70,6 +70,54 @@ def pins_hashes(repo, env, path, pin, a, b):
 
 
 
+def _wheel(where: Path, name: str, version: str, requires: str = "") -> Path:
+    wheel = where / f"{name}-{version}-py3-none-any.whl"
+    info = f"{name}-{version}.dist-info"
+    with zipfile.ZipFile(wheel, "w") as z:
+        z.writestr(f"{info}/METADATA", f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n"
+                   + (f"Requires-Dist: {requires}\n" if requires else ""))
+        z.writestr(f"{info}/WHEEL", "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
+        z.writestr(f"{info}/RECORD", "")
+    return wheel
+
+
+@given(parsers.parse('a wheel "{outer}" {version} that requires the wheel "{inner}" {inner_version} by its URL and sha256'))
+def wheels_by_url(tmp_path, env, outer, version, inner, inner_version):
+    """Two local wheels, as pubdeploy's and python-statemachine's: the first requires the
+    second by its URL, with the #sha256= fragment."""
+    where = tmp_path / "wheels"
+    where.mkdir()
+    pinned = _wheel(where, inner, inner_version)
+    digest = hashlib.sha256(pinned.read_bytes()).hexdigest()
+    env["inner"] = f"{inner} @ {pinned.as_uri()}#sha256={digest}"
+    env["outer"] = f"{outer} @ {_wheel(where, outer, version, env['inner']).as_uri()}"
+    env.update(PIP_NO_INDEX="1")
+
+
+@given(parsers.parse('tests/requirements.txt names "{name}" by its URL'))
+def requirements_by_url(repo, env, name):
+    (repo / "tests").mkdir(exist_ok=True)
+    (repo / "tests" / "requirements.txt").write_text(env[name] + "\n")
+
+
+@then(parsers.parse('"{path}" pins "{inner}" by its URL with its #sha256, and "{outer}" by its URL as named'))
+def pins_by_url(repo, env, path, inner, outer):
+    lock = (repo / path).read_text()
+    assert f"{env[inner]} \\\n" in lock, lock
+    assert f"{env[outer]} \\\n" in lock, lock
+
+
+@then("pip installs the lock with --require-hashes")
+def installs_lock(repo, env, tmp_path):
+    import subprocess  # noqa: PLC0415
+    done = subprocess.run([sys.executable, "-m", "pip", "install", "--dry-run", "--ignore-installed", "--quiet",
+                           "--require-hashes", "--target", str(tmp_path / "target"), "-r",
+                           str(repo / "tests" / "requirements.lock")],
+                          env={**os.environ, **{k: v for k, v in env.items() if k.isupper()}},
+                          capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+
+
 @when("pubrules' wheel is built", target_fixture="wheel")
 def built_wheel(tmp_path):
     # Templates are package data, and a glob that misses one (a
