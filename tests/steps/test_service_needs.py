@@ -1,18 +1,19 @@
-"""Steps for go-live: the caller `pubrules sync` writes, and `pubrules go-live`'s
+"""Steps for service-needs: the caller `pubrules sync` writes, and `pubrules service-needs`'s
 poll against a fake engine, a fake clock and a fake GitHub token service."""
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pubrules import golive
+from pubrules import service_needs as golive
 
-scenarios("go-live.feature")
+scenarios("service-needs.feature")
 
 ROOT = Path(__file__).resolve().parents[2]
 TOKEN = "eyJ-a-run-token"
@@ -40,10 +41,10 @@ def no_deploy_block(repo):
     _save(repo, config)
 
 
-@given(parsers.re(r"pubrules\.json's go-live block is (?P<block>.+)"))
-def go_live_block(repo, block):
+@given(parsers.re(r"pubrules\.json's service-needs block is (?P<block>.+)"))
+def service_needs_block(repo, block):
     config = _config(repo)
-    config["go-live"] = json.loads(block)
+    config["service-needs"] = json.loads(block)
     _save(repo, config)
 
 
@@ -69,7 +70,7 @@ def lists_under(repo, path, listed, plugin):
 @then("the caller and integrations.json are in step")
 def in_step(result):
     # The deploy block itself is pubdeploy's to check, which this suite does not install.
-    assert "go-live.yml" not in result.stderr and "integrations.json" not in result.stderr, result.stderr
+    assert "service-needs.yml" not in result.stderr and "integrations.json" not in result.stderr, result.stderr
 
 
 @then(parsers.parse('the repository has no "{path}"'))
@@ -77,19 +78,23 @@ def has_no(repo, path):
     assert not (repo / path).exists()
 
 
-@then("pubrules' go-live.yml takes the unit, asks for id-token write, and runs pubrules go-live")
+@then("pubrules' service-needs.yml takes the unit, asks for id-token write, and runs pubrules service-needs")
 def reusable():
-    flow = yaml.safe_load((ROOT / ".github/workflows/go-live.yml").read_text())
+    flow = yaml.safe_load((ROOT / ".github/workflows/service-needs.yml").read_text())
     inputs = flow[True]["workflow_call"]["inputs"]  # YAML reads `on` as true
-    assert inputs["unit"]["required"] is True and inputs["kind"]["default"] == "fulfil"
+    assert inputs["unit"]["required"] is True and inputs["kind"]["default"] == "check"
     assert inputs["timeout-minutes"]["default"] == 300
-    job = flow["jobs"]["go-live"]
+    job = flow["jobs"]["service-needs"]
     assert job["permissions"] == {"contents": "read", "id-token": "write"}
     assert "secrets" not in flow[True]["workflow_call"]
-    run = job["steps"][-1]["run"]
-    assert "pubrules go-live --unit \"$UNIT\"" in run and "${{" not in run
+    asked, waited = job["steps"][-2], job["steps"][-1]
+    assert asked["id"] == "ask" and "pubrules service-needs --stage ask --unit \"$UNIT\"" in asked["run"]
+    assert "--stage wait --request \"$REQUEST\"" in waited["run"]
+    assert waited["env"]["REQUEST"] == "${{ steps.ask.outputs.request }}"
+    assert waited["env"]["MINUTES"] == "${{ steps.ask.outputs.minutes }}"
+    assert "${{" not in asked["run"] + waited["run"]
     from pubrules.refs import SHIPPED  # noqa: PLC0415
-    assert "go-live.yml" in SHIPPED["workflows"]
+    assert "service-needs.yml" in SHIPPED["workflows"]
 
 
 # --- the poll ---------------------------------------------------------------------
@@ -121,10 +126,18 @@ class Engine:
         return 200 if method == "GET" else 201, json.dumps(answer).encode()
 
 
-def request(state: str, needs: dict | None = None, error: str = "") -> dict:
+def request(state: str, needs: dict | None = None, error: str = "", note: str = "",
+            found: dict | None = None) -> dict:
+    """An answer of the engine's: every need with its type, grade, state and what was found,
+    and the plan (k8s.secret:s missing, which the fulfil makes)."""
+    found = found or {}
+    listed = [{"need": k, "type": k.split(":")[0], "grade": "auto", "state": v, "detail": found.get(k, f"{k} is {v}")}
+              for k, v in (needs or {}).items()]
     return {"id": "20261117T100000Z-ab12", "kind": "fulfil", "state": state, "unit": "example",
-            "url": "https://convergence.example/approvals/20261117T100000Z-ab12",
-            "result": {"needs": [{"need": k, "state": v} for k, v in (needs or {}).items()], "error": error}}
+            "url": "https://convergence.example/approvals/20261117T100000Z-ab12", "expires_at": "2026-11-18T10:00:00Z",
+            "plan": [{"need": "k8s.secret:s", "state": "missing",
+                      "change": "the fulfil makes it: k8s.secret:s is missing"}],
+            "result": {"needs": listed, "error": error, "note": note}}
 
 
 class Run:
@@ -135,13 +148,16 @@ class Run:
         self.lines: list[str] = []
         self.summary: list[str] = []
         self.code: int | None = None
+        self.outputs: list[tuple[str, str]] = []
+        self.asked = None
 
     def http(self) -> golive.Http:
         def sleep(seconds):
             self.waits.append(seconds)
             self.now += seconds
         return golive.Http(send=self.engine.send, token=lambda audience: TOKEN, sleep=sleep,
-                           clock=lambda: self.now, out=self.lines.append, summary=self.summary.append)
+                           clock=lambda: self.now, out=self.lines.append, summary=self.summary.append,
+                           output=lambda name, value: self.outputs.append((name, value)))
 
 
 @pytest.fixture
@@ -157,6 +173,13 @@ def _answer(text: str):
         return text
     if text.isdigit():
         return int(text)
+    if " with needs " in text:
+        state, rest = text.split(" with needs ")
+        note = re.search(r' noted "([^"]+)"', rest)
+        found = re.search(r'"([^"]+)" (\w+) found "([^"]+)"', rest)
+        needs = dict(re.findall(r'"([^"]+)" (\w+)', re.sub(r' (noted|found) "[^"]+"', "", rest)))
+        return request(state.strip('"'), needs, note=note[1] if note else "",
+                       found={found[1]: found[3]} if found else None)
     if " with " in text:
         state, need = text.split(" with ")
         name, ready = need.rsplit(" ", 1)
@@ -187,14 +210,14 @@ def refuses_later(poll, state, status, reason):
     poll.engine.answers = [request(state), (status, json.dumps({"refused": reason}).encode())]
 
 
-@when(parsers.parse('the go-live of "{unit}" runs for {minutes:d} minutes'))
+@when(parsers.parse('the fulfil of "{unit}" runs for {minutes:d} minutes'))
 def runs(poll, unit, minutes):
-    poll.code = golive.go_live(poll.http(), "https://convergence.example/", unit, "fulfil", minutes)
+    poll.code = golive.service_needs(poll.http(), "https://convergence.example/", unit, "fulfil", minutes)
 
 
 @when(parsers.parse('the gate "{unit}" with the plan "{plan}" runs for {minutes:d} minutes'))
 def gate_runs(poll, unit, plan, minutes):
-    poll.code = golive.go_live(poll.http(), "https://convergence.example", unit, "gate", minutes, plan)
+    poll.code = golive.service_needs(poll.http(), "https://convergence.example", unit, "gate", minutes, plan)
 
 
 @then(parsers.parse("it exits {code:d}"))
@@ -204,7 +227,7 @@ def exits(poll, code):
 
 @then(parsers.parse("it printed each state once: {states}"))
 def each_once(poll, states):
-    said = [line for line in poll.lines if not line.startswith("go-live: asked")]
+    said = [line for line in poll.lines if not line.startswith("service-needs: asked")]
     wanted = [golive.SAID[s] for s in states.split(", ")]
     for state in wanted:
         assert sum(line.endswith(state) or f" {state}" in line for line in said) >= 1, (state, said)
@@ -213,7 +236,8 @@ def each_once(poll, states):
 
 @then("the job summary links the approval page")
 def links_page(poll):
-    assert any("Awaiting approval: [https://convergence.example/approvals/" in s for s in poll.summary)
+    assert any("**Approval needed.**" in s and "(https://convergence.example/approvals/20261117T100000Z-ab12)" in s
+               for s in poll.summary), poll.summary
 
 
 @then(parsers.parse('the job summary says "{text}"'))
@@ -279,7 +303,7 @@ def gives_500(github):
     github["tokens"].status = 500
 
 
-@when(parsers.parse('the go-live asks for two tokens for "{audience}"'))
+@when(parsers.parse('the service-needs asks for two tokens for "{audience}"'))
 def two_tokens(github, audience):
     token = golive.actions_token(github["env"], github["tokens"].get, github["out"].append)
     github["got"] = [token(audience), token(audience)]
@@ -307,3 +331,103 @@ def no_token(github):
     token = golive.actions_token(github["env"], github["tokens"].get, github["out"].append)
     with pytest.raises(golive.Unanswered):
         token("https://engine.example.eu")
+
+
+@given(parsers.re(r'the pubrules\.json key "(?P<key>[^"]+)" is (?P<value>.+)'))
+def config_key(repo, key, value):
+    config = _config(repo)
+    config[key] = json.loads(value)
+    _save(repo, config)
+
+
+@when(parsers.parse('the check of "{unit}" runs for {minutes:d} minutes'))
+def check_runs(poll, unit, minutes):
+    poll.code = golive.service_needs(poll.http(), "https://convergence.example", unit, "check", minutes)
+
+
+@then(parsers.parse('the log has the group "{title}" holding "{line}"'))
+def has_group(poll, title, line):
+    at = poll.lines.index(f"::group::{title}")
+    end = poll.lines.index("::endgroup::", at)
+    assert line in poll.lines[at + 1:end], poll.lines[at:end + 1]
+
+
+@then(parsers.parse('the job summary has the row "{row}"'))
+def has_row(poll, row):
+    assert any(row in s for s in poll.summary), poll.summary
+
+
+@then(parsers.parse('the log has the annotation "{line}"'))
+def has_annotation(poll, line):
+    assert line in poll.lines, poll.lines
+
+
+@then("it asked for nobody's approval")
+def no_approval(poll):
+    assert not any("Approval needed" in s for s in poll.summary + poll.lines)
+
+
+@when(parsers.parse('the ask step for "{unit}" runs'))
+def ask_step(poll, unit):
+    poll.asked = golive.ask(poll.http(), "https://convergence.example", unit, "fulfil", 300 * 60)
+
+
+@when(parsers.parse('the ask step of a check of "{unit}" runs'))
+def ask_check_step(poll, unit):
+    poll.asked = golive.ask(poll.http(), "https://convergence.example", unit, "check", 300 * 60)
+
+
+@then(parsers.parse('the job summary has the approval box, linking the request and naming "{need}"'))
+def approval_box(poll, need):
+    box = next(s for s in poll.summary if "**Approval needed.**" in s)
+    assert box.startswith("> [!IMPORTANT]") and "(https://convergence.example/approvals/20261117T100000Z-ab12)" in box
+    assert f"`{need}` (missing): the fulfil makes it" in box
+    assert "> It expires 2026-11-18 10:00 UTC, undecided." in box
+
+
+@then(parsers.parse('the step output "{name}" is "{value}"'))
+def step_output(poll, name, value):
+    assert (name, value) in poll.outputs, poll.outputs
+
+
+@then("the ask step ends without waiting for the decision")
+def ask_ends(poll):
+    assert isinstance(poll.asked, dict) and poll.asked["state"] == "awaiting"
+
+
+@then("the job summary says nothing of approval")
+def nothing_of_approval(poll):
+    assert not any("pproval" in s for s in poll.summary), poll.summary
+
+
+@when(parsers.parse('the wait step for the request "{request}" of "{unit}" runs for {minutes:d} minutes'))
+def wait_step(poll, request, unit, minutes):
+    poll.code = golive.wait(poll.http(), "https://convergence.example", unit, "fulfil", minutes, request)
+
+
+@then(parsers.parse('the engine was polled for "{path}"'))
+def polled(poll, path):
+    assert ("GET", f"https://convergence.example{path}") in [(m, u) for m, u, _, _ in poll.engine.asked]
+
+
+@given(parsers.parse('the engine refuses the poll with {status:d} "{reason}"'))
+def refuses_poll(poll, status, reason):
+    poll.engine.answers = [(status, json.dumps({"refused": reason}).encode())]
+
+
+@given("the go-live workflow pubrules 0.43.2 wrote is there")
+def old_caller(repo):
+    target = repo / golive.OLD_CALLER
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(golive.HEADER + "name: go-live\n")
+
+
+@then("the ask step fails")
+def ask_fails(poll):
+    assert poll.asked == 1
+
+
+@then(parsers.parse('pubrules.json has the key "{key}" as {value}, and no "{old}"'))
+def renamed(repo, key, value, old):
+    config = _config(repo)
+    assert config[key] == json.loads(value) and old not in config

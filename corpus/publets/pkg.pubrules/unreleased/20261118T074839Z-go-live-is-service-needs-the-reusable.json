@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "go-live is service-needs: the reusable workflow, the caller sync writes (.github/workflows/service-needs.yml, with action check or fulfil, check the default; sync removes the go-live.yml 0.43.2 wrote), the command pubrules service-needs and pubrules.json's service-needs block; a check asks the engine read-only and fails naming each need missing, drifted or blocked; a fulfil asks in a step of its own, whose summary box says where a person approves it; every need ends on a line of its own (a log group, an annotation when not ready, a summary row); no email or link is printed"
+}
