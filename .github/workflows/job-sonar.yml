@@ -3,7 +3,9 @@
 # security.sonar.organization), when the caller passes a SONAR_TOKEN. Without one, as
 # in a private repository or a pull request from a fork, it says so and
 # passes. The full history lets it tell new code from old, and every
-# coverage* artifact of the run, each in coverage-download/<artifact>/,
+# coverage* artifact of the run, each in coverage-download/<artifact>/
+# under the runner's temporary folder, outside the checkout, so the
+# analysis never takes a report (an HTML one, say) for the repository's code,
 # gives the coverage SonarQube Cloud's quality gate asks of new code: from
 # coverage-run instead, when the tests ran there and not here. Each
 # `property=pattern` in reports sends the files whose names match the
@@ -53,7 +55,7 @@ jobs:
         continue-on-error: true
         with:
           pattern: coverage*
-          path: coverage-download
+          path: ${{ runner.temp }}/coverage-download
           run-id: ${{ inputs.coverage-run }}
           repository: ${{ github.repository }}
           github-token: ${{ inputs.coverage-run != '' && github.token || '' }}
@@ -64,7 +66,7 @@ jobs:
           set -f
           args=()
           for report in $REPORTS; do
-            paths=$(find coverage-download -type f -name "${report#*=}" 2>/dev/null | paste -sd, -)
+            paths=$(find "$RUNNER_TEMP/coverage-download" -type f -name "${report#*=}" 2>/dev/null | paste -sd, -)
             args+=("-D${report%%=*}=$paths")
           done
           echo "args=${args[*]}" >> "$GITHUB_OUTPUT"

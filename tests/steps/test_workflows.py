@@ -149,6 +149,17 @@ def layout_first(workflow):
     assert "layout" in triggers(workflow)["workflow_call"]["inputs"]
 
 
+@then("the coverage reports are downloaded outside the checkout, and the scan finds them there")
+def reports_outside(workflow):
+    """A checkout analysed with sonar.sources=. would take an HTML coverage
+    report in it for the repository's own code."""
+    steps = workflow["data"]["jobs"]["sonar"]["steps"]
+    download = next(s for s in steps if "download-artifact" in s.get("uses", ""))
+    assert download["with"]["path"] == "${{ runner.temp }}/coverage-download", download
+    report = next(s for s in steps if s.get("id") == "report")
+    assert 'find "$RUNNER_TEMP/coverage-download"' in report["run"], report["run"]
+
+
 @then("the scan waits for the quality gate, so a failing gate fails the job")
 def sonar_gate(workflow):
     """Without the wait the scan only uploads, so `ci / passed` stays green
