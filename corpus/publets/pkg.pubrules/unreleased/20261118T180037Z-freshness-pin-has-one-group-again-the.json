@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "freshness.PIN has one group again, the version, so pubfleet's board, which reads PIN.findall, builds; the pubkit-or-pubrules pin TEST-04's waiver reads is PACKAGE_PIN"
+}
