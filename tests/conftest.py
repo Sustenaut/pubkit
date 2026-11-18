@@ -16,6 +16,9 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, then, when
 
+# This checkout: the workflows and actions pubrules ships are its own.
+SOURCE = Path(__file__).resolve().parents[1]
+
 @pytest.fixture(scope="session", autouse=True)
 def rust_toolchain(tmp_path_factory):
     """The Rust toolchain pubrules' rust-toolchain.toml pins, installed once
@@ -61,11 +64,13 @@ SEED = {"seed.feature": "Feature: Seed\n  Scenario: Seed\n    When it is read\n 
 
 
 @pytest.fixture
-def repo(tmp_path):
+def repo(tmp_path, pubtest_ctx):
+    """The scratch repository, which pubtest's file steps read too."""
     root = tmp_path / "repo"
     root.mkdir()
     for path, text in SEED.items():
         (root / path).write_text(text)
+    pubtest_ctx.directory = root
     return root
 
 
@@ -84,14 +89,6 @@ def empty(repo):
 @given(parsers.parse('a repository initialised as "{kind}"'))
 def initialised(repo, run, kind):
     assert run(pubrules(), "init", f"--kind={kind}", cwd=repo).code == 0
-
-
-@given(parsers.parse('the file "{path}" reads "{text}"'))
-@when(parsers.parse('the file "{path}" reads "{text}"'))
-def file_reads(repo, path, text):
-    target = repo / path
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(text + "\n")
 
 
 @pytest.fixture
@@ -235,17 +232,37 @@ def action_at(repo, path, owner, action, pin):
     assert want in (repo / path).read_text(), (repo / path).read_text()
 
 
-@then(parsers.parse('"{path}" contains "{text}"'))
-def contains(repo, path, text):
-    assert text in (repo / path).read_text()
-
-
-@then(parsers.parse('"{path}" does not contain "{text}"'))
-def lacks(repo, path, text):
-    assert text not in (repo / path).read_text()
-
-
 @given(parsers.re(r'pubrules (?P<args>(?:"[^"]*" ?)+) has run'))
 def has_run(repo, run, args):
     argv = args.strip().strip('"').split('" "')
     assert run(pubrules(), *argv, cwd=repo).code == 0
+
+
+@when("I read the workflows and actions pubrules ships", target_fixture="shipped")
+def read_shipped(pubtest_ctx):
+    """Each reusable workflow and action, by name, as text."""
+    def read():
+        return {"workflows": {p.name: p.read_text() for p in sorted((SOURCE / ".github" / "workflows").glob("*.yml"))},
+                "actions": {p.parent.name: p.read_text() for p in sorted((SOURCE / "actions").glob("*/action.yml"))}}
+    return pubtest_ctx.attempt(read)
+
+
+def render_launcher(pubtest_ctx, config):
+    """./pubrules, as sync writes it from this pubrules.json, in the scratch directory."""
+    import json  # noqa: PLC0415
+
+    from pubrules import cli  # noqa: PLC0415
+    from pubtest.steps.files import at  # noqa: PLC0415
+
+    text = cli.render(cli.templates("utility")["pubrules"], cli.values(json.loads(config)))
+    at(pubtest_ctx, "pubrules").write_text(text)
+
+
+@given(parsers.parse("pubrules renders the utility launcher for '{config}'"))
+def rendered(pubtest_ctx, config):
+    render_launcher(pubtest_ctx, config)
+
+
+@when(parsers.parse("pubrules renders the utility launcher for '{config}'"))
+def renders(pubtest_ctx, config):
+    pubtest_ctx.attempt(lambda: render_launcher(pubtest_ctx, config))

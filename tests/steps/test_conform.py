@@ -92,11 +92,6 @@ def conforming(repo, env):
     env["PUBRULES_TODAY"] = "2026-10-12"
 
 
-@given(parsers.parse('the file "{path}" is removed'))
-def file_removed(repo, path):
-    (repo / path).unlink()
-
-
 @given(parsers.parse('the directory "{path}" is removed'))
 def directory_removed(repo, path):
     shutil.rmtree(repo / path)

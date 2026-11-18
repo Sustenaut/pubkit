@@ -2,30 +2,34 @@
 pubdeploy's: the managed with-secrets in every repository with a
 with-secrets.json, the launchers' provider wheels, pubsec's and pubdeploy's
 floors in deploy.providers, ./pubdeploy, and the sustenaut.sync and
-sustenaut.bump hooks. In a scratch repository, with the hooks faked."""
+sustenaut.bump hooks. In a scratch repository, with the hooks faked: pubrules
+runs in this process (`I call pubrules with`), so the hooks it loads are these.
+
+The checks are pubtest's; the scratch directory pubtest's file steps read is
+the repository."""
 
 from __future__ import annotations
 
-import hashlib
 import json
+import shlex
 import subprocess
-from types import SimpleNamespace
 
 import pytest
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from pubrules import cli
-from pytest_bdd import scenarios, then
 
 scenarios("providers.feature")
 
-OLD_SCRIPT = "#!/usr/bin/env bash\nexec bws run -- \"$@\"\n"
+
 @pytest.fixture
-def repo(tmp_path, monkeypatch):
+def repo(tmp_path, monkeypatch, pubtest_ctx):
     root = tmp_path / "repo"
     root.mkdir()
     monkeypatch.chdir(root)
     monkeypatch.setenv("PUBRULES_ANY_VERSION", "1")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
+    pubtest_ctx.directory = root
     return root
 
 
@@ -35,77 +39,16 @@ def init(root, kind, **extra):
     (root / "pubrules.json").write_text(json.dumps(config | extra, indent=2))
 
 
-@then("a utility with a with secrets json gets the managed with secrets")
-def a_utility_with_a_with_secrets_json_gets_the_managed_with_secrets(repo, capsys):
-    init(repo, "utility")
-    (repo / "with-secrets.json").write_text('{"project": "example"}\n')
-    (repo / "with-secrets").write_text(OLD_SCRIPT)
-    assert cli.main(["sync", "--check"]) == 1
-    err = capsys.readouterr().err
-    assert ("with-secrets differs from pubrules" in err and "it is an older script, which does not say which Bitwarden "
-            "project it read (PUBRULES_SECRETS_PROJECT), so pubdeploy finds every bitwarden.* need unknown "
-            "through it") in err
-    assert cli.main(["sync"]) == 0
-    assert "Managed by pubrules" in (repo / "with-secrets").read_text()
-    assert (repo / "with-secrets").stat().st_mode & 0o111
-    capsys.readouterr()
-    assert cli.main(["sync", "--check"]) == 0
-
-
-@then("a utility without one gets none")
-def a_utility_without_one_gets_none(repo, capsys):
-    init(repo, "utility")
-    assert cli.main(["sync"]) == 0
-    assert not (repo / "with-secrets").exists()
-
-
-WHEEL = "https://github.com/example-org/example-needs/releases/download/v1.0.0/example_needs-1.0.0-py3-none-any.whl"
-
-
-def launcher(config):
-    return cli.render(cli.templates("utility")["pubrules"], cli.values(config))
-
-
-@then("the launcher runs with each provider checked against its sha256")
-def the_launcher_runs_with_each_provider_checked_against_its_sha256(tmp_path):
-    wheel = b"a wheel"
-    digest = hashlib.sha256(wheel).hexdigest()
-    text = launcher({"deploy": {"providers": [{"distribution": "example-needs", "wheel": WHEEL, "sha256": digest}]}})
-    assert f"provider {WHEEL} {digest}" in text and '"${with[@]}" pubrules "$@"' in text
-    cache = tmp_path / "cache"
-    held = cache / "pubrules" / "providers" / digest / WHEEL.rsplit("/", 1)[1]
-    held.parent.mkdir(parents=True)
-    held.write_bytes(wheel)
-    part = text[text.index("# A wheel"):text.index("exec uvx")]
-    script = f"set -euo pipefail\n{part}printf '%s\\n' \"${{with[@]}}\"\n"
-    done = subprocess.run(["bash", "-c", script], env={"PATH": "/usr/bin:/bin", "XDG_CACHE_HOME": str(cache)},
-                          capture_output=True, text=True)
-    assert done.returncode == 0 and done.stdout.split() == ["--with", str(held)], done
-    held.write_bytes(b"another wheel")
-    done = subprocess.run(["bash", "-c", script], env={"PATH": "/usr/bin:/bin", "XDG_CACHE_HOME": str(cache)},
-                          capture_output=True, text=True)
-    assert done.returncode == 1 and "is not the wheel deploy.providers pins" in done.stderr
-    assert not held.exists()
-
-
-@then("the launcher without providers is as it was")
-def the_launcher_without_providers_is_as_it_was():
-    text = launcher({})
-    assert "provider" not in text and 'py3-none-any.whl" pubrules "$@"' in text
-
-
-# --- pubsec: deploy.providers, ./pubsec and the new with-secrets ----------------
-
-
-def pin(name="pubsec"):
+def pin(name):
     from pubrules.new import FLOORS  # noqa: PLC0415
     version, sha, wheel = FLOORS[name]
     return {"distribution": name, "wheel": wheel.format(version), "sha256": sha}
 
 
-def both():
-    """deploy.providers as sync lists it from nothing: each entry goes first."""
-    return [pin("pubdeploy"), pin()]
+def providers(text):
+    """deploy.providers as a docstring gives it: {"floor": NAME} is NAME's pin
+    at the floor this pubrules works with."""
+    return [pin(p["floor"]) if set(p) == {"floor"} else p for p in json.loads(text)]
 
 
 class Hook:
@@ -121,226 +64,176 @@ class Hook:
 @pytest.fixture
 def hooks(monkeypatch):
     """The sustenaut.sync and sustenaut.bump hooks installed: pubdeploy's,
-    faked, unless a test changes them."""
+    faked, unless a step changes them."""
     installed = {"sustenaut.sync": [Hook("pubdeploy", lambda root, config, check: ([], False))],
                  "sustenaut.bump": []}
     monkeypatch.setattr("pubrules.hooks.entry_points", lambda group: installed[group])
     return installed
 
 
-def deployed(repo, hooks, **deploy):
+def deployed(repo, **deploy):
     init(repo, "service")
     config = json.loads((repo / "pubrules.json").read_text())
     (repo / "pubrules.json").write_text(json.dumps(config | {"deploy": {"namespace": "example"} | deploy}, indent=2) + "\n")
 
 
-@then("sync lists pubsec and pubdeploy in deploy providers and check fails without them")
-def sync_lists_pubsec_and_pubdeploy_in_deploy_providers_and_check_fails_without_them(repo, capsys, hooks):
-    deployed(repo, hooks)
-    before = (repo / "pubrules.json").read_text()
-    assert cli.main(["sync", "--check"]) == 1
-    err = capsys.readouterr().err
-    assert "pubrules: deploy.providers does not list pubsec: the types that hold a secret's value are pubsec's" in err
-    assert "pubrules: deploy.providers does not list pubdeploy: the deploy walk, and the check sync runs of the " \
-        "block, are pubdeploy's" in err
-    assert (repo / "pubrules.json").read_text() == before
+def exits(code):
+    """A command's return, as the program's exit: what pubtest reads."""
+    raise SystemExit(code)
+
+
+# --- the repository -----------------------------------------------------------
+
+
+@given(parsers.parse('a "{kind}" repository'))
+def repository(repo, hooks, kind):
+    init(repo, kind)
+
+
+@given("a repository with a deploy block")
+def with_deploy(repo, hooks):
+    deployed(repo)
+
+
+@given("a repository with a deploy block whose deploy.providers is:")
+def with_providers(repo, hooks, docstring):
+    deployed(repo, providers=providers(docstring))
+
+
+@given("a repository with a deploy block that lists both providers at their floors")
+def with_floors(repo, hooks):
+    deployed(repo, providers=[pin("pubdeploy"), pin("pubsec")])
+
+
+@given("pubrules has synced it")
+def synced(repo, hooks):
     assert cli.main(["sync"]) == 0
-    after = (repo / "pubrules.json").read_text()
-    assert json.loads(after)["deploy"]["providers"] == both()
-    # The entries, and nothing else of the file's layout.
-    assert after.replace(f'"providers": [{json.dumps(pin("pubdeploy"))}, {json.dumps(pin())}],\n    ', "") == before
-    assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
 
 
-@then("sync writes pubsec and with secrets runs it")
-def sync_writes_pubsec_and_with_secrets_runs_it(repo, capsys, hooks):
-    deployed(repo, hooks)
-    assert cli.main(["sync"]) == 0
-    launcher, wrapper = (repo / "pubsec").read_text(), (repo / "with-secrets").read_text()
-    assert f"fetch {pin()['wheel']} {pin()['sha256']} providers deploy.providers\n" in launcher
-    assert 'exec uvx --from "$fetched" pubsec "$@"' in launcher
-    assert (repo / "pubsec").stat().st_mode & 0o111
-    assert wrapper.rstrip().endswith('exec "$(cd "$(dirname "$0")" && pwd)/pubsec" run --cwd "$PWD" -- "$@"')
-    # ./pubrules runs with both, so pubdeploy's hooks and pubsec's types load.
-    for name in ("pubsec", "pubdeploy"):
-        assert f"provider {pin(name)['wheel']} {pin(name)['sha256']}\n" in (repo / "pubrules").read_text()
+# --- the hooks -----------------------------------------------------------------
 
 
-@then("sync writes pubdeploy which runs with the other providers")
-def sync_writes_pubdeploy_which_runs_with_the_other_providers(repo, capsys, hooks, tmp_path):
-    deployed(repo, hooks)
-    assert cli.main(["sync"]) == 0
-    text = (repo / "pubdeploy").read_text()
-    assert (repo / "pubdeploy").stat().st_mode & 0o111
-    assert f"fetch {pin('pubdeploy')['wheel']} {pin('pubdeploy')['sha256']} providers deploy.providers\n" in text
-    assert f"provider {pin()['wheel']} {pin()['sha256']}\n" in text
-    assert f"provider {pin('pubdeploy')['wheel']}" not in text
-    assert text.rstrip().endswith('exec uvx --from "$fetched" ${with[@]+"${with[@]}"} pubdeploy "$@"')
-    # The wheels as the launcher finds them in the cache: pubdeploy's is the one uvx runs.
-    cache = tmp_path / "cache"
-    for name in ("pubsec", "pubdeploy"):
-        held = cache / "pubrules" / "providers" / f"{name}-sha" / pin(name)["wheel"].rsplit("/", 1)[1]
-    part = text[text.index("# A wheel"):text.index("exec uvx")]
-    script = part.replace(pin()["sha256"], "s" * 64).replace(pin("pubdeploy")["sha256"], "d" * 64)
-    for name, sha in (("pubsec", "s" * 64), ("pubdeploy", "d" * 64)):
-        held = cache / "pubrules" / "providers" / sha / pin(name)["wheel"].rsplit("/", 1)[1]
-        held.parent.mkdir(parents=True)
-        held.write_bytes(name.encode())
-    sums = {hashlib.sha256(n.encode()).hexdigest(): s for n, s in (("pubsec", "s" * 64), ("pubdeploy", "d" * 64))}
-    for real, fake in sums.items():
-        script = script.replace(fake, real)
-        (cache / "pubrules" / "providers" / fake).rename(cache / "pubrules" / "providers" / real)
-    done = subprocess.run(["bash", "-c", f"set -euo pipefail\n{script}printf '%s\\n' \"$fetched\" \"${{with[@]}}\"\n"],
-                          env={"PATH": "/usr/bin:/bin", "XDG_CACHE_HOME": str(cache)}, capture_output=True, text=True)
-    assert done.returncode == 0, done.stderr
-    fetched, *rest = done.stdout.split()
-    assert fetched.endswith(pin("pubdeploy")["wheel"].rsplit("/", 1)[1])
-    assert rest[0] == "--with" and rest[1].endswith(pin()["wheel"].rsplit("/", 1)[1]) and len(rest) == 2
-
-
-@then("without a deploy block there is no pubdeploy")
-def without_a_deploy_block_there_is_no_pubdeploy(repo, capsys, hooks):
-    init(repo, "service")
-    assert cli.main(["sync"]) == 0
-    assert not (repo / "pubdeploy").exists()
-
-
-@then("a floored package below the floor is moved up and a newer one kept")
-def a_floored_package_below_the_floor_is_moved_up_and_a_newer_one_kept(repo, capsys, hooks):
-    old = {"distribution": "pubsec", "sha256": "0" * 64,
-           "wheel": "https://github.com/example-org/pubsec/releases/download/v0.0.1/pubsec-0.0.1-py3-none-any.whl"}
-    deployed(repo, hooks, providers=[old, pin("pubdeploy")])
-    assert cli.main(["sync", "--check"]) == 1
-    assert "lists a pubsec older than this pubrules works with" in capsys.readouterr().err
-    assert cli.main(["sync"]) == 0
-    assert json.loads((repo / "pubrules.json").read_text())["deploy"]["providers"] == [pin(), pin("pubdeploy")]
-    newer = {"distribution": "pubdeploy", "sha256": "1" * 64,
-             "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.0.0/pubdeploy-9.0.0-py3-none-any.whl"}
-    config = json.loads((repo / "pubrules.json").read_text())
-    config["deploy"]["providers"] = [pin(), newer]
-    (repo / "pubrules.json").write_text(json.dumps(config, indent=2) + "\n")
-    assert cli.main(["sync"]) == 0
-    assert json.loads((repo / "pubrules.json").read_text())["deploy"]["providers"] == [pin(), newer]
-    assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
-    assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
-
-
-# --- the hooks ------------------------------------------------------------------
-
-
-@then("the sync hooks run and their lines are printed")
-def the_sync_hooks_run_and_their_lines_are_printed(repo, capsys, hooks):
+@given(parsers.parse('pubdeploy\'s sync hook says "{line}"'))
+def sync_hook_says(hooks, line):
     calls = []
 
     def check(root, config, check):
-        calls.append((root, config["deploy"]["namespace"], check))
-        return (["pubdeploy: deploy: drift, k8s.secrets-declared:example"], check)
+        calls.append((config["deploy"]["namespace"], check))
+        return ([line], check)
     hooks["sustenaut.sync"] = [Hook("pubdeploy", check)]
-    deployed(repo, hooks, providers=both())
-    assert cli.main(["sync"]) == 0
-    assert "pubdeploy: deploy: drift, k8s.secrets-declared:example" in capsys.readouterr().err
-    assert cli.main(["sync", "--check"]) == 1
-    assert "pubdeploy: deploy: drift" in capsys.readouterr().err
-    assert [(c[1], c[2]) for c in calls] == [("example", False), ("example", True)]
+    hooks["calls"] = calls
 
 
-@then("a sync hook that fails is said by its type alone and fails check")
-def a_sync_hook_that_fails_is_said_by_its_type_alone_and_fails_check(repo, capsys, hooks):
-    secret = "canary-7f3e"
-
+@given(parsers.parse('the sync hook "{name}" raises ValueError "{message}"'))
+def sync_hook_raises(hooks, name, message):
     def broken(root, config, check):
-        raise ValueError(f"the token is {secret}")
-    hooks["sustenaut.sync"] = [Hook("pubdeploy", lambda root, config, check: ([], False)), Hook("other", broken)]
-    deployed(repo, hooks, providers=both())
-    assert cli.main(["sync"]) == 0
-    assert cli.main(["sync", "--check"]) == 1
-    err = capsys.readouterr().err
-    assert "pubrules: the sustenaut.sync hook other failed (ValueError)" in err and secret not in err
+        raise ValueError(message)
+    hooks["sustenaut.sync"].append(Hook(name, broken))
 
 
-@then("a deploy block without pubdeploy installed fails check")
-def a_deploy_block_without_pubdeploy_installed_fails_check(repo, capsys, hooks):
+@given("pubdeploy's hooks are not installed")
+def no_pubdeploy(hooks):
     hooks["sustenaut.sync"] = []
-    deployed(repo, hooks, providers=both())
-    assert cli.main(["sync"]) == 0
-    assert cli.main(["sync", "--check"]) == 1
-    assert "pubrules: deploy: the deploy block is pubdeploy's to check, and pubdeploy is not installed" \
-        in capsys.readouterr().err
 
 
-@then("a repository without a deploy block needs no pubdeploy")
-def a_repository_without_a_deploy_block_needs_no_pubdeploy(repo, capsys, hooks):
-    hooks["sustenaut.sync"] = []
-    init(repo, "utility")
-    assert cli.main(["sync"]) == 0
-    assert cli.main(["sync", "--check"]) == 0, capsys.readouterr().err
+@given(parsers.parse('the bump hook "{name}" raises OSError "{message}"'))
+def bump_hook_raises(hooks, name, message):
+    def broken(root):
+        raise OSError(message)
+    hooks["sustenaut.bump"].append(Hook(name, broken))
 
 
-@then("bump runs the bump hooks before sync writes the launchers")
-def bump_runs_the_bump_hooks_before_sync_writes_the_launchers(repo, capsys, hooks, monkeypatch):
-    deployed(repo, hooks, providers=both())
-    newer = {"distribution": "pubdeploy", "sha256": "2" * 64,
-             "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.1.0/pubdeploy-9.1.0-py3-none-any.whl"}
+@given(parsers.parse('pubdeploy\'s bump hook moves its pin to "{wheel}" with the sha256 "{sha}"'))
+def bump_hook_moves(hooks, wheel, sha):
+    version = wheel.rsplit("/v", 1)[1].split("/", 1)[0]
 
     def moved(root):
         config = json.loads((root / "pubrules.json").read_text())
-        config["deploy"]["providers"] = [pin(), newer]
+        config["deploy"]["providers"] = [pin("pubsec"), {"distribution": "pubdeploy", "sha256": sha, "wheel": wheel}]
         (root / "pubrules.json").write_text(json.dumps(config, indent=2) + "\n")
-        return ["updated  pubrules.json (deploy.providers pubdeploy: 9.1.0)"]
-
-    def broken(root):
-        raise OSError("no network")
-    hooks["sustenaut.bump"] = [Hook("other", broken), Hook("pubdeploy", moved)]
-    monkeypatch.setattr("pubrules.cli.lock", lambda root: None)
-    from pubrules.freshness import bump  # noqa: PLC0415
-    assert bump(repo) == 0
-    out = capsys.readouterr().out
-    assert "pubrules: the sustenaut.bump hook other failed (OSError)" in out
-    assert "updated  pubrules.json (deploy.providers pubdeploy: 9.1.0)" in out
-    assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
+        return [f"updated  pubrules.json (deploy.providers pubdeploy: {version})"]
+    hooks["sustenaut.bump"].append(Hook("pubdeploy", moved))
 
 
-@then("the removed commands are gone")
-def the_removed_commands_are_gone():
-    for command in (["deploy", "walk"], ["k8s", "preflight"]):
-        with pytest.raises(SystemExit) as stopped:
-            cli.main(command)
-        assert stopped.value.code == 2
-
-
-@then("the nightly runs the bump hooks and syncs what they moved")
-def the_nightly_runs_the_bump_hooks_and_syncs_what_they_moved(repo, capsys, hooks, monkeypatch):
-    """pins, as `pubrules bump` does: a moved provider reaches the launchers and the lock."""
-    deployed(repo, hooks, providers=both())
-    assert cli.main(["sync"]) == 0
-    newer = {"distribution": "pubdeploy", "sha256": "3" * 64,
-             "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.2.0/pubdeploy-9.2.0-py3-none-any.whl"}
-
-    def moved(root):
-        config = json.loads((root / "pubrules.json").read_text())
-        config["deploy"]["providers"] = [pin(), newer]
-        (root / "pubrules.json").write_text(json.dumps(config, indent=2) + "\n")
-        return ["updated  pubrules.json (deploy.providers pubdeploy: 9.2.0)"]
-
-    def broken(root):
-        raise OSError("no network")
-    hooks["sustenaut.bump"] = [Hook("other", broken), Hook("pubdeploy", moved)]
-    locked = []
-    monkeypatch.setattr("pubrules.cli.lock", lambda root: locked.append(root))
-    from pubrules.nightly import pins  # noqa: PLC0415
-    changes = pins(repo, "")
-    assert "pubrules.json (deploy.providers pubdeploy: 9.2.0)" in changes
-    assert "pubrules: the sustenaut.bump hook other failed (OSError)" in capsys.readouterr().err
-    assert locked == [repo]
-    assert f"fetch {newer['wheel']} {newer['sha256']} providers deploy.providers\n" in (repo / "pubdeploy").read_text()
-
-
-@then("the nightly with nothing moved neither syncs nor locks")
-def the_nightly_with_nothing_moved_neither_syncs_nor_locks(repo, capsys, hooks, monkeypatch):
-    deployed(repo, hooks, providers=both())
-    assert cli.main(["sync"]) == 0
+@given("pubdeploy's bump hook moves nothing")
+def bump_hook_still(hooks):
     hooks["sustenaut.bump"] = [Hook("pubdeploy", lambda root: [])]
-    monkeypatch.setattr("pubrules.cli.lock", lambda root: (_ for _ in ()).throw(AssertionError("no lock")))
-    monkeypatch.setattr("pubrules.cli.sync", lambda root, check: (_ for _ in ()).throw(AssertionError("no sync")))
+
+
+@pytest.fixture
+def recorded():
+    return {"lock": [], "sync": []}
+
+
+@given(parsers.parse("{what} the repository is recorded, not done"))
+def recorded_not_done(monkeypatch, recorded, what):
+    verb = {"locking": "lock", "syncing": "sync"}[what]
+    monkeypatch.setattr(f"pubrules.cli.{verb}", lambda root, *args, **kwargs: recorded[verb].append(root))
+
+
+# --- the action ------------------------------------------------------------------
+
+
+@when(parsers.parse('I call pubrules with "{command}"'), target_fixture="result")
+def call(pubtest_ctx, repo, hooks, command):
+    pubtest_ctx.attempt(lambda: exits(cli.main(shlex.split(command))))
+    return pubtest_ctx.outcome
+
+
+@when("I bump the repository", target_fixture="result")
+def bumps(pubtest_ctx, repo, hooks):
+    from pubrules.freshness import bump  # noqa: PLC0415
+    pubtest_ctx.attempt(lambda: exits(bump(repo)))
+    return pubtest_ctx.outcome
+
+
+@when("the nightly moves the repository's pins", target_fixture="result")
+def nightly_pins(pubtest_ctx, repo, hooks):
     from pubrules.nightly import pins  # noqa: PLC0415
-    assert pins(repo, "") == []
+    pubtest_ctx.attempt(lambda: pins(repo, ""))
+    return pubtest_ctx.outcome
+
+
+@when("deploy.providers changes to:")
+def providers_change(repo, docstring):
+    config = json.loads((repo / "pubrules.json").read_text())
+    config["deploy"]["providers"] = providers(docstring)
+    (repo / "pubrules.json").write_text(json.dumps(config, indent=2) + "\n")
+
+
+# --- what came of it ---------------------------------------------------------------
+
+
+@then("pubrules.json is as it was but for deploy.providers, which is:")
+def config_but_providers(pubtest_ctx, repo, docstring):
+    """The entries, and nothing else of the file's layout: the text before
+    the first action, with deploy.providers put first in the deploy block."""
+    wanted = providers(docstring)
+    before = pubtest_ctx.written["pubrules.json"].decode()
+    after = (repo / "pubrules.json").read_text()
+    assert json.loads(after)["deploy"]["providers"] == wanted, after
+    assert after.replace(f'"providers": {json.dumps(wanted)},\n    ', "") == before, after
+
+
+@then("the deploy.providers of pubrules.json is:")
+def providers_are(repo, docstring):
+    got = json.loads((repo / "pubrules.json").read_text())["deploy"]["providers"]
+    assert got == providers(docstring), got
+
+
+@then(parsers.parse('the file "{path}" ends with "{text}"'))
+def ends_with(pubtest_ctx, path, text):
+    from pubtest.steps.files import at  # noqa: PLC0415
+    held = at(pubtest_ctx, path).read_text()
+    assert held.rstrip().endswith(text), held
+
+
+@then(parsers.parse('pubdeploy\'s sync hook was asked of the namespace "{namespace}" to write, then to check'))
+def hook_asked(hooks, namespace):
+    assert hooks["calls"] == [(namespace, False), (namespace, True)], hooks["calls"]
+
+
+@then(parsers.parse("the repository was {verb} {count:d} times"))
+def was_done(repo, recorded, verb, count):
+    done = recorded[{"locked": "lock", "synced": "sync"}[verb]]
+    assert done == [repo] * count, done

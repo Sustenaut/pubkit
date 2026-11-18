@@ -9,18 +9,18 @@ Feature: ./pubrules runs the repository's pinned pubrules
     When I run pubrules "init" "--kind=utility"
     Then it succeeds
     And the repository has "pubrules"
-    And "pubrules" is executable
+    And the file "pubrules" can be run
     And "pubrules" runs this pubrules' release wheel
 
   Scenario: The wrapper is managed, so an edited copy fails the check
     Given a repository initialised as "utility"
-    And the file "pubrules" reads "edited"
+    And a file "pubrules" holding "edited"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "pubrules differs"
     When I run pubrules "sync"
     Then it succeeds
-    And "pubrules" is executable
+    And the file "pubrules" can be run
 
   Scenario: It runs the pinned release with the arguments given, in the repository's root
     Given a repository initialised as "utility"

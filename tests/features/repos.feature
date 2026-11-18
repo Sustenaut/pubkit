@@ -23,7 +23,8 @@ Feature: A repos file says which repositories pubrules protect acts on
     And it warns "--repos takes the place of --require"
 
   Scenario Outline: A repos file that is wrong is refused, saying why
-    Given the file "repos.json" reads "<text>"
+    Given an empty repository
+    And a file "repos.json" holding "<text>"
     When I run pubrules "protect" "--check" "--repos" "repos.json"
     Then it does not succeed
     And it warns "<message>"

@@ -15,7 +15,6 @@ from pubrules import service_needs as golive
 
 scenarios("service-needs.feature")
 
-ROOT = Path(__file__).resolve().parents[2]
 TOKEN = "eyJ-a-run-token"
 
 
@@ -80,14 +79,9 @@ def all_in_step(result):
                                                        "dependency-review-licenses.txt")), result.stderr
 
 
-@then(parsers.parse('the repository has no "{path}"'))
-def has_no(repo, path):
-    assert not (repo / path).exists()
-
-
 @then("pubrules' service-needs.yml takes the unit, asks for id-token write, and runs pubrules service-needs")
-def reusable():
-    flow = yaml.safe_load((ROOT / ".github/workflows/service-needs.yml").read_text())
+def reusable(shipped):
+    flow = yaml.safe_load(shipped["workflows"]["service-needs.yml"])
     inputs = flow[True]["workflow_call"]["inputs"]  # YAML reads `on` as true
     assert inputs["unit"]["required"] is True and inputs["kind"]["default"] == "check"
     assert inputs["timeout-minutes"]["default"] == 300
@@ -327,17 +321,14 @@ def masked(github):
     assert github["out"] == [f"::add-mask::{TOKEN}-1", f"::add-mask::{TOKEN}-2"]
 
 
-@then("asking for a token stops, saying the job needs id-token: write")
-def stops(github):
-    with pytest.raises(SystemExit, match="id-token: write"):
-        golive.actions_token(github["env"], github["tokens"].get, github["out"].append)
+@when(parsers.parse('the service-needs asks for a token for "{audience}"'))
+def one_token(pubtest_ctx, github, audience):
+    pubtest_ctx.attempt(lambda: golive.actions_token(github["env"], github["tokens"].get, github["out"].append)(audience))
 
 
-@then("asking for a token is no answer")
-def no_token(github):
-    token = golive.actions_token(github["env"], github["tokens"].get, github["out"].append)
-    with pytest.raises(golive.Unanswered):
-        token("https://engine.example.eu")
+@then(parsers.parse("GitHub was asked {times:d} times"))
+def asked(github, times):
+    assert len(github["tokens"].asked) == times, github["tokens"].asked
 
 
 @given(parsers.re(r'the pubrules\.json key "(?P<key>[^"]+)" is (?P<value>.+)'))

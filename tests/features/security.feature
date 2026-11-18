@@ -6,21 +6,25 @@ Feature: pubrules.json's security block configures Dependabot and SonarQube Clou
 
   Scenario: Without settings, Dependabot updates the GitHub Actions weekly
     Given the security settings '{"kind": "utility"}'
+    When pubrules writes dependabot.yml from them
     Then dependabot.yml updates "github-actions" at "/" "weekly"
 
   Scenario: The ecosystems, schedule and options come from pubrules.json
     Given the security settings '{"kind": "utility", "security": {"dependabot": {"schedule": "daily", "ecosystems": ["npm", {"package-ecosystem": "pip", "directory": "/tests"}], "options": {"open-pull-requests-limit": 3}}}}'
+    When pubrules writes dependabot.yml from them
     Then dependabot.yml updates "npm" at "/" "daily"
     And dependabot.yml updates "pip" at "/tests" "daily"
     And every dependabot.yml entry has "open-pull-requests-limit" 3
 
   Scenario: Dependabot opens no version updates of the actions the nightly moves
     Given the security settings '{"kind": "utility", "security": {"dependabot": {"ecosystems": ["github-actions", "npm"], "options": {"open-pull-requests-limit": 3}}}}'
+    When pubrules writes dependabot.yml from them
     Then the "github-actions" entry has "open-pull-requests-limit" 0
     And the "npm" entry has "open-pull-requests-limit" 3
 
   Scenario Outline: A repository that takes no nightly action updates keeps Dependabot's
     Given the security settings '<config>'
+    When pubrules writes dependabot.yml from them
     Then the "github-actions" entry has no "open-pull-requests-limit"
 
     Examples:
@@ -30,6 +34,7 @@ Feature: pubrules.json's security block configures Dependabot and SonarQube Clou
 
   Scenario: Dependabot leaves the pins pubrules moves to pubrules
     Given the security settings '{"kind": "utility"}'
+    When pubrules writes dependabot.yml from them
     Then the "github-actions" entry ignores "Sustenaut/pubrules/*" and "Sustenaut/pubrel/*"
     And Dependabot would not bump "Sustenaut/pubrel/.github/workflows/release.yml"
     And Dependabot would not bump "Sustenaut/pubrules/actions/deploy-static"
@@ -37,16 +42,19 @@ Feature: pubrules.json's security block configures Dependabot and SonarQube Clou
 
   Scenario: The ignored pins follow workflows_owner, and ignores in options are kept
     Given the security settings '{"kind": "utility", "workflows_owner": "example-org", "security": {"dependabot": {"ecosystems": ["github-actions", "npm"], "options": {"ignore": [{"dependency-name": "actions/cache"}]}}}}'
+    When pubrules writes dependabot.yml from them
     Then the "github-actions" entry ignores "example-org/pubrules/*", "example-org/pubrel/*" and "actions/cache"
     And the "npm" entry ignores "actions/cache"
 
   Scenario: Dependabot set to false leaves dependabot.yml to the repository
     Given the security settings '{"kind": "utility", "security": {"dependabot": false}}'
-    Then pubrules writes no dependabot.yml
+    When pubrules writes dependabot.yml from them
+    Then the result is "null"
 
   Scenario Outline: A security setting pubrules cannot use stops it with a message
     Given the security settings '<config>'
-    Then reading them stops with "<message>"
+    When the nightly reads its settings from them
+    Then it is refused, saying "<message>"
 
     Examples:
       | config                                                          | message                                   |
@@ -64,7 +72,10 @@ Feature: pubrules.json's security block configures Dependabot and SonarQube Clou
   Scenario: pubrules sync writes dependabot.yml and sync --check sees it drift
     Given a repository initialised as "utility"
     Then "pubrules.json" exists beside ".github/dependabot.yml" naming "github-actions"
-    When the file ".github/dependabot.yml" reads "version: 2"
+    When the file ".github/dependabot.yml" changes to:
+      """
+      version: 2
+      """
     And I run pubrules "sync" "--check"
     Then it fails
 

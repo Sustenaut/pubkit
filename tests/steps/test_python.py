@@ -6,7 +6,6 @@ import json
 import os
 import re
 import subprocess
-from pathlib import Path
 
 from pytest_bdd import given, parsers, scenarios, then
 
@@ -33,11 +32,6 @@ def coverage_run(repo, run):
 @then("the Makefile includes pubrules-python.mk")
 def includes(repo):
     assert cli.INCLUDES_PYTHON_MK.search((repo / "Makefile").read_text())
-
-
-@then(parsers.parse('the repository has no "{path}"'))
-def has_no(repo, path):
-    assert not (repo / path).exists()
 
 
 def _make(repo, words):

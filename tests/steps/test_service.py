@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import stat
 import sys
 from pathlib import Path
 
@@ -187,11 +186,6 @@ def unchanged():
 @then("the command did not run")
 def did_not_run(fake):
     assert not (fake / "seen.env").exists()
-
-
-@then(parsers.parse('"{path}" is executable'))
-def executable(repo, path):
-    assert (repo / path).stat().st_mode & stat.S_IXUSR, path
 
 
 FAKE_UVX = f"""#!{sys.executable}

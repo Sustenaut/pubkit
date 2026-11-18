@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import stat
 import sys
 
 import pytest
@@ -53,11 +52,6 @@ def run_without_uv(repo, run, tmp_path, command):
     empty.mkdir()
     program, *args = command.split(" ")
     return run(shutil.which("bash"), program, *args, cwd=repo, env={"PATH": str(empty)})
-
-
-@then(parsers.parse('"{path}" is executable'))
-def executable(repo, path):
-    assert (repo / path).stat().st_mode & stat.S_IXUSR
 
 
 @then(parsers.parse('"{path}" runs this pubrules\' release wheel'))

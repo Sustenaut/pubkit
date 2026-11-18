@@ -7,9 +7,9 @@ Feature: pubrules cache keeps what a build fetched or made, by the repository's 
 
   Background:
     Given a repository whose cache entry "packs" is made per unit from "data/{unit}/" with the input "build.py" and the tool "cat tool.txt"
-    And the file "data/north/roads.txt" reads "north roads"
-    And the file "data/south/roads.txt" reads "south roads"
-    And the file "build.py" reads "version 1"
+    And a file "data/north/roads.txt" holding "north roads"
+    And a file "data/south/roads.txt" holding "south roads"
+    And a file "build.py" holding "version 1"
 
   Scenario: A unit is made once, then reused while nothing it depends on changes
     When I make the pack of "north"
@@ -23,7 +23,10 @@ Feature: pubrules cache keeps what a build fetched or made, by the repository's 
   Scenario: A change to a unit's own files makes only that unit again
     When I make the pack of "north"
     And I make the pack of "south"
-    And the file "data/south/roads.txt" reads "south roads, resurfaced"
+    And the file "data/south/roads.txt" changes to:
+      """
+      south roads, resurfaced
+      """
     And I make the pack of "north"
     Then it prints "reused packs north"
     When I make the pack of "south"
@@ -32,7 +35,10 @@ Feature: pubrules cache keeps what a build fetched or made, by the repository's 
 
   Scenario: A change to an input, a tool's output or the version makes every unit again
     When I make the pack of "north"
-    And the file "build.py" reads "version 2"
+    And the file "build.py" changes to:
+      """
+      version 2
+      """
     And I make the pack of "north"
     Then it prints "built packs north"
     When the tool reports version "2"
@@ -139,15 +145,21 @@ Feature: pubrules cache keeps what a build fetched or made, by the repository's 
 
   Scenario: An input glob counts every file it matches, and a missing input counts as missing
     Given the cache entry "notes" is made from the inputs "*.md" and "later/"
-    And the file "a.md" reads "one"
+    And a file "a.md" holding "one"
     When I make "notes" into "out/notes.txt"
     Then it prints "built notes"
     When I make "notes" into "out/notes.txt"
     Then it prints "reused notes"
-    When the file "b.md" reads "two"
+    When the file "b.md" changes to:
+      """
+      two
+      """
     And I make "notes" into "out/notes.txt"
     Then it prints "built notes"
-    When the file "later/x.txt" reads "now here"
+    When the file "later/x.txt" changes to:
+      """
+      now here
+      """
     And I make "notes" into "out/notes.txt"
     Then it prints "built notes"
 

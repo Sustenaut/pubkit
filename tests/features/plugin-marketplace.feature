@@ -6,10 +6,13 @@ Feature: pubrules is also a Claude Code plugin marketplace
   checked here.
 
   Scenario: Every listed plugin has a manifest and its own directory
+    When I read the plugin marketplace pubrules is
     Then every plugin the marketplace lists has a plugin.json naming it
 
   Scenario: Each agent has the frontmatter Claude Code needs
+    When I read the plugin marketplace pubrules is
     Then every plugin agent states a name and a description
 
   Scenario: Each file an agent reads from its plugin is shipped with it
+    When I read the plugin marketplace pubrules is
     Then every ${CLAUDE_PLUGIN_ROOT} path an agent names exists in its plugin

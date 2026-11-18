@@ -1,0 +1,4 @@
+{
+  "category": "internal",
+  "change": "pubrules's own suite is Given/When/Then on pubtest's steps: every scenario has its When, so the TEST-04 exception is gone, and the suite's copies of pubtest's file and output steps are dropped"
+}

@@ -8,7 +8,7 @@ types 0 to 5 and the simple values pub read --json shows, nothing more.
 from __future__ import annotations
 
 from hypothesis import given, strategies as st
-from pytest_bdd import scenarios, then
+from pytest_bdd import scenarios, when
 
 from pubrules import cbor, nightly
 
@@ -52,18 +52,20 @@ def decode(data: bytes, at: int = 0) -> tuple[object, int]:
     return (items if major == 4 else dict(zip(items[::2], items[1::2], strict=True))), at
 
 
-@then("every value pub read --json shows encodes to CBOR that decodes back to it")
-def round_trips():
+@when("Hypothesis encodes each value pub read --json shows to CBOR and decodes it back")
+def round_trips(pubtest_ctx):
+    """Each decodes back to the value, and to all of the bytes."""
     @given(VALUES)
     def check(value):
         data = cbor.encode(value)
         assert decode(data) == (value, len(data))
 
-    check()
+    pubtest_ctx.attempt(check)
 
 
-@then("every map encodes to the same CBOR with its keys in any order, sorted by their bytes")
-def key_order():
+@when("Hypothesis encodes each map with its keys in any order")
+def key_order(pubtest_ctx):
+    """Every order gives the same CBOR, its keys sorted by their bytes."""
     @given(st.dictionaries(st.text(max_size=12).filter(lambda k: k != "$bytes"), INTEGERS,
                            min_size=1, max_size=8), st.randoms())
     def check(value, rnd):
@@ -75,11 +77,12 @@ def key_order():
         decoded, _ = decode(data)
         assert list(decoded) == sorted(value, key=str.encode)
 
-    check()
+    pubtest_ctx.attempt(check)
 
 
-@then("for any two locks, the packages listed as changed are those in both whose version differs")
-def changed_packages():
+@when("Hypothesis lists the packages changed between any two locks")
+def changed_packages(pubtest_ctx):
+    """The packages listed as changed are those in both whose version differs."""
     names = st.text("abcdefgh-", min_size=1, max_size=6)
     versions = st.from_regex(r"\A[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}\Z")
 
@@ -89,4 +92,4 @@ def changed_packages():
         moved = sorted(n for n in old if n in new and old[n] != new[n])
         assert listed == [f"{n} {old[n]} -> {new[n]}" for n in moved]
 
-    check()
+    pubtest_ctx.attempt(check)

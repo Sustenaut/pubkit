@@ -283,7 +283,10 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
   Scenario: A generated workflow that was edited fails the check, and sync restores it
     Given a Node repository whose ci block is '{}'
     When I run pubrules "sync"
-    And the file ".github/workflows/pr.yml" reads "name: pr"
+    And the file ".github/workflows/pr.yml" changes to:
+      """
+      name: pr
+      """
     And I run pubrules "sync" "--check"
     Then it fails
     When I run pubrules "sync"
@@ -292,7 +295,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
   Scenario: A hand-written ci.yml beside a ci block fails the check
     Given a Node repository whose ci block is '{}'
-    And the file ".github/workflows/ci.yml" reads "name: ci"
+    And a file ".github/workflows/ci.yml" holding "name: ci"
     When I run pubrules "sync"
     And I run pubrules "sync" "--check"
     Then it fails
@@ -300,12 +303,12 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
   Scenario: Without a ci block, the repository's own ci.yml is left alone
     Given an empty repository
-    And the file "pubrules.json" reads '{"kind": "utility"}'
-    And the file ".github/workflows/ci.yml" reads "name: ci"
+    And a file "pubrules.json" holding "{"kind": "utility"}"
+    And a file ".github/workflows/ci.yml" holding "name: ci"
     When I run pubrules "sync"
     Then it succeeds
     And no workflow is written for "pr"
-    And ".github/workflows/ci.yml" contains "name: ci"
+    And the file ".github/workflows/ci.yml" includes "name: ci"
 
   Scenario: The tools a Rust repository lists reach its functional job
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.2.3"}]}'
@@ -332,6 +335,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
 
   Scenario Outline: A setup that fails is tried again, three times at most, by pubrules' retry action
+    When I read the workflows and actions pubrules ships
     Then every setup step of "<workflow>" runs its setup input through actions/retry at pubrules' own pin, three times with 15 seconds between
 
     Examples:
@@ -346,6 +350,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | job-node-browser.yml      |
 
   Scenario: Every hash-locked install and every pip-audit in the reusable workflows is tried three times, the last pip-audit from the wheel mirror
+    When I read the workflows and actions pubrules ships
     Then every step that installs tests/requirements.lock does it through tests/install-lock
     And every pip-audit is tried three times, each try after a failed one
 
@@ -373,7 +378,8 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
   Scenario Outline: A wheel mirror that is not one https base stops sync with a message
     Given pubrules.json's mirror setting '<mirror>'
-    Then sync stops, saying what a mirror setting is
+    When sync reads the mirror setting
+    Then it is refused, saying "mirror is {"wheels": "https://host/path", "terraform": "https://host/path", "pypi": "https://host/path"}"
 
     Examples:
       | mirror                                          |
@@ -394,8 +400,12 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     Then the launcher stops with "is not the wheel tests/requirements.lock pins"
 
   Scenario: Without a wheel mirror, the launcher is as it was
-    Then the launcher without a mirror runs uvx on pubrules' GitHub release URL, with no fetch
+    Given a scratch directory
+    When pubrules renders the utility launcher for '{"kind": "utility"}'
+    Then the file "pubrules" runs uvx on this pubrules' GitHub release URL
+    And the file "pubrules" does not include "fetch()"
   Scenario Outline: A Terraform init that fails is tried three times, then once from pubrules.json's provider mirror, by pubrules' terraform-init action
+    When I read the workflows and actions pubrules ships
     Then the "<workflow>" init step runs actions/terraform-init at pubrules' own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause
 
     Examples:
@@ -407,10 +417,12 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     A reusable workflow runs in the caller's repository, where ./actions/ is
     the caller's own, so pubrules' workflows name pubrules' actions as any
     other repository does: by a release's commit, no later than this pubrules.
+    When I read the workflows and actions pubrules ships
     Then every use of pubrules' actions in pubrules' workflows pins one commit, at a release no later than this pubrules
     And no reusable workflow of pubrules' uses an action by a local path
 
   Scenario: Without a list, the review leaves pubrules' and pubrel's workflows and actions out of the license check alone
+    When I read the workflows and actions pubrules ships
     Then job-review.yml's license exceptions name every reusable workflow and action pubrules has, and pubrel's release workflow
     And job-review.yml sets no other input, so advisories apply to everything
 
@@ -428,7 +440,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
   Scenario: Without the review job there is no list
     Given a Node repository whose ci block is '{"jobs": {"review": false}}'
     When I run pubrules "sync"
-    Then ".github/dependency-review-licenses.txt" is not there
+    Then the file ".github/dependency-review-licenses.txt" does not exist
 
   Scenario Outline: The review takes only the owner's purls from the list, and pubrules' and pubrel's without one
     When the "<workflow>" review exceptions step runs on a list holding another owner's purl
@@ -449,16 +461,16 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "pubrules.json: ci.tools some-cli v1.2.3 -> v1.3.0"
-    And "pubrules.json" contains "v1.3.0"
-    And ".github/workflows/pr.yml" contains "v1.3.0"
-    And ".github/workflows/pr.yml" does not contain "v1.2.3"
+    And the file "pubrules.json" includes "v1.3.0"
+    And the file ".github/workflows/pr.yml" includes "v1.3.0"
+    And the file ".github/workflows/pr.yml" does not include "v1.2.3"
 
   Scenario: pins leaves a tool already at its latest release
     Given a Rust repository whose ci block is '{"tools": [{"crate": "some-cli", "git": "https://github.com/example-org/some-cli", "tag": "v1.3.0"}]}'
     And the latest release of "example-org/some-cli" is "v1.3.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "pubrules.json" contains "v1.3.0"
+    And the file "pubrules.json" includes "v1.3.0"
     And "pins" reported no tool moving
 
   Scenario Outline: pins leaves a tool whose latest release it cannot trust, and warns
@@ -467,7 +479,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And stderr mentions "so some-cli stays at v1.2.3"
-    And "pubrules.json" contains "v1.2.3"
+    And the file "pubrules.json" includes "v1.2.3"
 
     Examples:
       | git                                         | latest      |
@@ -550,6 +562,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | content  |
 
   Scenario Outline: A job's workflow runs the same steps as the job in the shared workflow
+    When I read the workflows and actions pubrules ships
     Then "<job>" runs the steps of the "<name>" job in "<shared>"
 
     Examples:
@@ -584,7 +597,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     Given a Node repository whose ci block is '{}'
     When I run pubrules "sync"
     Then it succeeds
-    And ".github/workflows/pr.yml" contains "job-osv.yml@v"
+    And the file ".github/workflows/pr.yml" includes "job-osv.yml@v"
 
   Scenario: pubrel's release workflow is pinned to the commit its tag names, and checked offline
     Given a Node repository whose ci block is '{"release": {"pubrel": "0.5.4"}}'
@@ -602,7 +615,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     When I run pubrules "sync"
     Then it succeeds
     And stderr mentions "could not read the commit of v0.5.4"
-    And ".github/workflows/pr.yml" contains "release.yml@v0.5.4"
+    And the file ".github/workflows/pr.yml" includes "release.yml@v0.5.4"
 
   Scenario Outline: Every reader takes a pin by commit, and the older pin by tag, under any owner
     When every pin reader reads "<line>"
@@ -630,7 +643,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     Then it succeeds
     And every pubrules and pubrel workflow ".github/workflows/pr.yml" calls is "sustenaut"'s
     And every pubrules and pubrel workflow ".github/workflows/main.yml" calls is "sustenaut"'s
-    And ".github/workflows/pr.yml" contains "sustenaut/pubrules/.github/workflows/job-osv.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v"
+    And the file ".github/workflows/pr.yml" includes "sustenaut/pubrules/.github/workflows/job-osv.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v"
     When I run pubrules "sync" "--check"
     Then it succeeds
 
@@ -753,7 +766,7 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
   Scenario: sync --check fails on a pubrules Terraform module, which pubrules no longer ships
     Given a Node repository whose ci block is '{}'
-    And the file "infra/main.tf" reads "module "dns" { source = "github.com/Sustenaut/pubrules//terraform/hosting?ref=v0.24.4" }"
+    And a file "infra/main.tf" holding "module "dns" { source = "github.com/Sustenaut/pubrules//terraform/hosting?ref=v0.24.4" }"
     When I run pubrules "sync"
     And I run pubrules "sync" "--check"
     Then it fails
@@ -832,33 +845,33 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
 
   Scenario: sync declares the sonar job's token where the repository lists its integrations
     Given a Node repository whose ci block is '{}'
-    And the file "integrations.json" reads "{"uses": [{"plugin": "github.app-token", "paths": ["a.yml"], "mode": "required"}]}"
+    And a file "integrations.json" holding "{"uses": [{"plugin": "github.app-token", "paths": ["a.yml"], "mode": "required"}]}"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "integrations.json doesn't declare what the files pubrules writes use"
     When I run pubrules "sync"
-    Then "integrations.json" contains ""plugin": "sonarcloud.scan""
-    And "integrations.json" contains "".github/workflows/pr.yml""
-    And "integrations.json" contains ""plugin": "github.app-token""
+    Then the file "integrations.json" includes ""plugin": "sonarcloud.scan""
+    And the file "integrations.json" includes "".github/workflows/pr.yml""
+    And the file "integrations.json" includes ""plugin": "github.app-token""
     When I run pubrules "sync" "--check"
     Then it succeeds
 
   Scenario: A token already declared, by name or pattern, leaves integrations.json alone
     Given a Node repository whose ci block is '{}'
-    And the file "integrations.json" reads "{"uses": [{"plugin": "sonarcloud.read", "paths": [".github/workflows/*.yml"], "mode": "required"}]}"
+    And a file "integrations.json" holding "{"uses": [{"plugin": "sonarcloud.read", "paths": [".github/workflows/*.yml"], "mode": "required"}]}"
     When I run pubrules "sync"
-    Then "integrations.json" does not contain "sonarcloud.scan"
+    Then the file "integrations.json" does not include "sonarcloud.scan"
 
   Scenario: A repository with no integrations.json gets none
     Given a Node repository whose ci block is '{}'
     When I run pubrules "sync"
-    Then "integrations.json" is not there
+    Then the file "integrations.json" does not exist
 
   Scenario: Without the sonar job, nothing is declared
     Given a Node repository whose ci block is '{"jobs": {"sonar": false}}'
-    And the file "integrations.json" reads "{"uses": []}"
+    And a file "integrations.json" holding "{"uses": []}"
     When I run pubrules "sync"
-    Then "integrations.json" does not contain "sonarcloud"
+    Then the file "integrations.json" does not include "sonarcloud"
 
   # The checks a ruleset requires are only passed if something reports them
   # on the commit it waits on: the merge queue's, or with no queue the pull
@@ -1027,10 +1040,12 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | Rust     | {"test": "my-runners"}          | whose runners its os-matrix input gives   |
 
   Scenario: Every reusable workflow a job calls takes its runner as an input
+    When I read the workflows and actions pubrules ships
     Then every job workflow pubrules calls, but Rust's test, takes runs-on, ubuntu-latest by default
     And python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default
 
   Scenario: A refused report upload or cache never fails a job, and a failing test still does
+    When I read the workflows and actions pubrules ships
     Then every upload-artifact and actions/cache step in pubrules' workflows continues on error, within five minutes
     And every cache restore and save in pubrules' cache action continues on error
     And no step that runs a test command continues on error

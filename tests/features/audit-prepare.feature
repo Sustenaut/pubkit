@@ -59,7 +59,7 @@ Feature: pubrules audit prepare writes the audit with every machine-decidable ru
     And the report "demo-tool" "0.1.1" lists under "Falls short of the standard" "`demo-tool --help` exits 2, with nothing on stdout and output on stderr"
     And the report "demo-tool" "0.1.1" lists under "Falls short of the standard" "for a command-line tool it points at the README"
     And the report "demo-tool" "0.1.1" lists under "Falls short of the standard" "the README has no why this tool section"
-    And "audit/demo-tool-0.1.1.md" contains "**Not applicable to a command-line tool (binary only):** §1.1"
+    And the file "audit/demo-tool-0.1.1.md" includes "**Not applicable to a command-line tool (binary only):** §1.1"
 
   Scenario: A report that may hold a person's review is not written over
     Given the crate "library" released as "v0.1.0" and changed since, with pubrel giving "0.1.1"
@@ -72,7 +72,7 @@ Feature: pubrules audit prepare writes the audit with every machine-decidable ru
     Given the crate "library" released as "v0.1.0" and changed since, with pubrel giving "0.1.1"
     When I run pubrules "audit" "prepare" "--package" "demo" "--version" "0.2.0" "--out" "elsewhere.md" "--quick"
     Then it succeeds
-    And "elsewhere.md" contains "version: 0.2.0"
+    And the file "elsewhere.md" includes "version: 0.2.0"
 
   Scenario: Without pubrel, the version must be given
     Given the crate "library" released as "v0.1.0" and changed since, with no pubrel
