@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.44.0 is released as v0.44.0 from commit ec42d13f43677adab6510d0ba8d3d0fca315acc5.",
+      "content": "pubrules 0.45.0 is released as v0.45.0 from commit 5f65968adadf9753ec0f7586bc49333f98feb2e1.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.44.0",
+            "0.45.0",
             "pubrules --version",
-            "pubrules 0.44.0",
-            "v0.44.0",
-            "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
+            "pubrules 0.45.0",
+            "v0.45.0",
+            "5f65968adadf9753ec0f7586bc49333f98feb2e1"
           ]
         ]
       },
-      "scope": "the published release v0.44.0 of pubrules",
+      "scope": "the published release v0.45.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
+          "revision": "5f65968adadf9753ec0f7586bc49333f98feb2e1"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.44.0 was released on 2026-11-18 from commit ec42d13f43677adab6510d0ba8d3d0fca315acc5 with these changes.",
+      "content": "pubrules 0.45.0 was released on 2026-11-18 from commit 5f65968adadf9753ec0f7586bc49333f98feb2e1 with these changes.",
       "data": {
         "columns": [
           {
@@ -58,22 +58,26 @@
         "rows": [
           [
             "fixed",
-            "The sonar job downloads the coverage reports outside the checkout, so SonarQube Cloud no longer analyses an HTML coverage report as the repository's code"
+            "pubrules lock keeps the #sha256 of a URL pin only a package requires, so pip --require-hashes installs the lock"
+          ],
+          [
+            "fixed",
+            "pubrules sync takes the go-live workflow out of integrations.json and the review's license list in the same pass that removes it"
           ],
           [
             "changed",
-            "go-live is service-needs: the reusable workflow, the caller sync writes (.github/workflows/service-needs.yml, with action check or fulfil, check the default; sync removes the go-live.yml 0.43.2 wrote), the command pubrules service-needs and pubrules.json's service-needs block; a check asks the engine read-only and fails naming each need missing, drifted or blocked; a fulfil asks in a step of its own, whose summary box says where a person approves it; every need ends on a line of its own (a log group, an annotation when not ready, a summary row); no email or link is printed"
+            "Suites run on pubtest 0.2.1, with its new steps (printed JSON, patterns, YAML, headers, git, stand-ins that read their input)"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.44.0 of pubrules",
+      "scope": "the published release v0.45.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "ec42d13f43677adab6510d0ba8d3d0fca315acc5"
+          "revision": "5f65968adadf9753ec0f7586bc49333f98feb2e1"
         }
       ]
     }

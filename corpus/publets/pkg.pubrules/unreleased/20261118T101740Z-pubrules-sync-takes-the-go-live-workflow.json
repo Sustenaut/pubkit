@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "pubrules sync takes the go-live workflow out of integrations.json and the review's license list in the same pass that removes it"
-}
