@@ -161,12 +161,24 @@ Feature: A service's needs from GitHub Actions
     When I run pubrules "sync"
     Then the repository has no ".github/workflows/go-live.yml"
 
-  Scenario: A go-live block says it is the service-needs block now
+  Scenario: sync renames a go-live block service-needs, and the check says it is stale
     Given a repository initialised as "utility"
     And the pubrules.json key "go-live" is {"claude-dispatch": false}
     When I run pubrules "sync" "--check"
     Then it fails
-    And stderr mentions "go-live block is now service-needs"
+    And stderr mentions "go-live block is the service-needs block now; run `pubrules sync`, which renames it"
+    When I run pubrules "sync"
+    Then pubrules.json has the key "service-needs" as {"claude-dispatch": false}, and no "go-live"
+    When I run pubrules "sync" "--check"
+    Then stderr does not mention "go-live"
+
+  Scenario: A pubrules.json with both a go-live and a service-needs block says to keep one
+    Given a repository initialised as "utility"
+    And the pubrules.json key "go-live" is {"claude-dispatch": false}
+    And the pubrules.json key "service-needs" is {"claude-dispatch": true}
+    When I run pubrules "sync"
+    Then it fails
+    And stderr mentions "both a go-live and a service-needs block: keep service-needs"
 
   Scenario: A check whose needs are all ready succeeds, each need on a line of its own
     Given the engine answers the request with "planning", then "done" with needs "k8s.secret:s" ready and "k8s.namespace:example" ready
@@ -199,6 +211,7 @@ Feature: A service's needs from GitHub Actions
     Then the job summary has the approval box, linking the request and naming "k8s.secret:s"
     And the log has the annotation "::notice title=Approval needed::https://convergence.example/approvals/20261117T100000Z-ab12"
     And the step output "request" is "20261117T100000Z-ab12"
+    And the step output "minutes" is "299.8"
     And the ask step ends without waiting for the decision
 
   Scenario: The ask step of a check writes no box
@@ -227,3 +240,9 @@ Feature: A service's needs from GitHub Actions
     When the check of "example" runs for 300 minutes
     Then the log has the group "❌ k8s.secret:s drift" holding "ask [someone] at [link]"
     And nothing it printed or summarised holds an email or the token
+
+  Scenario: The engine refusing the run while it plans fails the ask step, saying so
+    Given the engine answers the request with "planning", then refuses with 403 "not-your-request"
+    When the ask step for "example" runs
+    Then the ask step fails
+    And the job summary says "The engine stopped answering this run"

@@ -65,6 +65,20 @@ SAID = {"planning": "the engine is walking the unit read-only for its plan",
 CALLER = ".github/workflows/service-needs.yml"
 OLD_CALLER = ".github/workflows/go-live.yml"  # pubrules 0.43.2 wrote it; sync takes it away
 OLD_BLOCK = "go-live"
+
+
+def renamed_block(text: str) -> str:
+    """pubrules.json's text with its top-level go-live key named service-needs: nothing else
+    of it changes, byte for byte."""
+    data = json.loads(text)
+    if OLD_BLOCK not in data:
+        return text
+    if BLOCK in data:
+        raise SystemExit(f"pubrules: pubrules.json has both a {OLD_BLOCK} and a {BLOCK} block: keep {BLOCK}")
+    out = re.sub(r'"go-live"(\s*:)', r'"service-needs"\1', text, count=1)
+    if json.loads(out) != {(BLOCK if k == OLD_BLOCK else k): v for k, v in data.items()}:
+        return json.dumps({(BLOCK if k == OLD_BLOCK else k): v for k, v in data.items()}, indent=2) + "\n"
+    return out
 HEADER = ("# Written by `pubrules sync` from pubrules.json's deploy block. Do not edit:\n"
           "# change pubrules.json and run `pubrules sync`.\n")
 BLOCK = "service-needs"
@@ -282,9 +296,13 @@ def ask(http: Http, engine: str, unit: str, kind: str, deadline: float,
     http.out(f"service-needs: asked the engine to {kind} {unit}: request {clean(first.get('id', ''))}")
     http.output("request", clean(first.get("id", "")))
     answer = watch(http, engine, unit, kind, deadline, first, poll or Poll(), lambda state: state != "planning")
-    if isinstance(answer, dict) and answer["state"] == "awaiting":
+    if isinstance(answer, int):  # the engine refused the run while it planned: said by watch
+        return answer
+    if answer["state"] == "awaiting":
         approval_box(http, unit, answer)
-    return answer if isinstance(answer, dict) else first
+    # What is left of the run's time, for the wait step: one limit for both steps.
+    http.output("minutes", f"{max(0.0, (deadline - http.clock()) / 60):.1f}")
+    return answer
 
 
 def approval_box(http: Http, unit: str, answer: dict[str, Any]) -> None:
@@ -415,7 +433,7 @@ def actions_token(env: dict[str, str], get: Callable[..., tuple[int, bytes]] = s
 def main(argv: list[str], env: dict[str, str] | None = None) -> int:  # pragma: no cover - the workflow's
     parser = argparse.ArgumentParser(prog="pubrules service-needs", description=__doc__.split("\n")[0])
     parser.add_argument("--unit", required=True, help="the deploy unit (a fulfil), or what the gate is for")
-    parser.add_argument("--kind", choices=KINDS, default="fulfil")
+    parser.add_argument("--kind", choices=KINDS, default="check")
     parser.add_argument("--minutes", type=float, default=300.0, help="how long the run waits (300)")
     parser.add_argument("--engine", default=ENGINE, help=f"the convergence engine's address ({ENGINE})")
     parser.add_argument("--plan", default="", help="a gate's plan, which the approver reads (8 KB at most)")

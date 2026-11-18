@@ -396,9 +396,17 @@ def sync(root: Path, check: bool) -> int:
         from .variables import block_problems  # noqa: PLC0415
         if bad := block_problems(config["variables"]):
             sys.exit(f"pubrules: {CONFIG}'s variables block: {'; '.join(bad)}")
-    if "go-live" in config:
-        sys.exit(f"pubrules: {CONFIG}'s go-live block is now service-needs (pubrules 0.44.0), with the same "
-                 f"keys: rename it")
+    # pubrules 0.43.2's go-live block is the service-needs block, with the same keys: sync
+    # renames the key in pubrules.json, as the rest of it reads, and --check says it is stale.
+    from .service_needs import OLD_BLOCK, renamed_block  # noqa: PLC0415
+    renamed = OLD_BLOCK in config
+    if renamed and check:
+        print(f"pubrules: {CONFIG}'s {OLD_BLOCK} block is the service-needs block now; run `pubrules sync`, "
+              f"which renames it", file=sys.stderr)
+    elif renamed:
+        (root / CONFIG).write_text(renamed_block((root / CONFIG).read_text(encoding="utf-8")), encoding="utf-8")
+        print(f"updated  {CONFIG} ({OLD_BLOCK} is service-needs now)")
+        config = read_config(root)
     if "service-needs" in config:
         from .service_needs import block_problems as service_needs_problems  # noqa: PLC0415
         if bad := service_needs_problems(config["service-needs"]):
@@ -530,7 +538,7 @@ def sync(root: Path, check: bool) -> int:
         gherkin_lines, gherkin_bad = gherkin(root, config)
         for problem in gherkin_bad:
             print(f"pubrules: {problem}", file=sys.stderr)
-        if (stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported
+        if (stale or lock_stale or replaced or actions or unignored or deploy_failed or unreported or renamed
                 or python_bad or gherkin_bad):
             return 1
         print(f"in step with pubrules {__version__}")

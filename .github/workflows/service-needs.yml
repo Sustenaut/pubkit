@@ -63,5 +63,6 @@ jobs:
           REQUEST: ${{ steps.ask.outputs.request }}
           UNIT: ${{ inputs.unit }}
           KIND: ${{ inputs.kind }}
-          MINUTES: ${{ inputs.timeout-minutes }}
+          # What the ask step left of timeout-minutes: the two steps share one limit.
+          MINUTES: ${{ steps.ask.outputs.minutes }}
           ENGINE: ${{ inputs.engine }}

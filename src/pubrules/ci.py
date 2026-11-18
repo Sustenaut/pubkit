@@ -767,7 +767,7 @@ def path(event: str) -> str:
 INTEGRATIONS = "integrations.json"
 WITH_SECRETS = "with-secrets"
 OIDC = "github.actions-oidc"
-SERVICE_NEEDS = ".github/workflows/service-needs.yml"  # golive.CALLER
+SERVICE_NEEDS = ".github/workflows/service-needs.yml"  # service_needs.CALLER
 
 
 def declared(root: Path, wanted: list[tuple[str, str]]) -> tuple[str, str] | None:

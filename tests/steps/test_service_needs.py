@@ -91,6 +91,7 @@ def reusable():
     assert asked["id"] == "ask" and "pubrules service-needs --stage ask --unit \"$UNIT\"" in asked["run"]
     assert "--stage wait --request \"$REQUEST\"" in waited["run"]
     assert waited["env"]["REQUEST"] == "${{ steps.ask.outputs.request }}"
+    assert waited["env"]["MINUTES"] == "${{ steps.ask.outputs.minutes }}"
     assert "${{" not in asked["run"] + waited["run"]
     from pubrules.refs import SHIPPED  # noqa: PLC0415
     assert "service-needs.yml" in SHIPPED["workflows"]
@@ -386,7 +387,7 @@ def approval_box(poll, need):
 
 @then(parsers.parse('the step output "{name}" is "{value}"'))
 def step_output(poll, name, value):
-    assert poll.outputs == [(name, value)]
+    assert (name, value) in poll.outputs, poll.outputs
 
 
 @then("the ask step ends without waiting for the decision")
@@ -419,3 +420,14 @@ def old_caller(repo):
     target = repo / golive.OLD_CALLER
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(golive.HEADER + "name: go-live\n")
+
+
+@then("the ask step fails")
+def ask_fails(poll):
+    assert poll.asked == 1
+
+
+@then(parsers.parse('pubrules.json has the key "{key}" as {value}, and no "{old}"'))
+def renamed(repo, key, value, old):
+    config = _config(repo)
+    assert config[key] == json.loads(value) and old not in config
