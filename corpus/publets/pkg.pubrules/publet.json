@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.45.0 is released as v0.45.0 from commit 5f65968adadf9753ec0f7586bc49333f98feb2e1.",
+      "content": "pubrules 0.45.1 is released as v0.45.1 from commit a1cd91dc01d32709a4a6b97d22b34fee3c097a6d.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.45.0",
+            "0.45.1",
             "pubrules --version",
-            "pubrules 0.45.0",
-            "v0.45.0",
-            "5f65968adadf9753ec0f7586bc49333f98feb2e1"
+            "pubrules 0.45.1",
+            "v0.45.1",
+            "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
           ]
         ]
       },
-      "scope": "the published release v0.45.0 of pubrules",
+      "scope": "the published release v0.45.1 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "5f65968adadf9753ec0f7586bc49333f98feb2e1"
+          "revision": "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.45.0 was released on 2026-11-18 from commit 5f65968adadf9753ec0f7586bc49333f98feb2e1 with these changes.",
+      "content": "pubrules 0.45.1 was released on 2026-11-19 from commit a1cd91dc01d32709a4a6b97d22b34fee3c097a6d with these changes.",
       "data": {
         "columns": [
           {
@@ -58,31 +58,23 @@
         "rows": [
           [
             "fixed",
-            "pubrules lock keeps the #sha256 of a URL pin only a package requires, so pip --require-hashes installs the lock"
-          ],
-          [
-            "fixed",
-            "pubrules sync takes the go-live workflow out of integrations.json and the review's license list in the same pass that removes it"
-          ],
-          [
-            "changed",
-            "Suites run on pubtest 0.2.1, with its new steps (printed JSON, patterns, YAML, headers, git, stand-ins that read their input)"
+            "freshness.PIN has one group again, the version, so pubfleet's board, which reads PIN.findall, builds; the pubkit-or-pubrules pin TEST-04's waiver reads is PACKAGE_PIN"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.45.0 of pubrules",
+      "scope": "the published release v0.45.1 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "5f65968adadf9753ec0f7586bc49333f98feb2e1"
+          "revision": "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
         }
       ]
     }
   },
-  "created": "2026-11-18T00:00:00Z",
+  "created": "2026-11-19T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
