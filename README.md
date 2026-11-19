@@ -17,11 +17,36 @@ The pytest plugin and the Gherkin steps every suite loads are
 [pubtest](https://github.com/Sustenaut/pubtest)'s: one grammar
 ([GRAMMAR.md](https://github.com/Sustenaut/pubtest/blob/main/GRAMMAR.md)), a
 pytest-bdd plugin and an npm package for cucumber-js and quickpickle. The managed
-`tests/requirements-pubrules.txt` pins the pubtest this pubrules was released with, so
-every suite gets `ctx`, `binary(name)`, `run(...)`, the tag markers and the steps
+`tests/requirements-pubrules.txt` names the oldest pubtest whose steps pubrules' own
+files use (`pubtest>=X`), and each repository's `tests/requirements.txt` pins the
+release wheel, which its lock holds with its hash and the nightly moves to pubtest's
+latest release, so a pubtest release needs no pubrules release. `pubrules sync` pins
+the one the lock has where `tests/requirements.txt` pins none (`sync --check`
+fails), and `pubrules lock` refuses a pubtest from an index: PyPI's `pubtest` is
+another project. So every suite gets `ctx`, `binary(name)`, `run(...)`, the tag markers and the steps
 (`it succeeds`, `it prints "…"`, `the result is "V"`, the files, stand-ins, HTTP and
 secrets steps) without writing them. pubrules carried the plugin itself until 0.42.0;
 a suite that imported `pubrules.plugin` imports `pubtest.core` instead.
+
+## Other packages' releases
+
+pubrules holds no version of pubrel, pubtest, pubsec or pubdeploy. Each
+repository pins them: pubrel in `ci.release.pubrel` (or the release workflow
+sync wrote), pubtest in `tests/requirements.txt`, pubsec and pubdeploy in
+`deploy.providers` (or the launcher sync wrote). The nightly moves each to
+its latest release, as it moves any other pin. Only where a repository has
+no pin yet (`pubrules new`, `pubrules init`, a launcher written for the
+first time) is one read: from the release-state file `PUBRULES_RELEASES`
+names, when its `releases` block lists the package, otherwise from the
+package's latest GitHub release.
+
+```json
+{"releases": {"pubrel": "0.8.0", "pubtest": "0.2.2",
+              "pubsec": {"version": "0.3.0", "sha256": "…"}}}
+```
+
+A version alone, or with its wheel's sha256 (without it, the wheel is
+fetched and hashed). With neither, the command stops and says so.
 
 ## Keeping the files in step
 
@@ -91,8 +116,8 @@ That script, managed in every repository with a `with-secrets.json`, is one
 line: `./pubsec run --cwd "$PWD" -- COMMAND`. Holding a secret's value is
 [pubsec](https://github.com/Sustenaut/pubsec)'s, not pubrules', so `pubrules
 sync` writes `./pubsec` beside it, which runs the repository's pubsec
-(`deploy.providers`' entry, or pubrules' floor where a repository has no
-deploy block), its wheel checked against its sha256 on every run. pubsec's README, "Services:
+(`deploy.providers`' entry, or where a repository has no deploy block the one
+`./pubsec` already fetches, which the nightly moves to pubsec's latest release), its wheel checked against its sha256 on every run. pubsec's README, "Services:
 ./with-secrets", explains `with-secrets.json` and `pubsec run`.
 
 `service-ci.yml` is a service's CI: `pubrules sync --check` and shellcheck,
@@ -255,12 +280,12 @@ and `./pubdeploy walk` checks and makes it (pubdeploy's README, "Declaring
 what a service needs", "Making what a service needs" and "Provider
 contract"). pubrules keeps three things of it:
 
-- **`deploy.providers`** lists pubsec and pubdeploy, each at the oldest
-  release this pubrules works with or newer (`PUBSEC_FLOOR` and
-  `PUBDEPLOY_FLOOR` in `new.py`, which its suite tests): `pubrules sync` adds
-  the floor where none is listed and moves one below it up, changing nothing
-  else of pubrules.json, and `sync --check` fails without one or below it. The
-  floor moves only when pubrules needs a newer release.
+- **`deploy.providers`** lists pubsec and pubdeploy, each the repository's
+  own pin, which `pubrules bump` and the nightly move through pubdeploy's
+  hook: `pubrules sync` adds one where none is listed (the one its launcher
+  already runs, or else the latest release, below), changing nothing else of
+  pubrules.json, and `sync --check` fails without one. pubrules holds no
+  version of either.
 - **The launchers.** In a repository with a deploy block, `sync` writes
   `./pubdeploy`, which runs the listed pubdeploy with every other
   `deploy.providers` wheel, and `./pubrules` runs with every wheel, pubdeploy's
@@ -708,7 +733,10 @@ first commit: the managed and seeded files, docs, test vectors, a fuzz
 target, Gherkin scenarios, `deny.toml`, `supply-chain/`, `SECURITY.md`,
 `release.json` with its security checks (the quality audit among them), and
 a release key labelled "pubfoo release key", its secret in the gitignored
-`corpus/.publet`. Its repository is `--owner`'s, by default the owner the
+`corpus/.publet`. It pins pubrel (`ci.release.pubrel`) and pubtest
+(`tests/requirements.txt`) at the releases the release state lists, or
+else at their latest GitHub releases ("Other packages' releases", above).
+Its repository is `--owner`'s, by default the owner the
 `origin` remote names; without either it stops. It refuses a `pubrel` older
 than 0.5.3 or a `pub` older than 0.2.1, and prints the steps it does not take
 itself: the protect block to add to `pubrules.json`, and switching the repository
@@ -1095,7 +1123,7 @@ Pin each one to the full commit its release's tag names, with the version in a c
 
 ### Generated CI: only the jobs a repository runs
 
-A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubrules.json`. `pubrules sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubrules' release, so the Actions pins still live in pubrules. `pubrules init` and `pubrules new` write `"ci": {}`.
+A shared reusable workflow has to skip the jobs a repository doesn't use, and GitHub lists each one as skipped. A repository of any kind avoids that with a `ci` block in `pubrules.json`. `pubrules sync` then writes one workflow per event, and each workflow calls only the jobs that event runs. Each job is its own reusable workflow (`job-node-test.yml`, `job-rust-gates.yml`, `job-sonar.yml` and so on) at this pubrules' release, so the Actions pins still live in pubrules. `pubrules init` writes `"ci": {}`, and `pubrules new` `"ci": {"release": {"pubrel": "X.Y.Z"}}`, at the release above.
 
 Sync pins each one, and pubrel's release workflow, to the full commit of the release's tag, with the version in a comment, so SonarQube Cloud's S7637 (a reusable workflow pinned to a tag, which can move) needs no exception:
 
@@ -1103,7 +1131,7 @@ Sync pins each one, and pubrel's release workflow, to the full commit of the rel
     uses: Sustenaut/pubrules/.github/workflows/job-rust-test.yml@0f3574a72707a46bae149d3ed7a4644b4837795a # v0.15.2
 ```
 
-Usually neither needs the network. pubrules' commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubrules has none, and pins by tag. pubrel's commit is the one pubrules records beside the pubrel it pins by default, or the one the repository's workflows already pin at that version; failing both, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
+Usually neither needs the network. pubrules' commit is in its wheel: the release CI writes the tag's commit into the package (`release-commit`) before it builds the wheel. A source checkout of pubrules has none, and pins by tag. pubrel's commit is the one the repository's workflows already pin at that version; failing that, sync reads it once from pubrel's tags with `git ls-remote`, and when it cannot, pins by tag with a warning. Workflows written before, pinned by tag, still read and check as before.
 
 Whose pubrules and pubrel these are is set in one place, `OWNER` in `src/pubrules/refs.py`: `Sustenaut`, since both moved there from `schryer`. Every repository moves to it on its next `pubrules sync`, and the nightly moves its hand-written `*-ci.yml` and pubrel pins with `pubrules pins` (`pubrules bump` too). A repository can name another owner first with `"workflows_owner": "sustenaut"` in pubrules.json; it also names the repository `git ls-remote` reads pubrel's tags from. `conform`, the nightly and the audit read a pin under any owner, so one still under the old owner keeps working.
 
@@ -1125,7 +1153,7 @@ Whose pubrules and pubrel these are is set in one place, `OWNER` in `src/pubrule
 - **`tools`:** Rust's: what the functional suite drives. Each `crate` is installed from its `git` repository at its `tag` with `cargo install --locked`, and the nightly moves the tag to that repository's latest release.
 - **`runs-on`:** the runners, for a repository with self-hosted ones. A label (`"runs-on": "my-runners"`) runs every job there; an object of labels by job name, with `default` for the rest (`{"default": "my-runners", "review": "ubuntu-latest"}`), places them one by one. Sync passes it to each job as its `runs-on` input (every reusable workflow, `python-ci.yml`, `node-ci.yml`, `rust-ci.yml` and `service-ci.yml` too, takes one, `ubuntu-latest` by default) and writes it into `tested`, `passed` and `site`. Rust's `test` runs on its `os-matrix` instead. pubrel's release workflow takes it (`release` places it on its own) from pubrel 0.7.0, which installs Rust on a runner without it. An older pubrel's runs on GitHub's runners. Without it nothing is written, and every job runs on `ubuntu-latest`. The runner must have what `ubuntu-latest` gives these jobs (git, curl, jq, python3 with venv, gh, shellcheck, unzip, a C toolchain, Docker).
 - **`language`:** a utility's, `node` or `python`. Without it, a `package.json` with no `pyproject.toml` beside it means Node. A rust, service or content repository's CI is its kind's.
-- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses this pubrules' pubrel unless `pubrel` names one, and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none, and a content repository, which pubrules neither releases nor deploys, has none either. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubrules.json, then runs `pubrules sync`.
+- **`release`:** adds pubrel's release workflow to `pr.yml`, `queue.yml` and `main.yml`, after `passed`. It uses the pubrel `pubrel` names, or where it names none the one the workflows sync wrote already pin, or else pubrel's latest release (below), and `with` adds inputs (Rust's always checks semver, `semver-checks-version: 0.51.0`). `false` leaves it out. A service deploys rather than releases, so it has none, and a content repository, which pubrules neither releases nor deploys, has none either. `{"uses": "local"}` calls the repository's own `.github/workflows/release.yml` in place of pubrel's published one, as pubrel does, so a change to its release workflow is tested before it ships; only `with` goes with it. The nightly moves `release.pubrel` in pubrules.json, writing it there where it named none, then runs `pubrules sync`.
 
 Neither the merge queue nor `main.yml` tests again what an earlier run already tested. A pull request up to date with main merges as the very files its own run tested, and merging moves main to the very commit the queue tested. So `main.yml`, and `pr.yml` where the queue runs it (there is no `queue.yml`), start with `tested` (`job-tested.yml`, `ci / tested`). In the queue and on main, it looks for a successful run of that workflow, on a pull request or in the queue, whose commit has this commit's tree. A run that skipped its own tests names, in a notice, the run it took them from, and that run counts, so long as its artifacts have not expired. When there is one, every job that run ran is skipped (a job only main runs still runs), and `passed` and the release follow. On main, `sonar` still runs, reading the coverage that run uploaded, because SonarQube Cloud measures main from a push to it. The merge queue never scans: SonarQube Cloud analyses pull requests and main, and refuses the queue's `gh-readonly-queue` branch. The pull request's run scanned the change, and main's push scans the merge, so `sonar` does not run on `merge_group` in `pr.yml`, `passed` takes that skip, and a Rust `queue.yml` has no `sonar` at all. So a ruleset with a merge queue must not require SonarQube Cloud's own check, `SonarCloud Code Analysis` (sync refuses it), or the queue waits for that check forever; `ci / sonar` still fails `ci / passed` on a pull request's quality gate. `ci / passed` already takes the skip. When there is none (a pull request's own run, main moved on in between, several pull requests merged together, a repository without the queue, or a commit that reached main some other way) every job runs as it would without `tested`. A Rust crate's `queue.yml` runs jobs its pull requests do not, so its queue tests everything. The nightly always runs everything.
 

@@ -40,7 +40,9 @@ a test. Rust's jobs are the ones the Rust crate standard asks for here,
 from the rules and pubrules.json's exceptions, and sync writes each job's
 required make targets into its workflow, so a change to either shows as a
 change there. `release` adds pubrel's release workflow to pr.yml,
-queue.yml and main.yml, at this pubrules' pubrel unless it names one, passing it the
+queue.yml and main.yml, at the pubrel it names (where it names none, the one
+the workflows already pin, or else pubrel's latest release; the nightly
+moves it), passing it the
 release app's RELEASE_APP_ID and RELEASE_APP_KEY from pubrel 0.6.1, the
 first to take them, so `pubrel tag` tags with the app the tag ruleset lets
 through; `false` leaves it
@@ -412,7 +414,6 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
         events = [e for e in events if e != "queue"]
         jobs = {name: tuple(e for e in EVENTS if e in events and (
                     e in on or (e == "pr" and "queue" in on))) for name, on in jobs.items()}
-    from .new import PUBREL_PIN  # noqa: PLC0415
     release = given.get("release", language not in UNRELEASED)
     if language in UNRELEASED and release is not False:
         stop(f"release is not for {UNRELEASED[language]}")
@@ -431,7 +432,7 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
                      '.github/workflows/release.yml, and then names no pubrel')
             release = {"local": True, "with": extra}
         else:
-            pubrel = release.get("pubrel", PUBREL_PIN)
+            pubrel = release["pubrel"] if "pubrel" in release else pinned_pubrel(config, root)
             if not isinstance(pubrel, str) or not pubrel[:1].isdigit():
                 stop('release.pubrel must be a version, such as "0.5.4"')
             release = {"pubrel": pubrel, "with": {**RELEASE_WITH.get(language, {}), **extra}}
@@ -439,6 +440,20 @@ def settings(config: dict[str, Any], root: Path) -> dict[str, Any] | None:
             "with": inputs, "jobs": jobs, "release": release, "layout": layout(language, root),
             "site": site(config, root), "tools": listed, "runs-on": runners,
             "targets": rules["targets"] if rules else {}}
+
+
+def pinned_pubrel(config: dict[str, Any], root: Path) -> str:
+    """The pubrel a release job calls where ci.release names none: the one the
+    workflows sync last wrote pin, else its latest release (releases.py),
+    which the nightly then moves."""
+    from .refs import RELEASE_PIN  # noqa: PLC0415
+    for event in EVENTS:
+        written = root / path(event)
+        if written.is_file() and is_generated(text := written.read_text(encoding="utf-8")):
+            if m := RELEASE_PIN.search(text):
+                return m["version"]
+    from .releases import version  # noqa: PLC0415
+    return version("pubrel", owner(config))
 
 
 # A runner label: GitHub's, such as ubuntu-latest, or a self-hosted runner

@@ -2,15 +2,18 @@
 
 `pubrules pins --pubrel V` moves every outdated pub* pin to its latest
 release: this pubrules (managed files, lock, `rust-ci.yml`), pubrel's release
-workflow and `pubrel-version`, each
+workflow and `pubrel-version` (ci.release.pubrel, written there where the
+repository's release job named none), the pubsec or pubdeploy a launcher
+fetches where deploy.providers lists none, with its sha256, each
 tool `ci.tools` pins by tag, to the latest release of its git repository,
 every other repository's reusable workflow a workflow pins at a release
 (a control plane's reusable workflow, say), to that repository's
 latest release, every Python package a requirements file or pyproject.toml
 pins by another repository's release wheel (`name @ https://github.com/OWNER/
-REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`) to that repository's
-latest release, forward only, with each `uv pip compile` lock made from a
-moved file compiled again, and the crates `nightly.pins.crates` names in
+REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`, pubtest's in
+tests/requirements.txt among them) to that repository's latest release,
+forward only, with each `uv pip compile` lock made from a moved file
+compiled again, and the crates `nightly.pins.crates` names in
 `Cargo.lock`, within their requirements.
 
 `pubrules crates --report FILE` then tries each upgrade `cargo update` would
@@ -238,19 +241,37 @@ def record(root: Path, text: str, category: str = "internal") -> list[str]:
 
 
 def released_by_config(root: Path, pubrel: str, changes: list[str]) -> bool:
-    """Move the pubrel that pubrules.json's ci.release names to `pubrel`; True
-    when it moved. One the ci block leaves to pubrules moves with pubrules."""
+    """Move the pubrel the repository's release job calls to `pubrel`; True
+    when it moved. It is ci.release.pubrel, or, where that names none, the
+    one the workflows sync wrote pin, which is then written there."""
     path = root / "pubrules.json"
     if not path.exists():
         return False
     config = json.loads(path.read_text(encoding="utf-8"))
-    release = config.get("ci", {}).get("release") if isinstance(config.get("ci"), dict) else None
-    if not isinstance(release, dict) or release.get("pubrel") in (None, pubrel):
+    ci = config.get("ci")
+    release = ci.get("release") if isinstance(ci, dict) else None
+    if isinstance(release, dict) and "pubrel" in release:
+        current = release["pubrel"]
+    elif release is False or (isinstance(release, dict) and "uses" in release) or not isinstance(ci, dict):
         return False
-    changes.append(f"pubrules.json: ci.release.pubrel {release['pubrel']} -> {pubrel}")
-    release["pubrel"] = pubrel
+    else:
+        current = written_pubrel(root)
+    if current in (None, pubrel):
+        return False
+    changes.append(f"pubrules.json: ci.release.pubrel {current} -> {pubrel}")
+    ci["release"] = {**(release if isinstance(release, dict) else {}), "pubrel": pubrel}
     path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     return True
+
+
+def written_pubrel(root: Path) -> str | None:
+    """The pubrel the workflows sync wrote call, or None."""
+    from .ci import is_generated  # noqa: PLC0415
+    for path in sorted((root / ".github" / "workflows").glob("*.y*ml")):
+        text = path.read_text(encoding="utf-8")
+        if is_generated(text) and (m := RELEASE_PIN.search(text)):
+            return m["version"]
+    return None
 
 
 def latest_release(repo: str) -> str | None:
@@ -380,6 +401,36 @@ def wheels_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Pa
             path.write_text(new, encoding="utf-8")
             moved_files.append(path)
     return moved_files
+
+
+def launchers_by_release(root: Path, changes: list[str]) -> bool:
+    """The pubsec or pubdeploy a managed launcher fetches where deploy.providers
+    lists none (a service without a deploy block runs ./pubsec), moved to its
+    latest release, the wheel's sha256 with it; sync then writes the launcher
+    from that pin. True when one moved. One whose latest release cannot be
+    read, or is not newer, stays."""
+    from .providers import PUBDEPLOY, PUBSEC, WHEEL, in_launcher, listed  # noqa: PLC0415
+    path = root / "pubrules.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    moved = False
+    for name in (PUBSEC, PUBDEPLOY):
+        pin = in_launcher(root, name)
+        m = WHEEL.fullmatch(pin["wheel"]) if pin and listed(config, name) is None else None
+        if m is None:
+            continue
+        latest = latest_tag(m["repo"])
+        if latest is None or release_key(latest[1:]) <= release_key(m["version"]):
+            continue
+        from .cli import sha256_of  # noqa: PLC0415
+        version = latest[1:]
+        wheel = pin["wheel"].replace(f"/v{m['version']}/", f"/{latest}/").replace(
+            f"-{m['version']}-", f"-{version}-")
+        launcher = root / name
+        launcher.write_text(launcher.read_text(encoding="utf-8").replace(
+            f"fetch {pin['wheel']} {pin['sha256']} ", f"fetch {wheel} {sha256_of(wheel)} "), encoding="utf-8")
+        changes.append(f"{name}: {m['repo']} {m['version']} -> {version}")
+        moved = True
+    return moved
 
 
 def recompile(root: Path, moved: list[Path], changes: list[str]) -> None:
@@ -546,7 +597,8 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     if before and before != __version__:
         changes.append(f"pubrules {before} -> {__version__}")
     released = bool(pubrel) and released_by_config(root, pubrel, changes)
-    if tools_by_config(root, changes) or released:
+    launched = launchers_by_release(root, changes)
+    if tools_by_config(root, changes) or released or launched:
         from .cli import sync  # noqa: PLC0415
         sync(root, check=False)
     from .ci import is_generated  # noqa: PLC0415

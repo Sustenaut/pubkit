@@ -9,8 +9,8 @@
 #   ./pubdeploy check --offline
 #   ./pubdeploy types
 #
-# The release is deploy.providers' pubdeploy, or the oldest pubrules {version}
-# works with where it lists none, or an older one, and it runs with every
+# The release is deploy.providers' pubdeploy (`pubrules bump` moves it), and
+# it runs with every
 # other deploy.providers wheel, so their need types load. Each wheel is
 # fetched once into the user's cache (from the wheel mirror, when
 # pubrules.json names one and GitHub fails) and checked against its sha256 on

@@ -227,7 +227,7 @@ def cached_wheel(repo, tmp_path, cached, version):
     sha = hashlib.sha256(data).hexdigest()
     wheel = f"https://github.com/example-org/pubsec/releases/download/v{version}/pubsec-{version}-py3-none-any.whl"
     config = {"kind": "service", "deploy": {"providers": [{"distribution": "pubsec", "wheel": wheel, "sha256": sha}]}}
-    (repo / "pubsec").write_text(render(templates("service")["pubsec"], values(config)))
+    (repo / "pubsec").write_text(render(templates("service")["pubsec"], values(config, repo, frozenset({"pubsec"}))))
     (repo / "pubsec").chmod(0o755)
     file = tmp_path / "cache" / "pubrules" / "providers" / sha / wheel.rsplit("/", 1)[1]
     file.parent.mkdir(parents=True)
@@ -259,11 +259,15 @@ def uvx_not_run(tmp_path):
     assert not (tmp_path / "uvx.json").exists()
 
 
-@then(parsers.parse('"{path}" runs the oldest pubsec this pubrules works with'))
+@then(parsers.parse('"{path}" runs the pubsec the release state lists'))
 def runs_pinned(repo, path):
-    from pubrules.new import PUBSEC_FLOOR, PUBSEC_WHEEL  # noqa: PLC0415
+    from conftest import RELEASES  # noqa: PLC0415
+    from pubrules.refs import OWNER  # noqa: PLC0415
+    from pubrules.releases import WHEEL  # noqa: PLC0415
+    entry = RELEASES["pubsec"]
+    wheel = WHEEL.format(owner=OWNER, name="pubsec", version=entry["version"])
     text = (repo / path).read_text()
-    assert f"fetch {PUBSEC_WHEEL.format(PUBSEC_FLOOR[0])} {PUBSEC_FLOOR[1]} providers deploy.providers\n" in text, text
+    assert f"fetch {wheel} {entry['sha256']} providers deploy.providers\n" in text, text
     assert 'exec uvx --from "$fetched" pubsec "$@"' in text, text
 
 

@@ -644,14 +644,6 @@ def app_secrets(repo, given):
             assert "secrets" not in release, (name, release)
 
 
-@then(parsers.parse('"{name}" pins pubrel\'s release workflow to the commit pubrules records'))
-def recorded_pubrel(repo, name):
-    from pubrules.new import PUBREL_COMMIT, PUBREL_PIN  # noqa: PLC0415
-
-    text = (repo / ".github" / "workflows" / name).read_text()
-    assert f"release.yml@{PUBREL_COMMIT} # v{PUBREL_PIN}\n" in text, text
-
-
 @when(parsers.parse('every pin reader reads "{line}"'), target_fixture="read")
 def read_pin(line):
     from pubrules import conform, freshness, nightly  # noqa: PLC0415

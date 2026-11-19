@@ -77,7 +77,7 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     Then it succeeds
     And the file "pubsec" can be run
     And the file "with-secrets" includes "/pubsec" run --cwd "$PWD" -- "$@""
-    And "pubsec" runs the oldest pubsec this pubrules works with
+    And "pubsec" runs the pubsec the release state lists
 
   Scenario: ./with-secrets runs ./pubsec run in the directory it is called from, from the checked wheel
     Given a repository initialised as service for the project "infra"

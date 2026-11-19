@@ -58,9 +58,6 @@ from pathlib import Path
 from . import __version__
 
 KINDS = ("rust", "utility", "service", "content")
-# The step library every suite's tests/requirements-pubrules.txt pins: the
-# pytest-bdd plugin pubrules carried until 0.42.0, and the steps (GRAMMAR.md).
-PUBTEST = "0.2.2"
 
 
 def bin_var(name: str) -> str:
@@ -282,9 +279,11 @@ def wheel_mirror(config: dict) -> str:
     return mirrors(config).get("wheels", "")
 
 
-def values(config: dict[str, str]) -> dict[str, str]:
+def values(config: dict[str, str], root: Path | None = None, launchers: frozenset[str] = frozenset()) -> dict[str, str]:
+    """What the templates are filled with; the pubsec and pubdeploy launchers'
+    only for those of `launchers` written, each the repository's own pin
+    (providers.pinned)."""
     import shlex  # noqa: PLC0415
-    from .new import PUBREL_PIN
     wheels = providers(config)
     mirror = wheel_mirror(config)
     fetch = FETCH.replace("{fallback}", FALLBACK.format(mirror=mirror) if mirror else "")
@@ -295,21 +294,24 @@ def values(config: dict[str, str]) -> dict[str, str]:
         launch = 'exec uvx --from "$from" '
     else:
         launch = f'exec uvx --from "https://github.com/Sustenaut/pubrules/releases/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl" '
-    from .providers import PUBDEPLOY as DEPLOYS, PUBSEC as SECRETS, launched as floored  # noqa: PLC0415
-    wheel = floored(config, SECRETS)
-    walker = floored(config, DEPLOYS)
-    others = [p for p in wheels if p.get("distribution") != DEPLOYS]
-    return {"version": __version__, "pubtest": PUBTEST, "bin_var": bin_var(config.get("bin", "app")),
-            "pubrel": PUBREL_PIN, "providers": (fetch + "\n" if wheels or own else "") + launched + own,
-            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
-            "pypi": mirrors(config).get("pypi", ""),
-            "provider_requirements": provider_requirements(wheels),
-            "pubsec": fetch + f"\nfetch {shlex.quote(wheel['wheel'])} {shlex.quote(wheel['sha256'])} providers "
-                              f"deploy.providers\n",
-            "pubdeploy": fetch + "\n" + (PROVIDER + "".join(
-                f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n" for p in others) + "\n"
-                if others else "with=()\n")
-                + f"fetch {shlex.quote(walker['wheel'])} {shlex.quote(walker['sha256'])} providers deploy.providers\n"}
+    out = {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
+           "providers": (fetch + "\n" if wheels or own else "") + launched + own,
+           "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
+           "pypi": mirrors(config).get("pypi", ""),
+           "provider_requirements": provider_requirements(wheels)}
+    from .providers import PUBDEPLOY as DEPLOYS, PUBSEC as SECRETS, pinned  # noqa: PLC0415
+    if SECRETS in launchers:
+        wheel = pinned(root, config, SECRETS)
+        out["pubsec"] = (fetch + f"\nfetch {shlex.quote(wheel['wheel'])} {shlex.quote(wheel['sha256'])} providers "
+                         f"deploy.providers\n")
+    if DEPLOYS in launchers:
+        walker = pinned(root, config, DEPLOYS)
+        others = [p for p in wheels if p.get("distribution") != DEPLOYS]
+        out["pubdeploy"] = (fetch + "\n" + (PROVIDER + "".join(
+            f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n" for p in others) + "\n"
+            if others else "with=()\n")
+            + f"fetch {shlex.quote(walker['wheel'])} {shlex.quote(walker['sha256'])} providers deploy.providers\n")
+    return out
 
 
 def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | None = None,
@@ -319,8 +321,9 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
     kind = config["kind"]
     (root / CONFIG).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     owned = set(managed(kind)) | ({PYTHON_MK} if is_python(config, root) else set())
-    fill = {**values(config), **(extra or {})}
-    for path, text in sorted(templates(kind, layers).items()):
+    files = templates(kind, layers)
+    fill = {**values(config, root, frozenset(files) & {PUBSEC, PUBDEPLOY}), **(extra or {})}
+    for path, text in sorted(files.items()):
         target = root / path
         if target.exists() and path not in owned:
             print(f"kept     {path} (already present)")
@@ -330,6 +333,8 @@ def init_files(root: Path, config: dict[str, str], layers: tuple[str, ...] | Non
         if (path.endswith(".py") and text.startswith("#!")) or path in EXECUTABLE:
             target.chmod(0o755)
         print(f"{'managed' if path in owned else 'seeded '}  {path}")
+    for line in pubtest_pin(root, check=False)[0]:
+        print(line)
     from .security import DEPENDABOT_PATH, dependabot  # noqa: PLC0415
     from .ci import generated as workflows  # noqa: PLC0415
     written = workflows(config, root)
@@ -414,7 +419,7 @@ def sync(root: Path, check: bool) -> int:
     deploy_failed = False
     if "deploy" in config:
         # pubsec and pubdeploy, whose types and walk a deploy block needs, in
-        # deploy.providers at this pubrules' floors or newer.
+        # deploy.providers, each the repository's own pin.
         from .providers import ensure  # noqa: PLC0415
         lines, deploy_failed = ensure(root, config, check)
         for line in lines:
@@ -428,6 +433,10 @@ def sync(root: Path, check: bool) -> int:
     deploy_failed = deploy_failed or hooks_failed
     for line in lines:
         print(line, file=sys.stderr if line.startswith(("pubrules:", "pubdeploy:")) else sys.stdout)
+    lines, unpinned = pubtest_pin(root, check)
+    deploy_failed = deploy_failed or unpinned
+    for line in lines:
+        print(line, file=sys.stderr if check else sys.stdout)
     kind = config["kind"]
     every = templates(kind)
     stale = []
@@ -453,7 +462,8 @@ def sync(root: Path, check: bool) -> int:
         if not check and not (root / "Makefile").exists():
             (root / "Makefile").write_text(python_templates["Makefile"], encoding="utf-8")
             print("seeded   Makefile")
-    wanted = [(path, render(every[path], values(config))) for path in owned]
+    filled = values(config, root, frozenset(owned) & {PUBSEC, PUBDEPLOY})
+    wanted = [(path, render(every[path], filled)) for path in owned]
     wanted += workflows(config, root)
     from .service_needs import CALLER, OLD_CALLER, caller, is_caller  # noqa: PLC0415
     from .refs import owner, ref, release_commit  # noqa: PLC0415
@@ -632,12 +642,26 @@ def lock(root: Path) -> int:
     """
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
+        # pip takes pubtest's wheel only when its URL comes before the floor
+        # requirements-pubrules.txt names, so the pin is read first.
+        given = root / REQUIREMENTS
+        first = [m.group(0) for m in PUBTEST_PIN.finditer(given.read_text(encoding="utf-8"))] \
+            if given.is_file() else []
+        if first:
+            ordered = Path(tmp) / "requirements.txt"
+            ordered.write_text("\n".join(first) + f"\n-r {given.resolve()}\n", encoding="utf-8")
+            given = ordered
         subprocess.run(
             [*pip(), "install", "--dry-run", "--ignore-installed",
-             "--quiet", "--report", str(report), "-r", str(root / REQUIREMENTS)],
+             "--quiet", "--report", str(report), "-r", str(given)],
             check=True, stdout=subprocess.DEVNULL,
         )
         items = json.loads(report.read_text(encoding="utf-8"))["install"]
+    indexed = [i["metadata"]["name"] for i in items
+               if i["metadata"]["name"].lower() == "pubtest" and not i.get("is_direct")]
+    if indexed:
+        sys.exit(f"pubrules: {REQUIREMENTS} must pin pubtest by its release wheel (`pubtest @ https://...`): "
+                 f"from an index it is PyPI's pubtest, another project; `pubrules sync` pins it")
     out = [f"# Generated by `pubrules lock` from {REQUIREMENTS.name}. Do not edit.",
            "# Installed with --require-hashes: a changed artifact fails the install.", ""]
     for item in sorted(items, key=lambda i: i["metadata"]["name"].lower()):
@@ -659,6 +683,42 @@ def lock(root: Path) -> int:
     (root / LOCK).write_text("\n".join(out) + "\n", encoding="utf-8")
     print(f"locked {len(items)} packages in {LOCK}")
     return 0
+
+
+# The repository's own pin of pubtest, in its tests/requirements.txt: the
+# release wheel, which the nightly moves. requirements-pubrules.txt names
+# only the floor, and PyPI's "pubtest" is another project, so the lock never
+# takes pubtest from an index.
+PUBTEST_PIN = re.compile(r"^pubtest\s*@\s*(?P<wheel>https://github\.com/[A-Za-z0-9-]+/pubtest/releases/download/"
+                         r"v[0-9][^/\s]*/pubtest-[^/\s]+\.whl)", re.M)
+
+
+def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
+    """tests/requirements.txt pins pubtest by its release wheel: `sync` adds
+    the one tests/requirements.lock has, else the latest release, where it
+    pins none; `--check` fails instead. Lines to print, and whether that fails."""
+    path = root / REQUIREMENTS
+    if not path.is_file() or PUBTEST_PIN.search(path.read_text(encoding="utf-8")):
+        return [], False
+    if check:
+        return [f"pubrules: {REQUIREMENTS} does not pin pubtest by its release wheel, which the lock needs "
+                f"(PyPI's pubtest is another project); run `pubrules sync`, which pins the one "
+                f"{LOCK.name} has, or the latest release"], True
+    lock = root / LOCK
+    found = PUBTEST_PIN.search(lock.read_text(encoding="utf-8")) if lock.is_file() else None
+    if found:
+        wheel = found["wheel"]
+    else:
+        from .releases import WHEEL, version  # noqa: PLC0415
+        from .refs import OWNER  # noqa: PLC0415
+        wheel = WHEEL.format(owner=OWNER, name="pubtest", version=version("pubtest"))
+    text = path.read_text(encoding="utf-8")
+    pin = f"# The steps and plugin the suite runs with; the nightly moves the pin.\npubtest @ {wheel}\n"
+    included = re.search(r"^-r requirements-pubrules\.txt$", text, re.M)
+    at = included.start() if included else len(text)
+    path.write_text(text[:at] + ("" if text[:at].endswith("\n") or not at else "\n") + pin + text[at:],
+                    encoding="utf-8")
+    return [f"updated  {REQUIREMENTS} (pubtest: {wheel.rsplit('/', 2)[-2][1:]})"], False
 
 
 def conform(root: Path) -> int:

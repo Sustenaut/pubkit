@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pubrules holds no version of another package: the managed tests/requirements-pubrules.txt names pubtest as a floor (pubtest>=0.2.2) and each repository's tests/requirements.txt pins the wheel; pubrel, pubsec and pubdeploy are each repository's own pins (ci.release.pubrel, deploy.providers, or what the workflows and launchers already pin), which the nightly moves to their latest releases; where a repository has none yet, pubrules new, init and sync take the release the PUBRULES_RELEASES release-state file lists, or else the latest GitHub release"
+}

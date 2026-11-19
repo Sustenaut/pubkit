@@ -21,9 +21,12 @@ names; without either it stops. It:
 4. creates the corpus's workspace and its release key, labelled "<name>
    release key", names it in `release.json`, and writes its public object
    to `corpus/objects`, checked against its identifier;
-5. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
+5. pins pubrel (ci.release.pubrel) and pubtest (tests/requirements.txt) at
+   the releases the release-state file PUBRULES_RELEASES lists, or else at
+   their latest GitHub releases (releases.py), which the nightly moves on;
+6. generates TESTING.md, SUPPLY-CHAIN.md and the test vectors, and locks
    the test requirements;
-6. prints the protect block its pubrules.json needs, and that the repository
+7. prints the protect block its pubrules.json needs, and that the repository
    is then switched on in the release app.
 """
 
@@ -36,7 +39,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__, cbor
+from . import cbor
 from .refs import OWNER_NAME
 
 # The releases a new package's pipeline needs on this machine: pubrel 0.6.0
@@ -47,22 +50,6 @@ MIN_PUBREL = (0, 6, 0)
 MIN_PUB = (0, 2, 1)
 # Where pub comes from: publet-cli, at a tag of this repository.
 PUB_GIT = "https://github.com/Sustenaut/publet"
-# The pubrel release workflow a new package's CI calls, and the commit its
-# tag names, which the workflow pins (refs.py).
-PUBREL_PIN = "0.7.0"
-PUBREL_COMMIT = "931f3016d6fec63315e413060cde079d77730b52"
-# The oldest pubsec this pubrules works with, and its wheel's sha256: the floor.
-# A repository's deploy.providers pins its own pubsec, which `pubrules bump`
-# (pubdeploy's hook) moves to the latest release; sync adds the floor where none is listed and
-# moves one below it up, and sync --check fails below it. It moves only when
-# pubrules needs a newer pubsec, such as for a change to the provider contract.
-PUBSEC_FLOOR = ("0.3.0", "a9036c741e29098cdd04baf64c7873e0ff1dd6e7bde12e9671a3940370724e18")
-PUBSEC_WHEEL = "https://github.com/Sustenaut/pubsec/releases/download/v{0}/pubsec-{0}-py3-none-any.whl"
-# The oldest pubdeploy this pubrules works with, the same way: the deploy walk,
-# whose sustenaut.sync and sustenaut.bump hooks pubrules' sync and bump call.
-PUBDEPLOY_FLOOR = ("0.5.0", "320d68e081c674457294e6ed3a6c8ab9e2606ca4a2946c252a34021b62dc70cd")
-PUBDEPLOY_WHEEL = "https://github.com/Sustenaut/pubdeploy/releases/download/v{0}/pubdeploy-{0}-py3-none-any.whl"
-FLOORS = {"pubsec": (*PUBSEC_FLOOR, PUBSEC_WHEEL), "pubdeploy": (*PUBDEPLOY_FLOOR, PUBDEPLOY_WHEEL)}
 
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 TAG = re.compile(r"PKG-[A-Z0-9]{6}-(0[1-9]|1[0-2])-\d{4}")
@@ -193,7 +180,11 @@ def run(root: Path, name: str, tag: str, description: str, *, owner: str | None 
             print(f"pubrules: {p}", file=sys.stderr)
         return 1
 
-    config = {"kind": "rust", "bin": name, "ci": {}}
+    # The pubrel its release job calls: the release state's, else pubrel's
+    # latest release (releases.py); the nightly moves it from there. Its
+    # tests/requirements.txt pins pubtest the same way (cli.pubtest_pin).
+    from .releases import version  # noqa: PLC0415
+    config = {"kind": "rust", "bin": name, "ci": {"release": {"pubrel": version("pubrel")}}}
     extra = {"name": name, "owner": owner, "crate": name.replace("-", "_"), "tag": tag,
              "description": description or f"{name}: a pub* package."}
     init_files(root, config, layers=("common", "rust", "new-rust"), extra=extra,

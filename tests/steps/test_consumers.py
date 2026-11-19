@@ -34,10 +34,7 @@ DEPENDENCIES = {"actions", "astral-sh", "bitwarden", "docker", "google", "google
 # pub is a pubrules tool, like pubrel, so `pubrules new` names where it comes from.
 # pubrules' own CI, which it does not ship to anyone, runs the integrations scan.
 TOOLS = {("src/pubrules/new.py", "Sustenaut/publet"),
-         ("src/pubrules/new.py", "Sustenaut/pubsec"),
-         ("src/pubrules/new.py", "Sustenaut/pubdeploy"),
-         (".github/workflows/integrations.yml", "Sustenaut/integrations"),
-         ("src/pubrules/templates/common/tests/requirements-pubrules.txt", "Sustenaut/pubtest")}
+         (".github/workflows/integrations.yml", "Sustenaut/integrations")}
 ALLOWED = TOOLS
 
 

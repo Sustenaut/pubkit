@@ -9,8 +9,8 @@
 #   ./pubsec run -- terraform plan
 #   ./pubsec --version
 #
-# The release is deploy.providers' pubsec, or the oldest pubrules {version}
-# works with where it lists none, or an older one.
+# The release is deploy.providers' pubsec, or where it lists none the one
+# this file fetched when sync first wrote it; the nightly moves it.
 # Its wheel is fetched once into the user's cache (from the wheel mirror,
 # when pubrules.json names one and GitHub fails) and checked against its
 # sha256 on every run, and uvx runs that file; nothing is installed into the
