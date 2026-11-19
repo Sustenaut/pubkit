@@ -3,8 +3,8 @@
   "corpus": {
     "domain": "pub:sha2-256:in4ep6bxkmo2pfus7ugocibigqnpc27ld5pxylscd3gxffn6gl4q",
     "generation": {
-      "cid": "pub:sha2-256:tgoj6ga5eyiyxocifsx2onmaisqtko7iul7qmewylfrb2ejrjbeq",
-      "index": 89
+      "cid": "pub:sha2-256:fd22pwablulnljklxz5qb3yiscy2di5tiaca6lxdu72ov2sdbrva",
+      "index": 90
     },
     "imports": {},
     "key": "pub:sha2-256:ks7g2ycpdnhjdtsn3sfoiqoh2tazwtiwr2emxut3ugourttnnbka",
@@ -18,8 +18,8 @@
     ]
   },
   "publets": [
-    {"slug": "pkg.pubrules", "kind": "doc", "tag": "PKG-PUBRLZ-11-2026", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:psakar7khnifn4nrqllsxbksuhv65cj4blmbtfmhw6frbq7atniq", "genesis": "pub:sha2-256:t3qh7yksriibaz5hp7sr7zy3m7pt7dfnord3ssv7myzgttuwxwuq", "deps": ["pkg.pubrules#identity", "pkg.pubrules#release"]},
-    {"slug": "pkg.pubrules#identity", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:k7jt37ylukxoeyx5s4usq2xgewsv2c32q7dtkq3hygu2vn7mv6za", "genesis": "pub:sha2-256:ymxkdj7f6qfwx76kq6h7dkh34rj2w2djbldpzbq5fm7u6wwtg35q", "deps": []},
-    {"slug": "pkg.pubrules#release", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:q7q5cs6ha27yt2zh5jw4dgttlhll4afwfhepl4nmxw6aprlel4hq", "genesis": "pub:sha2-256:cfwviqjxqsb5fgdgfdgat2qjaz4mmwsxp4vk4w6cgkkooo6xdfwq", "deps": ["pkg.pubrules#identity"]}
+    {"slug": "pkg.pubrules", "kind": "doc", "tag": "PKG-PUBRLZ-11-2026", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:bob2tbv5malzgzga3t455vowqcair2k4fm4godih57iddytm36aa", "genesis": "pub:sha2-256:t3qh7yksriibaz5hp7sr7zy3m7pt7dfnord3ssv7myzgttuwxwuq", "deps": ["pkg.pubrules#identity", "pkg.pubrules#release"]},
+    {"slug": "pkg.pubrules#identity", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:iva745j33lct5giv4npbngws2t66ygc37744afcldlvv6u46exxq", "genesis": "pub:sha2-256:ymxkdj7f6qfwx76kq6h7dkh34rj2w2djbldpzbq5fm7u6wwtg35q", "deps": []},
+    {"slug": "pkg.pubrules#release", "kind": "claim", "source": "publets/pkg.pubrules", "cid": "pub:sha2-256:bkxh2qxmmpegxx2x7rg6jzziheo62ywc5ihks4qeytz72rr4ybca", "genesis": "pub:sha2-256:cfwviqjxqsb5fgdgfdgat2qjaz4mmwsxp4vk4w6cgkkooo6xdfwq", "deps": ["pkg.pubrules#identity"]}
   ]
 }
