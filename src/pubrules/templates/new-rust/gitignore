@@ -1,5 +1,6 @@
 /target
-.venv/
+# A directory or a link: pubrel prepare links the checkout's .venv into its worktree.
+.venv
 __pycache__/
 .pytest_cache/
 *.pyc
