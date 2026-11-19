@@ -60,7 +60,7 @@ from . import __version__
 KINDS = ("rust", "utility", "service", "content")
 # The step library every suite's tests/requirements-pubrules.txt pins: the
 # pytest-bdd plugin pubrules carried until 0.42.0, and the steps (GRAMMAR.md).
-PUBTEST = "0.2.1"
+PUBTEST = "0.2.2"
 
 
 def bin_var(name: str) -> str:
