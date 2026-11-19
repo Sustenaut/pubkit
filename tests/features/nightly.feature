@@ -444,3 +444,15 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     When the nightly compiles again the locks made from "requirements.in"
     Then the result is "[]"
     And stderr mentions "requirements.lock could not be compiled again: no such wheel"
+
+  Scenario Outline: The lock's pubrules pin is read by its version alone, as pubfleet's board reads it
+    When I find the pubrules pins in a lock pinning "<wheel>"
+    Then the result is:
+      """
+      <found>
+      """
+
+    Examples:
+      | wheel                                                                                    | found      |
+      | https://github.com/Sustenaut/pubrules/releases/download/v0.45.0/pubrules-0.45.0-py3-none-any.whl | ["0.45.0"] |
+      | https://github.com/Sustenaut/pubkit/releases/download/v0.41.1/pubkit-0.41.1-py3-none-any.whl     | []         |

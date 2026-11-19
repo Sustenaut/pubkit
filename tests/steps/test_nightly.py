@@ -435,3 +435,9 @@ def recompiles(pubtest_ctx, source):
     root = pubtest_ctx.directory
     changes = []
     pubtest_ctx.attempt(lambda: (nightly.recompile(root, [root / source], changes), changes)[1])
+
+
+@when(parsers.parse('I find the pubrules pins in a lock pinning "{wheel}"'))
+def pins_in_lock(pubtest_ctx, wheel):
+    from pubrules.freshness import PIN  # noqa: PLC0415
+    pubtest_ctx.attempt(lambda: PIN.findall(f"pubrules @ {wheel}\n"))
