@@ -37,7 +37,7 @@ by `init` and the repository's own from then on. Extensions go in seeded
 files (the Makefile includes `pubrules.mk`, or a Python package's `pubrules-python.mk`; requirements.txt includes
 requirements-pubrules.txt), so nothing managed is ever edited by hand. One
 file is neither: .gitignore is the repository's own, but `init` and `sync`
-add `.env` to it when it's missing (ignores.py), and `sync --check` fails
+add `.env` and `.venv` to it when they're missing (ignores.py), and `sync --check` fails
 until they have.
 """
 
@@ -490,7 +490,7 @@ def sync(root: Path, check: bool) -> int:
         else:
             old.unlink()
             print(f"removed  {OLD_CALLER} (now {CALLER})")
-    from .ignores import GITIGNORE, heal, missing  # noqa: PLC0415
+    from .ignores import GITIGNORE, REQUIRED, heal, missing  # noqa: PLC0415
     unignored = missing(root) if check else heal(root)
     if unignored and not check:
         print(f"updated  {GITIGNORE} (now ignores {', '.join(unignored)})")
@@ -532,8 +532,8 @@ def sync(root: Path, check: bool) -> int:
             print(f"pubrules: {path} differs from pubrules {__version__}'s; run `pubrules sync`",
                   file=sys.stderr)
         for name in unignored:
-            print(f"pubrules: {GITIGNORE} doesn't ignore {name}, where local tools read secrets; "
-                  f"run `pubrules sync`, which adds it", file=sys.stderr)
+            print(f"pubrules: {GITIGNORE} doesn't ignore {name}. {REQUIRED[name]} "
+                  f"Run `pubrules sync`, which adds it.", file=sys.stderr)
         if lock_stale:
             print(f"pubrules: {LOCK} does not pin pubrules {__version__}; run `pubrules lock`",
                   file=sys.stderr)
