@@ -12,9 +12,9 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     When I run pubrules "init" "--kind=service" "--project=infra"
     Then it succeeds
     And the repository has "with-secrets", "with-secrets.json", ".github/workflows/pr.yml", ".github/workflows/main.yml", "tests/requirements-pubrules.txt"
-    And "with-secrets" is executable
-    And "with-secrets.json" contains ""project": "infra""
-    And ".github/workflows/pr.yml" contains "job-service-checks.yml@v"
+    And the file "with-secrets" can be run
+    And the file "with-secrets.json" includes ""project": "infra""
+    And the file ".github/workflows/pr.yml" includes "job-service-checks.yml@v"
   Scenario: A service names the project its secrets are in
     Given an empty repository
     When I run pubrules "init" "--kind=service"
@@ -22,16 +22,16 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     And stderr mentions "--project=NAME"
   Scenario: with-secrets is managed, so an edited copy fails the check
     Given a repository initialised as service for the project "infra"
-    And the file "with-secrets" reads "edited"
+    And a file "with-secrets" holding "edited"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "with-secrets differs"
     When I run pubrules "sync"
     Then it succeeds
-    And "with-secrets" is executable
+    And the file "with-secrets" can be run
   Scenario Outline: A kind pubrules no longer has names the one to use
     Given an empty repository
-    And the file "pubrules.json" reads "{"kind": "<old>"}"
+    And a file "pubrules.json" holding "{"kind": "<old>"}"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "the kind "<old>" is now "utility""
@@ -42,21 +42,21 @@ Feature: A service runs its secret-needing commands through ./with-secrets
       | python-utility |
   Scenario: sync moves a Bitwarden use declared on with-secrets to with-secrets.json
     Given a repository initialised as service for the project "infra"
-    And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets", "push-secrets.sh"], "mode": "required"}]}"
+    And a file "integrations.json" holding "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets", "push-secrets.sh"], "mode": "required"}]}"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "or with-secrets.json for Bitwarden"
     When I run pubrules "sync"
-    Then "integrations.json" contains ""push-secrets.sh""
-    And "integrations.json" contains ""with-secrets.json""
-    And "integrations.json" does not contain ""with-secrets","
+    Then the file "integrations.json" includes ""push-secrets.sh""
+    And the file "integrations.json" includes ""with-secrets.json""
+    And the file "integrations.json" does not include ""with-secrets","
     When I run pubrules "sync" "--check"
     Then it succeeds
   Scenario: A repository that does not run pubrules' with-secrets keeps its declaration
     Given a repository initialised as "utility"
-    And the file "integrations.json" reads "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets"], "mode": "required"}]}"
+    And a file "integrations.json" holding "{"uses": [{"plugin": "bitwarden.secrets", "paths": ["with-secrets"], "mode": "required"}]}"
     When I run pubrules "sync"
-    Then "integrations.json" does not contain "with-secrets.json"
+    Then the file "integrations.json" does not include "with-secrets.json"
 
   Scenario: deploy.providers' wheels join the tests' requirements, where sync --check reads their need types
     Given a repository initialised as "utility"
@@ -66,15 +66,17 @@ Feature: A service runs its secret-needing commands through ./with-secrets
     And "tests/requirements-pubrules.txt" lists the pubsec and pubdeploy of deploy.providers by their wheels
 
   Scenario: Without a deploy block the tests' requirements name no provider
-    Given a repository initialised as "utility"
-    Then "tests/requirements-pubrules.txt" does not contain "pubsec"
+    Given an empty repository
+    When I run pubrules "init" "--kind=utility"
+    Then it succeeds
+    And the file "tests/requirements-pubrules.txt" does not include "pubsec"
 
   Scenario: init writes ./pubsec beside ./with-secrets, which runs it
     Given an empty repository
     When I run pubrules "init" "--kind=service" "--project=infra"
     Then it succeeds
-    And "pubsec" is executable
-    And "with-secrets" contains "/pubsec" run --cwd "$PWD" -- "$@""
+    And the file "pubsec" can be run
+    And the file "with-secrets" includes "/pubsec" run --cwd "$PWD" -- "$@""
     And "pubsec" runs the oldest pubsec this pubrules works with
 
   Scenario: ./with-secrets runs ./pubsec run in the directory it is called from, from the checked wheel
@@ -97,10 +99,10 @@ Feature: A service runs its secret-needing commands through ./with-secrets
 
   Scenario: Any repository with a with-secrets.json gets ./pubsec
     Given a repository initialised as "utility"
-    And the file "with-secrets.json" reads "{"project": "infra"}"
+    And a file "with-secrets.json" holding "{"project": "infra"}"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "pubsec differs"
     When I run pubrules "sync"
-    Then "pubsec" is executable
-    And "with-secrets" is executable
+    Then the file "pubsec" can be run
+    And the file "with-secrets" can be run

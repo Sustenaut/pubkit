@@ -11,7 +11,6 @@ import zipfile
 import sys
 from pathlib import Path
 
-import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from pubrules import __version__
@@ -161,11 +160,6 @@ def vetted_crate(repo, name, a, b):
     (chain / "config.toml").write_text('[cargo-vet]\nversion = "0.10"\n' + imports)
     (chain / "audits.toml").write_text("[audits]\n")
     (chain / "imports.lock").write_text("")
-
-
-@then(parsers.parse('stderr does not mention "{text}"'))
-def stderr_lacks(result, text):
-    assert text not in result.stderr, result.stderr
 
 
 @when(parsers.re(r'I run make (?P<args>(?:"[^"]*" ?)+)'), target_fixture="result")

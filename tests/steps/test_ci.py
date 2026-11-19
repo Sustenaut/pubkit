@@ -106,69 +106,73 @@ def step_fails(install):
     assert install["code"] != 0
 
 
+def _workflows(shipped):
+    """Each workflow pubrules ships, by name, as YAML reads it."""
+    return [(name, yaml.safe_load(text)) for name, text in sorted(shipped["workflows"].items())]
+
+
 @then("every step that installs tests/requirements.lock does it through tests/install-lock")
-def installs_retried():
+def installs_retried(shipped):
     found = 0
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values():
+    for name, data in _workflows(shipped):
+        for job in (data.get("jobs") or {}).values():
             for step in job.get("steps") or []:
                 for line in step.get("run", "").splitlines():
-                    assert not ("pip install" in line and "requirements.lock" in line), f"{path.name}: {line}"
+                    assert not ("pip install" in line and "requirements.lock" in line), f"{name}: {line}"
                     if line.strip().startswith("tests/install-lock "):
                         found += 1
     assert found >= 4
 
 
 @then("every pip-audit is tried three times, each try after a failed one")
-def audits_retried():
+def audits_retried(shipped):
     found = 0
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values():
+    for name, data in _workflows(shipped):
+        for job in (data.get("jobs") or {}).values():
             tries = [s for s in job.get("steps") or [] if "gh-action-pip-audit" in s.get("uses", "")]
             if not tries:
                 continue
             found += 1
-            assert len(tries) == 3, path.name
-            assert tries[0].get("continue-on-error") and tries[1].get("continue-on-error"), path.name
-            assert tries[1]["if"] == f"steps.{tries[0]['id']}.outcome == 'failure'", path.name
-            assert tries[2]["if"] == f"steps.{tries[1]['id']}.outcome == 'failure'", path.name
-            assert not tries[2].get("continue-on-error"), path.name
+            assert len(tries) == 3, name
+            assert tries[0].get("continue-on-error") and tries[1].get("continue-on-error"), name
+            assert tries[1]["if"] == f"steps.{tries[0]['id']}.outcome == 'failure'", name
+            assert tries[2]["if"] == f"steps.{tries[1]['id']}.outcome == 'failure'", name
+            assert not tries[2].get("continue-on-error"), name
             # Before the last try, each lock's release wheels move to the mirror.
             steps = job["steps"]
             between = steps[steps.index(tries[1]) + 1:steps.index(tries[2])]
-            assert any("tests/install-lock --rewrite" in s.get("run", "") for s in between), path.name
+            assert any("tests/install-lock --rewrite" in s.get("run", "") for s in between), name
     assert found >= 2
 
 
-def _review_steps(workflow="job-review.yml"):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
-    return data["jobs"]["review"]["steps"]
+def _review_steps(workflow="job-review.yml", shipped=None):
+    text = shipped["workflows"][workflow] if shipped else (WORKFLOWS / workflow).read_text()
+    return yaml.safe_load(text)["jobs"]["review"]["steps"]
 
 
-def _review_step():
-    return _review_steps()[-1]
+def _review_step(shipped):
+    return _review_steps(shipped=shipped)[-1]
 
 
-def _default_purls():
-    (step,) = [s for s in _review_steps() if s.get("id") == "exceptions"]
+def _default_purls(shipped=None):
+    (step,) = [s for s in _review_steps(shipped=shipped) if s.get("id") == "exceptions"]
     return step["env"]["DEFAULT"]
 
 
 @then("job-review.yml's license exceptions name every reusable workflow and action pubrules has, "
       "and pubrel's release workflow")
-def review_exceptions():
-    listed = {p.strip() for p in _default_purls().split(",")}
-    wanted = {f"pkg:githubactions/Sustenaut/pubrules/.github/workflows/{path.name}"
-              for path in WORKFLOWS.glob("*.yml") if "workflow_call" in (yaml.safe_load(path.read_text()).get(True) or {})}
-    wanted |= {f"pkg:githubactions/Sustenaut/pubrules/actions/{path.parent.name}"
-               for path in (WORKFLOWS.parents[1] / "actions").glob("*/action.yml")}
+def review_exceptions(shipped):
+    listed = {p.strip() for p in _default_purls(shipped).split(",")}
+    wanted = {f"pkg:githubactions/Sustenaut/pubrules/.github/workflows/{name}"
+              for name, data in _workflows(shipped) if "workflow_call" in (data.get(True) or {})}
+    wanted |= {f"pkg:githubactions/Sustenaut/pubrules/actions/{name}" for name in shipped["actions"]}
     wanted |= {"pkg:githubactions/Sustenaut/pubrel/.github/workflows/release.yml"}
     assert listed == wanted, (sorted(wanted - listed), sorted(listed - wanted))
 
 
 @then("job-review.yml sets no other input, so advisories apply to everything")
-def review_only_licenses():
-    assert _review_step()["with"] == {"allow-dependencies-licenses": "${{ steps.exceptions.outputs.purls }}"}
+def review_only_licenses(shipped):
+    assert _review_step(shipped)["with"] == {"allow-dependencies-licenses": "${{ steps.exceptions.outputs.purls }}"}
 
 
 DEPLOY = f"""on: push
@@ -199,11 +203,6 @@ def lists(repo, path, purl):
 def names_neither(repo, path):
     text = (repo / path).read_text()
     assert "actions/checkout" not in text and "local" not in text, text
-
-
-@then(parsers.parse('"{path}" is not there'))
-def not_there(repo, path):
-    assert not (repo / path).exists()
 
 
 @when(parsers.re(r'the "(?P<workflow>[^"]+)" review exceptions step runs (?P<how>on a list holding another owner\'s purl|without a list)'),
@@ -275,11 +274,6 @@ def excepts(repo, rule):
     config = json.loads((repo / "pubrules.json").read_text())
     config["exceptions"] = [{"rule": rule, "reason": "not yet", "until": "2099-01-01"}]
     (repo / "pubrules.json").write_text(json.dumps(config))
-
-
-@given(parsers.parse("the file \"{path}\" reads '{text}'"))
-def file_reads_json(repo, path, text):
-    (repo / path).write_text(text + "\n")
 
 
 @then(parsers.parse('"{name}" runs the jobs "{expected}"'))
@@ -727,9 +721,9 @@ def well_formed(table):
 
 
 @then(parsers.parse('"{workflow}" runs the steps of the "{name}" job in "{shared}"'))
-def same_steps(workflow, name, shared):
-    own = yaml.safe_load((WORKFLOWS / workflow).read_text())["jobs"][name]
-    theirs = yaml.safe_load((WORKFLOWS / shared).read_text())["jobs"][name]
+def same_steps(shipped, workflow, name, shared):
+    own = yaml.safe_load(shipped["workflows"][workflow])["jobs"][name]
+    theirs = yaml.safe_load(shipped["workflows"][shared])["jobs"][name]
     assert own["steps"] == theirs["steps"]
     assert own["runs-on"] == theirs["runs-on"]
 
@@ -747,16 +741,6 @@ def token_by_name(repo, names, name):
     found = jobs(repo, name)
     for job in names.split(", "):
         assert found[job]["secrets"] == {"SONAR_TOKEN": "${{ secrets.SONAR_TOKEN }}"}, job
-
-
-@then(parsers.parse('stderr does not mention "{text}"'))
-def stderr_lacks(result, text):
-    assert text not in result.stderr, result.stderr
-
-
-@then(parsers.parse('"{path}" is not there'))
-def not_there(repo, path):
-    assert not (repo / path).exists()
 
 
 # tests/install-lock and the launcher's wheel mirror.
@@ -851,12 +835,9 @@ def mirror_setting(setting):
     return json.loads(setting)
 
 
-@then("sync stops, saying what a mirror setting is")
-def mirror_refused(setting):
-    with pytest.raises(SystemExit) as stop:
-        cli.values({"kind": "utility", "mirror": setting})
-    assert 'mirror is {"wheels": "https://host/path", "terraform": "https://host/path", "pypi": "https://host/path"}' \
-        in str(stop.value)
+@when("sync reads the mirror setting")
+def mirror_read(pubtest_ctx, setting):
+    pubtest_ctx.attempt(lambda: cli.values({"kind": "utility", "mirror": setting}))
 
 
 @given("a lock that pins this pubrules' wheel", target_fixture="repo_dir")
@@ -905,14 +886,15 @@ def launcher_stops(launched, message):
     assert launched["code"] == 1 and message in launched["stderr"], launched
 
 
-@then("the launcher without a mirror runs uvx on pubrules' GitHub release URL, with no fetch")
-def launcher_plain():
-    text = cli.render(cli.templates("utility")["pubrules"], cli.values({"kind": "utility"}))
-    assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text and "fetch()" not in text
+@then(parsers.parse('the file "{path}" runs uvx on this pubrules\' GitHub release URL'))
+def launcher_plain(pubtest_ctx, path):
+    from pubtest.steps.files import at  # noqa: PLC0415
+    text = at(pubtest_ctx, path).read_text()
+    assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text, text
 
 
-def _steps(workflow):
-    data = yaml.safe_load((WORKFLOWS / workflow).read_text())
+def _steps(shipped, workflow):
+    data = yaml.safe_load(shipped["workflows"][workflow])
     return [s for job in data["jobs"].values() for s in job.get("steps", [])]
 
 
@@ -926,16 +908,16 @@ def _self_pinned(step, name):
     return m["commit"]
 
 
-def _action_inputs(name):
-    return yaml.safe_load((WORKFLOWS.parents[1] / "actions" / name / "action.yml").read_text())["inputs"]
+def _action_inputs(shipped, name):
+    return yaml.safe_load(shipped["actions"][name])["inputs"]
 
 
 @then(parsers.parse("every setup step of \"{workflow}\" runs its setup input through actions/retry at pubrules' "
                     "own pin, three times with 15 seconds between"))
-def setup_retried(workflow):
-    steps = [s for s in _steps(workflow) if s.get("name", "").startswith("Set up, tried three times")]
+def setup_retried(shipped, workflow):
+    steps = [s for s in _steps(shipped, workflow) if s.get("name", "").startswith("Set up, tried three times")]
     assert steps, workflow
-    retry = _action_inputs("retry")
+    retry = _action_inputs(shipped, "retry")
     assert (retry["what"]["default"], retry["tries"]["default"], retry["pause"]["default"]) == ("setup", "3", "15")
     for step in steps:
         _self_pinned(step, "retry")
@@ -945,25 +927,24 @@ def setup_retried(workflow):
 
 @then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubrules' own pin in the "
                     "terraform-dir input, with \"{args}\" and the action's default pause"))
-def init_by_action(workflow, args):
-    (step,) = [s for s in _steps(workflow) if s.get("name", "").startswith("terraform init, tried three times")]
+def init_by_action(shipped, workflow, args):
+    (step,) = [s for s in _steps(shipped, workflow) if s.get("name", "").startswith("terraform init, tried three times")]
     _self_pinned(step, "terraform-init")
-    init = _action_inputs("terraform-init")
+    init = _action_inputs(shipped, "terraform-init")
     assert (init["tries"]["default"], init["pause"]["default"]) == ("3", "15")
     assert step["with"] == {"dir": "${{ inputs.terraform-dir }}", "args": args}, step
     assert "run" not in step and "env" not in step, step
 
 
 @then("every use of pubrules' actions in pubrules' workflows pins one commit, at a release no later than this pubrules")
-def self_pins_released():
+def self_pins_released(shipped):
     """No self-pin at all passes too: the workflows may carry their own steps."""
     pins = set()
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        text = path.read_text()
+    for name, text in sorted(shipped["workflows"].items()):
         uses = [u for u in refs.PUBRULES_USE.findall(text) if "/pubrules/actions/" in u]
         pinned = [m for m in refs.PUBRULES_PIN.finditer(text) if m["name"].startswith("actions/")]
         assert len(pinned) == len(uses) and all(m["commit"] for m in pinned), \
-            f"{path.name}: pin pubrules' actions by a release's commit, with its version: {uses}"
+            f"{name}: pin pubrules' actions by a release's commit, with its version: {uses}"
         pins |= {(m["commit"], m["version"]) for m in pinned}
     assert len(pins) <= 1, f"pubrules' workflows pin its actions at more than one commit: {sorted(pins)}"
     for _, version in pins:
@@ -972,14 +953,13 @@ def self_pins_released():
 
 
 @then("no reusable workflow of pubrules' uses an action by a local path")
-def no_local_actions():
+def no_local_actions(shipped):
     reusable = 0
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        data = yaml.safe_load(path.read_text())
+    for name, data in _workflows(shipped):
         on = data.get("on", data.get(True))  # YAML 1.1 reads a bare `on` as true
         if "workflow_call" in (on if isinstance(on, (dict, list)) else [on]):
             reusable += 1
-            assert not [s for s in _steps(path.name) if s.get("uses", "").startswith("./")], path.name
+            assert not [s for s in _steps(shipped, name) if s.get("uses", "").startswith("./")], name
     assert reusable, "no reusable workflow found"
 
 
@@ -1041,8 +1021,8 @@ def given_no_runner(repo, name, job):
     assert "runs-on" not in (jobs(repo, name)[job].get("with") or {})
 
 
-def _takes_runs_on(name):
-    data = yaml.safe_load((WORKFLOWS / name).read_text())
+def _takes_runs_on(shipped, name):
+    data = yaml.safe_load(shipped["workflows"][name])
     spec = triggers(data)["workflow_call"]["inputs"]["runs-on"]
     assert spec["type"] == "string" and spec["default"] == "ubuntu-latest", name
     for job_name, job in data["jobs"].items():
@@ -1050,19 +1030,19 @@ def _takes_runs_on(name):
 
 
 @then("every job workflow pubrules calls, but Rust's test, takes runs-on, ubuntu-latest by default")
-def job_workflows_take_runs_on():
+def job_workflows_take_runs_on(shipped):
     called = {job.workflow for table in ci.JOBS.values() for job in table.values()
               if not job.matrix} | {"job-tested.yml"}
     for name in sorted(called):
-        _takes_runs_on(name)
+        _takes_runs_on(shipped, name)
     assert all(job.workflow == "job-rust-test.yml"
                for table in ci.JOBS.values() for job in table.values() if job.matrix)
 
 
 @then("python-ci.yml, node-ci.yml, rust-ci.yml and service-ci.yml take runs-on, ubuntu-latest by default")
-def whole_workflows_take_runs_on():
+def whole_workflows_take_runs_on(shipped):
     for name in ("python-ci.yml", "node-ci.yml", "rust-ci.yml", "service-ci.yml"):
-        _takes_runs_on(name)
+        _takes_runs_on(shipped, name)
 
 
 @then("no workflow that runs in the merge queue scans there")
@@ -1078,9 +1058,6 @@ def no_queue_scan(repo):
     assert not protect.reported(repo, "merge_group")[2]
 
 
-PUBRULES_ACTIONS = WORKFLOWS.parents[1] / "actions"
-
-
 def _all_steps(data):
     for job in (data.get("jobs") or {}).values():
         yield from job.get("steps") or []
@@ -1088,41 +1065,35 @@ def _all_steps(data):
 
 
 @then("every upload-artifact and actions/cache step in pubrules' workflows continues on error, within five minutes")
-def uploads_non_fatal():
+def uploads_non_fatal(shipped):
     found = 0
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        for step in _all_steps(yaml.safe_load(path.read_text())):
+    for name, data in _workflows(shipped):
+        for step in _all_steps(data):
             if re.match(r"actions/(upload-artifact|cache)@", step.get("uses", "")):
                 found += 1
-                assert step.get("continue-on-error") is True, (path.name, step)
-                assert step.get("timeout-minutes") == 5, (path.name, step)
+                assert step.get("continue-on-error") is True, (name, step)
+                assert step.get("timeout-minutes") == 5, (name, step)
     assert found
 
 
 @then("every cache restore and save in pubrules' cache action continues on error")
-def cache_action_non_fatal():
-    steps = [s for s in _all_steps(yaml.safe_load((PUBRULES_ACTIONS / "cache" / "action.yml").read_text()))
+def cache_action_non_fatal(shipped):
+    steps = [s for s in _all_steps(yaml.safe_load(shipped["actions"]["cache"]))
              if re.match(r"actions/cache/(restore|save)@", s.get("uses", ""))]
     assert len(steps) == 16
     assert all(s.get("continue-on-error") is True for s in steps)
 
 
 @then("no step that runs a test command continues on error")
-def tests_fatal():
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        for step in _all_steps(yaml.safe_load(path.read_text())):
+def commands_never_continue(shipped):
+    for name, data in _workflows(shipped):
+        for step in _all_steps(data):
             run = step.get("run", "")
             if "inputs.test" in run or "inputs.browser-test" in run or "make check" in run:
-                assert not step.get("continue-on-error"), (path.name, step)
+                assert not step.get("continue-on-error"), (name, step)
 
 
 # A content repository (content.feature): the steps above, and these.
-
-@then(parsers.parse('the repository has no {paths}'))
-def has_none(repo, paths):
-    for path in paths.split(", "):
-        assert not (repo / path.strip('"')).exists(), path
-
 
 @then(parsers.parse("pubrules.json reads {text}"))
 def config_reads(repo, text):

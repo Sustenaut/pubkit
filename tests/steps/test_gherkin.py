@@ -64,11 +64,12 @@ TESTS = {
 
 
 @pytest.fixture
-def repo(tmp_path):
+def repo(tmp_path, pubtest_ctx):
     """A scratch repository with nothing in it: not conftest's, which holds
-    the suite init seeds."""
+    the suite init seeds. pubtest's file steps read it too."""
     root = tmp_path / "repo"
     root.mkdir()
+    pubtest_ctx.directory = root
     return root
 
 

@@ -7,8 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-from pytest_bdd import given, parsers, scenarios, then
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from pubrules import hosting
 
@@ -35,13 +34,12 @@ def with_zone(zone):
     return config
 
 
-@then("pubrules accepts its hosting block")
-def accepts(config):
-    assert hosting.settings(config) == config.get("hosting", {})
+@when("pubrules reads the hosting block")
+def reads(pubtest_ctx, config):
+    pubtest_ctx.attempt(lambda: hosting.settings(config))
 
 
-@then(parsers.parse('reading them stops with "{message}"'))
-def stops(config, message):
-    with pytest.raises(SystemExit) as stop:
-        hosting.settings(config)
-    assert message in str(stop.value)
+@then("the result is the hosting block it was given")
+def accepts(pubtest_ctx, config):
+    assert pubtest_ctx.refused is None, pubtest_ctx.refused
+    assert pubtest_ctx.result == config.get("hosting", {}), pubtest_ctx.result

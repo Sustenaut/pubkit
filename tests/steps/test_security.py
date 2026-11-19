@@ -7,7 +7,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -23,72 +22,76 @@ def config(text):
     return json.loads(text)
 
 
-def entries(config):
-    return yaml.safe_load(security.dependabot(config))["updates"]
+@when("pubrules writes dependabot.yml from them")
+def writes(pubtest_ctx, config):
+    """What it writes, as YAML reads it; nothing (null) when it writes no file."""
+    def write():
+        text = security.dependabot(config)
+        read = None if text is None else yaml.safe_load(text)
+        return text if read is None else read
+    pubtest_ctx.attempt(write)
+
+
+def entries(pubtest_ctx):
+    assert pubtest_ctx.refused is None, pubtest_ctx.refused.message
+    return pubtest_ctx.result["updates"]
 
 
 @then(parsers.parse('dependabot.yml updates "{ecosystem}" at "{directory}" "{interval}"'))
-def updates(config, ecosystem, directory, interval):
+def updates(pubtest_ctx, ecosystem, directory, interval):
     assert {"package-ecosystem": ecosystem, "directory": directory,
             "schedule": {"interval": interval}}.items() <= next(
-        e for e in entries(config) if e["package-ecosystem"] == ecosystem).items()
+        e for e in entries(pubtest_ctx) if e["package-ecosystem"] == ecosystem).items()
 
 
 @then(parsers.parse('every dependabot.yml entry has "{key}" {value:d}'))
-def every_entry(config, key, value):
-    assert all(e[key] == value for e in entries(config))
+def every_entry(pubtest_ctx, key, value):
+    assert all(e[key] == value for e in entries(pubtest_ctx))
 
 
-def ignored(config, ecosystem):
-    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+def ignored(pubtest_ctx, ecosystem):
+    entry = next(e for e in entries(pubtest_ctx) if e["package-ecosystem"] == ecosystem)
     return [i["dependency-name"] for i in entry.get("ignore", [])]
 
 
 @then(parsers.parse('the "{ecosystem}" entry has "{key}" {value:d}'))
-def entry_has(config, ecosystem, key, value):
-    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+def entry_has(pubtest_ctx, ecosystem, key, value):
+    entry = next(e for e in entries(pubtest_ctx) if e["package-ecosystem"] == ecosystem)
     assert entry[key] == value, entry
 
 
 @then(parsers.parse('the "{ecosystem}" entry has no "{key}"'))
-def entry_lacks(config, ecosystem, key):
-    entry = next(e for e in entries(config) if e["package-ecosystem"] == ecosystem)
+def entry_lacks(pubtest_ctx, ecosystem, key):
+    entry = next(e for e in entries(pubtest_ctx) if e["package-ecosystem"] == ecosystem)
     assert key not in entry, entry
 
 
 @then(parsers.re(r'the "(?P<ecosystem>[\w-]+)" entry ignores (?P<names>.+)'))
-def entry_ignores(config, ecosystem, names):
-    assert ignored(config, ecosystem) == re.findall(r'"([^"]+)"', names)
+def entry_ignores(pubtest_ctx, ecosystem, names):
+    assert ignored(pubtest_ctx, ecosystem) == re.findall(r'"([^"]+)"', names)
 
 
-def matched(config, dependency):
+def matched(pubtest_ctx, dependency):
     """Whether an ignore matches, as Dependabot reads one: `*` is any run of
     characters, slashes included, and case does not count."""
     return any(re.fullmatch(".*".join(map(re.escape, name.split("*"))), dependency, re.I)
-               for name in ignored(config, "github-actions"))
+               for name in ignored(pubtest_ctx, "github-actions"))
 
 
 @then(parsers.parse('Dependabot would not bump "{dependency}"'))
-def not_bumped(config, dependency):
-    assert matched(config, dependency)
+def not_bumped(pubtest_ctx, dependency):
+    assert matched(pubtest_ctx, dependency)
 
 
 @then(parsers.parse('Dependabot would bump "{dependency}"'))
-def bumped(config, dependency):
-    assert not matched(config, dependency)
+def bumped(pubtest_ctx, dependency):
+    assert not matched(pubtest_ctx, dependency)
 
 
-@then("pubrules writes no dependabot.yml")
-def no_file(config):
-    assert security.dependabot(config) is None
-
-
-@then(parsers.parse('reading them stops with "{message}"'))
-def stops(repo, config, message):
+@when("the nightly reads its settings from them")
+def reads_settings(pubtest_ctx, repo, config):
     (repo / "pubrules.json").write_text(json.dumps(config))
-    with pytest.raises(SystemExit) as stop:
-        nightly.settings(repo)
-    assert message in str(stop.value)
+    pubtest_ctx.attempt(lambda: nightly.settings(repo))
 
 
 @then(parsers.parse('"pubrules.json" exists beside "{path}" naming "{ecosystem}"'))

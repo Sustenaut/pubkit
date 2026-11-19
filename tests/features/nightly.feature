@@ -9,21 +9,21 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Given an empty repository
 
   Scenario: pins moves every workflow pin to the latest releases
-    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1 }"
+    Given a file ".github/workflows/ci.yml" holding "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.1 with: { pubrel-version: v0.5.1 }"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
-    And ".github/workflows/ci.yml" contains "release.yml@v0.5.3 with: { pubrel-version: v0.5.3 }"
+    And the file ".github/workflows/ci.yml" includes "release.yml@v0.5.3 with: { pubrel-version: v0.5.3 }"
 
   Scenario: pins moves pubrules' pin in every one of its reusable workflows
-    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrules/.github/workflows/node-ci.yml@v0.0.1"
+    Given a file ".github/workflows/ci.yml" holding "uses: example-org/pubrules/.github/workflows/node-ci.yml@v0.0.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/ci.yml" does not contain "node-ci.yml@v0.0.1"
+    And the file ".github/workflows/ci.yml" does not include "node-ci.yml@v0.0.1"
 
   Scenario: pins moves pubrel's commit together with its version
     Given pubrel's repository tags "v0.5.3"
-    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
+    And a file ".github/workflows/ci.yml" holding "    uses: example-org/pubrel/.github/workflows/release.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.5.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.1 -> 0.5.3"
@@ -31,14 +31,14 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves pubrules' commit together with its version
     Given pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrules/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
+    And a file ".github/workflows/ci.yml" holding "    uses: example-org/pubrules/.github/workflows/node-ci.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.0.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And ".github/workflows/ci.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
 
   Scenario: pins moves a current pin by tag to the tag's commit
     Given pubrel's repository tags "v0.5.3"
-    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
+    And a file ".github/workflows/ci.yml" holding "    uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints "ci.yml: pubrel release workflow 0.5.3 pinned to"
@@ -46,11 +46,11 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves a workflow pinned under the old owner to workflows_owner's
     Given pubrules.json names the workflows owner "sustenaut"
-    And the file ".github/workflows/ci.yml" reads "    uses: example-org/pubrules/.github/workflows/node-ci.yml@v0.0.1"
+    And a file ".github/workflows/ci.yml" holding "    uses: example-org/pubrules/.github/workflows/node-ci.yml@v0.0.1"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
-    And ".github/workflows/ci.yml" contains "uses: sustenaut/pubrules/.github/workflows/node-ci.yml@v"
-    And ".github/workflows/ci.yml" does not contain "example-org"
+    And the file ".github/workflows/ci.yml" includes "uses: sustenaut/pubrules/.github/workflows/node-ci.yml@v"
+    And the file ".github/workflows/ci.yml" does not include "example-org"
 
   Scenario Outline: pins moves a pubrules action to this pubrules' commit, under the current owner
     Given pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
@@ -88,7 +88,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves another repository's workflow to its latest release, by its tag's commit
     Given "example-org/somefleet" releases "v0.2.0"
-    And the file ".github/workflows/nightly.yml" reads "    uses: example-org/somefleet/.github/workflows/nightly.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
+    And a file ".github/workflows/nightly.yml" holding "    uses: example-org/somefleet/.github/workflows/nightly.yml@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "nightly.yml: example-org/somefleet 0.1.0 -> 0.2.0"
@@ -96,7 +96,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves another repository's current pin by tag to the tag's commit
     Given "example-org/somefleet" releases "v0.2.0"
-    And the file ".github/workflows/board.yml" reads "    uses: example-org/somefleet/.github/workflows/board.yml@v0.2.0"
+    And a file ".github/workflows/board.yml" holding "    uses: example-org/somefleet/.github/workflows/board.yml@v0.2.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "board.yml: example-org/somefleet 0.2.0 pinned to"
@@ -104,19 +104,19 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins leaves another repository's workflow whose latest release it cannot read, and warns
     Given "example-org/somefleet" releases "main"
-    And the file ".github/workflows/nightly.yml" reads "    uses: example-org/somefleet/.github/workflows/nightly.yml@v0.1.0"
+    And a file ".github/workflows/nightly.yml" holding "    uses: example-org/somefleet/.github/workflows/nightly.yml@v0.1.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And stderr mentions "no latest release of example-org/somefleet to read"
-    And ".github/workflows/nightly.yml" contains "nightly.yml@v0.1.0"
+    And the file ".github/workflows/nightly.yml" includes "nightly.yml@v0.1.0"
 
   Scenario: pins moves another repository's action to its latest release, by its tag's commit
     Given "example-org/somehost" releases "v0.2.0"
-    And the file ".github/workflows/deploy.yml" reads "      - uses: example-org/somehost/actions/docker-build@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
+    And a file ".github/workflows/deploy.yml" holding "      - uses: example-org/somehost/actions/docker-build@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v0.1.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "deploy.yml: example-org/somehost 0.1.0 -> 0.2.0"
-    And ".github/workflows/deploy.yml" contains "example-org/somehost/actions/docker-build@"
+    And the file ".github/workflows/deploy.yml" includes "example-org/somehost/actions/docker-build@"
     And ".github/workflows/deploy.yml" pins "example-org/somehost" to the commit of "v0.2.0"
 
   Scenario: actions moves a third-party action to its latest release, by its tag's commit
@@ -130,20 +130,20 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: actions moves the pins in the repository's own composite actions
     Given "example-org/setup-thing" releases "v2.1.0"
-    And the file "actions/build/action.yml" reads "    - uses: 'example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0'"
-    And the file "node_modules/dep/action.yml" reads "    - uses: example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
+    And a file "actions/build/action.yml" holding "    - uses: 'example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0'"
+    And a file "node_modules/dep/action.yml" holding "    - uses: example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
     When I run pubrules "actions"
     Then it succeeds
     And it prints "actions/build/action.yml: example-org/setup-thing 1.4.0 -> 2.1.0"
     And "actions/build/action.yml" uses "example-org/setup-thing" at the commit of "v2.1.0"
-    And "node_modules/dep/action.yml" contains "# v1.4.0"
+    And the file "node_modules/dep/action.yml" includes "# v1.4.0"
 
   Scenario Outline: actions leaves an action it does not move
     Given "example-org/setup-thing" releases "<latest>"
-    And the file ".github/workflows/ci.yml" reads "      - uses: <pin>"
+    And a file ".github/workflows/ci.yml" holding "      - uses: <pin>"
     When I run pubrules "actions"
     Then it succeeds
-    And ".github/workflows/ci.yml" contains "<pin>"
+    And the file ".github/workflows/ci.yml" includes "<pin>"
 
     Examples:
       | latest | pin                                                                            |
@@ -160,11 +160,11 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And the generated workflow "pr.yml" uses "example-org/setup-thing@1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0 # v1.4.0"
     When I run pubrules "actions"
     Then it succeeds
-    And ".github/workflows/pr.yml" contains "# v1.4.0"
+    And the file ".github/workflows/pr.yml" includes "# v1.4.0"
 
   Scenario: pins moves another repository's Terraform module from its tag to its latest release's commit
     Given "example-org/somehost" releases "v0.2.0"
-    And the file "infra/dns.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    And a file "infra/dns.tf" holding "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "infra/dns.tf: example-org/somehost 0.1.0 -> 0.2.0"
@@ -172,70 +172,70 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pins moves a Terraform module pinned by commit, by the version in its comment
     Given "example-org/somehost" releases "v0.2.0"
-    And the file "infra/dns.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" # v0.1.0"
+    And a file "infra/dns.tf" holding "  source = "github.com/example-org/somehost//terraform/hosting?ref=1a49eb98c9647c1b60073d55b9ca0daf3eeee5c0" # v0.1.0"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And "infra/dns.tf" sources "example-org/somehost//terraform/hosting" at the commit of "v0.2.0"
 
   Scenario: pins leaves pubrules' own Terraform modules and those outside .tf files
     Given "example-org/somehost" releases "v0.2.0"
-    And the file "infra/dns.tf" reads "  source = "github.com/Sustenaut/pubrules//terraform/hosting?ref=v0.24.4""
-    And the file "infra/notes.md" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
-    And the file "infra/.terraform/modules/x/main.tf" reads "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    And a file "infra/dns.tf" holding "  source = "github.com/Sustenaut/pubrules//terraform/hosting?ref=v0.24.4""
+    And a file "infra/notes.md" holding "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
+    And a file "infra/.terraform/modules/x/main.tf" holding "  source = "github.com/example-org/somehost//terraform/hosting?ref=v0.1.0""
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "infra/dns.tf" contains "pubrules//terraform/hosting?ref=v0.24.4"
-    And "infra/notes.md" contains "?ref=v0.1.0"
-    And "infra/.terraform/modules/x/main.tf" contains "?ref=v0.1.0"
+    And the file "infra/dns.tf" includes "pubrules//terraform/hosting?ref=v0.24.4"
+    And the file "infra/notes.md" includes "?ref=v0.1.0"
+    And the file "infra/.terraform/modules/x/main.tf" includes "?ref=v0.1.0"
 
   Scenario: pins leaves a deploy.providers package's workflow to the package's own bump
     Given "example-org/somedeploy" releases "v0.2.0"
     And pubrules.json lists "https://github.com/example-org/somedeploy/releases/download/v0.1.0/somedeploy-0.1.0-py3-none-any.whl" in deploy.providers
-    And the file ".github/workflows/deploy.yml" reads "    uses: example-org/somedeploy/.github/workflows/deploy.yml@v0.1.0"
+    And a file ".github/workflows/deploy.yml" holding "    uses: example-org/somedeploy/.github/workflows/deploy.yml@v0.1.0"
     When I run pubrules "pins" "--no-lock"
-    Then ".github/workflows/deploy.yml" contains "deploy.yml@v0.1.0"
+    Then the file ".github/workflows/deploy.yml" includes "deploy.yml@v0.1.0"
 
   Scenario: pins moves another repository's release wheel in a requirements file and pyproject.toml
     Given "example-org/somelib" releases "v0.3.0"
-    And the file "requirements.in" reads "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
-    And the file "pyproject.toml" reads "dependencies = ["somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"]"
+    And a file "requirements.in" holding "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    And a file "pyproject.toml" holding "dependencies = ["somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"]"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "requirements.in: example-org/somelib 0.2.1 -> 0.3.0"
-    And "requirements.in" contains "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
-    And "pyproject.toml" contains "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+    And the file "requirements.in" includes "somelib[extra] @ https://github.com/example-org/somelib/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+    And the file "pyproject.toml" includes "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
 
   Scenario: A content repository is governed like any other: pins moves its pubrules and its release wheels
     Given a repository initialised as "content"
     And "example-org/somelib" releases "v0.3.0"
-    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.0.1/pubrules-0.0.1-py3-none-any.whl"
-    And the file "tests/requirements.txt" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.0.1/pubrules-0.0.1-py3-none-any.whl"
+    And a file "tests/requirements.txt" holding "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "pubrules 0.0.1 ->"
     And it prints "tests/requirements.txt: example-org/somelib 0.2.1 -> 0.3.0"
-    And "tests/requirements.txt" contains "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
-    And the repository has no "with-secrets"
-    And the repository has no "pubsec"
+    And the file "tests/requirements.txt" includes "/releases/download/v0.3.0/somelib-0.3.0-py3-none-any.whl"
+    And the file "with-secrets" does not exist
+    And the file "pubsec" does not exist
 
   Scenario: pins never moves a release wheel back, and leaves files that are not requirements
     Given "example-org/somelib" releases "v0.2.0"
-    And the file "tests/requirements.txt" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
-    And the file "README.md" reads "somelib @ https://github.com/example-org/somelib/releases/download/v0.1.0/somelib-0.1.0-py3-none-any.whl"
+    And a file "tests/requirements.txt" holding "somelib @ https://github.com/example-org/somelib/releases/download/v0.2.1/somelib-0.2.1-py3-none-any.whl"
+    And a file "README.md" holding "somelib @ https://github.com/example-org/somelib/releases/download/v0.1.0/somelib-0.1.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "tests/requirements.txt" contains "v0.2.1/somelib-0.2.1"
-    And "README.md" contains "v0.1.0/somelib-0.1.0"
+    And the file "tests/requirements.txt" includes "v0.2.1/somelib-0.2.1"
+    And the file "README.md" includes "v0.1.0/somelib-0.1.0"
 
   Scenario: pins run by an older pubrules than the repository's leaves pubrules' files alone
-    Given the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v99.0.0/pubrules-99.0.0-py3-none-any.whl"
+    Given a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v99.0.0/pubrules-99.0.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "tests/requirements.lock" contains "v99.0.0/pubrules-99.0.0"
+    And the file "tests/requirements.lock" includes "v99.0.0/pubrules-99.0.0"
     And it does not print "pubrules 99.0.0 ->"
 
   Scenario: pins on a repository already current changes nothing
-    Given the file ".github/workflows/ci.yml" reads "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
+    Given a file ".github/workflows/ci.yml" holding "uses: example-org/pubrel/.github/workflows/release.yml@v0.5.3"
     When I run pubrules "pins" "--pubrel" "0.5.3" "--no-lock"
     Then it succeeds
     And it prints nothing
@@ -281,12 +281,27 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then reading the nightly settings stops with "security.fuzz has no language go"
 
   Scenario: A repository with no npm or Python lock gets no npm or Python updates
-    Then the npm and Python updates are empty
+    Given an empty repository
+    When the nightly reads the npm and Python updates and locks
+    Then the result is:
+      """
+      {"npm": [], "npm locked": {}, "python": [], "python locked": {}}
+      """
 
   Scenario: The npm updates listed are the direct dependencies that moved
     Given a package-lock.json where "marked" is 18.1.0 and "entities" is 4.5.0
-    Then the npm packages listed are "marked@18.1.0"
-    And the packages that moved from "marked@18.1.0, yaml@2.9.1" to "marked@18.2.0, yaml@2.9.1" are "marked 18.1.0 -> 18.2.0"
+    When the nightly reads the npm packages locked
+    Then the result is:
+      """
+      {"marked": "18.1.0"}
+      """
+
+  Scenario: The packages listed as moved are those whose version changed
+    When the nightly compares the packages "marked@18.1.0, yaml@2.9.1" with "marked@18.2.0, yaml@2.9.1"
+    Then the result is:
+      """
+      ["marked 18.1.0 -> 18.2.0"]
+      """
 
   Scenario: The body of a repository that takes no updates says so
     When the nightly writes a body for a repository that takes no updates
@@ -317,7 +332,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And its body says "takes no third-party updates" and lists no "marked"
 
   Scenario: pins moves the crates pubrules.json names, and no others
-    Given the file "pubrules.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
+    Given a file "pubrules.json" holding "{"nightly": {"pins": {"crates": ["my-core"]}}}"
     And Cargo.lock locks "my-core, publet-core"
     And cargo stands in, recording what it is asked
     When I run pubrules "pins" "--no-lock"
@@ -326,7 +341,7 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And stderr does not mention "nightly.pins.crates"
 
   Scenario: pins moves no crates when pubrules.json names none
-    Given the file "pubrules.json" reads "{"nightly": {"pins": {"crates": []}}}"
+    Given a file "pubrules.json" holding "{"nightly": {"pins": {"crates": []}}}"
     And Cargo.lock locks "publet-core"
     And cargo stands in, recording what it is asked
     When I run pubrules "pins" "--no-lock"
@@ -340,12 +355,12 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     Then it succeeds
     And cargo was asked to update nothing
   Scenario: The upgrades tried leave out the crates pubrules.json pins, and only those
-    Given the file "pubrules.json" reads "{"nightly": {"pins": {"crates": ["my-core"]}}}"
+    Given a file "pubrules.json" holding "{"nightly": {"pins": {"crates": ["my-core"]}}}"
     When cargo update --dry-run here says "Updating my-core v1.0.0 -> v1.0.1" and "Updating publet-core v1.0.0 -> v1.0.1"
     Then the upgrades tried are "publet-core 1.0.0 -> 1.0.1"
 
   Scenario Outline: sync --check refuses a nightly block pubrules cannot use, naming the key
-    Given the file "pubrules.json" reads "{"kind": "utility", "nightly": <block>}"
+    Given a file "pubrules.json" holding "{"kind": "utility", "nightly": <block>}"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "<message>"
@@ -361,21 +376,21 @@ Feature: The nightly keeps every pub* repository current, through a pull request
 
   Scenario: pubrules new names the owner it is given, and the protect block the repository needs
     When I start the package "pubfoo" owned by "example-org"
-    Then "Cargo.toml" contains "https://github.com/example-org/pubfoo"
-    And "SECURITY.md" contains "https://github.com/example-org/pubfoo/security"
+    Then the file "Cargo.toml" includes "https://github.com/example-org/pubfoo"
+    And the file "SECURITY.md" includes "https://github.com/example-org/pubfoo/security"
     And what it printed says "add a protect block" and "switch the repository on in the release app"
     And what it printed does not say "protected.json" or "governed.json"
 
   Scenario: pubrules new takes the owner from the origin remote
     Given the origin remote is "git@github.com:example-org/pubfoo.git"
     When I start the package "pubfoo" without a key
-    Then "Cargo.toml" contains "https://github.com/example-org/pubfoo"
+    Then the file "Cargo.toml" includes "https://github.com/example-org/pubfoo"
 
   Scenario: pubrules new without an owner or a GitHub origin stops, asking for one
     When I run pubrules "new" "--name=pubfoo" "--tag=PKG-PUBFOO-10-2026" "--no-key" "--no-lock"
     Then it fails
     And stderr mentions "--owner=OWNER"
-    And the repository has no "Cargo.toml"
+    And the file "Cargo.toml" does not exist
 
   Scenario: pubrules new uses no key whose identifier pub prints wrongly
     Given pub stands in, printing the key "--root=elsewhere"
@@ -384,7 +399,9 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And pub was not asked to set the policy
 
   Scenario: The identifier pubrules new takes is the one pubrules makes
-    Then an object's identifier passes as a key
+    When pubrules makes the identifier of "an object"
+    And pubrules new reads it as a key
+    Then the result is "true"
 
   Scenario: pubrules new refuses an owner GitHub could not have
     When I run pubrules "new" "--name=pubfoo" "--tag=PKG-PUBFOO-10-2026" "--owner=a/b" "--no-key" "--no-lock"
@@ -402,10 +419,31 @@ Feature: The nightly keeps every pub* repository current, through a pull request
     And it conforms to the standard but for "RS-SUP-05"
 
   Scenario: A uv lock made from a moved file is compiled again
-    Then a uv lock made from a moved file is compiled again
+    Given a scratch directory
+    And a file "requirements.in" holding "x"
+    And a file "requirements.lock" holding:
+      """
+      # This file was autogenerated by uv via the following command:
+      #    uv pip compile --generate-hashes requirements.in -o requirements.lock
+      """
+    And a file "other.lock" holding "#    uv pip compile other.in -o other.lock"
+    And a stand-in "uv"
+    When the nightly compiles again the locks made from "requirements.in"
+    Then the result is:
+      """
+      ["requirements.lock: compiled again"]
+      """
+    And "uv" was run with "pip compile --generate-hashes requirements.in -o requirements.lock"
+    And "uv" was run 1 times
 
   Scenario: A uv lock that fails to compile is said and left
-    Then a uv lock that fails to compile is said and left
+    Given a scratch directory
+    And a file "requirements.in" holding "x"
+    And a file "requirements.lock" holding "#    uv pip compile requirements.in -o requirements.lock"
+    And a stand-in "uv" that fails, saying "no such wheel"
+    When the nightly compiles again the locks made from "requirements.in"
+    Then the result is "[]"
+    And stderr mentions "requirements.lock could not be compiled again: no such wheel"
 
   Scenario Outline: The lock's pubrules pin is read by its version alone, as pubfleet's board reads it
     When I find the pubrules pins in a lock pinning "<wheel>"

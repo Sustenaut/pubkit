@@ -9,7 +9,14 @@ Feature: A content repository is one pubrules neither releases nor deploys
     When I run pubrules "init" "--kind=content"
     Then it succeeds
     And the repository has "pubrules", "AGENTS.md", "tests/requirements-pubrules.txt", "tests/install-lock", "tests/requirements.txt", ".github/workflows/pr.yml", ".github/workflows/main.yml"
-    And the repository has no "with-secrets", "with-secrets.json", "pubsec", "pubdeploy", "pubrules.mk", "pubrules-python.mk", "rust-toolchain.toml", "Makefile"
+    And the file "with-secrets" does not exist
+    And the file "with-secrets.json" does not exist
+    And the file "pubsec" does not exist
+    And the file "pubdeploy" does not exist
+    And the file "pubrules.mk" does not exist
+    And the file "pubrules-python.mk" does not exist
+    And the file "rust-toolchain.toml" does not exist
+    And the file "Makefile" does not exist
     And pubrules.json reads {"kind": "content", "ci": {}}
 
   Scenario: A repository just initialised as content is in step

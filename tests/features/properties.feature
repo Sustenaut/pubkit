@@ -1,13 +1,17 @@
 Feature: What holds for every input, tried by Hypothesis
   Each scenario states a property and lets Hypothesis generate the inputs
   that would break it, PUBRULES_FUZZ_RUNS of them: a few on every push, many
-  on the nightly schedule.
+  on the nightly schedule. The action is Hypothesis trying them; a refusal
+  would carry the smallest input that broke the property.
 
   Scenario: Canonical CBOR decodes back to every value it encodes
-    Then every value pub read --json shows encodes to CBOR that decodes back to it
+    When Hypothesis encodes each value pub read --json shows to CBOR and decodes it back
+    Then it is not refused
 
   Scenario: Canonical CBOR is the same whatever order a map's keys come in
-    Then every map encodes to the same CBOR with its keys in any order, sorted by their bytes
+    When Hypothesis encodes each map with its keys in any order
+    Then it is not refused
 
   Scenario: The nightly lists exactly the packages whose version moved
-    Then for any two locks, the packages listed as changed are those in both whose version differs
+    When Hypothesis lists the packages changed between any two locks
+    Then it is not refused

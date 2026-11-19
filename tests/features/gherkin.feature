@@ -22,7 +22,7 @@ Feature: Every test is a Gherkin scenario
 
   Scenario: A feature file with no scenario fails TEST-01
     Given a utility whose suite is Gherkin
-    And the file "tests/features/empty.feature" reads "Feature: Nothing yet"
+    And a file "tests/features/empty.feature" holding "Feature: Nothing yet"
     When I run pubrules "gherkin"
     Then it fails
     And stderr mentions "TEST-01: tests/features/empty.feature has no scenario"
@@ -112,27 +112,27 @@ Feature: Every test is a Gherkin scenario
   Scenario: The move from a pubrules before TEST-04 waives it, until the end of 2026, where it fails
     Given a utility whose suite is Gherkin
     And the suite's scenario has no When
-    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "pubrules.json: TEST-04 waived until 2026-12-31, for the 1 scenario with no When"
-    And "pubrules.json" contains ""until": "2026-12-31""
-    And "pubrules.json" contains "had no When on the move from pubrules 0.43.0, before the rule"
+    And the file "pubrules.json" includes ""until": "2026-12-31""
+    And the file "pubrules.json" includes "had no When on the move from pubrules 0.43.0, before the rule"
 
   Scenario: The move from pubkit 0.41.1 waives TEST-04 where it fails
     Given a utility whose suite is Gherkin
     And the suite's scenario has no When
-    And the file "tests/requirements.lock" reads "pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v0.41.1/pubkit-0.41.1-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubkit @ https://github.com/Sustenaut/pubkit/releases/download/v0.41.1/pubkit-0.41.1-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
     And it prints "pubrules.json: TEST-04 waived until 2026-12-31, for the 1 scenario with no When"
-    And "pubrules.json" contains "had no When on the move from pubkit 0.41.1, before the rule"
+    And the file "pubrules.json" includes "had no When on the move from pubkit 0.41.1, before the rule"
 
   Scenario: Once waived by the move, TEST-04 is an open exception
     Given a utility whose suite is Gherkin
     And the suite's scenario has no When
     And PUBRULES_ANY_VERSION is set
-    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     And I run pubrules "gherkin"
     Then it succeeds
@@ -140,23 +140,23 @@ Feature: Every test is a Gherkin scenario
 
   Scenario: The move from a pubrules before TEST-04 waives nothing where every scenario has a When
     Given a utility whose suite is Gherkin
-    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "pubrules.json" does not contain "TEST-04"
+    And the file "pubrules.json" does not include "TEST-04"
 
   Scenario: The move waives TEST-04 no more after 2026
     Given a utility whose suite is Gherkin
     And the suite's scenario has no When
     And today is "2027-01-01"
-    And the file "tests/requirements.lock" reads "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v0.43.0/pubrules-0.43.0-py3-none-any.whl"
     When I run pubrules "pins" "--no-lock"
     Then it succeeds
-    And "pubrules.json" does not contain "TEST-04"
+    And the file "pubrules.json" does not include "TEST-04"
 
   Scenario: A Rust crate's own tests are the Rust crate standard's
     Given a utility whose suite is Gherkin
-    And the file "src/lib.rs" reads "#[test] fn adds() {}"
+    And a file "src/lib.rs" holding "#[test] fn adds() {}"
     When I run pubrules "gherkin"
     Then it succeeds
 

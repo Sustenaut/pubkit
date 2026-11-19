@@ -97,7 +97,7 @@ Feature: A Rust repository conforms to the standard, or says why not
   Scenario: Without a workflow calling rust-ci.yml, conform names workflows_owner's
     Given a Rust crate that meets the standard
     And pubrules.json names the workflows owner "sustenaut"
-    And the file ".github/workflows/ci.yml" reads "jobs: {}"
+    And a file ".github/workflows/ci.yml" holding "jobs: {}"
     When I run pubrules "conform"
     Then it fails
     And stderr mentions "no workflow calls sustenaut/pubrules/.github/workflows/rust-ci.yml"

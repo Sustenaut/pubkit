@@ -7,19 +7,26 @@ Feature: pubrules.json's hosting block holds the providers and the zones
 
   Scenario: The Terraform modules' test setup is a hosting block pubrules accepts
     Given the pubrules.json the Terraform modules are tested with
-    Then pubrules accepts its hosting block
+    When pubrules reads the hosting block
+    Then the result is the hosting block it was given
 
   Scenario: A repository without a hosting block has nothing to check
     Given the hosting settings '{"kind": "service"}'
-    Then pubrules accepts its hosting block
+    When pubrules reads the hosting block
+    Then the result is "{}"
 
   Scenario: Any name can be a provider of a type pubrules knows
     Given the hosting settings '{"hosting": {"providers": {"main-hetzner": {"type": "hetzner"}, "other-hetzner": {"type": "hetzner"}}, "zones": {"example.eu": {"dns": ["other-hetzner"]}}}}'
-    Then pubrules accepts its hosting block
+    When pubrules reads the hosting block
+    Then the result is:
+      """
+      {"providers": {"main-hetzner": {"type": "hetzner"}, "other-hetzner": {"type": "hetzner"}}, "zones": {"example.eu": {"dns": ["other-hetzner"]}}}
+      """
 
   Scenario Outline: A provider pubrules cannot use stops it with a message
     Given the hosting settings '{"hosting": {"providers": {"p": <provider>}}}'
-    Then reading them stops with "<message>"
+    When pubrules reads the hosting block
+    Then it is refused, saying "<message>"
 
     Examples:
       | provider                                                          | message                                       |
@@ -42,7 +49,8 @@ Feature: pubrules.json's hosting block holds the providers and the zones
 
   Scenario Outline: A zone pubrules cannot use stops it with a message
     Given the providers of the modules' test setup with the zone '<zone>'
-    Then reading them stops with "<message>"
+    When pubrules reads the hosting block
+    Then it is refused, saying "<message>"
 
     Examples:
       | zone                                                                                    | message                                         |
@@ -71,11 +79,13 @@ Feature: pubrules.json's hosting block holds the providers and the zones
 
   Scenario: A zone deSEC and Cloudflare serve can be signed by both
     Given the providers of the modules' test setup with the zone '{"dns": ["desec", "cloudflare"], "dnssec": {"keys": {"desec": ["257 3 13 AAAA"], "cloudflare": ["257 3 13 BBBB", "256 3 13 CCCC"]}}}'
-    Then pubrules accepts its hosting block
+    When pubrules reads the hosting block
+    Then the result is the hosting block it was given
 
   Scenario Outline: A dnssec block pubrules cannot use stops it with a message
     Given the providers of the modules' test setup with the zone '{"dns": <dns>, "dnssec": <dnssec>}'
-    Then reading them stops with "<message>"
+    When pubrules reads the hosting block
+    Then it is refused, saying "<message>"
 
     Examples:
       | dns                       | dnssec                                                                                  | message                                          |
@@ -94,7 +104,8 @@ Feature: pubrules.json's hosting block holds the providers and the zones
 
   Scenario Outline: A hosting block of the wrong shape stops it with a message
     Given the hosting settings '<config>'
-    Then reading them stops with "<message>"
+    When pubrules reads the hosting block
+    Then it is refused, saying "<message>"
 
     Examples:
       | config                                           | message                                      |
@@ -107,7 +118,10 @@ Feature: pubrules.json's hosting block holds the providers and the zones
 
   Scenario: pubrules sync --check stops on a hosting block it cannot use
     Given a repository initialised as "utility"
-    When the file "pubrules.json" reads "{"kind": "utility", "hosting": {"provider": {}}}"
+    When the file "pubrules.json" changes to:
+      """
+      {"kind": "utility", "hosting": {"provider": {}}}
+      """
     And I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "hosting has no setting provider"

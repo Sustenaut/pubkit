@@ -7,16 +7,16 @@ Feature: A service's needs from GitHub Actions
 
   Scenario: sync writes the caller in a repository with a deploy block, its units the choices
     Given a repository initialised as "utility"
-    And the file "integrations.json" reads "{"uses": []}"
+    And a file "integrations.json" holding "{"uses": []}"
     And pubrules.json has a deploy block for "example" and the unit "other"
     When I run pubrules "sync"
     Then it succeeds
-    And ".github/workflows/service-needs.yml" contains "options: ["example", "other"]"
-    And ".github/workflows/service-needs.yml" contains "/pubrules/.github/workflows/service-needs.yml@"
-    And ".github/workflows/service-needs.yml" contains "id-token: write"
-    And ".github/workflows/service-needs.yml" contains "with: {"unit": "${{ inputs.unit }}", "kind": "${{ inputs.action }}"}"
-    And ".github/workflows/service-needs.yml" contains "default: check"
-    And ".github/workflows/service-needs.yml" contains "options: ["check", "fulfil"]"
+    And the file ".github/workflows/service-needs.yml" includes "options: ["example", "other"]"
+    And the file ".github/workflows/service-needs.yml" includes "/pubrules/.github/workflows/service-needs.yml@"
+    And the file ".github/workflows/service-needs.yml" includes "id-token: write"
+    And the file ".github/workflows/service-needs.yml" includes "with: {"unit": "${{ inputs.unit }}", "kind": "${{ inputs.action }}"}"
+    And the file ".github/workflows/service-needs.yml" includes "default: check"
+    And the file ".github/workflows/service-needs.yml" includes "options: ["check", "fulfil"]"
     And "integrations.json" lists ".github/workflows/service-needs.yml" under "github.actions-oidc"
     When I run pubrules "sync" "--check"
     Then the caller and integrations.json are in step
@@ -28,21 +28,21 @@ Feature: A service's needs from GitHub Actions
     And pubrules.json's ci block runs on "my-runners"
     When I run pubrules "sync"
     Then it succeeds
-    And ".github/workflows/service-needs.yml" contains ""engine": "https://engine.example.eu", "timeout-minutes": 60, "runs-on": "my-runners""
-    And ".github/workflows/service-needs.yml" contains "service-needs.claude-dispatch is true"
+    And the file ".github/workflows/service-needs.yml" includes ""engine": "https://engine.example.eu", "timeout-minutes": 60, "runs-on": "my-runners""
+    And the file ".github/workflows/service-needs.yml" includes "service-needs.claude-dispatch is true"
 
   Scenario: An edited caller fails the check
     Given a repository initialised as "utility"
     And pubrules.json has a deploy block for "example" and the unit "other"
     And I run pubrules "sync"
-    And the file ".github/workflows/service-needs.yml" reads "edited"
+    And a file ".github/workflows/service-needs.yml" holding "edited"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions ".github/workflows/service-needs.yml differs"
 
   Scenario: Without a deploy block there is no caller, and a written one is to be deleted
     Given a repository initialised as "utility"
-    Then the repository has no ".github/workflows/service-needs.yml"
+    Then the file ".github/workflows/service-needs.yml" does not exist
     Given pubrules.json has a deploy block for "example" and the unit "other"
     And I run pubrules "sync"
     And pubrules.json has no deploy block
@@ -65,6 +65,7 @@ Feature: A service's needs from GitHub Actions
       | {"claude-dispatch": "yes"}             | claude-dispatch must be true or false                  |
 
   Scenario: pubrules ships the reusable service-needs workflow
+    When I read the workflows and actions pubrules ships
     Then pubrules' service-needs.yml takes the unit, asks for id-token write, and runs pubrules service-needs
 
   Scenario Outline: The run ends as the request ends
@@ -146,12 +147,14 @@ Feature: A service's needs from GitHub Actions
 
   Scenario Outline: Without an OIDC token from GitHub nothing is asked
     Given GitHub Actions <gives>
-    Then asking for a token <fails>
+    When the service-needs asks for a token for "https://engine.example.eu"
+    Then it is refused, saying "<said>"
+    And GitHub was asked <times> times
 
     Examples:
-      | gives                         | fails                                        |
-      | gives no OIDC request address | stops, saying the job needs id-token: write |
-      | answers 500 for the token     | is no answer                                 |
+      | gives                         | said                                         | times |
+      | gives no OIDC request address | the job needs `permissions: id-token: write` | 0     |
+      | answers 500 for the token     | GitHub gave no OIDC token                    | 1     |
 
   Scenario: sync takes away the go-live workflow pubrules 0.43.2 wrote, and the check says so
     Given a repository initialised as "utility"
@@ -159,20 +162,20 @@ Feature: A service's needs from GitHub Actions
     When I run pubrules "sync" "--check"
     Then stderr mentions ".github/workflows/go-live.yml is the service-needs workflow now"
     When I run pubrules "sync"
-    Then the repository has no ".github/workflows/go-live.yml"
+    Then the file ".github/workflows/go-live.yml" does not exist
 
   Scenario: One sync after the rename leaves integrations.json and the review's list without the go-live workflow
     Given a repository initialised as "utility"
     And pubrules.json has a deploy block for "example" and the unit "other"
     And the go-live workflow pubrules 0.43.2 wrote is there, calling pubrules' go-live.yml
-    And the file "integrations.json" reads "{"uses": [{"plugin": "github.actions-oidc", "paths": [".github/workflows/go-live.yml"], "mode": "required"}]}"
+    And a file "integrations.json" holding "{"uses": [{"plugin": "github.actions-oidc", "paths": [".github/workflows/go-live.yml"], "mode": "required"}]}"
     When I run pubrules "sync"
     Then it succeeds
-    And the repository has no ".github/workflows/go-live.yml"
+    And the file ".github/workflows/go-live.yml" does not exist
     And "integrations.json" lists ".github/workflows/service-needs.yml" under "github.actions-oidc"
-    And "integrations.json" does not contain "go-live.yml"
-    And ".github/dependency-review-licenses.txt" contains "pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-needs.yml"
-    And ".github/dependency-review-licenses.txt" does not contain "go-live.yml"
+    And the file "integrations.json" does not include "go-live.yml"
+    And the file ".github/dependency-review-licenses.txt" includes "pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-needs.yml"
+    And the file ".github/dependency-review-licenses.txt" does not include "go-live.yml"
     When I run pubrules "sync" "--check"
     Then the caller, integrations.json and the review's list are in step
 

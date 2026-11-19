@@ -6,7 +6,8 @@ Feature: pubrules reads what pubrules.json says about secrets, and never a value
   ones that were pubrules' say so.
 
   Scenario Outline: A wrong secrets list is refused by sync
-    Given the file "pubrules.json" reads "{"kind": "utility", "secrets": <list>}"
+    Given an empty repository
+    And a file "pubrules.json" holding "{"kind": "utility", "secrets": <list>}"
     When I run pubrules "sync" "--check"
     Then the exit code is 1
     And stderr mentions "<message>"
@@ -28,7 +29,8 @@ Feature: pubrules reads what pubrules.json says about secrets, and never a value
       | [{"from": "a", "to": "A", "kind": "secret"}, {"from": "b", "to": "A", "kind": "secret"}] | two of them have the same |
 
   Scenario Outline: pubrules sync refuses a bad github_app block
-    Given the file "pubrules.json" reads "{"kind": "utility", "github_app": <block>}"
+    Given an empty repository
+    And a file "pubrules.json" holding "{"kind": "utility", "github_app": <block>}"
     When I run pubrules "sync" "--check"
     Then the exit code is 1
     And stderr mentions "<message>"

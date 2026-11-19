@@ -13,9 +13,9 @@ Feature: pubrules audit draft has Claude draft the rules left for review
   Scenario: Each rule left for review is drafted, and marked for a person
     When I run pubrules "audit" "draft" "--package" "demo"
     Then it succeeds
-    And "audit/demo-0.1.1.md" contains "**[machine-drafted by claude-opus-5-5: needs human review]** Verdict: falls short."
-    And "audit/demo-0.1.1.md" contains "- **blocks** (`src/lib.rs:1`): drafted for §1.1"
-    And "audit/demo-0.1.1.md" does not contain "[needs review]"
+    And the file "audit/demo-0.1.1.md" includes "**[machine-drafted by claude-opus-5-5: needs human review]** Verdict: falls short."
+    And the file "audit/demo-0.1.1.md" includes "- **blocks** (`src/lib.rs:1`): drafted for §1.1"
+    And the file "audit/demo-0.1.1.md" does not include "[needs review]"
     And the report "demo" "0.1.1" has the header "auditor: pubrules audit prepare (pubrules"
     And the report's blocking count rose by the drafted findings that block
     When I run pubrules "audit" "--check" "demo" "0.1.1"
@@ -53,7 +53,7 @@ Feature: pubrules audit draft has Claude draft the rules left for review
     When I run pubrules "audit" "draft" "--package" "demo"
     Then it fails
     And stderr mentions "the model declined"
-    And "audit/demo-0.1.1.md" contains "[needs review]"
+    And the file "audit/demo-0.1.1.md" includes "[needs review]"
 
   Scenario: An error from the API is reported
     Given the fake Claude API answers 401 "invalid x-api-key"

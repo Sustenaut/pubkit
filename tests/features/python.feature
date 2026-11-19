@@ -24,7 +24,7 @@ Feature: Every Python package runs its suite by the same make targets
 
   Scenario: A Makefile of its own that does not include pubrules-python.mk fails the check
     Given a Python package
-    And the file "Makefile" reads "check:"
+    And a file "Makefile" holding "check:"
     When I run pubrules "sync"
     And I run pubrules "sync" "--check"
     Then it fails
@@ -54,7 +54,7 @@ Feature: Every Python package runs its suite by the same make targets
   Scenario Outline: Only a Python package gets pubrules-python.mk
     Given a <kind> package
     When I run pubrules "sync"
-    Then the repository has no "pubrules-python.mk"
+    Then the file "pubrules-python.mk" does not exist
 
     Examples:
       | kind |

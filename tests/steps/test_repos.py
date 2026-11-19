@@ -104,11 +104,6 @@ def not_ok(result):
     assert result.code != 0, result.stdout
 
 
-@then(parsers.parse('it does not print "{text}"'))
-def not_printed(result, text):
-    assert text not in result.stdout
-
-
 @then(parsers.parse('it warns "{text}"'))
 def warns(result, text):
     assert text in result.stderr, result.stderr
