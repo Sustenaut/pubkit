@@ -474,3 +474,9 @@ def a_uv_lock_that_fails_to_compile_is_said_and_left(tmp_path, monkeypatch, caps
 @then(parsers.parse('it does not print "{text}"'))
 def does_not_print(result, text):
     assert text not in result.stdout, result.stdout
+
+
+@when(parsers.parse('I find the pubrules pins in a lock pinning "{wheel}"'))
+def pins_in_lock(pubtest_ctx, wheel):
+    from pubrules.freshness import PIN  # noqa: PLC0415
+    pubtest_ctx.attempt(lambda: PIN.findall(f"pubrules @ {wheel}\n"))
