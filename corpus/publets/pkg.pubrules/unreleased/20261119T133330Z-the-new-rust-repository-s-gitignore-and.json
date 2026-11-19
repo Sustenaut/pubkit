@@ -1,4 +1,0 @@
-{
-  "category": "fixed",
-  "change": "The new Rust repository's .gitignore, and pubrules' own, ignore .venv as a link too, so pubrel 0.8's prepare, which links the checkout's .venv into its worktree, no longer commits it"
-}
