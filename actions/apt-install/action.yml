@@ -1,0 +1,68 @@
+# Installs apt packages, keeping the package lists and the .deb files in
+# the Actions cache, so a run whose packages and runner image are the same
+# as an earlier run's installs them without fetching anything: a slow
+# Ubuntu mirror can take minutes over what the cache restores in seconds.
+#
+#   - name: Install the cross toolchain
+#     uses: Sustenaut/pubrules/actions/apt-install@<commit> # vX.Y.Z
+#     with: { packages: gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user }
+#
+# The key is apt-<ImageOS>-<ImageVersion>-<arch>-<sha256 of the sorted
+# packages and the no-install-recommends flag>, so a new runner image, or
+# another package list, starts a new entry. On a hit the packages are
+# installed with --no-download and no apt-get update; if that fails, the
+# lists are updated and the install tried again, as on a miss, which then
+# saves the new entry. Where the cache service refuses (a self-hosted
+# runner whose billing is blocked), restore and save fail quietly and the
+# packages are installed from the mirror, as without the cache.
+name: apt-install
+description: Install apt packages, with the package lists and .deb files kept in the Actions cache.
+
+inputs:
+  packages:
+    description: The packages to install, separated by spaces.
+    required: true
+  no-install-recommends:
+    description: "'true' installs no recommended package (apt-get --no-install-recommends); 'false' installs them."
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Plan the apt cache key
+      id: plan
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        NO_INSTALL_RECOMMENDS: ${{ inputs.no-install-recommends }}
+      run: '"$GITHUB_ACTION_PATH/plan.sh"'
+
+    # A composite step takes no timeout-minutes: actions/cache gives up on
+    # a download after SEGMENT_DOWNLOAD_TIMEOUT_MINS instead.
+    - name: Restore the apt packages
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '5'
+      with:
+        path: ${{ steps.plan.outputs.dir }}
+        key: ${{ steps.plan.outputs.key }}
+
+    - name: Install the apt packages
+      id: install
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+        NO_INSTALL_RECOMMENDS: ${{ inputs.no-install-recommends }}
+        HIT: ${{ steps.restore.outputs.cache-hit }}
+        DIR: ${{ steps.plan.outputs.dir }}
+      run: '"$GITHUB_ACTION_PATH/install.sh"'
+
+    - name: Save the apt packages
+      if: steps.install.outputs.save == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: ${{ steps.plan.outputs.dir }}
+        key: ${{ steps.plan.outputs.key }}

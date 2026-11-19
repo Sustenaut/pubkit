@@ -174,6 +174,22 @@ here first, then by pubhost's modules. pubrules also keeps
 
 ## pubrules' actions
 
+- **`actions/apt-install`:** installs the apt packages `packages` names
+  (separated by spaces; `no-install-recommends` is `true` by default),
+  keeping the package lists and the .deb files in the Actions cache under
+  `apt-<ImageOS>-<ImageVersion>-<arch>-<sha256 of the sorted packages and
+  the flag>` (off a hosted runner, the release's codename and
+  `self-hosted`). On a hit the packages are installed with `--no-download`
+  and no `apt-get update`, so nothing is fetched; a hit that will not
+  install, or a miss, updates the lists and installs, tried as retry tries
+  a script, and a miss saves the new entry. A cache service that refuses,
+  as for a self-hosted runner whose billing is blocked, only means the
+  packages come from the mirror.
+
+  ```yaml
+  - uses: Sustenaut/pubrules/actions/apt-install@<commit> # vX.Y.Z
+    with: { packages: gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user }
+  ```
 - **`actions/cache`:** keeps what a build fetched or made between runs,
   by the entries of pubrules.json's `cache` block (see "Caching a build"
   below). Call it with `step: restore` before the build and `step: save`
