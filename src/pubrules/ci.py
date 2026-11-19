@@ -223,7 +223,7 @@ JOBS: dict[str, dict[str, Job]] = {
     "service": {
         "checks": Job("job-service-checks.yml", ("python-version", "shellcheck", "sync-check")),
         "terraform": Job("job-service-terraform.yml", ("terraform-dir",), when="terraform-dir"),
-        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test", "coverage-report"),
+        "tests": Job("job-service-tests.yml", ("python-version", "apt-packages", "setup", "test", "coverage-report"),
                      when="test"),
         "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("tests",), secrets=True,
                      fixed={"reports": "sonar.python.coverage.reportPaths=*.xml "
@@ -238,7 +238,7 @@ JOBS: dict[str, dict[str, Job]] = {
     "content": {
         "checks": Job("job-service-checks.yml", ("python-version", "shellcheck", "sync-check"),
                       defaults={"shellcheck": "**/*.sh"}),
-        "tests": Job("job-service-tests.yml", ("python-version", "setup", "test", "coverage-report"),
+        "tests": Job("job-service-tests.yml", ("python-version", "apt-packages", "setup", "test", "coverage-report"),
                      when="test"),
     },
 }

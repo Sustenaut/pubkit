@@ -18,6 +18,7 @@ on:
     inputs:
       runs-on: { type: string, default: ubuntu-latest, description: "The runner label the job runs on, from pubrules.json's ci.runs-on: a self-hosted runner scale set, or GitHub's ubuntu-latest." }
       python-version: { type: string, default: '3.14' }
+      apt-packages: { type: string, default: '', description: "Extra Ubuntu packages to install first, from the Actions cache when an earlier run installed them (actions/apt-install)." }
       setup: { type: string, default: '', description: 'Prepares the tests, for example make venv. Empty skips it.' }
       test: { type: string, default: '', description: 'Runs the tests. Empty skips it.' }
       terraform-dir: { type: string, default: '', description: 'Where the Terraform files are. Empty skips the Terraform checks.' }
@@ -59,7 +60,7 @@ jobs:
       - run: terraform -chdir="$DIR" fmt -check -recursive
         env: { DIR: '${{ inputs.terraform-dir }}' }
       - name: terraform init, tried three times, then from the provider mirror
-        uses: Sustenaut/pubrules/actions/terraform-init@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/terraform-init@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
         with:
           dir: ${{ inputs.terraform-dir }}
           args: -backend=false -input=false
@@ -86,9 +87,13 @@ jobs:
             ~/.cache/uv
           key: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-${{ hashFiles('**/requirements*.lock', '**/requirements*.txt', '**/uv.lock') }}
           restore-keys: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-
+      - if: inputs.apt-packages != ''
+        name: Install the apt packages, kept in the Actions cache
+        uses: Sustenaut/pubrules/actions/apt-install@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
+        with: { packages: '${{ inputs.apt-packages }}' }
       - if: inputs.setup != ''
         name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
         with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.

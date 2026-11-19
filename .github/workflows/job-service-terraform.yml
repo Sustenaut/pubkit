@@ -22,7 +22,7 @@ jobs:
       - run: terraform -chdir="$DIR" fmt -check -recursive
         env: { DIR: '${{ inputs.terraform-dir }}' }
       - name: terraform init, tried three times, then from the provider mirror
-        uses: Sustenaut/pubrules/actions/terraform-init@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/terraform-init@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
         with:
           dir: ${{ inputs.terraform-dir }}
           args: -backend=false -input=false

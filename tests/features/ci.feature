@@ -236,6 +236,17 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And "pr.yml" has no release
     And in "pr.yml" the "terraform" job is given "terraform-dir" "."
 
+  Scenario Outline: A service's or content repository's tests job is given the apt packages its ci block names
+    Given a <kind> repository whose ci block is '{"with": {"test": "make functional", "apt-packages": "tippecanoe"}}'
+    When I run pubrules "sync"
+    Then it succeeds
+    And in "pr.yml" the "tests" job is given "apt-packages" "tippecanoe"
+
+    Examples:
+      | kind    |
+      | service |
+      | content |
+
   Scenario: A service without Terraform or tests runs only its checks and its scan
     Given a service repository whose ci block is '{}'
     When I run pubrules "sync"
@@ -333,6 +344,37 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | job-rust-functional.yml |
       | rust-ci.yml             |
 
+
+  Scenario Outline: A job's apt packages come from the Actions cache, by pubrules' apt-install action
+    When I read the workflows and actions pubrules ships
+    Then every apt step of "<workflow>" installs its apt-packages input through actions/apt-install at pubrules' own pin, without recommended packages
+
+    Examples:
+      | workflow                  |
+      | python-ci.yml             |
+      | job-python-functional.yml |
+      | job-python-browser.yml    |
+      | node-ci.yml               |
+      | job-node-test.yml         |
+      | job-node-browser.yml      |
+      | rust-ci.yml               |
+      | job-rust-functional.yml   |
+      | job-service-tests.yml     |
+      | service-ci.yml            |
+
+  Scenario Outline: The cross job's linker and emulator come from the Actions cache, and the target's linker and runner stay set
+    When I read the workflows and actions pubrules ships
+    Then the cross job of "<workflow>" installs the packages its target step names through actions/apt-install at pubrules' own pin
+    And for "s390x-unknown-linux-gnu" the target step of "<workflow>" names "gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user" and sets CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_LINKER and CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_RUNNER
+
+    Examples:
+      | workflow           |
+      | job-rust-cross.yml |
+      | rust-ci.yml        |
+
+  Scenario: No workflow pubrules ships runs apt-get itself
+    When I read the workflows and actions pubrules ships
+    Then no step of pubrules' workflows runs apt-get
 
   Scenario Outline: A setup that fails is tried again, three times at most, by pubrules' retry action
     When I read the workflows and actions pubrules ships

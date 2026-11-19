@@ -925,6 +925,55 @@ def setup_retried(shipped, workflow):
         assert "run" not in step and "env" not in step, step
 
 
+@then(parsers.parse("every apt step of \"{workflow}\" installs its apt-packages input through actions/apt-install "
+                    "at pubrules' own pin, without recommended packages"))
+def apt_by_action(shipped, workflow):
+    steps = [s for s in _steps(shipped, workflow) if s.get("if") == "inputs.apt-packages != ''"]
+    assert steps, workflow
+    assert _action_inputs(shipped, "apt-install")["no-install-recommends"]["default"] == "true"
+    for step in steps:
+        _self_pinned(step, "apt-install")
+        assert step["with"] == {"packages": "${{ inputs.apt-packages }}"}, step
+        assert "run" not in step and "env" not in step, step
+
+
+def _cross_steps(shipped, workflow):
+    data = yaml.safe_load(shipped["workflows"][workflow])
+    (job,) = [j for j in data["jobs"].values() if any(s.get("id") == "target" for s in j.get("steps", []))]
+    steps = job["steps"]
+    (at,) = [n for n, s in enumerate(steps) if s.get("id") == "target"]
+    return steps[at], steps[at + 1]
+
+
+@then(parsers.parse("the cross job of \"{workflow}\" installs the packages its target step names through "
+                    "actions/apt-install at pubrules' own pin"))
+def cross_by_action(shipped, workflow):
+    target, install = _cross_steps(shipped, workflow)
+    _self_pinned(install, "apt-install")
+    assert install["with"] == {"packages": "${{ steps.target.outputs.packages }}"}, install
+    assert install.get("if") == target.get("if"), (target, install)
+
+
+@then(parsers.re(r'for "(?P<triple>[^"]+)" the target step of "(?P<workflow>[^"]+)" names "(?P<packages>[^"]+)" and sets '
+                 r"(?P<linker>\w+) and (?P<runner>\w+)$"))
+def cross_target(shipped, workflow, tmp_path, triple, packages, linker, runner):
+    target, _ = _cross_steps(shipped, workflow)
+    out, env = tmp_path / "output", tmp_path / "env"
+    done = subprocess.run(["bash", "-e", "-c", target["run"]], capture_output=True, text=True, check=False,
+                          env={**os.environ, "TARGET": triple, "GITHUB_OUTPUT": str(out), "GITHUB_ENV": str(env)})
+    assert done.returncode == 0, done
+    assert out.read_text() == f"packages={packages}\n"
+    assert [line.split("=", 1)[0] for line in env.read_text().splitlines()] == [linker, runner]
+
+
+@then("no step of pubrules' workflows runs apt-get")
+def no_apt_get(shipped):
+    for name, data in _workflows(shipped):
+        for job in (data.get("jobs") or {}).values():
+            for step in job.get("steps") or []:
+                assert "apt-get" not in step.get("run", ""), f"{name}: {step}"
+
+
 @then(parsers.parse("the \"{workflow}\" init step runs actions/terraform-init at pubrules' own pin in the "
                     "terraform-dir input, with \"{args}\" and the action's default pause"))
 def init_by_action(shipped, workflow, args):
