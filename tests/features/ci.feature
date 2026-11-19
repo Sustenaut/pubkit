@@ -236,6 +236,17 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And "pr.yml" has no release
     And in "pr.yml" the "terraform" job is given "terraform-dir" "."
 
+  Scenario Outline: A service's or content repository's tests job is given the apt packages its ci block names
+    Given a <kind> repository whose ci block is '{"with": {"test": "make functional", "apt-packages": "tippecanoe"}}'
+    When I run pubrules "sync"
+    Then it succeeds
+    And in "pr.yml" the "tests" job is given "apt-packages" "tippecanoe"
+
+    Examples:
+      | kind    |
+      | service |
+      | content |
+
   Scenario: A service without Terraform or tests runs only its checks and its scan
     Given a service repository whose ci block is '{}'
     When I run pubrules "sync"
@@ -348,6 +359,8 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | job-node-browser.yml      |
       | rust-ci.yml               |
       | job-rust-functional.yml   |
+      | job-service-tests.yml     |
+      | service-ci.yml            |
 
   Scenario Outline: The cross job's linker and emulator come from the Actions cache, and the target's linker and runner stay set
     When I read the workflows and actions pubrules ships
