@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.45.1 is released as v0.45.1 from commit a1cd91dc01d32709a4a6b97d22b34fee3c097a6d.",
+      "content": "pubrules 0.46.0 is released as v0.46.0 from commit 146106f7e3f4fbba5a05bb63705d32fd1cda254b.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.45.1",
+            "0.46.0",
             "pubrules --version",
-            "pubrules 0.45.1",
-            "v0.45.1",
-            "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
+            "pubrules 0.46.0",
+            "v0.46.0",
+            "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
           ]
         ]
       },
-      "scope": "the published release v0.45.1 of pubrules",
+      "scope": "the published release v0.46.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
+          "revision": "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.45.1 was released on 2026-11-19 from commit a1cd91dc01d32709a4a6b97d22b34fee3c097a6d with these changes.",
+      "content": "pubrules 0.46.0 was released on 2026-11-19 from commit 146106f7e3f4fbba5a05bb63705d32fd1cda254b with these changes.",
       "data": {
         "columns": [
           {
@@ -57,19 +57,27 @@
         ],
         "rows": [
           [
-            "fixed",
-            "freshness.PIN has one group again, the version, so pubfleet's board, which reads PIN.findall, builds; the pubkit-or-pubrules pin TEST-04's waiver reads is PACKAGE_PIN"
+            "internal",
+            "pubrules's own suite is Given/When/Then on pubtest's steps: every scenario has its When, so the TEST-04 exception is gone, and the suite's copies of pubtest's file and output steps are dropped"
+          ],
+          [
+            "changed",
+            "Suites run on pubtest 0.2.2: a refusal's class and fields, empty quoted values, the asgi and URL adapters, and the other steps the fleet's move found missing"
+          ],
+          [
+            "added",
+            "actions/apt-install installs apt packages (split on any whitespace) with their lists and .deb files kept in the Actions cache, keyed by runner image, architecture, package list and run and restored by the newest entry: a hit installs with --no-download and no apt-get update, a hit that will not install and a miss update and install through retry's loop and save this run's entry, and a refused cache service installs from the mirror"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.45.1 of pubrules",
+      "scope": "the published release v0.46.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "a1cd91dc01d32709a4a6b97d22b34fee3c097a6d"
+          "revision": "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
         }
       ]
     }
