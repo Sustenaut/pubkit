@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "Suites run on pubtest 0.2.2: a refusal's class and fields, empty quoted values, the asgi and URL adapters, and the other steps the fleet's move found missing"
+}
