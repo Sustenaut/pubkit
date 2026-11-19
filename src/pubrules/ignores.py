@@ -48,12 +48,18 @@ def missing(root: Path) -> list[str]:
 
 
 def _undirected(line: str, name: str) -> str | None:
-    """`line` without its trailing slash, when it ignores `name` only as a
-    directory (`/.venv/` for `.venv`); None for any other line."""
+    """`line` without its trailing slash, when it names `name` only as a
+    directory (`.venv/`, `/.venv/`, `**/.venv/`); None for any other line,
+    a wildcard's included."""
     stripped = line.strip()
     if stripped.startswith(("!", "#")) or not stripped.endswith("/"):
         return None
     pattern = stripped.rstrip("/")
+    # Only a pattern that names the file: dropping the slash of a wildcard
+    # (`*/`, `.*/`, `*env/`) would ignore far more than .venv, and undo a
+    # later `!` that brings a directory back (`!.github/`).
+    if any(c in pattern.removeprefix("**/") for c in "*?["):
+        return None
     return pattern if pattern and ignores(pattern, name) else None
 
 

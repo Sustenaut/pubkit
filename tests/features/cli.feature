@@ -140,6 +140,20 @@ Feature: Keeping a repository's shared files in step
       | ".env" and "**/.venv/"          | ".env" and "**/.venv"         |
       | ".env" and ".venv/" and "/.venv/" | ".env" and ".venv" and "/.venv" |
 
+  Scenario Outline: A wildcard that matches .venv only as a directory is left as it is, and .venv is appended
+    Given a repository initialised as "utility"
+    And the .gitignore reads <lines>
+    When I run pubrules "sync"
+    Then it succeeds
+    And ".gitignore" reads <lines> and "" and "# The local environment, a directory or a link (pubrel prepare links it into its worktree)." and ".venv"
+    And ".gitignore" ignores .venv as a directory and as a link
+
+    Examples:
+      | lines                             |
+      | ".env" and "*/"                   |
+      | ".env" and ".*/" and "!.github/"  |
+      | ".env" and "*env/"                |
+
   Scenario: A .venv that a later ! takes back is appended again, under its comment
     Given a repository initialised as "utility"
     And the .gitignore reads ".env" and ".venv/" and "!.venv"
