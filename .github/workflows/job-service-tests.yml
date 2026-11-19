@@ -38,7 +38,7 @@ jobs:
           restore-keys: service-tests-${{ runner.os }}-py${{ inputs.python-version }}-
       - if: inputs.setup != ''
         name: Set up, tried three times (a release download can time out)
-        uses: Sustenaut/pubrules/actions/retry@afabaf91f5285f163967383edaadaee927e0c30a # v0.35.1
+        uses: Sustenaut/pubrules/actions/retry@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
         with: { run: '${{ inputs.setup }}' }
       - run: ${{ inputs.test }}
       # The sonar job runs elsewhere, so the report goes to it as an artifact.

@@ -50,22 +50,27 @@ jobs:
           fi
         env: { EVENT: '${{ github.event_name }}', HEAD_REF: '${{ github.head_ref }}' }
       - if: steps.changes.outputs.slow != 'false'
-        name: Install the target's linker and emulator
+        name: The target's linker and emulator
+        id: target
         run: |
           case "$TARGET" in
             i686-unknown-linux-gnu)
-              sudo apt-get update && sudo apt-get install -y gcc-multilib ;;
+              echo "packages=gcc-multilib" >> "$GITHUB_OUTPUT" ;;
             s390x-unknown-linux-gnu)
-              sudo apt-get update && sudo apt-get install -y gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user
+              echo "packages=gcc-s390x-linux-gnu libc6-dev-s390x-cross qemu-user" >> "$GITHUB_OUTPUT"
               echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_LINKER=s390x-linux-gnu-gcc" >> "$GITHUB_ENV"
               echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_RUNNER=qemu-s390x -L /usr/s390x-linux-gnu" >> "$GITHUB_ENV" ;;
             aarch64-unknown-linux-gnu)
-              sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross qemu-user
+              echo "packages=gcc-aarch64-linux-gnu libc6-dev-arm64-cross qemu-user" >> "$GITHUB_OUTPUT"
               echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
               echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER=qemu-aarch64 -L /usr/aarch64-linux-gnu" >> "$GITHUB_ENV" ;;
             *) echo "::error::no recipe for $TARGET (i686, s390x and aarch64 linux-gnu are known)"; exit 1 ;;
           esac
         env: { TARGET: '${{ matrix.target }}' }
+      - if: steps.changes.outputs.slow != 'false'
+        name: Install the target's linker and emulator, kept in the Actions cache
+        uses: Sustenaut/pubrules/actions/apt-install@c847823ea0256b08a3811264e43571277c7aac7a # v0.46.0
+        with: { packages: '${{ steps.target.outputs.packages }}' }
       - if: steps.changes.outputs.slow != 'false'
         run: rustup target add "$TARGET"
         env: { TARGET: '${{ matrix.target }}' }

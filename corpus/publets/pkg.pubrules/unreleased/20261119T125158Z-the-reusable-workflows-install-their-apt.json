@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "The reusable workflows install their apt packages (the apt-packages input, and the cross job's linker and emulator) through actions/apt-install, so a job whose packages and runner image an earlier run had installs them from the Actions cache without recommended packages; their uses of retry and terraform-init move to v0.46.0 with it, so terraform-init reads pubrules.json's provider mirror"
+}
