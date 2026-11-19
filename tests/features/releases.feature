@@ -59,19 +59,32 @@ Feature: Other packages' releases are each repository's own pins
   Scenario: Sync check fails where tests/requirements.txt pins no pubtest, and sync pins the lock's
     Given a repository initialised as "utility"
     And a file "tests/requirements.txt" holding "-r requirements-pubrules.txt"
-    And a file "tests/requirements.lock" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl"
+    And a file "tests/requirements.lock" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.4/pubtest-0.2.4-py3-none-any.whl"
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "tests/requirements.txt does not pin pubtest by its release wheel"
     When I run pubrules "sync"
     Then it succeeds
-    And it prints "updated  tests/requirements.txt (pubtest: 0.2.1)"
+    And it prints "updated  tests/requirements.txt (pubtest: 0.2.4)"
     And the file "tests/requirements.txt" holds:
       """
       # The steps and plugin the suite runs with; the nightly moves the pin.
-      pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl
+      pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.4/pubtest-0.2.4-py3-none-any.whl
       -r requirements-pubrules.txt
       """
+    And the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes
+
+  Scenario: A lock of an older pubrules, whose pubtest this pubrules no longer takes, gives no pin: sync pins the release state's
+    A bump from pubrules 0.45.0 kept such a lock's pubtest 0.2.1 beside
+    `pubtest>=0.2.2`, which no lock resolves.
+    Given a repository initialised as "utility"
+    And a file "tests/requirements.txt" holding "-r requirements-pubrules.txt"
+    And a file "tests/requirements.lock" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl"
+    When I run pubrules "sync"
+    Then it succeeds
+    And it prints "updated  tests/requirements.txt (pubtest: 0.2.2)"
+    And the file "tests/requirements.txt" includes "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.2/pubtest-0.2.2-py3-none-any.whl"
+    And the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes
 
   Scenario: The nightly moves the pubtest tests/requirements.txt pins to its latest release
     Given a repository initialised as "utility"

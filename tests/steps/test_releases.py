@@ -5,6 +5,8 @@ pubtest's."""
 
 from __future__ import annotations
 
+import re
+
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from pubrules import cli, new, nightly
@@ -60,3 +62,12 @@ def moves_include(moves, line):
 def exits(code):
     """A command's return, as the program's exit: what pubtest reads."""
     raise SystemExit(code)
+
+
+@then("the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes")
+def pin_meets_floor(repo):
+    """What `pubrules lock` needs to resolve: the wheel's release is at
+    least the `pubtest>=` floor of the managed requirements-pubrules.txt."""
+    pinned = re.search(r"pubtest/releases/download/v([0-9.]+)/", (repo / "tests/requirements.txt").read_text())[1]
+    floor = re.search(r"^pubtest>=([0-9.]+)$", (repo / "tests/requirements-pubrules.txt").read_text(), re.M)[1]
+    assert tuple(map(int, pinned.split("."))) >= tuple(map(int, floor.split("."))), (pinned, floor)

@@ -693,10 +693,24 @@ PUBTEST_PIN = re.compile(r"^pubtest\s*@\s*(?P<wheel>https://github\.com/[A-Za-z0
                          r"v[0-9][^/\s]*/pubtest-[^/\s]+\.whl)", re.M)
 
 
+def _release(text: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in text.split("."))
+
+
+def pubtest_floor() -> str:
+    """The least pubtest this pubrules' requirements-pubrules.txt takes
+    (`pubtest>=X`): a pin below it does not resolve with it."""
+    text = (resources.files("pubrules") / "templates" / "common" / "tests" / "requirements-pubrules.txt"
+            ).read_text(encoding="utf-8")
+    return re.search(r"^pubtest>=([0-9]+\.[0-9]+\.[0-9]+)$", text, re.M)[1]
+
+
 def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
     """tests/requirements.txt pins pubtest by its release wheel: `sync` adds
-    the one tests/requirements.lock has, else the latest release, where it
-    pins none; `--check` fails instead. Lines to print, and whether that fails."""
+    the one tests/requirements.lock has, where it is at least the pubtest
+    requirements-pubrules.txt takes (a lock of an older pubrules may hold an
+    older one), else the latest release, where it pins none; `--check` fails
+    instead. Lines to print, and whether that fails."""
     path = root / REQUIREMENTS
     if not path.is_file() or PUBTEST_PIN.search(path.read_text(encoding="utf-8")):
         return [], False
@@ -706,6 +720,9 @@ def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
                 f"{LOCK.name} has, or the latest release"], True
     lock = root / LOCK
     found = PUBTEST_PIN.search(lock.read_text(encoding="utf-8")) if lock.is_file() else None
+    held = re.search(r"/download/v([0-9]+\.[0-9]+\.[0-9]+)/", found["wheel"]) if found else None
+    if found and (held is None or _release(held[1]) < _release(pubtest_floor())):
+        found = None
     if found:
         wheel = found["wheel"]
     else:

@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "sync, and so bump, pins pubtest in tests/requirements.txt from the lock only when the lock's is one requirements-pubrules.txt takes (pubtest>=0.2.2); a lock of an older pubrules gave pubtest 0.2.1, which no lock resolved, and now the release state's or latest release is pinned instead"
+}
