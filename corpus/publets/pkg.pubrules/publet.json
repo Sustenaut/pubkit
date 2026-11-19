@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.46.0 is released as v0.46.0 from commit 146106f7e3f4fbba5a05bb63705d32fd1cda254b.",
+      "content": "pubrules 0.47.0 is released as v0.47.0 from commit 7e039c9242d6cd4ee7248fe7c9f6f6ebb2bbf149.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.46.0",
+            "0.47.0",
             "pubrules --version",
-            "pubrules 0.46.0",
-            "v0.46.0",
-            "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
+            "pubrules 0.47.0",
+            "v0.47.0",
+            "7e039c9242d6cd4ee7248fe7c9f6f6ebb2bbf149"
           ]
         ]
       },
-      "scope": "the published release v0.46.0 of pubrules",
+      "scope": "the published release v0.47.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
+          "revision": "7e039c9242d6cd4ee7248fe7c9f6f6ebb2bbf149"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.46.0 was released on 2026-11-19 from commit 146106f7e3f4fbba5a05bb63705d32fd1cda254b with these changes.",
+      "content": "pubrules 0.47.0 was released on 2026-11-19 from commit 7e039c9242d6cd4ee7248fe7c9f6f6ebb2bbf149 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,27 +57,27 @@
         ],
         "rows": [
           [
-            "internal",
-            "pubrules's own suite is Given/When/Then on pubtest's steps: every scenario has its When, so the TEST-04 exception is gone, and the suite's copies of pubtest's file and output steps are dropped"
+            "changed",
+            "pubrules holds no version of another package: the managed tests/requirements-pubrules.txt names pubtest as a floor (pubtest>=0.2.2) and each repository's tests/requirements.txt pins the wheel; pubrel, pubsec and pubdeploy are each repository's own pins (ci.release.pubrel, deploy.providers, or what the workflows and launchers already pin), which the nightly moves to their latest releases; where a repository has none yet, pubrules new, init and sync take the release the PUBRULES_RELEASES release-state file lists, or else the latest GitHub release"
           ],
           [
             "changed",
-            "Suites run on pubtest 0.2.2: a refusal's class and fields, empty quoted values, the asgi and URL adapters, and the other steps the fleet's move found missing"
+            "The reusable workflows install their apt packages (the apt-packages input, and the cross job's linker and emulator) through actions/apt-install, so a job whose packages and runner image an earlier run had installs them from the Actions cache without recommended packages; their uses of retry and terraform-init move to v0.46.0 with it, so terraform-init reads pubrules.json's provider mirror; job-service-tests and service-ci take apt-packages too, which a service's or content repository's ci block sets in with"
           ],
           [
-            "added",
-            "actions/apt-install installs apt packages (split on any whitespace) with their lists and .deb files kept in the Actions cache, keyed by runner image, architecture, package list and run and restored by the newest entry: a hit installs with --no-download and no apt-get update, a hit that will not install and a miss update and install through retry's loop and save this run's entry, and a refused cache service installs from the mirror"
+            "fixed",
+            "The new Rust repository's .gitignore, and pubrules' own, ignore .venv as a link too, so pubrel 0.8's prepare, which links the checkout's .venv into its worktree, no longer commits it"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.46.0 of pubrules",
+      "scope": "the published release v0.47.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "146106f7e3f4fbba5a05bb63705d32fd1cda254b"
+          "revision": "7e039c9242d6cd4ee7248fe7c9f6f6ebb2bbf149"
         }
       ]
     }
