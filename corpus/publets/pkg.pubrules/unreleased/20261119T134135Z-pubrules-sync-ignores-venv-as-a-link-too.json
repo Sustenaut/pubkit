@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "pubrules sync ignores .venv as a link too: a .gitignore line that ignores it only as a directory (.venv/, /.venv/) loses its slash where it stands, a .gitignore with none gets .venv under its comment, and sync --check fails until then, since pubrel 0.8's prepare links the checkout's .venv into its worktree and a release commit took the link"
+}

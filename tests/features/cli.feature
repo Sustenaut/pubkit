@@ -72,11 +72,12 @@ Feature: Keeping a repository's shared files in step
     When I run pubrules "sync" "--check"
     Then it succeeds
 
-  Scenario: init writes a .gitignore that ignores .env
+  Scenario: init writes a .gitignore that ignores .env, and .venv as a directory or a link
     Given an empty repository
     When I run pubrules "init" "--kind=rust"
     Then it succeeds
     And ".gitignore" holds the line ".env" once
+    And ".gitignore" ignores .venv as a directory and as a link
 
   Scenario: A .gitignore that doesn't ignore .env fails the check, and sync adds it to the rest
     Given a repository initialised as "utility"
@@ -86,14 +87,16 @@ Feature: Keeping a repository's shared files in step
     And stderr mentions ".gitignore doesn't ignore .env"
     When I run pubrules "sync"
     Then it succeeds
-    And it prints "updated  .gitignore (now ignores .env)"
+    And it prints "updated  .gitignore (now ignores .env, .venv)"
     And ".gitignore" holds the line "/build/" once
     And ".gitignore" holds the line ".env" once
+    And ".gitignore" holds the line ".venv" once
     When I run pubrules "sync" "--check"
     Then it succeeds
     When I run pubrules "sync"
     Then it prints "already in step"
     And ".gitignore" holds the line ".env" once
+    And ".gitignore" holds the line ".venv" once
 
   Scenario: sync adds .env on a line of its own after a last line with no newline
     Given a repository initialised as "utility"
@@ -110,9 +113,43 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And ".gitignore" holds the line ".env" once
 
-  Scenario Outline: A pattern that covers .env counts, and a later ! takes it back
+  Scenario: A .venv/ that matches only the directory fails the check, and sync drops its slash where it stands
+    Given a repository initialised as "utility"
+    And the .gitignore reads "/.env" and "/.venv/" and "/build/"
+    When I run pubrules "sync" "--check"
+    Then it fails
+    And stderr mentions ".gitignore doesn't ignore .venv. The local environment, a directory or a link"
+    When I run pubrules "sync"
+    Then it succeeds
+    And it prints "updated  .gitignore (now ignores .venv)"
+    And ".gitignore" reads "/.env" and "/.venv" and "/build/"
+    And ".gitignore" ignores .venv as a directory and as a link
+    When I run pubrules "sync" "--check"
+    Then it succeeds
+
+  Scenario Outline: Every line that ignores .venv only as a directory loses its slash, and nothing is appended
     Given a repository initialised as "utility"
     And the .gitignore reads <lines>
+    When I run pubrules "sync"
+    Then it succeeds
+    And ".gitignore" reads <mended>
+
+    Examples:
+      | lines                           | mended                        |
+      | ".env" and ".venv/"             | ".env" and ".venv"            |
+      | ".env" and "**/.venv/"          | ".env" and "**/.venv"         |
+      | ".env" and ".venv/" and "/.venv/" | ".env" and ".venv" and "/.venv" |
+
+  Scenario: A .venv that a later ! takes back is appended again, under its comment
+    Given a repository initialised as "utility"
+    And the .gitignore reads ".env" and ".venv/" and "!.venv"
+    When I run pubrules "sync"
+    Then it succeeds
+    And ".gitignore" ignores .venv as a directory and as a link
+
+  Scenario Outline: A pattern that covers .env counts, and a later ! takes it back
+    Given a repository initialised as "utility"
+    And the .gitignore reads <lines> and ".venv"
     When I run pubrules "sync" "--check"
     Then it <result>
 

@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import zipfile
 import sys
 from pathlib import Path
@@ -210,6 +211,30 @@ def gitignore_reads(repo, lines):
 @then(parsers.parse('"{path}" holds the line "{line}" once'))
 def holds_line_once(repo, path, line):
     assert (repo / path).read_text().splitlines().count(line) == 1
+
+
+@then(parsers.re(r'"(?P<path>[^"]+)" reads (?P<lines>(?:"[^"]*"(?: and )?)+)$'))
+def reads_lines(repo, path, lines):
+    assert (repo / path).read_text().splitlines() == lines.strip('"').split('" and "')
+
+
+@then(parsers.parse('"{path}" ignores .venv as a directory and as a link'))
+def ignores_venv(repo, path, tmp_path):
+    """git itself asks the .gitignore, in a scratch repository, of a .venv
+    directory and of a .venv link."""
+    for kind in ("directory", "link"):
+        scratch = tmp_path / f"venv-{kind}"
+        scratch.mkdir()
+        subprocess.run(["git", "init", "-q", str(scratch)], check=True)
+        (scratch / ".gitignore").write_text((repo / path).read_text())
+        if kind == "directory":
+            (scratch / ".venv").mkdir()
+            (scratch / ".venv" / "pyvenv.cfg").write_text("")
+        else:
+            (scratch / ".venv").symlink_to(tmp_path)
+        done = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=scratch,
+                              capture_output=True, text=True, check=True)
+        assert ".venv" not in done.stdout, (kind, done.stdout)
 
 
 @given(parsers.parse('the .gitignore ends without a newline after "{line}"'))
