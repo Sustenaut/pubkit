@@ -6,7 +6,9 @@ pytest==9.0.3
 pytest-bdd==8.1.0
 pytest-xdist==3.8.0
 hypothesis==6.170.5
-# The steps and the pytest plugin every suite loads (pubtest's GRAMMAR.md).
-pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v{pubtest}/pubtest-{pubtest}-py3-none-any.whl
+# The steps and the pytest plugin every suite loads (pubtest's GRAMMAR.md), at
+# least the release whose steps pubrules' own files use. requirements.txt pins
+# the release wheel, which the nightly moves.
+pubtest>=0.2.2
 pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl
 {provider_requirements}

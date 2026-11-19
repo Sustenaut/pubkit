@@ -1,10 +1,10 @@
 Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
   The managed with-secrets in every repository with a with-secrets.json, the
-  launchers' provider wheels, pubsec's and pubdeploy's floors in
-  deploy.providers, ./pubdeploy, and the sustenaut.sync and sustenaut.bump
-  hooks, in a scratch repository with the hooks faked. pubrules runs in this
-  process, so the hooks it loads are the fakes; a provider's "floor" in
-  deploy.providers is the pin this pubrules works with at least.
+  launchers' provider wheels, pubsec and pubdeploy in deploy.providers,
+  ./pubdeploy, and the sustenaut.sync and sustenaut.bump hooks, in a scratch
+  repository with the hooks faked. pubrules runs in this process, so the
+  hooks it loads are the fakes; a provider's "release" in deploy.providers is
+  its pin at the release the scenario's release state lists.
 
   Scenario: A utility with a with secrets json gets the managed with secrets
     Given a "utility" repository
@@ -69,7 +69,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     Then it succeeds
     And pubrules.json is as it was but for deploy.providers, which is:
       """
-      [{"floor": "pubdeploy"}, {"floor": "pubsec"}]
+      [{"release": "pubdeploy"}, {"release": "pubsec"}]
       """
     When I call pubrules with "sync --check"
     Then it succeeds
@@ -116,39 +116,51 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     Then it succeeds
     And the file "pubdeploy" does not exist
 
-  Scenario: A floored package below the floor is moved up and a newer one kept
-    Given a repository with a deploy block whose deploy.providers is:
-      """
-      [{"distribution": "pubsec", "sha256": "0000000000000000000000000000000000000000000000000000000000000000", "wheel": "https://github.com/example-org/pubsec/releases/download/v0.0.1/pubsec-0.0.1-py3-none-any.whl"},
-       {"floor": "pubdeploy"}]
-      """
-    When I call pubrules with "sync --check"
-    Then the exit code is 1
-    And stderr mentions "lists a pubsec older than this pubrules works with"
+  Scenario: Sync lists the pubsec that pubsec already runs and keeps a newer one listed
+    Given a "service" repository
+    And pubrules has synced it
+    And the release state lists "pubsec" at "9.9.9"
+    And pubrules.json gets a deploy block
     When I call pubrules with "sync"
     Then it succeeds
     And the deploy.providers of pubrules.json is:
       """
-      [{"floor": "pubsec"}, {"floor": "pubdeploy"}]
+      [{"release": "pubdeploy"}, {"release": "pubsec"}]
       """
     When deploy.providers changes to:
       """
-      [{"floor": "pubsec"},
+      [{"release": "pubsec"},
        {"distribution": "pubdeploy", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.0.0/pubdeploy-9.0.0-py3-none-any.whl"}]
       """
     And I call pubrules with "sync"
     Then it succeeds
     And the deploy.providers of pubrules.json is:
       """
-      [{"floor": "pubsec"},
+      [{"release": "pubsec"},
        {"distribution": "pubdeploy", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "wheel": "https://github.com/example-org/pubdeploy/releases/download/v9.0.0/pubdeploy-9.0.0-py3-none-any.whl"}]
       """
     And the file "pubdeploy" includes "fetch https://github.com/example-org/pubdeploy/releases/download/v9.0.0/pubdeploy-9.0.0-py3-none-any.whl 1111111111111111111111111111111111111111111111111111111111111111 providers deploy.providers"
     When I call pubrules with "sync --check"
     Then it succeeds
 
+  Scenario: An entry without its sha256 fails check and sync writes the pin in its place
+    Given a repository with a deploy block whose deploy.providers is:
+      """
+      [{"distribution": "pubsec", "wheel": "https://github.com/example-org/pubsec/releases/download/v0.0.1/pubsec-0.0.1-py3-none-any.whl"},
+       {"release": "pubdeploy"}]
+      """
+    When I call pubrules with "sync --check"
+    Then the exit code is 1
+    And stderr mentions "deploy.providers lists pubsec without a release wheel and its sha256"
+    When I call pubrules with "sync"
+    Then it succeeds
+    And the deploy.providers of pubrules.json is:
+      """
+      [{"release": "pubsec"}, {"release": "pubdeploy"}]
+      """
+
   Scenario: The sync hooks run and their lines are printed
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And pubdeploy's sync hook says "pubdeploy: deploy: drift, k8s.secrets-declared:example"
     When I call pubrules with "sync"
     Then it succeeds
@@ -159,7 +171,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     And pubdeploy's sync hook was asked of the namespace "example" to write, then to check
 
   Scenario: A sync hook that fails is said by its type alone and fails check
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And the secret "canary-7f3e"
     And the sync hook "other" raises ValueError "the token is canary-7f3e"
     When I call pubrules with "sync"
@@ -170,7 +182,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     And no secret appears in what it produced
 
   Scenario: A deploy block without pubdeploy installed fails check
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And pubdeploy's hooks are not installed
     When I call pubrules with "sync"
     Then it succeeds
@@ -187,7 +199,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     Then it succeeds
 
   Scenario: Bump runs the bump hooks before sync writes the launchers
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And the bump hook "other" raises OSError "no network"
     And pubdeploy's bump hook moves its pin to "https://github.com/example-org/pubdeploy/releases/download/v9.1.0/pubdeploy-9.1.0-py3-none-any.whl" with the sha256 "2222222222222222222222222222222222222222222222222222222222222222"
     And locking the repository is recorded, not done
@@ -209,7 +221,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
   Scenario: The nightly runs the bump hooks and syncs what they moved
     The nightly moves the pins as `pubrules bump` does: a moved provider
     reaches the launchers and the lock.
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And pubrules has synced it
     And the bump hook "other" raises OSError "no network"
     And pubdeploy's bump hook moves its pin to "https://github.com/example-org/pubdeploy/releases/download/v9.2.0/pubdeploy-9.2.0-py3-none-any.whl" with the sha256 "3333333333333333333333333333333333333333333333333333333333333333"
@@ -221,7 +233,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     And the file "pubdeploy" includes "fetch https://github.com/example-org/pubdeploy/releases/download/v9.2.0/pubdeploy-9.2.0-py3-none-any.whl 3333333333333333333333333333333333333333333333333333333333333333 providers deploy.providers"
 
   Scenario: The nightly with nothing moved neither syncs nor locks
-    Given a repository with a deploy block that lists both providers at their floors
+    Given a repository with a deploy block that lists both providers at their releases
     And pubrules has synced it
     And pubdeploy's bump hook moves nothing
     And locking the repository is recorded, not done

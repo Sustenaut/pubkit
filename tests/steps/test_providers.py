@@ -40,15 +40,18 @@ def init(root, kind, **extra):
 
 
 def pin(name):
-    from pubrules.new import FLOORS  # noqa: PLC0415
-    version, sha, wheel = FLOORS[name]
-    return {"distribution": name, "wheel": wheel.format(version), "sha256": sha}
+    """NAME's pin at the release the scenario's release state lists (conftest.RELEASES)."""
+    from conftest import RELEASES  # noqa: PLC0415
+    from pubrules.releases import WHEEL  # noqa: PLC0415
+    from pubrules.refs import OWNER  # noqa: PLC0415
+    return {"distribution": name, "wheel": WHEEL.format(owner=OWNER, name=name, version=RELEASES[name]["version"]),
+            "sha256": RELEASES[name]["sha256"]}
 
 
 def providers(text):
-    """deploy.providers as a docstring gives it: {"floor": NAME} is NAME's pin
-    at the floor this pubrules works with."""
-    return [pin(p["floor"]) if set(p) == {"floor"} else p for p in json.loads(text)]
+    """deploy.providers as a docstring gives it: {"release": NAME} is NAME's pin
+    at the release the release state lists."""
+    return [pin(p["release"]) if set(p) == {"release"} else p for p in json.loads(text)]
 
 
 class Hook:
@@ -100,9 +103,15 @@ def with_providers(repo, hooks, docstring):
     deployed(repo, providers=providers(docstring))
 
 
-@given("a repository with a deploy block that lists both providers at their floors")
-def with_floors(repo, hooks):
+@given("a repository with a deploy block that lists both providers at their releases")
+def with_releases(repo, hooks):
     deployed(repo, providers=[pin("pubdeploy"), pin("pubsec")])
+
+
+@given("pubrules.json gets a deploy block")
+def gets_deploy(repo):
+    config = json.loads((repo / "pubrules.json").read_text())
+    (repo / "pubrules.json").write_text(json.dumps(config | {"deploy": {"namespace": "example"}}, indent=2) + "\n")
 
 
 @given("pubrules has synced it")

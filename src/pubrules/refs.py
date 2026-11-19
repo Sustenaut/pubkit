@@ -10,9 +10,8 @@ as workflows written before pinned.
 pubrules' own commit is in its wheel: the release CI writes the tag's
 commit into the package, as `release-commit`, before it builds the wheel,
 so `pubrules sync` needs no network for it. A source tree has none, and pins
-by tag. pubrel's is the one recorded beside the pubrel pubrules pins
-(new.py), or the one a workflow already pins at that version, or else
-read once from pubrel's tags with `git ls-remote`; when that cannot be
+by tag. pubrel's is the one a workflow already pins at that version, or
+else read once from pubrel's tags with `git ls-remote`; when that cannot be
 read either, the pin is by tag, with a warning.
 
 Whose pubrules and pubrel these are is OWNER, set here and nowhere else; a
@@ -183,14 +182,10 @@ def release_commit() -> str | None:
 
 
 def pubrel_commit(version: str, workflows: str, owner: str) -> str | None:
-    """The commit of pubrel's tag v`version`: recorded, already pinned in
+    """The commit of pubrel's tag v`version`: already pinned in
     `workflows`, or read from the tags of `owner`'s pubrel
     (PUBRULES_PUBREL_REMOTE, which tests set, in place of it). A transfer
     keeps the commits, so one pinned under another owner serves."""
-    from .new import PUBREL_COMMIT, PUBREL_PIN  # noqa: PLC0415
-
-    if version == PUBREL_PIN:
-        return PUBREL_COMMIT
     for m in RELEASE_PIN.finditer(workflows):
         if m["commit"] and m["version"] == version:
             return m["commit"]

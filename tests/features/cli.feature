@@ -192,6 +192,15 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
+  Scenario: lock refuses a pubtest an index gives, which is another project
+    Given an empty repository
+    And a package "pubtest" 1.0 whose index lists files hashed "aaaa" and "bbbb"
+    And a file "tests/requirements.txt" holding "pubtest>=0.2.2"
+    When I run pubrules "lock"
+    Then it fails
+    And stderr mentions "tests/requirements.txt must pin pubtest by its release wheel"
+    And the file "tests/requirements.lock" does not exist
+
   Scenario: lock works where pip is not installed, as under uvx and ./pubrules
     Given an empty repository
     And a package "demo" 1.0 whose index lists files hashed "aaaa" and "bbbb"

@@ -627,11 +627,12 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
   Scenario: A released pubrules pins every job to its tag's commit, with the version in a comment
     Given a Node repository whose ci block is '{}'
     And pubrules is a release whose tag names "0f3574a72707a46bae149d3ed7a4644b4837795a"
+    And pubrel's repository tags "v0.7.0"
     When I run pubrules "sync"
     Then it succeeds
     And ".github/workflows/pr.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
     And ".github/workflows/main.yml" pins pubrules' workflows to "0f3574a72707a46bae149d3ed7a4644b4837795a"
-    And "pr.yml" pins pubrel's release workflow to the commit pubrules records
+    And ".github/workflows/pr.yml" pins pubrel's release workflow to the commit of "v0.7.0"
     When I run pubrules "sync" "--check"
     Then it succeeds
 

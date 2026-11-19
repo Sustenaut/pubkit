@@ -1,11 +1,15 @@
-"""deploy.providers: the packages a deploy block's walk runs with, and the
-two pubrules floors, pubsec and pubdeploy (`ensure`, in `pubrules sync`), each
-listed at the oldest release this pubrules works with or newer. pubrules holds
-no deploy code: pubdeploy walks, and its sustenaut.bump hook moves each
-provider to its latest release.
+"""deploy.providers: the packages a deploy block's walk runs with, among them
+pubsec and pubdeploy (`ensure`, in `pubrules sync`). pubrules holds no deploy
+code and no version of either: pubdeploy walks, and its sustenaut.bump hook
+moves each provider to its latest release.
 
-pubrules.json is changed in place, the two strings of an entry and nothing
-else, so its layout stays the repository's.
+The pubsec and pubdeploy the launchers run are the repository's own pins:
+deploy.providers' entry, else the one its launcher already fetches, else
+(a launcher sync writes for the first time) the latest release
+(releases.py).
+
+pubrules.json is changed in place, the entry added and nothing else, so its
+layout stays the repository's.
 """
 
 from __future__ import annotations
@@ -19,26 +23,11 @@ WHEEL = re.compile(r"https://github\.com/(?P<repo>[A-Za-z0-9-]+/[A-Za-z0-9_.-]+)
                    r"(?P<name>[A-Za-z0-9_.]+)-(?P<version>[^-/\s]+)-py3-none-any\.whl")
 PUBSEC = "pubsec"
 PUBDEPLOY = "pubdeploy"
-# Why each floored package is listed, for the line sync --check prints.
+# Why each of the two is listed, for the line sync --check prints.
 WHY = {PUBSEC: "the types that hold a secret's value are pubsec's",
        PUBDEPLOY: "the deploy walk, and the check sync runs of the block, are pubdeploy's"}
-
-
-def version_of(wheel: str) -> tuple[int, ...] | None:
-    m = WHEEL.fullmatch(wheel)
-    if not m:
-        return None
-    try:
-        return tuple(int(n) for n in m["version"].split("."))
-    except ValueError:
-        return None
-
-
-def floor(name: str) -> dict[str, str]:
-    """`name` at the oldest release this pubrules works with, as deploy.providers lists it."""
-    from .new import FLOORS  # noqa: PLC0415
-    version, sha, wheel = FLOORS[name]
-    return {"distribution": name, "wheel": wheel.format(version), "sha256": sha}
+# The wheel a launcher fetches and runs, as the managed launchers write it.
+FETCHED = re.compile(r"^fetch (?P<wheel>\S+) (?P<sha256>[0-9a-f]{64}) providers deploy\.providers$", re.M)
 
 
 def listed(config: dict[str, Any], name: str) -> dict[str, str] | None:
@@ -48,24 +37,40 @@ def listed(config: dict[str, Any], name: str) -> dict[str, str] | None:
     return next((p for p in given or [] if isinstance(p, dict) and p.get("distribution") == name), None)
 
 
-def sound(given: dict[str, str] | None, want: dict[str, str]) -> bool:
+def sound(given: dict[str, str] | None) -> bool:
     return given is not None and isinstance(given.get("wheel"), str) and isinstance(given.get("sha256"), str) \
-        and bool(given["sha256"]) and (version_of(given["wheel"]) or ()) >= (version_of(want["wheel"]) or ())
+        and bool(given["sha256"]) and WHEEL.fullmatch(given["wheel"]) is not None
 
 
-def launched(config: dict[str, Any], name: str) -> dict[str, str]:
-    """The `name` its launcher runs: deploy.providers' when it is at least the floor, else the floor."""
-    want, given = floor(name), listed(config, name)
-    return given if sound(given, want) else want
+def in_launcher(root: Path | None, name: str) -> dict[str, str] | None:
+    """The wheel the repository's ./`name` fetches, as sync last wrote it."""
+    path = root / name if root is not None else None
+    if path is None or not path.is_file():
+        return None
+    m = FETCHED.search(path.read_text(encoding="utf-8"))
+    return {"distribution": name, "wheel": m["wheel"], "sha256": m["sha256"]} if m else None
+
+
+def pinned(root: Path | None, config: dict[str, Any], name: str) -> dict[str, str]:
+    """The `name` the repository pins: deploy.providers', else its launcher's,
+    else the latest release."""
+    given = listed(config, name)
+    if sound(given):
+        return given
+    found = in_launcher(root, name)
+    if found is not None:
+        return found
+    from .releases import wheel  # noqa: PLC0415
+    return wheel(name)
 
 
 def ensure(root: Path, config: dict[str, Any], check: bool) -> tuple[list[str], bool]:
     """A repository with a deploy block lists pubsec and pubdeploy in
-    deploy.providers, each at this pubrules' floor or newer. The pins are the
-    repository's own (`pubrules bump` moves them, through pubdeploy's hook):
-    `sync` adds the floor where none is listed, or moves one below it up,
-    changing nothing else of pubrules.json; `--check` fails instead. Lines to
-    print, and whether that fails."""
+    deploy.providers. The pins are the repository's own (`pubrules bump`
+    moves them, through pubdeploy's hook): `sync` adds one where none is
+    listed, the one its launcher runs or else the latest release, changing
+    nothing else of pubrules.json; `--check` fails instead. Lines to print,
+    and whether that fails."""
     if not isinstance(config.get("deploy"), dict):
         return [], False
     out, failed = [], False
@@ -79,29 +84,24 @@ def ensure(root: Path, config: dict[str, Any], check: bool) -> tuple[list[str], 
 
 
 def ensure_one(root: Path, config: dict[str, Any], name: str, check: bool) -> tuple[list[str], bool]:
-    want, given = floor(name), listed(config, name)
-    if sound(given, want):
+    given = listed(config, name)
+    if sound(given):
         return [], False
-    version = WHEEL.fullmatch(want["wheel"])["version"]
+    said = f"does not list {name}" if given is None else f"lists {name} without a release wheel and its sha256"
     if check:
-        said = f"does not list {name}" if given is None else f"lists a {name} older than this pubrules works with"
-        return [f"pubrules: deploy.providers {said}: {WHY[name]}, {version} or newer; "
-                f"run `pubrules sync`, which lists {version}"], True
+        return [f"pubrules: deploy.providers {said}: {WHY[name]}; run `pubrules sync`, which lists "
+                f"the one ./{name} runs, or its latest release"], True
+    want = pinned(root, {}, name)
     path = root / "pubrules.json"
     text = path.read_text(encoding="utf-8")
-    entry = json.dumps(want)
-    if given is not None:
-        for key in ("wheel", "sha256"):
-            if isinstance(given.get(key), str) and given[key]:
-                text = text.replace(json.dumps(given[key]), json.dumps(want[key]), 1)
-        if listed(json.loads(text), name) != want:  # a hand-written entry, in another shape: written whole
-            data = json.loads(text)
-            data["deploy"]["providers"] = [want if p is given else p for p in data["deploy"]["providers"]]
-            text = json.dumps(data, indent=2) + "\n"
+    if given is not None:  # a hand-written entry, in another shape: written whole
+        data = json.loads(text)
+        data["deploy"]["providers"] = [want if p == given else p for p in data["deploy"]["providers"]]
+        text = json.dumps(data, indent=2) + "\n"
     else:
-        text = inserted(text, entry, want)
+        text = inserted(text, json.dumps(want), want)
     path.write_text(text, encoding="utf-8")
-    return [f"updated  pubrules.json (deploy.providers {name}: {version})"], False
+    return [f"updated  pubrules.json (deploy.providers {name}: {WHEEL.fullmatch(want['wheel'])['version']})"], False
 
 
 def inserted(text: str, entry: str, want: dict[str, str]) -> str:
