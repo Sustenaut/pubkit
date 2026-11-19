@@ -413,6 +413,7 @@ jobs:
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/python-ci.yml,
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/rust-ci.yml,
               pkg:githubactions/Sustenaut/pubrules/.github/workflows/service-ci.yml,
+              pkg:githubactions/Sustenaut/pubrules/actions/apt-install,
               pkg:githubactions/Sustenaut/pubrules/actions/cache,
               pkg:githubactions/Sustenaut/pubrules/actions/pr-label,
               pkg:githubactions/Sustenaut/pubrules/actions/retry,

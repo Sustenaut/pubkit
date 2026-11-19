@@ -67,7 +67,7 @@ PUBRULES_USE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/pubrules/(?:actions/[\w.-]+
 # to the repository's tree. A pin of a name not listed is to a pubrules that
 # lacks it, which `pins` never moves to and `sync --check` refuses.
 SHIPPED = {
-    "actions": ("cache", "pr-label", "retry", "terraform-init"),
+    "actions": ("apt-install", "cache", "pr-label", "retry", "terraform-init"),
     "workflows": (
         "job-node-audit.yml", "job-node-browser.yml", "job-node-test.yml", "job-osv.yml",
         "job-python-audit.yml", "job-python-browser.yml", "job-python-functional.yml",
