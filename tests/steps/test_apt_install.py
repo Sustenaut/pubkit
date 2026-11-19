@@ -74,7 +74,8 @@ def run_step(work, step_id, given, outputs, extra_env=None, codename="noble"):
     inputs = {key: str(spec.get("default", "")) for key, spec in action["inputs"].items()}
     unknown = set(given) - set(inputs)
     assert not unknown, f"apt-install has no input {unknown}"
-    inputs.update(given)
+    # A "\n" in a scenario's input is a newline, as a YAML block gives.
+    inputs.update({key: value.replace("\\n", "\n") for key, value in given.items()})
     (step,) = [s for s in action["runs"]["steps"] if s.get("id") == step_id]
     env = {}
     for key, value in step["env"].items():
@@ -93,6 +94,7 @@ def run_step(work, step_id, given, outputs, extra_env=None, codename="noble"):
         env={**base, **env, **(extra_env or {}),
              "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}", "GITHUB_ACTION_PATH": str(ACTION),
              "RUNNER_TEMP": str(work / "temp"), "GITHUB_OUTPUT": str(out),
+             "GITHUB_RUN_ID": "7", "GITHUB_RUN_ATTEMPT": "2",
              "SLEPT": str(work / "slept"), "APT_LOG": str(work / "apt.log")})
     written = dict(line.split("=", 1) for line in out.read_text().splitlines() if "=" in line)
     return {"code": done.returncode, "stdout": done.stdout, "stderr": done.stderr, "outputs": written}
@@ -147,15 +149,20 @@ def plan_failed(plans, code):
     assert plans[-1]["code"] == code, plans[-1]
 
 
-@then(parsers.parse('the key is "{prefix}" and the sha256 of "{text}"'))
-def key_is(plans, prefix, text):
+@then(parsers.parse('the restore prefix is "{start}", the sha256 of "{text}" and "{end}"'))
+def prefix_is(plans, start, text, end):
     digest = hashlib.sha256(text.encode().decode("unicode_escape").encode()).hexdigest()
-    assert plans[-1]["outputs"]["key"] == prefix + digest, plans[-1]
+    assert plans[-1]["outputs"]["prefix"] == start + digest + end, plans[-1]
 
 
-@then(parsers.parse('the key starts "{prefix}"'))
-def key_starts(plans, prefix):
-    assert re.fullmatch(re.escape(prefix) + "[0-9a-f]{64}", plans[-1]["outputs"]["key"]), plans[-1]
+@then(parsers.parse('the key is the restore prefix and "{run}", the run and its attempt'))
+def key_is(plans, run):
+    assert plans[-1]["outputs"]["key"] == plans[-1]["outputs"]["prefix"] + run, plans[-1]
+
+
+@then(parsers.parse('the restore prefix starts "{start}"'))
+def prefix_starts(plans, start):
+    assert re.fullmatch(re.escape(start) + "[0-9a-f]{64}-", plans[-1]["outputs"]["prefix"]), plans[-1]
 
 
 @then(parsers.parse('the cache directory is "{name}" in the runner\'s temporary directory'))
@@ -165,7 +172,8 @@ def cache_dir(plans, tmp_path, name):
 
 @then(parsers.re(r"the two keys (?P<how>are the same|differ)"))
 def two_keys(plans, how):
-    first, second = (ran["outputs"]["key"] for ran in plans[-2:])
+    assert all(ran["code"] == 0 for ran in plans[-2:]), plans
+    first, second = (ran["outputs"]["prefix"] for ran in plans[-2:])
     assert (first == second) == (how == "are the same"), (first, second)
 
 
@@ -175,8 +183,9 @@ def reported(plans, error):
                for line in plans[-1]["stdout"].splitlines()), plans[-1]
 
 
-HITS = {"on a hit": "true", "on a hit whose packages the cache lacks": "true",
-        "on a miss": "false", "after a restore that failed": ""}
+# The key actions/cache restored: an earlier run's entry, or none.
+HITS = {"on a hit": "5-1", "on a hit whose packages the cache lacks": "5-1",
+        "on a miss": None, "after a restore that failed": None}
 MIRRORS = {None: "works", "fails the first time": "flaky", "always fails": "down"}
 
 
@@ -189,7 +198,8 @@ def installs(tmp_path, packages, when, mirror, flag):
     plan = run_step(tmp_path, "plan", given, {}, _image("ubuntu24", "20261110.1"))
     assert plan["code"] == 0, plan
     how = "lacking" if "lacks" in when else MIRRORS[mirror]
-    outputs = {"plan": plan["outputs"], "restore": {"cache-hit": HITS[when]}}
+    matched = "" if HITS[when] is None else plan["outputs"]["prefix"] + HITS[when]
+    outputs = {"plan": plan["outputs"], "restore": {"cache-matched-key": matched}}
     ran = run_step(tmp_path, "install", given, outputs, {"HOW": how})
     log = tmp_path / "apt.log"
     ran["apt"] = log.read_text().splitlines() if log.exists() else []
@@ -260,6 +270,16 @@ def cache_steps(action):
     assert pins and pins <= _cache_pin(), pins
     assert restore["uses"].startswith("actions/cache/restore@") and save["uses"].startswith("actions/cache/save@")
     assert restore["continue-on-error"] is True and save["continue-on-error"] is True
+
+
+@then("its restore takes the newest entry by the restore prefix, and its save keeps this run's key")
+def rolling_keys(action):
+    restore, save = [s for s in action["runs"]["steps"] if s.get("uses", "").startswith("actions/cache/")]
+    assert restore["with"] == {"path": "${{ steps.plan.outputs.dir }}", "key": "${{ steps.plan.outputs.key }}",
+                               "restore-keys": "${{ steps.plan.outputs.prefix }}"}
+    assert save["with"] == {"path": "${{ steps.plan.outputs.dir }}", "key": "${{ steps.plan.outputs.key }}"}
+    (install,) = [s for s in action["runs"]["steps"] if s.get("id") == "install"]
+    assert install["env"]["MATCHED"] == "${{ steps.restore.outputs.cache-matched-key }}"
 
 
 @then("its save runs only when the install step asks for one")

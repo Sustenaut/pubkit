@@ -175,14 +175,18 @@ here first, then by pubhost's modules. pubrules also keeps
 ## pubrules' actions
 
 - **`actions/apt-install`:** installs the apt packages `packages` names
-  (separated by spaces; `no-install-recommends` is `true` by default),
-  keeping the package lists and the .deb files in the Actions cache under
+  (separated by any whitespace, so a YAML block of lines will do;
+  `no-install-recommends` is `true` by default), keeping the package lists
+  and the .deb files in the Actions cache under
   `apt-<ImageOS>-<ImageVersion>-<arch>-<sha256 of the sorted packages and
-  the flag>` (off a hosted runner, the release's codename and
-  `self-hosted`). On a hit the packages are installed with `--no-download`
-  and no `apt-get update`, so nothing is fetched; a hit that will not
-  install, or a miss, updates the lists and installs, tried as retry tries
-  a script, and a miss saves the new entry. A cache service that refuses,
+  the flag>-<run id>-<attempt>` (off a hosted runner, the release's
+  codename and `self-hosted`), restored by all but the run, so the newest
+  entry wins. On a hit the packages are installed with `--no-download` and
+  no `apt-get update`, so nothing is fetched; a hit that will not install,
+  or a miss, updates the lists and installs, tried as retry tries a script,
+  and saves this run's entry, so a stale cache mends itself even where
+  `ImageVersion` never changes. GitHub evicts the older entries once no
+  run has used them for 7 days. A cache service that refuses,
   as for a self-hosted runner whose billing is blocked, only means the
   packages come from the mirror.
 

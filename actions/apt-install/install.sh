@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Installs $PACKAGES with apt-get, keeping the package lists and the .deb
 # files in $DIR (lists/ and archives/) rather than in /var, so a cache can
-# hold them. With HIT=true, $DIR came from the cache: the packages are
+# hold them. With MATCHED, the key of the entry restored, $DIR came from
+# the cache: the packages are
 # installed from it with --no-download, so nothing is fetched. When that
 # fails (lists or packages the cache lacks), or with no hit, the lists are
 # updated and the packages installed through the retry action's script
 # ($TRIES tries, $PAUSE seconds apart). Then $DIR is made the runner's own,
 # without apt's lock files and partial downloads, so actions/cache/save
-# can read it; save=true goes to $GITHUB_OUTPUT when there was no hit, so
-# the new key is saved once. Exits 1 when no install passed.
+# can read it; save=true goes to $GITHUB_OUTPUT whenever the packages did
+# not install from the cache (a miss, or a hit that would not install),
+# so the next run restores what this one fetched. Exits 1 when no install
+# passed.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -32,7 +35,7 @@ export APT_FLAGS=-y
 # shellcheck disable=SC2016 # expanded by the bash that runs each try
 install='set -f; sudo apt-get -c "$APT_CONF" install $APT_FLAGS'
 installed=false
-if [ "${HIT:-false}" = true ]; then
+if [ -n "${MATCHED:-}" ]; then
   if bash -ec "$install --no-download \$PACKAGES"; then
     installed=true
   else
@@ -46,6 +49,6 @@ if [ "$installed" = false ]; then
 fi
 sudo rm -rf "$dir/lists/lock" "$dir/lists/partial" "$dir/archives/lock" "$dir/archives/partial"
 sudo chown -R "$(id -u):$(id -g)" "$dir"
-if [ "${HIT:-false}" != true ]; then
+if [ "$installed" = false ]; then
   echo "save=true" >> "${GITHUB_OUTPUT:?}"
 fi

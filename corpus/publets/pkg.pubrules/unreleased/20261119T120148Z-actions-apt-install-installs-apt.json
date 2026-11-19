@@ -1,4 +1,4 @@
 {
   "category": "added",
-  "change": "actions/apt-install installs apt packages with their lists and .deb files kept in the Actions cache, keyed by runner image, architecture and package list: a hit installs with --no-download and no apt-get update, a hit that will not install and a miss update and install through retry's loop, a miss saves, and a refused cache service installs from the mirror"
+  "change": "actions/apt-install installs apt packages (split on any whitespace) with their lists and .deb files kept in the Actions cache, keyed by runner image, architecture, package list and run and restored by the newest entry: a hit installs with --no-download and no apt-get update, a hit that will not install and a miss update and install through retry's loop and save this run's entry, and a refused cache service installs from the mirror"
 }
