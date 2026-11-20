@@ -117,10 +117,10 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And "queue.yml" checks the site in "public" after running "nothing", deploying nothing
     And "main.yml" has no site job
 
-  Scenario: pubrules' own CI runs in the merge queue, and builds the wheel from a push to main alone
+  Scenario: pubrules' own CI runs in the merge queue, and its wheel follows main's run alone
     When I read pubrules' own ci.yml
     Then it runs on pull requests, in the merge queue and on pushes to main
-    And its wheel job runs only on a push to main
+    And its wheel is built by wheel.yml, after a passing run of ci on main, and uploaded to PyPI only when attached
     And in the merge queue and on a push to main it skips the tests an earlier run passed on the same tree
     And it scans on pull requests and pushes to main, never in the merge queue, and passed takes that skip
 

@@ -1,0 +1,98 @@
+# Attaches the wheel to a release pubrel made, and uploads that same file to
+# PyPI as pubrules. pubrel's release workflow, in ci, tags the version
+# pyproject.toml holds and creates its GitHub release once it is published;
+# when ci's run finishes, this builds that tag's wheel and uploads it as
+# pubrules-X.Y.Z-py3-none-any.whl, the name consumers pin by URL and hash. A
+# release that already has its wheel, or a version not yet released, does
+# nothing here. The wheel carries the tag's
+# commit as src/pubrules/release-commit: `pubrules sync` pins pubrules'
+# workflows to that commit (src/pubrules/refs.py) without asking the network.
+#
+# The pypi job runs when this run attached a release's wheel, or when run by
+# hand for a released version (to upload one PyPI lacks). It takes the file the
+# release carries, checks it against the sha256 GitHub records for the asset,
+# and uploads it by trusted publishing (PyPI's pending publisher names this
+# repository, wheel.yml and the pypi environment), so PyPI's file is the
+# release's byte for byte and every hash pin names both. skip-existing makes
+# a rerun a no-op for a version PyPI already has.
+name: wheel
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      upload: ${{ steps.attach.outputs.upload }}
+      version: ${{ steps.attach.outputs.version }}
+      wheel: ${{ steps.attach.outputs.wheel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: '3.14' }
+      - name: Attach the wheel to the release, if it has none
+        id: attach
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          gh release view "v$version" >/dev/null 2>&1 || { echo "v$version is not released"; exit 0; }
+          git fetch --quiet --depth 1 origin tag "v$version"
+          # The wheel is named by the distribution the tag's pyproject.toml
+          # names: a release from before a rename keeps its old name.
+          wheel="$(git show "v$version:pyproject.toml" | python -c 'import re, sys, tomllib
+          print(re.sub(r"[-_.]+", "_", tomllib.loads(sys.stdin.read())["project"]["name"]).lower())')-$version-py3-none-any.whl"
+          { echo "version=$version"; echo "wheel=$wheel"; } >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" --json assets --jq '.assets[].name' | grep -qx "$wheel"; then
+            echo "$wheel already attached"
+            # By hand, PyPI is offered the release's wheel again.
+            [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && echo "upload=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git checkout --quiet "v$version"
+          git rev-parse "v$version^{commit}" > src/pubrules/release-commit
+          python -m pip wheel --quiet --no-deps . -w dist
+          unzip -p "dist/$wheel" pubrules/release-commit | grep -qxE '[0-9a-f]{40}'
+          gh release upload "v$version" "dist/$wheel"
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    needs: wheel
+    if: needs.wheel.outputs.upload == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Take the release's wheel, as GitHub recorded it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.wheel.outputs.version }}
+          WHEEL: ${{ needs.wheel.outputs.wheel }}
+        run: |
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --pattern "$WHEEL" --dir dist
+          digest=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" \
+            --jq ".assets[] | select(.name == \"$WHEEL\") | .digest // empty")
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "GitHub records no sha256 for $WHEEL"; exit 1 ;;
+          esac
+          echo "${digest#sha256:}  dist/$WHEEL" | sha256sum --check --strict
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true
