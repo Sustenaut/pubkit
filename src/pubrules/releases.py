@@ -84,12 +84,11 @@ def version(name: str, owner: str = OWNER) -> str:
 
 def wheel_url(name: str, version: str, owner: str = OWNER) -> str:
     """The URL of release `version` of `owner/name`'s wheel. Its file: the
-    release state's, where it lists that release, else the one the release
-    carries; else (neither says) `name-version-py3-none-any.whl`."""
+    release state's, where it lists that release with its wheel, else the
+    one the release carries; else (neither says) `name-version-py3-none-any.whl`."""
     entry = stated(name) or {}
-    if entry.get("version") == version:
-        file = entry.get("wheel")
-    else:
+    file = entry.get("wheel") if entry.get("version") == version else None
+    if not file:
         from .nightly import release_wheel  # noqa: PLC0415
         file = release_wheel(f"{owner}/{name}", version)
     file = file or f"{name}-{version}-py3-none-any.whl"

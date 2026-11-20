@@ -695,6 +695,10 @@ PUBTEST_PIN = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9_.-]*)\s*@\s*(?P<wheel
                          r"releases/download/v[0-9][^/\s]*/[A-Za-z0-9_.]+-[^/\s]+\.whl)", re.M)
 
 
+# The line sync writes above the pubtest pin.
+PUBTEST_COMMENT = "# The steps and plugin the suite runs with; the nightly moves the pin.\n"
+
+
 def _release(text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in text.split("."))
 
@@ -736,7 +740,8 @@ def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
                 f"{LOCK.name} has, or the latest release"], True
     if given:
         # Too old: dropped, and pinned again below as if it had none.
-        text = text[:given.start()] + text[given.end():].removeprefix("\n")
+        before, after = text[:given.start()], text[given.end():].removeprefix("\n")
+        text = before.removesuffix(PUBTEST_COMMENT) + after
     lock = root / LOCK
     found = PUBTEST_PIN.search(lock.read_text(encoding="utf-8")) if lock.is_file() else None
     if found and (_held(found["wheel"]) or (0,)) < floor:
@@ -747,7 +752,7 @@ def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
         from .releases import version, wheel_url  # noqa: PLC0415
         wheel = wheel_url("pubtest", version("pubtest"))
     from .nightly import distribution  # noqa: PLC0415
-    pin = (f"# The steps and plugin the suite runs with; the nightly moves the pin.\n"
+    pin = (f"{PUBTEST_COMMENT}"
            f"{distribution(wheel.rsplit('/', 1)[1])} @ {wheel}\n")
     included = re.search(r"^-r requirements-pubrules\.txt$", text, re.M)
     at = included.start() if included else len(text)

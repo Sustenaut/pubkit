@@ -59,10 +59,12 @@ def offline_pubrel(tmp_path, monkeypatch):
 
 # The releases a pin pubrules writes where a repository has none comes from
 # (releases.py): a release-state file, so no scenario reads GitHub's.
-RELEASES = {"pubrel": "0.7.0", "pubtest": "0.2.2",
-            "pubsec": {"version": "0.3.0",
+# Each wheel is named too, so no scenario run as a program asks GitHub.
+RELEASES = {"pubrel": "0.7.0",
+            "pubtest": {"version": "0.2.2", "wheel": "pubtest-0.2.2-py3-none-any.whl"},
+            "pubsec": {"version": "0.3.0", "wheel": "pubsec-0.3.0-py3-none-any.whl",
                        "sha256": "a9036c741e29098cdd04baf64c7873e0ff1dd6e7bde12e9671a3940370724e18"},
-            "pubdeploy": {"version": "0.5.0",
+            "pubdeploy": {"version": "0.5.0", "wheel": "pubdeploy-0.5.0-py3-none-any.whl",
                           "sha256": "320d68e081c674457294e6ed3a6c8ab9e2606ca4a2946c252a34021b62dc70cd"}}
 
 
@@ -88,7 +90,8 @@ def release_state(tmp_path, monkeypatch):
 @given(parsers.parse('the release state lists "{name}" at "{version}"'))
 def release_state_lists(release_state, name, version):
     data = json.loads(release_state.read_text())
-    data["releases"][name] = version
+    data["releases"][name] = version if name == "pubrel" else \
+        {"version": version, "wheel": f"{name}-{version}-py3-none-any.whl"}
     release_state.write_text(json.dumps(data))
 
 

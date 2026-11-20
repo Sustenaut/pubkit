@@ -34,6 +34,13 @@ def release_state_wheel(release_state, name, file, version):
     release_state.write_text(json.dumps(data))
 
 
+@given(parsers.parse('the release state lists "{name}" at "{version}" with no wheel'))
+def release_state_bare(release_state, name, version):
+    data = json.loads(release_state.read_text())
+    data["releases"][name] = version
+    release_state.write_text(json.dumps(data))
+
+
 @given(parsers.parse('GitHub has no release of "{slug}"'))
 def no_release(monkeypatch, slug):
     monkeypatch.setattr(nightly, "latest_release", lambda repo: None)

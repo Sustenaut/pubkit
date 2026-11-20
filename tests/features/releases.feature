@@ -138,11 +138,25 @@ Feature: Other packages' releases are each repository's own pins
 
   Scenario: Sync check fails on a pubtest older than pubrules' steps need, and sync pins a newer one
     Given a repository initialised as "utility"
-    And a file "tests/requirements.txt" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl"
+    And a file "tests/requirements.txt" holding:
+      """
+      # The steps and plugin the suite runs with; the nightly moves the pin.
+      pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl
+      """
     When I run pubrules "sync" "--check"
     Then it fails
     And stderr mentions "tests/requirements.txt pins a pubtest older than the 0.2.2 pubrules' steps need"
     When I run pubrules "sync"
     Then it succeeds
-    And the file "tests/requirements.txt" includes "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.2/pubtest-0.2.2-py3-none-any.whl"
-    And the file "tests/requirements.txt" does not include "v0.2.1"
+    And the file "tests/requirements.txt" holds:
+      """
+      # The steps and plugin the suite runs with; the nightly moves the pin.
+      pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.2/pubtest-0.2.2-py3-none-any.whl
+      """
+
+  Scenario: A release state entry that names no wheel takes the name the release gives it
+    Given the release state lists "pubtest" at "0.3.1" with no wheel
+    And release "v0.3.1" of "Sustenaut/pubtest" carries "pubtestrules-0.3.1-py3-none-any.whl"
+    When I start the package "pubfoo"
+    Then it succeeds
+    And the file "tests/requirements.txt" includes "pubtestrules @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.1/pubtestrules-0.3.1-py3-none-any.whl"
