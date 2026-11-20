@@ -190,7 +190,8 @@ JOBS: dict[str, dict[str, Job]] = {
         "osv": Job("job-osv.yml"),
         "review": Job("job-review.yml", events=("pr",)),
         "sonar": Job("job-sonar.yml", ("sonar-args",), needs=("functional", "browser"), secrets=True,
-                     fixed={"reports": "sonar.python.coverage.reportPaths=*.xml"},
+                     fixed={"reports": "sonar.python.coverage.reportPaths=*.xml "
+                                       "sonar.javascript.lcov.reportPaths=lcov.info"},
                      internal=SONAR_INTERNAL),
     },
     "rust": {
