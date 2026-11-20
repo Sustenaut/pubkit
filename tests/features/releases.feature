@@ -19,8 +19,9 @@ Feature: Other packages' releases are each repository's own pins
     And the JSON in "pubrules.json" has "ci.release.pubrel" equal to "0.8.0"
     And the file ".github/workflows/pr.yml" includes "pubrel/.github/workflows/release.yml@v0.8.0"
     And the file "tests/requirements.txt" includes "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.3/pubtest-0.2.3-py3-none-any.whl"
-    And the file "tests/requirements-pubrules.txt" includes "pubtest>=0.2.2"
+    And the file "tests/requirements-pubrules.txt" includes "# pubtest floor: 0.2.2"
     And the file "tests/requirements-pubrules.txt" does not include "pubtest @"
+    And the file "tests/requirements-pubrules.txt" does not include "pubtest>="
 
   Scenario: Where the release state lists none, a new package pins pubrel's latest GitHub release
     Given the release state lists no "pubrel"
@@ -76,7 +77,7 @@ Feature: Other packages' releases are each repository's own pins
 
   Scenario: A lock of an older pubrules, whose pubtest this pubrules no longer takes, gives no pin: sync pins the release state's
     A bump from pubrules 0.45.0 kept such a lock's pubtest 0.2.1 beside
-    `pubtest>=0.2.2`, which no lock resolves.
+    a floor of 0.2.2, which no lock resolves.
     Given a repository initialised as "utility"
     And a file "tests/requirements.txt" holding "-r requirements-pubrules.txt"
     And a file "tests/requirements.lock" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl"
@@ -100,3 +101,48 @@ Feature: Other packages' releases are each repository's own pins
     When the nightly moves the repository's pins
     Then the moves include "pubsec: Sustenaut/pubsec 0.3.0 -> 0.4.0"
     And the file "pubsec" includes "fetch https://github.com/Sustenaut/pubsec/releases/download/v0.4.0/pubsec-0.4.0-py3-none-any.whl 4444444444444444444444444444444444444444444444444444444444444444 providers deploy.providers"
+
+  Scenario: A release whose wheel is named by another distribution is pinned by that name
+    pubtest's repository releases its wheel as pubtestrules, its PyPI name.
+    Given the release state lists no "pubtest"
+    And GitHub's latest release of "Sustenaut/pubtest" is "v0.3.1"
+    And release "v0.3.1" of "Sustenaut/pubtest" carries "pubtestrules-0.3.1-py3-none-any.whl"
+    When I start the package "pubfoo"
+    Then it succeeds
+    And the file "tests/requirements.txt" includes "pubtestrules @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.1/pubtestrules-0.3.1-py3-none-any.whl"
+
+  Scenario: The release state can name a release's wheel
+    Given the release state lists "pubtest" with the wheel "pubtestrules-0.3.1-py3-none-any.whl" at "0.3.1"
+    And a repository initialised as "utility"
+    And a file "tests/requirements.txt" holding "-r requirements-pubrules.txt"
+    When I run pubrules "sync"
+    Then it succeeds
+    And the file "tests/requirements.txt" includes "pubtestrules @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.1/pubtestrules-0.3.1-py3-none-any.whl"
+
+  Scenario: The nightly follows a pubtest release whose wheel is named by another distribution
+    Given a repository initialised as "utility"
+    And GitHub's latest release of "Sustenaut/pubtest" is "v0.3.1"
+    And release "v0.3.1" of "Sustenaut/pubtest" carries "pubtestrules-0.3.1-py3-none-any.whl"
+    When the nightly moves the repository's pins
+    Then the moves include "tests/requirements.txt: Sustenaut/pubtest 0.2.2 -> 0.3.1"
+    And the file "tests/requirements.txt" includes "pubtestrules @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.1/pubtestrules-0.3.1-py3-none-any.whl"
+    And the file "tests/requirements.txt" does not include "pubtest @"
+    And the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes
+
+  Scenario: A release that names no wheel keeps the name the pin had
+    Given a repository initialised as "utility"
+    And GitHub's latest release of "Sustenaut/pubtest" is "v0.2.5"
+    And release "v0.2.5" of "Sustenaut/pubtest" carries "pubtest-0.2.5.tar.gz"
+    When the nightly moves the repository's pins
+    Then the file "tests/requirements.txt" includes "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.5/pubtest-0.2.5-py3-none-any.whl"
+
+  Scenario: Sync check fails on a pubtest older than pubrules' steps need, and sync pins a newer one
+    Given a repository initialised as "utility"
+    And a file "tests/requirements.txt" holding "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.1/pubtest-0.2.1-py3-none-any.whl"
+    When I run pubrules "sync" "--check"
+    Then it fails
+    And stderr mentions "tests/requirements.txt pins a pubtest older than the 0.2.2 pubrules' steps need"
+    When I run pubrules "sync"
+    Then it succeeds
+    And the file "tests/requirements.txt" includes "pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.2.2/pubtest-0.2.2-py3-none-any.whl"
+    And the file "tests/requirements.txt" does not include "v0.2.1"

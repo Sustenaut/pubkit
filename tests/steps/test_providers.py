@@ -42,9 +42,8 @@ def init(root, kind, **extra):
 def pin(name):
     """NAME's pin at the release the scenario's release state lists (conftest.RELEASES)."""
     from conftest import RELEASES  # noqa: PLC0415
-    from pubrules.releases import WHEEL  # noqa: PLC0415
-    from pubrules.refs import OWNER  # noqa: PLC0415
-    return {"distribution": name, "wheel": WHEEL.format(owner=OWNER, name=name, version=RELEASES[name]["version"]),
+    from pubrules.releases import wheel_url  # noqa: PLC0415
+    return {"distribution": name, "wheel": wheel_url(name, RELEASES[name]["version"]),
             "sha256": RELEASES[name]["sha256"]}
 
 

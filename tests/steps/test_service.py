@@ -263,9 +263,9 @@ def uvx_not_run(tmp_path):
 def runs_pinned(repo, path):
     from conftest import RELEASES  # noqa: PLC0415
     from pubrules.refs import OWNER  # noqa: PLC0415
-    from pubrules.releases import WHEEL  # noqa: PLC0415
+    from pubrules.releases import wheel_url  # noqa: PLC0415
     entry = RELEASES["pubsec"]
-    wheel = WHEEL.format(owner=OWNER, name="pubsec", version=entry["version"])
+    wheel = wheel_url("pubsec", entry["version"], OWNER)
     text = (repo / path).read_text()
     assert f"fetch {wheel} {entry['sha256']} providers deploy.providers\n" in text, text
     assert 'exec uvx --from "$fetched" pubsec "$@"' in text, text

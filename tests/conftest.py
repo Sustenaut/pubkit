@@ -67,6 +67,16 @@ RELEASES = {"pubrel": "0.7.0", "pubtest": "0.2.2",
 
 
 @pytest.fixture(autouse=True)
+def no_release_assets(monkeypatch):
+    """No scenario asks GitHub what a release's files are called: a release
+    says nothing, so its wheel is named by its repository, unless a scenario
+    says otherwise."""
+    from pubrules import nightly  # noqa: PLC0415
+    monkeypatch.setattr(nightly, "release_assets", lambda repo, tag: None)
+    nightly.release_wheel.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def release_state(tmp_path, monkeypatch):
     """The release-state file every scenario's pubrules reads, with RELEASES."""
     path = tmp_path / "release-state.json"

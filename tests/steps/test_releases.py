@@ -5,6 +5,7 @@ pubtest's."""
 
 from __future__ import annotations
 
+import json
 import re
 
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -18,6 +19,19 @@ scenarios("releases.feature")
 def latest(monkeypatch, slug, tag):
     monkeypatch.setattr(nightly, "latest_release", lambda repo: tag if repo == slug else None)
     nightly.latest_tag.cache_clear()
+
+
+@given(parsers.parse('release "{tag}" of "{slug}" carries "{file}"'))
+def carries(monkeypatch, tag, slug, file):
+    monkeypatch.setattr(nightly, "release_assets", lambda repo, at: [file] if (repo, at) == (slug, tag) else None)
+    nightly.release_wheel.cache_clear()
+
+
+@given(parsers.parse('the release state lists "{name}" with the wheel "{file}" at "{version}"'))
+def release_state_wheel(release_state, name, file, version):
+    data = json.loads(release_state.read_text())
+    data["releases"][name] = {"version": version, "wheel": file}
+    release_state.write_text(json.dumps(data))
 
 
 @given(parsers.parse('GitHub has no release of "{slug}"'))
@@ -67,7 +81,7 @@ def exits(code):
 @then("the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes")
 def pin_meets_floor(repo):
     """What `pubrules lock` needs to resolve: the wheel's release is at
-    least the `pubtest>=` floor of the managed requirements-pubrules.txt."""
+    least the pubtest floor the managed requirements-pubrules.txt names."""
     pinned = re.search(r"pubtest/releases/download/v([0-9.]+)/", (repo / "tests/requirements.txt").read_text())[1]
-    floor = re.search(r"^pubtest>=([0-9.]+)$", (repo / "tests/requirements-pubrules.txt").read_text(), re.M)[1]
+    floor = re.search(r"^# pubtest floor: ([0-9.]+)$", (repo / "tests/requirements-pubrules.txt").read_text(), re.M)[1]
     assert tuple(map(int, pinned.split("."))) >= tuple(map(int, floor.split("."))), (pinned, floor)
