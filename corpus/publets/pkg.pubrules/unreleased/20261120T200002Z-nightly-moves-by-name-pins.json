@@ -1,4 +1,4 @@
 {
   "category": "added",
-  "change": "the nightly moves each pub* package a requirements file pins by name (`pubtestrules==X` among them) to its newest release on PyPI, or on the PyPI mirror where pubrules.json names one, and locks again"
+  "change": "the nightly moves each pub* package a requirements file pins by name (`pubtestrules==X` among them) to its newest release on PyPI with a file not yanked, or on the PyPI mirror where pubrules.json names one, and locks again"
 }

@@ -218,12 +218,17 @@ provider() {
   with+=(--with "$fetched")
 }
 """
-# pubrules itself, by name from PyPI; with a PyPI mirror, from its simple
-# index when PyPI does not give it (the try that tells is uv's own cache hit
-# once it has run).
-OWN = """# pubrules {version} from PyPI, or from the mirror's simple index (mirror.pypi) when PyPI fails.
-from=(--from "pubrules=={version}")
-uvx --quiet "${{from[@]}}" pubrules --version >/dev/null 2>&1 || from+=(--index-url "{pypi}/simple/")
+# With a wheel mirror, pubrules' own wheel, by the sha256 tests/requirements.lock
+# pins for this version of it: from its GitHub release, else the mirror, and
+# checked either way. Without one, or a lock with no hash for it, uvx takes
+# pubrules==X from PyPI.
+OWN = """# pubrules' own wheel, by the sha256 tests/requirements.lock pins, from the mirror when GitHub fails.
+from="pubrules=={version}"
+pin=$(sed -n "/^pubrules=={version} /,/--hash=sha256:/s/.*--hash=sha256:\\([0-9a-f]\\{{64\\}}\\).*/\\1/p" tests/requirements.lock 2>/dev/null | head -n 1)
+if [ -n "$pin" ]; then
+  fetch "https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl" "$pin" wheels tests/requirements.lock
+  from="$fetched"
+fi
 """
 
 
@@ -286,11 +291,10 @@ def values(config: dict[str, str], root: Path | None = None, launchers: frozense
     fetch = FETCH.replace("{fallback}", FALLBACK.format(mirror=mirror) if mirror else "")
     launched = PROVIDER + "".join(f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n"
                                   for p in wheels) + "\n" if wheels else ""
-    pypi = mirrors(config).get("pypi", "")
-    own = OWN.format(version=__version__, pypi=pypi) if pypi else ""
-    launch = 'exec uvx "${from[@]}" ' if own else f'exec uvx --from "pubrules=={__version__}" '
+    own = OWN.format(version=__version__) if mirror else ""
+    launch = 'exec uvx --from "$from" ' if own else f'exec uvx --from "pubrules=={__version__}" '
     out = {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
-           "providers": (fetch + "\n" if wheels else "") + launched + own,
+           "providers": (fetch + "\n" if wheels or own else "") + launched + own,
            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
            "pypi": mirrors(config).get("pypi", ""),
            "provider_requirements": provider_requirements(wheels), "pubtest": pubtest_requirement(root)}

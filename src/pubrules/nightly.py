@@ -457,16 +457,17 @@ def read_url(url: str) -> str:
 
 @functools.cache
 def pypi_latest(name: str, mirror: str = "") -> str | None:
-    """The newest X.Y.Z release of `name` on PyPI, from its JSON API, or from
-    the simple index of the PyPI mirror (mirror.pypi) where one is set; None,
-    with a warning, when neither says."""
+    """The newest X.Y.Z release of `name` on PyPI with a file not yanked, from
+    its JSON API, or from the simple index of the PyPI mirror (mirror.pypi)
+    where one is set; None, with a warning, when neither says."""
     from .cli import INDEX_JSON  # noqa: PLC0415
     index = os.environ.get("PUBRULES_INDEX_JSON", INDEX_JSON).rstrip("/")
     url = f"{mirror}/simple/{name}/" if mirror else f"{index}/{name}/json"
     try:
         body = read_url(url)
         found = (re.findall(rf"{name}-([0-9]+\.[0-9]+\.[0-9]+)-py3-none-any\.whl", body) if mirror
-                 else [v for v in json.loads(body).get("releases", {}) if RELEASE_TAG.fullmatch(f"v{v}")])
+                 else [v for v, files in json.loads(body).get("releases", {}).items()
+                       if RELEASE_TAG.fullmatch(f"v{v}") and any(not f.get("yanked") for f in files)])
     except (OSError, ValueError):
         found = []
     if not found:

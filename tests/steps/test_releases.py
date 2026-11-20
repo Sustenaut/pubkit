@@ -43,9 +43,12 @@ def release_state_bare(release_state, name, version):
 
 @given(parsers.parse('PyPI\'s newest release of "{name}" is "{version}"'))
 def pypi_release(pypi_pages, name, version):
-    """PyPI's JSON API answer for `name`."""
-    pypi_pages[f"https://pypi.org/pypi/{name}/json"] = json.dumps({"releases": {"0.4.0": [], version: [],
-                                                                         "0.5.0rc1": []}})
+    """PyPI's JSON API answer for `name`: beside it, a pre-release, a newer
+    release whose only file is yanked and one with no files, none of which
+    counts."""
+    file, yanked = {"yanked": False}, {"yanked": True}
+    pypi_pages[f"https://pypi.org/pypi/{name}/json"] = json.dumps({"releases": {
+        "0.4.0": [file], version: [file], "0.5.0rc1": [file], "9.0.0": [yanked], "9.0.1": []}})
 
 
 @given(parsers.parse('pubrules.json\'s PyPI mirror lists "{a}" and "{b}"'))

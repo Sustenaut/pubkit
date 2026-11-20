@@ -1074,14 +1074,15 @@ The mirror serves each file at `<base>/f/<sha256>/<file>.whl`, so a lock
 line alone gives its address, and the hashes stay as they are: pip checks
 every file, and the mirror only has to be there, never trusted.
 pip-audit's last try reads the locks rewritten the same way
-(`tests/install-lock --rewrite LOCK`), and `./pubrules` fetches
+(`tests/install-lock --rewrite LOCK`), and `./pubrules` fetches its own wheel
+(by the sha256 tests/requirements.lock pins for `pubrules==X`) and
 deploy.providers' wheels from the mirror when GitHub fails to give them.
-Without the setting, the installs only retry.
+Without the setting, the installs only retry, and `./pubrules` takes
+`pubrules==X` from PyPI.
 
 With a PyPI mirror too, the fourth try takes every other package from its
 simple repository index (PEP 503) instead of PyPI, again checked against
-the lock's hashes, and `./pubrules` takes pubrules itself from that index
-when PyPI does not give it:
+the lock's hashes:
 
 ```json
 "mirror": {"wheels": "https://storage.sustenaut.eu/wheels", "pypi": "https://storage.sustenaut.eu/pypi"}

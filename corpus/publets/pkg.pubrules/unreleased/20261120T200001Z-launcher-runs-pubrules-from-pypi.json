@@ -1,4 +1,4 @@
 {
   "category": "changed",
-  "change": "./pubrules runs `uvx --from pubrules==X`, from PyPI, and from the PyPI mirror's simple index (mirror.pypi) when PyPI does not give it, in place of the GitHub release wheel and the wheel mirror"
+  "change": "./pubrules runs `uvx --from pubrules==X` from PyPI; with a wheel mirror (mirror.wheels) it still fetches pubrules' release wheel, from GitHub or else the mirror, checked against the sha256 tests/requirements.lock pins for `pubrules==X`"
 }
