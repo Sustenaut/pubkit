@@ -81,8 +81,7 @@
     {
       "plugin": "pypi.publish",
       "paths": [
-        "src/pubrules/cli.py",
-        "src/pubrules/nightly.py"
+        "src/pubrules/cli.py"
       ],
       "mode": "required"
     },
