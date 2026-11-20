@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "sync pins no pubtest in pubtest's own repository (its pyproject.toml registers the pubtest pytest plugin): its suite runs on its checkout, and a pinned release would be a second distribution of the same package once pubtest's is pubtestrules"
+}

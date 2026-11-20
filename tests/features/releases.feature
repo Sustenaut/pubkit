@@ -160,3 +160,20 @@ Feature: Other packages' releases are each repository's own pins
     When I start the package "pubfoo"
     Then it succeeds
     And the file "tests/requirements.txt" includes "pubtestrules @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.1/pubtestrules-0.3.1-py3-none-any.whl"
+
+  Scenario: pubtest's own repository pins no pubtest: its suite runs on its checkout
+    Given a repository initialised as "utility"
+    And a file "pyproject.toml" holding:
+      """
+      [project]
+      name = "pubtestrules"
+      version = "0.3.1"
+
+      [project.entry-points.pytest11]
+      pubtest = "pubtest.plugin"
+      """
+    And a file "tests/requirements.txt" holding "-r requirements-pubrules.txt"
+    When I run pubrules "sync" "--check"
+    Then stderr does not mention "pin pubtest"
+    When I run pubrules "sync"
+    Then the file "tests/requirements.txt" does not include "pubtest"

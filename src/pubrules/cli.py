@@ -717,6 +717,19 @@ def _held(wheel: str) -> tuple[int, ...] | None:
     return _release(m[1]) if m else None
 
 
+def is_pubtest(root: Path) -> bool:
+    """Whether the repository is pubtest itself: its pyproject.toml registers
+    the pubtest pytest plugin. Its suite runs on its own checkout, installed
+    editable; a pinned release beside it would be another distribution once
+    pubtest's is pubtestrules, and the two would share the package."""
+    import tomllib  # noqa: PLC0415
+    try:
+        project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {})
+    except (OSError, ValueError):
+        return False
+    return "pubtest" in project.get("entry-points", {}).get("pytest11", {})
+
+
 def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
     """tests/requirements.txt pins pubtest by its release wheel: `sync` adds
     the one tests/requirements.lock has, where it is at least the pubtest
@@ -724,7 +737,7 @@ def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
     older one), else the latest release, where it pins none; `--check` fails
     instead. Lines to print, and whether that fails."""
     path = root / REQUIREMENTS
-    if not path.is_file():
+    if not path.is_file() or is_pubtest(root):
         return [], False
     text = path.read_text(encoding="utf-8")
     floor = _release(pubtest_floor())
