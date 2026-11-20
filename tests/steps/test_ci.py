@@ -843,13 +843,13 @@ def mirror_read(pubtest_ctx, setting):
     pubtest_ctx.attempt(lambda: cli.values({"kind": "utility", "mirror": setting}))
 
 
-@given("a lock that pins this pubrules' wheel", target_fixture="repo_dir")
+@given("a lock that pins this pubrules by name with its hash", target_fixture="repo_dir")
 def pinned_repo(tmp_path):
     repo = tmp_path / "repo"
     (repo / "tests").mkdir(parents=True)
     digest = hashlib.sha256(b"the wheel").hexdigest()
     (repo / "tests" / "requirements.lock").write_text(
-        f"pubrules @ {PUBRULES_URL} \\\n    --hash=sha256:{digest}\n{PYTEST_LINES}")
+        f"{PYTEST_LINES}pubrules=={__version__} \\\n    --hash=sha256:{digest}\n")
     return repo
 
 
@@ -889,11 +889,11 @@ def launcher_stops(launched, message):
     assert launched["code"] == 1 and message in launched["stderr"], launched
 
 
-@then(parsers.parse('the file "{path}" runs uvx on this pubrules\' GitHub release URL'))
+@then(parsers.parse('the file "{path}" runs uvx on this pubrules from PyPI'))
 def launcher_plain(pubtest_ctx, path):
     from pubtest.steps.files import at  # noqa: PLC0415
     text = at(pubtest_ctx, path).read_text()
-    assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text, text
+    assert f'exec uvx --from "pubrules=={__version__}" pubrules "$@"' in text, text
 
 
 def _steps(shipped, workflow):

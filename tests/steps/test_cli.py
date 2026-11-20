@@ -54,10 +54,10 @@ def no_pip(tmp_path, env):
     env.update(PYTHONPATH=str(hide), HIDE_PIP="1")
 
 
-@then(parsers.parse('"{path}" pins this pubrules\' wheel'))
-def pins_wheel(repo, path):
-    assert f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl" in (
-        repo / path).read_text()
+@then(parsers.parse('"{path}" pins this pubrules by name, and pubtest by its floor'))
+def pins_by_name(repo, path):
+    lines = (repo / path).read_text().splitlines()
+    assert f"pubrules=={__version__}" in lines and "pubtestrules>=0.4.0" in lines, lines
 
 
 @then(parsers.parse('"{path}" pins "{pin}" with the hashes "{a}", "{b}" and the resolved file\'s'))
@@ -171,7 +171,7 @@ def run_make(repo, run, args):
 @given("the lock pins this pubrules")
 def lock_pins_this(repo):
     (repo / "tests" / "requirements.lock").write_text(
-        f"pubrules @ https://example.org/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl\n")
+        f"pubrules=={__version__} \\\n    --hash=sha256:{'a' * 64}\n")
 
 
 @given(".venv was built from the current lock")

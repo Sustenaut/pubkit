@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "pub* packages are pinned by their PyPI names: requirements-pubrules.txt requires `pubtestrules>=0.4.0` and `pubrules==X`, tests/requirements.txt pins `pubtestrules==X` (sync pins by name the release a wheel pin of pubrules 0.48.0 and before names, raised to the floor), the lock holds each with every published hash, and `pubrules lock` refuses any package named pubtest (PyPI's other project)"
+}

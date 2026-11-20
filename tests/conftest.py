@@ -79,6 +79,22 @@ def no_release_assets(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def pypi_pages(monkeypatch):
+    """No scenario reads PyPI: the pages a scenario gives (URL -> body) are
+    all there is."""
+    from pubrules import nightly  # noqa: PLC0415
+    pages: dict[str, str] = {}
+
+    def read(url):
+        if url not in pages:
+            raise OSError(f"no page {url}")
+        return pages[url]
+    monkeypatch.setattr(nightly, "read_url", read)
+    nightly.pypi_latest.cache_clear()
+    return pages
+
+
+@pytest.fixture(autouse=True)
 def release_state(tmp_path, monkeypatch):
     """The release-state file every scenario's pubrules reads, with RELEASES."""
     path = tmp_path / "release-state.json"

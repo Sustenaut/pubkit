@@ -2,8 +2,8 @@
 
 A command, `pubrules`, that keeps each repository's copies of the shared files
 in step with the version it pins. The pytest plugin and the Gherkin steps
-every suite loads are pubtest's, which the managed tests/requirements-pubrules.txt
-pins.
+every suite loads are pubtest's (on PyPI as pubtestrules), whose floor the
+managed tests/requirements-pubrules.txt names.
 """
 
 from importlib.metadata import PackageNotFoundError, version

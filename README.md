@@ -16,14 +16,17 @@ driving the built program as a user would. pubrules is that setup, written once.
 The pytest plugin and the Gherkin steps every suite loads are
 [pubtest](https://github.com/Sustenaut/pubtest)'s: one grammar
 ([GRAMMAR.md](https://github.com/Sustenaut/pubtest/blob/main/GRAMMAR.md)), a
-pytest-bdd plugin and an npm package for cucumber-js and quickpickle. The managed
-`tests/requirements-pubrules.txt` names the oldest pubtest whose steps pubrules' own
-files use (`# pubtest floor: X`, which `sync --check` holds the pin to), and each repository's `tests/requirements.txt` pins the
-release wheel, which its lock holds with its hash and the nightly moves to pubtest's
-latest release, so a pubtest release needs no pubrules release. `pubrules sync` pins
-the one the lock has where `tests/requirements.txt` pins none (`sync --check`
-fails), and `pubrules lock` refuses a pubtest from an index: PyPI's `pubtest` is
-another project. So every suite gets `ctx`, `binary(name)`, `run(...)`, the tag markers and the steps
+pytest-bdd plugin and an npm package for cucumber-js and quickpickle, on PyPI as
+`pubtestrules` (PyPI's `pubtest` is another project; the package imported is still
+`pubtest`). The managed `tests/requirements-pubrules.txt` names the oldest pubtest whose
+steps pubrules' own files use (`pubtestrules>=X`, which `sync --check` holds the pin to)
+and pins pubrules itself by name (`pubrules==X`), and each repository's
+`tests/requirements.txt` pins `pubtestrules==X`, which its lock holds with every
+published hash and the nightly moves to the newest release on PyPI (or the PyPI
+mirror, `mirror.pypi`), so a pubtest release needs no pubrules release. `pubrules sync`
+pins the one the lock has where `tests/requirements.txt` pins none (`sync --check`
+fails), and pins by name the release a wheel pin of pubrules 0.48.0 and before
+names; `pubrules lock` refuses any package named `pubtest`. So every suite gets `ctx`, `binary(name)`, `run(...)`, the tag markers and the steps
 (`it succeeds`, `it prints "…"`, `the result is "V"`, the files, stand-ins, HTTP and
 secrets steps) without writing them. pubrules carried the plugin itself until 0.42.0;
 a suite that imported `pubrules.plugin` imports `pubtest.core` instead.
@@ -176,8 +179,8 @@ files, and needs no `--project`.
   `tags` defaults to false, since there are no release tags to keep, and
   `"tags": true` or a `release_app` stops sync.
 - **Nightly:** governed like any other repository: the nightly moves its
-  pubrules, its lock, the workflows' and actions' pins and any release wheel
-  its requirements files pin.
+  pubrules, its lock, the workflows' and actions' pins, any release wheel
+  its requirements files pin and any pub* package they pin by name.
 
 ## Hosting
 
@@ -1072,9 +1075,10 @@ line alone gives its address, and the hashes stay as they are: pip checks
 every file, and the mirror only has to be there, never trusted.
 pip-audit's last try reads the locks rewritten the same way
 (`tests/install-lock --rewrite LOCK`), and `./pubrules` fetches its own wheel
-(by the sha256 tests/requirements.lock pins) and deploy.providers' wheels
-from the mirror when GitHub fails to give them. Without the setting, the
-installs only retry, and `./pubrules` is as before.
+(by the sha256 tests/requirements.lock pins for `pubrules==X`) and
+deploy.providers' wheels from the mirror when GitHub fails to give them.
+Without the setting, the installs only retry, and `./pubrules` takes
+`pubrules==X` from PyPI.
 
 With a PyPI mirror too, the fourth try takes every other package from its
 simple repository index (PEP 503) instead of PyPI, again checked against

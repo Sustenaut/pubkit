@@ -218,13 +218,15 @@ provider() {
   with+=(--with "$fetched")
 }
 """
-# With a wheel mirror, pubrules' own wheel too, when tests/requirements.lock
-# pins this version of it by its sha256.
+# With a wheel mirror, pubrules' own wheel, by the sha256 tests/requirements.lock
+# pins for this version of it: from its GitHub release, else the mirror, and
+# checked either way. Without one, or a lock with no hash for it, uvx takes
+# pubrules==X from PyPI.
 OWN = """# pubrules' own wheel, by the sha256 tests/requirements.lock pins, from the mirror when GitHub fails.
-from="https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl"
-pin=$(sed -n "\\#^pubrules @ $from#,/--hash=sha256:/s/.*--hash=sha256:\\([0-9a-f]\\{{64\\}}\\).*/\\1/p" tests/requirements.lock 2>/dev/null | head -n 1)
+from="pubrules=={version}"
+pin=$(sed -n "/^pubrules=={version} /,/--hash=sha256:/s/.*--hash=sha256:\\([0-9a-f]\\{{64\\}}\\).*/\\1/p" tests/requirements.lock 2>/dev/null | head -n 1)
 if [ -n "$pin" ]; then
-  fetch "$from" "$pin" wheels tests/requirements.lock
+  fetch "https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl" "$pin" wheels tests/requirements.lock
   from="$fetched"
 fi
 """
@@ -290,15 +292,12 @@ def values(config: dict[str, str], root: Path | None = None, launchers: frozense
     launched = PROVIDER + "".join(f"provider {shlex.quote(p['wheel'])} {shlex.quote(p['sha256'])}\n"
                                   for p in wheels) + "\n" if wheels else ""
     own = OWN.format(version=__version__) if mirror else ""
-    if own:
-        launch = 'exec uvx --from "$from" '
-    else:
-        launch = f'exec uvx --from "https://github.com/Sustenaut/pubrules/releases/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl" '
+    launch = 'exec uvx --from "$from" ' if own else f'exec uvx --from "pubrules=={__version__}" '
     out = {"version": __version__, "bin_var": bin_var(config.get("bin", "app")),
            "providers": (fetch + "\n" if wheels or own else "") + launched + own,
            "launch": launch, "with": '"${with[@]}" ' if wheels else "", "mirror": mirror,
            "pypi": mirrors(config).get("pypi", ""),
-           "provider_requirements": provider_requirements(wheels)}
+           "provider_requirements": provider_requirements(wheels), "pubtest": pubtest_requirement(root)}
     from .providers import PUBDEPLOY as DEPLOYS, PUBSEC as SECRETS, pinned  # noqa: PLC0415
     if SECRETS in launchers:
         wheel = pinned(root, config, SECRETS)
@@ -507,8 +506,8 @@ def sync(root: Path, check: bool) -> int:
                 target.chmod(0o755)
             print(f"updated  {path}")
     lock = root / LOCK
-    wheel = f"/download/v{__version__}/pubrules-{__version__}-py3-none-any.whl"
-    lock_stale = lock.exists() and wheel not in lock.read_text(encoding="utf-8")
+    lock_stale = lock.exists() and not re.search(rf"^pubrules=={re.escape(__version__)}\b",
+                                                 lock.read_text(encoding="utf-8"), re.M)
     for path in replaced:
         why = ("pubrules.json has no deploy block, so it has no needs to check" if path == CALLER
                else "pubrules.json's ci block writes the workflows now")
@@ -642,26 +641,18 @@ def lock(root: Path) -> int:
     """
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
-        # pip takes pubtest's wheel only when its URL comes before the floor
-        # requirements-pubrules.txt names, so the pin is read first.
         given = root / REQUIREMENTS
-        first = [m.group(0) for m in PUBTEST_PIN.finditer(given.read_text(encoding="utf-8"))] \
-            if given.is_file() else []
-        if first:
-            ordered = Path(tmp) / "requirements.txt"
-            ordered.write_text("\n".join(first) + f"\n-r {given.resolve()}\n", encoding="utf-8")
-            given = ordered
         subprocess.run(
             [*pip(), "install", "--dry-run", "--ignore-installed",
              "--quiet", "--report", str(report), "-r", str(given)],
             check=True, stdout=subprocess.DEVNULL,
         )
         items = json.loads(report.read_text(encoding="utf-8"))["install"]
-    indexed = [i["metadata"]["name"] for i in items
-               if i["metadata"]["name"].lower() == "pubtest" and not i.get("is_direct")]
-    if indexed:
-        sys.exit(f"pubrules: {REQUIREMENTS} must pin pubtest by its release wheel (`pubtest @ https://...`): "
-                 f"from an index it is PyPI's pubtest, another project; `pubrules sync` pins it")
+    # pubtest's distribution is pubtestrules: a "pubtest" is PyPI's other
+    # project, or a wheel of a pubtest before the name changed.
+    if any(i["metadata"]["name"].lower() == "pubtest" for i in items):
+        sys.exit(f"pubrules: {REQUIREMENTS} resolves a package named pubtest, which PyPI's index gives to another "
+                 f"project: pubtest is pubtestrules (`pubtestrules==X`); `pubrules sync` pins it")
     out = [f"# Generated by `pubrules lock` from {REQUIREMENTS.name}. Do not edit.",
            "# Installed with --require-hashes: a changed artifact fails the install.", ""]
     for item in sorted(items, key=lambda i: i["metadata"]["name"].lower()):
@@ -671,8 +662,8 @@ def lock(root: Path) -> int:
         if item.get("is_direct"):
             digest = digest or sha256_of(info["url"])
             # pip's report drops a URL's #sha256= fragment. A package that requires this one by URL
-            # names it with one (pubdeploy's python-statemachine), and --require-hashes counts the
-            # two as different requirements: a pin only a package requires keeps its fragment.
+            # names it with one, and --require-hashes counts the two as different requirements:
+            # a pin only a package requires keeps its fragment.
             url = info["url"] if item.get("requested") else info["url"].split("#", 1)[0] + f"#sha256={digest}"
             out.append(f"{name} @ {url} \\\n    --hash=sha256:{digest}")
         else:
@@ -685,14 +676,14 @@ def lock(root: Path) -> int:
     return 0
 
 
-# The repository's own pin of pubtest, in its tests/requirements.txt: the
-# release wheel, which the nightly moves. requirements-pubrules.txt names
-# only the floor, and PyPI's "pubtest" is another project, so the lock never
-# takes pubtest from an index. Known by the repository it comes from: the
-# wheel, and so the requirement, is named by its distribution, which from
-# pubtest's PyPI release on is pubtestrules.
-PUBTEST_PIN = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9_.-]*)\s*@\s*(?P<wheel>https://github\.com/[A-Za-z0-9-]+/pubtest/"
-                         r"releases/download/v[0-9][^/\s]*/[A-Za-z0-9_.]+-[^/\s]+\.whl)", re.M)
+# The repository's own pin of pubtest, in its tests/requirements.txt: by its
+# PyPI name, pubtestrules (PyPI's "pubtest" is another project), which the
+# nightly moves. requirements-pubrules.txt names the floor.
+PUBTEST_PIN = re.compile(r"^pubtestrules==(?P<version>[0-9]+\.[0-9]+\.[0-9]+)[ \t]*$", re.M)
+# The pin pubrules 0.48.0 and before wrote: pubtest's release wheel, named
+# pubtest or pubtestrules. sync pins the same release by name instead.
+PUBTEST_WHEEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\s*@\s*https://github\.com/[A-Za-z0-9-]+/pubtest/"
+                           r"releases/download/v(?P<version>[0-9][^/\s]*)/[A-Za-z0-9_.]+-[^/\s]+\.whl", re.M)
 
 
 # The line sync writes above the pubtest pin.
@@ -705,23 +696,22 @@ def _release(text: str) -> tuple[int, ...]:
 
 def pubtest_floor() -> str:
     """The least pubtest this pubrules' steps need, as its
-    requirements-pubrules.txt says (`# pubtest floor: X`)."""
+    requirements-pubrules.txt says (`pubtestrules>=X`)."""
     text = (resources.files("pubrules") / "templates" / "common" / "tests" / "requirements-pubrules.txt"
             ).read_text(encoding="utf-8")
     return re.search(r"^# pubtest floor: ([0-9]+\.[0-9]+\.[0-9]+)$", text, re.M)[1]
 
 
-def _held(wheel: str) -> tuple[int, ...] | None:
-    """The release a pubtest wheel URL names, or None."""
-    m = re.search(r"/download/v([0-9]+\.[0-9]+\.[0-9]+)/", wheel)
-    return _release(m[1]) if m else None
+def pubtest_requirement(root: Path | None) -> str:
+    """requirements-pubrules.txt's pubtest line: the floor, by its PyPI name;
+    none in pubtest's own repository, whose suite runs on its checkout."""
+    return "" if root is not None and is_pubtest(root) else f"pubtestrules>={pubtest_floor()}\n"
 
 
 def is_pubtest(root: Path) -> bool:
     """Whether the repository is pubtest itself: its pyproject.toml registers
     the pubtest pytest plugin. Its suite runs on its own checkout, installed
-    editable; a pinned release beside it would be another distribution once
-    pubtest's is pubtestrules, and the two would share the package."""
+    editable, so it pins no released pubtest."""
     import tomllib  # noqa: PLC0415
     try:
         project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {})
@@ -731,47 +721,49 @@ def is_pubtest(root: Path) -> bool:
 
 
 def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
-    """tests/requirements.txt pins pubtest by its release wheel: `sync` adds
-    the one tests/requirements.lock has, where it is at least the pubtest
-    requirements-pubrules.txt takes (a lock of an older pubrules may hold an
-    older one), else the latest release, where it pins none; `--check` fails
-    instead. Lines to print, and whether that fails."""
+    """tests/requirements.txt pins pubtest by name, `pubtestrules==X`: `sync`
+    writes the release a wheel pin of an older pubrules names, else the one
+    tests/requirements.lock has, else the latest release, each at least the
+    floor requirements-pubrules.txt takes; `--check` fails instead. Lines to
+    print, and whether that fails."""
     path = root / REQUIREMENTS
     if not path.is_file() or is_pubtest(root):
         return [], False
     text = path.read_text(encoding="utf-8")
-    floor = _release(pubtest_floor())
+    floor = pubtest_floor()
     given = PUBTEST_PIN.search(text)
-    if given and (_held(given["wheel"]) or (0,)) >= floor:
+    if given and _release(given["version"]) >= _release(floor):
         return [], False
+    old = PUBTEST_WHEEL.search(text)
     if check:
         if given:
-            return [f"pubrules: {REQUIREMENTS} pins a pubtest older than the {pubtest_floor()} pubrules' "
+            return [f"pubrules: {REQUIREMENTS} pins a pubtest older than the {floor} pubrules' "
                     f"steps need; run `pubrules sync`, which pins the latest release"], True
-        return [f"pubrules: {REQUIREMENTS} does not pin pubtest by its release wheel, which the lock needs "
-                f"(PyPI's pubtest is another project); run `pubrules sync`, which pins the one "
-                f"{LOCK.name} has, or the latest release"], True
-    if given:
-        # Too old: dropped, and pinned again below as if it had none.
-        before, after = text[:given.start()], text[given.end():].removeprefix("\n")
-        text = before.removesuffix(PUBTEST_COMMENT) + after
-    lock = root / LOCK
-    found = PUBTEST_PIN.search(lock.read_text(encoding="utf-8")) if lock.is_file() else None
-    if found and (_held(found["wheel"]) or (0,)) < floor:
-        found = None
-    if found:
-        wheel = found["wheel"]
-    else:
-        from .releases import version, wheel_url  # noqa: PLC0415
-        wheel = wheel_url("pubtest", version("pubtest"))
-    from .nightly import distribution  # noqa: PLC0415
-    pin = (f"{PUBTEST_COMMENT}"
-           f"{distribution(wheel.rsplit('/', 1)[1])} @ {wheel}\n")
+        if old:
+            return [f"pubrules: {REQUIREMENTS} pins pubtest by its release wheel; it is pinned by its PyPI "
+                    f"name now (`pubtestrules==X`); run `pubrules sync`, which pins the same release"], True
+        return [f"pubrules: {REQUIREMENTS} does not pin pubtest (`pubtestrules==X`); run `pubrules sync`, "
+                f"which pins the one {LOCK.name} has, or the latest release"], True
+    # Each pin there is dropped, and the release it names pinned again below.
+    held = (given or old)["version"] if given or old else None
+    text = "".join(line for line in text.splitlines(keepends=True)
+                   if line != PUBTEST_COMMENT and not PUBTEST_PIN.match(line) and not PUBTEST_WHEEL.match(line))
+    if held is None:
+        lock = root / LOCK
+        locked = lock.read_text(encoding="utf-8") if lock.is_file() else ""
+        found = re.search(r"^pubtestrules==([0-9]+\.[0-9]+\.[0-9]+)", locked, re.M) or PUBTEST_WHEEL.search(locked)
+        held = found[1] if found else None
+    if held is None or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", held):
+        from .releases import version  # noqa: PLC0415
+        held = version("pubtest")
+    if _release(held) < _release(floor):
+        held = floor
+    pin = f"{PUBTEST_COMMENT}pubtestrules=={held}\n"
     included = re.search(r"^-r requirements-pubrules\.txt$", text, re.M)
     at = included.start() if included else len(text)
     path.write_text(text[:at] + ("" if text[:at].endswith("\n") or not at else "\n") + pin + text[at:],
                     encoding="utf-8")
-    return [f"updated  {REQUIREMENTS} (pubtest: {wheel.rsplit('/', 2)[-2][1:]})"], False
+    return [f"updated  {REQUIREMENTS} (pubtest: {held})"], False
 
 
 def conform(root: Path) -> int:

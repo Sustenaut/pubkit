@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "./pubrules runs `uvx --from pubrules==X` from PyPI; with a wheel mirror (mirror.wheels) it still fetches pubrules' release wheel, from GitHub or else the mirror, checked against the sha256 tests/requirements.lock pins for `pubrules==X`"
+}
