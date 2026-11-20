@@ -79,7 +79,7 @@ OTHER_PIN = re.compile(ANY_OWNER + r"(?P<repo>[A-Za-z0-9_.-]+)"
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 # A Python package pinned by another repository's release wheel, in a requirements
 # file or pyproject.toml: the version is in the tag and in the file's name.
-WHEEL_PIN = re.compile(r"(?P<lead>[A-Za-z0-9][A-Za-z0-9_.-]*(?:\[[^\]]*\])?\s*@\s*)https://github\.com/"
+WHEEL_PIN = re.compile(r"(?P<lead>(?P<name>[A-Za-z0-9][A-Za-z0-9_.-]*)(?:\[[^\]]*\])?\s*@\s*)https://github\.com/"
                        r"(?P<owner>[A-Za-z0-9][A-Za-z0-9-]*)/(?P<repo>[A-Za-z0-9_.-]+)/releases/download/"
                        r"v(?P<version>[0-9]+\.[0-9]+\.[0-9]+)/(?P<file>[A-Za-z0-9_.+-]+\.whl)")
 # The command a `uv pip compile` lock was made with, in its header.
@@ -312,6 +312,38 @@ def tools_by_config(root: Path, changes: list[str]) -> bool:
     return moved
 
 
+def release_assets(repo: str, tag: str) -> list[str] | None:
+    """The file names release `tag` of `repo` carries, or None when GitHub does not say."""
+    try:
+        out = subprocess.run(["gh", "release", "view", tag, "--repo", repo, "--json", "assets",
+                              "--jq", ".assets[].name"], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return out.stdout.split() if out.returncode == 0 else None
+
+
+@functools.cache
+def release_wheel(slug: str, version: str) -> str | None:
+    """The file name of the pure-Python wheel release vVERSION of `slug`
+    carries (`<distribution>-VERSION-py3-none-any.whl`), or None when it
+    carries none or GitHub does not say. A repository's distribution may be
+    named otherwise than the repository (pubtest's is pubtestrules), so the
+    release itself says what its wheel is called."""
+    wheels = [name for name in release_assets(slug, f"v{version}") or []
+              if name.endswith(f"-{version}-py3-none-any.whl")]
+    return wheels[0] if len(wheels) == 1 else None
+
+
+def distribution(file: str) -> str:
+    """The distribution a wheel's file name names, as the file spells it."""
+    return file.split("-", 1)[0]
+
+
+def same_name(a: str, b: str) -> bool:
+    """Whether two distribution names are one (PEP 503: case, `-`, `_` and `.` alike)."""
+    return re.sub(r"[-_.]+", "-", a).lower() == re.sub(r"[-_.]+", "-", b).lower()
+
+
 @functools.cache
 def latest_tag(slug: str) -> str | None:
     """`slug`'s latest release tag, when it is vX.Y.Z; None, with a warning, when not."""
@@ -390,8 +422,15 @@ def wheels_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Pa
         line = f"{rel}: {slug} {m['version']} -> {version}"
         if line not in changes:
             changes.append(line)
-        file = m["file"].replace(m["version"], version, 1)
-        return f"{m['lead']}https://github.com/{slug}/releases/download/v{version}/{file}"
+        # The new release's wheel, by the name it carries: a distribution
+        # renamed since (pubtest's, as pubtestrules) takes the requirement's
+        # name with it. A release that says nothing keeps the old file's name.
+        file = release_wheel(slug, version) or m["file"].replace(m["version"], version, 1)
+        lead = m["lead"]
+        old, new = distribution(m["file"]), distribution(file)
+        if not same_name(old, new) and same_name(m["name"], old):
+            lead = new + lead[len(m["name"]):]
+        return f"{lead}https://github.com/{slug}/releases/download/v{version}/{file}"
 
     for path in wheel_files(root):
         text = path.read_text(encoding="utf-8")

@@ -688,9 +688,15 @@ def lock(root: Path) -> int:
 # The repository's own pin of pubtest, in its tests/requirements.txt: the
 # release wheel, which the nightly moves. requirements-pubrules.txt names
 # only the floor, and PyPI's "pubtest" is another project, so the lock never
-# takes pubtest from an index.
-PUBTEST_PIN = re.compile(r"^pubtest\s*@\s*(?P<wheel>https://github\.com/[A-Za-z0-9-]+/pubtest/releases/download/"
-                         r"v[0-9][^/\s]*/pubtest-[^/\s]+\.whl)", re.M)
+# takes pubtest from an index. Known by the repository it comes from: the
+# wheel, and so the requirement, is named by its distribution, which from
+# pubtest's PyPI release on is pubtestrules.
+PUBTEST_PIN = re.compile(r"^(?P<name>[A-Za-z0-9][A-Za-z0-9_.-]*)\s*@\s*(?P<wheel>https://github\.com/[A-Za-z0-9-]+/pubtest/"
+                         r"releases/download/v[0-9][^/\s]*/[A-Za-z0-9_.]+-[^/\s]+\.whl)", re.M)
+
+
+# The line sync writes above the pubtest pin.
+PUBTEST_COMMENT = "# The steps and plugin the suite runs with; the nightly moves the pin.\n"
 
 
 def _release(text: str) -> tuple[int, ...]:
@@ -698,11 +704,30 @@ def _release(text: str) -> tuple[int, ...]:
 
 
 def pubtest_floor() -> str:
-    """The least pubtest this pubrules' requirements-pubrules.txt takes
-    (`pubtest>=X`): a pin below it does not resolve with it."""
+    """The least pubtest this pubrules' steps need, as its
+    requirements-pubrules.txt says (`# pubtest floor: X`)."""
     text = (resources.files("pubrules") / "templates" / "common" / "tests" / "requirements-pubrules.txt"
             ).read_text(encoding="utf-8")
-    return re.search(r"^pubtest>=([0-9]+\.[0-9]+\.[0-9]+)$", text, re.M)[1]
+    return re.search(r"^# pubtest floor: ([0-9]+\.[0-9]+\.[0-9]+)$", text, re.M)[1]
+
+
+def _held(wheel: str) -> tuple[int, ...] | None:
+    """The release a pubtest wheel URL names, or None."""
+    m = re.search(r"/download/v([0-9]+\.[0-9]+\.[0-9]+)/", wheel)
+    return _release(m[1]) if m else None
+
+
+def is_pubtest(root: Path) -> bool:
+    """Whether the repository is pubtest itself: its pyproject.toml registers
+    the pubtest pytest plugin. Its suite runs on its own checkout, installed
+    editable; a pinned release beside it would be another distribution once
+    pubtest's is pubtestrules, and the two would share the package."""
+    import tomllib  # noqa: PLC0415
+    try:
+        project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {})
+    except (OSError, ValueError):
+        return False
+    return "pubtest" in project.get("entry-points", {}).get("pytest11", {})
 
 
 def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
@@ -712,25 +737,36 @@ def pubtest_pin(root: Path, check: bool) -> tuple[list[str], bool]:
     older one), else the latest release, where it pins none; `--check` fails
     instead. Lines to print, and whether that fails."""
     path = root / REQUIREMENTS
-    if not path.is_file() or PUBTEST_PIN.search(path.read_text(encoding="utf-8")):
+    if not path.is_file() or is_pubtest(root):
+        return [], False
+    text = path.read_text(encoding="utf-8")
+    floor = _release(pubtest_floor())
+    given = PUBTEST_PIN.search(text)
+    if given and (_held(given["wheel"]) or (0,)) >= floor:
         return [], False
     if check:
+        if given:
+            return [f"pubrules: {REQUIREMENTS} pins a pubtest older than the {pubtest_floor()} pubrules' "
+                    f"steps need; run `pubrules sync`, which pins the latest release"], True
         return [f"pubrules: {REQUIREMENTS} does not pin pubtest by its release wheel, which the lock needs "
                 f"(PyPI's pubtest is another project); run `pubrules sync`, which pins the one "
                 f"{LOCK.name} has, or the latest release"], True
+    if given:
+        # Too old: dropped, and pinned again below as if it had none.
+        before, after = text[:given.start()], text[given.end():].removeprefix("\n")
+        text = before.removesuffix(PUBTEST_COMMENT) + after
     lock = root / LOCK
     found = PUBTEST_PIN.search(lock.read_text(encoding="utf-8")) if lock.is_file() else None
-    held = re.search(r"/download/v([0-9]+\.[0-9]+\.[0-9]+)/", found["wheel"]) if found else None
-    if found and (held is None or _release(held[1]) < _release(pubtest_floor())):
+    if found and (_held(found["wheel"]) or (0,)) < floor:
         found = None
     if found:
         wheel = found["wheel"]
     else:
-        from .releases import WHEEL, version  # noqa: PLC0415
-        from .refs import OWNER  # noqa: PLC0415
-        wheel = WHEEL.format(owner=OWNER, name="pubtest", version=version("pubtest"))
-    text = path.read_text(encoding="utf-8")
-    pin = f"# The steps and plugin the suite runs with; the nightly moves the pin.\npubtest @ {wheel}\n"
+        from .releases import version, wheel_url  # noqa: PLC0415
+        wheel = wheel_url("pubtest", version("pubtest"))
+    from .nightly import distribution  # noqa: PLC0415
+    pin = (f"{PUBTEST_COMMENT}"
+           f"{distribution(wheel.rsplit('/', 1)[1])} @ {wheel}\n")
     included = re.search(r"^-r requirements-pubrules\.txt$", text, re.M)
     at = included.start() if included else len(text)
     path.write_text(text[:at] + ("" if text[:at].endswith("\n") or not at else "\n") + pin + text[at:],

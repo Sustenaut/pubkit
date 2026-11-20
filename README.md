@@ -18,7 +18,7 @@ The pytest plugin and the Gherkin steps every suite loads are
 ([GRAMMAR.md](https://github.com/Sustenaut/pubtest/blob/main/GRAMMAR.md)), a
 pytest-bdd plugin and an npm package for cucumber-js and quickpickle. The managed
 `tests/requirements-pubrules.txt` names the oldest pubtest whose steps pubrules' own
-files use (`pubtest>=X`), and each repository's `tests/requirements.txt` pins the
+files use (`# pubtest floor: X`, which `sync --check` holds the pin to), and each repository's `tests/requirements.txt` pins the
 release wheel, which its lock holds with its hash and the nightly moves to pubtest's
 latest release, so a pubtest release needs no pubrules release. `pubrules sync` pins
 the one the lock has where `tests/requirements.txt` pins none (`sync --check`

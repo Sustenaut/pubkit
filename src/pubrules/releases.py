@@ -14,7 +14,13 @@ GitHub release.
                   "pubsec": {"version": "0.3.0", "sha256": "..."}}}
 
 A version alone, or with the sha256 of its wheel (without it, the wheel is
-fetched and hashed).
+fetched and hashed) and the wheel's file name, where its distribution is
+named otherwise than its repository (pubtest's is pubtestrules):
+
+    {"releases": {"pubtest": {"version": "0.3.1",
+                              "wheel": "pubtestrules-0.3.1-py3-none-any.whl"}}}
+
+A release the release state does not list says itself what its wheel is called.
 """
 
 from __future__ import annotations
@@ -32,7 +38,9 @@ STATE = "PUBRULES_RELEASES"
 BLOCK = "releases"
 # The packages a pin of which pubrules writes, where a repository has none.
 PACKAGES = ("pubrel", "pubsec", "pubdeploy", "pubtest")
-WHEEL = "https://github.com/{owner}/{name}/releases/download/v{version}/{name}-{version}-py3-none-any.whl"
+# A release's wheel. Its file is named by the distribution, which may differ
+# from the repository (pubtest's is pubtestrules): wheel_url asks the release.
+WHEEL = "https://github.com/{owner}/{name}/releases/download/v{version}/{file}"
 RELEASE = re.compile(r"v?(?P<version>[0-9]+\.[0-9]+\.[0-9]+)")
 
 
@@ -53,9 +61,10 @@ def stated(name: str) -> dict[str, str] | None:
         entry = {"version": entry}
     if (not isinstance(entry, dict) or not isinstance(entry.get("version"), str)
             or not RELEASE.fullmatch(entry["version"])
-            or not isinstance(entry.get("sha256", ""), str)):
+            or not isinstance(entry.get("sha256", ""), str)
+            or not isinstance(entry.get("wheel", ""), str)):
         sys.exit(f'pubrules: {path}\'s {BLOCK}.{name} must be a version, such as "1.2.3", '
-                 f'or {{"version": "1.2.3", "sha256": "..."}}')
+                 f'or {{"version": "1.2.3", "sha256": "...", "wheel": "..."}}')
     return {**entry, "version": RELEASE.fullmatch(entry["version"])["version"]}
 
 
@@ -73,11 +82,24 @@ def version(name: str, owner: str = OWNER) -> str:
     return m["version"]
 
 
+def wheel_url(name: str, version: str, owner: str = OWNER) -> str:
+    """The URL of release `version` of `owner/name`'s wheel. Its file: the
+    release state's, where it lists that release with its wheel, else the
+    one the release carries; else (neither says) `name-version-py3-none-any.whl`."""
+    entry = stated(name) or {}
+    file = entry.get("wheel") if entry.get("version") == version else None
+    if not file:
+        from .nightly import release_wheel  # noqa: PLC0415
+        file = release_wheel(f"{owner}/{name}", version)
+    file = file or f"{name}-{version}-py3-none-any.whl"
+    return WHEEL.format(owner=owner, name=name, version=version, file=file)
+
+
 def wheel(name: str, owner: str = OWNER) -> dict[str, str]:
     """`name`'s release wheel to pin, as deploy.providers lists one."""
     entry = stated(name) or {}
     at = entry.get("version") or version(name, owner)
-    url = WHEEL.format(owner=owner, name=name, version=at)
+    url = wheel_url(name, at, owner)
     sha = entry.get("sha256")
     if not sha:
         from .cli import sha256_of  # noqa: PLC0415

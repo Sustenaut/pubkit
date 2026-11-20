@@ -1,0 +1,4 @@
+{
+  "category": "changed",
+  "change": "a release's wheel is pinned by the name the release gives it, which may differ from its repository (pubtest's PyPI name is pubtestrules): sync, new and the nightly read the file name from the release (or the release state's new `wheel` field) and name the requirement by its distribution; requirements-pubrules.txt no longer requires `pubtest>=X`, which would resolve PyPI's unrelated pubtest beside a pubtestrules pin, and `sync --check` instead fails on a pin older than that floor"
+}

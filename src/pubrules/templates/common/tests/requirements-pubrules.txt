@@ -6,9 +6,12 @@ pytest==9.0.3
 pytest-bdd==8.1.0
 pytest-xdist==3.8.0
 hypothesis==6.170.5
-# The steps and the pytest plugin every suite loads (pubtest's GRAMMAR.md), at
-# least the release whose steps pubrules' own files use. requirements.txt pins
-# the release wheel, which the nightly moves.
-pubtest>=0.2.2
+# The steps and the pytest plugin every suite loads (pubtest's GRAMMAR.md):
+# requirements.txt pins the release wheel, which the nightly moves, and
+# `pubrules sync --check` fails on one older than the release whose steps
+# pubrules' own files use. Not a requirement here: the wheel's distribution
+# is pubtest or, from its PyPI release on, pubtestrules, and a floor naming
+# the other would resolve PyPI's unrelated pubtest.
+# pubtest floor: 0.2.2
 pubrules @ https://github.com/Sustenaut/pubrules/releases/download/v{version}/pubrules-{version}-py3-none-any.whl
 {provider_requirements}
