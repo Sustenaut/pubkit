@@ -2,7 +2,7 @@
   "claims": {
     "identity": {
       "class": "archival",
-      "content": "pubrules 0.47.0 is released as v0.47.0 from commit 6da11a0f2cbed85c69e1f39e564cb30b33424438.",
+      "content": "pubrules 0.48.0 is released as v0.48.0 from commit 8eeac9c96b115814692d58dce004047f1c5f80c4.",
       "data": {
         "columns": [
           {
@@ -27,25 +27,25 @@
         "rows": [
           [
             "pubrules",
-            "0.47.0",
+            "0.48.0",
             "pubrules --version",
-            "pubrules 0.47.0",
-            "v0.47.0",
-            "6da11a0f2cbed85c69e1f39e564cb30b33424438"
+            "pubrules 0.48.0",
+            "v0.48.0",
+            "8eeac9c96b115814692d58dce004047f1c5f80c4"
           ]
         ]
       },
-      "scope": "the published release v0.47.0 of pubrules",
+      "scope": "the published release v0.48.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "6da11a0f2cbed85c69e1f39e564cb30b33424438"
+          "revision": "8eeac9c96b115814692d58dce004047f1c5f80c4"
         }
       ]
     },
     "release": {
       "class": "archival",
-      "content": "pubrules 0.47.0 was released on 2026-11-19 from commit 6da11a0f2cbed85c69e1f39e564cb30b33424438 with these changes.",
+      "content": "pubrules 0.48.0 was released on 2026-11-20 from commit 8eeac9c96b115814692d58dce004047f1c5f80c4 with these changes.",
       "data": {
         "columns": [
           {
@@ -57,36 +57,40 @@
         ],
         "rows": [
           [
-            "changed",
-            "pubrules holds no version of another package: the managed tests/requirements-pubrules.txt names pubtest as a floor (pubtest>=0.2.2) and each repository's tests/requirements.txt pins the wheel; pubrel, pubsec and pubdeploy are each repository's own pins (ci.release.pubrel, deploy.providers, or what the workflows and launchers already pin), which the nightly moves to their latest releases; where a repository has none yet, pubrules new, init and sync take the release the PUBRULES_RELEASES release-state file lists, or else the latest GitHub release"
-          ],
-          [
-            "changed",
-            "The reusable workflows install their apt packages (the apt-packages input, and the cross job's linker and emulator) through actions/apt-install, so a job whose packages and runner image an earlier run had installs them from the Actions cache without recommended packages; their uses of retry and terraform-init move to v0.46.0 with it, so terraform-init reads pubrules.json's provider mirror; job-service-tests and service-ci take apt-packages too, which a service's or content repository's ci block sets in with"
-          ],
-          [
             "fixed",
-            "The new Rust repository's .gitignore, and pubrules' own, ignore .venv as a link too, so pubrel 0.8's prepare, which links the checkout's .venv into its worktree, no longer commits it"
+            "sync, and so bump, pins pubtest in tests/requirements.txt from the lock only when the lock's is one requirements-pubrules.txt takes (pubtest>=0.2.2); a lock of an older pubrules gave pubtest 0.2.1, which no lock resolved, and now the release state's or latest release is pinned instead"
           ],
           [
-            "fixed",
-            "pubrules sync ignores .venv as a link too: a .gitignore line that ignores it only as a directory (.venv/, /.venv/) loses its slash where it stands (a wildcard such as */ or .*/ is left as it is), a .gitignore with none gets .venv under its comment, and sync --check fails until then, since pubrel 0.8's prepare links the checkout's .venv into its worktree and a release commit took the link"
+            "changed",
+            "pubrules' own suite runs on pubtest 0.3.0, its record/replay harness among it; the floor every suite's requirements-pubrules.txt names stays pubtest>=0.2.2, so a repository whose features still use a step 0.3.0 removed keeps 0.2.2 until it moves, and the nightly moves the rest"
+          ],
+          [
+            "internal",
+            "The nightly's provider scenarios no longer read GitHub's latest releases, which moved pubtest's pin once 0.3.0 was out and so locked once too often"
+          ],
+          [
+            "changed",
+            "a release's wheel is pinned by the name the release gives it, which may differ from its repository (pubtest's PyPI name is pubtestrules): sync, new and the nightly read the file name from the release (or the release state's new `wheel` field) and name the requirement by its distribution; requirements-pubrules.txt no longer requires `pubtest>=X`, which would resolve PyPI's unrelated pubtest beside a pubtestrules pin, and `sync --check` instead fails on a pin older than that floor"
+          ],
+          [
+            "changed",
+            "sync pins no pubtest in pubtest's own repository (its pyproject.toml registers the pubtest pytest plugin): its suite runs on its checkout, and a pinned release would be a second distribution of the same package once pubtest's is pubtestrules"
           ]
         ]
       },
       "depends": [
         "#identity"
       ],
-      "scope": "the published release v0.47.0 of pubrules",
+      "scope": "the published release v0.48.0 of pubrules",
       "sources": [
         {
           "ref": "pubrules",
-          "revision": "6da11a0f2cbed85c69e1f39e564cb30b33424438"
+          "revision": "8eeac9c96b115814692d58dce004047f1c5f80c4"
         }
       ]
     }
   },
-  "created": "2026-11-19T00:00:00Z",
+  "created": "2026-11-20T00:00:00Z",
   "sections": [
     {
       "heading": "Identity",
