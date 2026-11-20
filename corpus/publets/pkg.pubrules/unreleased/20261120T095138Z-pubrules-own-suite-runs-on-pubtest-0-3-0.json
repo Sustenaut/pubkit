@@ -1,4 +1,0 @@
-{
-  "category": "changed",
-  "change": "pubrules' own suite runs on pubtest 0.3.0, its record/replay harness among it; the floor every suite's requirements-pubrules.txt names stays pubtest>=0.2.2, so a repository whose features still use a step 0.3.0 removed keeps 0.2.2 until it moves, and the nightly moves the rest"
-}
