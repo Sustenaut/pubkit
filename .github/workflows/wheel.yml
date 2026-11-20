@@ -29,7 +29,11 @@ permissions:
 
 jobs:
   wheel:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Only a passing run of a push to main: a run on a pull request, even
+    # one from a branch named main, never reaches a job that can write.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -39,9 +43,10 @@ jobs:
       wheel: ${{ steps.attach.outputs.wheel }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # main as it is now, never the triggering run's commit: the version
+        # it holds names the tag the wheel is built from.
         with:
           persist-credentials: false
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.14' }
       - name: Attach the wheel to the release, if it has none

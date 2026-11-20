@@ -557,7 +557,11 @@ def own_wheel(own):
     wheel = yaml.safe_load((WORKFLOWS / "wheel.yml").read_text())
     trigger = wheel[True]["workflow_run"]
     assert (trigger["workflows"], trigger["branches"], trigger["types"]) == (["ci"], ["main"], ["completed"])
-    assert "github.event.workflow_run.conclusion == 'success'" in wheel["jobs"]["wheel"]["if"]
+    condition = wheel["jobs"]["wheel"]["if"]
+    assert "github.event.workflow_run.conclusion == 'success'" in condition
+    assert "github.event.workflow_run.event == 'push'" in condition
+    checkout = wheel["jobs"]["wheel"]["steps"][0]
+    assert "ref" not in checkout["with"], "a workflow_run job checks out main, not the run's commit"
     pypi = wheel["jobs"]["pypi"]
     assert pypi["needs"] == "wheel" and pypi["environment"] == "pypi"
     assert pypi["if"] == "needs.wheel.outputs.upload == 'true'"
