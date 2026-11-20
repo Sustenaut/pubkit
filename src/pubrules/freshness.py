@@ -18,11 +18,14 @@ from . import __version__
 from .refs import (ANY_OWNER, AT, PUBRULES_PIN, VERSION, owner_of, ref, release_commit, repin,
                    stale_pins)
 
-# pubrules's wheel in a lock: one group, the version, as pubfleet's board
-# reads it (PIN.findall).
-PIN = re.compile(r"/download/v([0-9][^/]*)/pubrules-")
-# pubrules's wheel, or pubkit's, which pubrules was called before 0.43.0.
-PACKAGE_PIN = re.compile(r"/download/v(?P<version>[0-9][^/]*)/(?P<package>pubrules|pubkit)-")
+# pubrules in a lock, by name (`pubrules==X`) or, as pubrules 0.48.0 and
+# before pinned it, by its release wheel: one group, the version, as
+# pubfleet's board reads it (PIN.findall).
+PIN = re.compile(r"(?:(?<=^pubrules==)|(?<=/download/v))([0-9][^/\s\\]*)(?=/pubrules-|[\s\\]|$)", re.M)
+# pubrules by name; or its release wheel, or pubkit's, which pubrules was
+# called before 0.43.0.
+PACKAGE_PIN = re.compile(r"^(?P<package>pubrules)==(?P<version>[0-9][^\s\\]*)", re.M)
+WHEEL_PACKAGE_PIN = re.compile(r"/download/v(?P<version>[0-9][^/]*)/(?P<package>pubrules|pubkit)-")
 WORKFLOW_PIN = re.compile(ANY_OWNER + r"(?P<path>pubrules/\.github/workflows/rust-ci\.yml@)"
                           + AT + VERSION)
 
@@ -33,7 +36,8 @@ def pinned_package(repo: Path) -> tuple[str, str] | None:
     lock = repo / "tests" / "requirements.lock"
     if not lock.is_file():
         return None
-    m = PACKAGE_PIN.search(lock.read_text(encoding="utf-8"))
+    text = lock.read_text(encoding="utf-8")
+    m = PACKAGE_PIN.search(text) or WHEEL_PACKAGE_PIN.search(text)
     return (m["package"], m["version"]) if m else None
 
 

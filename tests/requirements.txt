@@ -8,4 +8,4 @@ hypothesis==6.170.5
 PyYAML==6.0.3
 coverage==7.16.2
 # The steps and plugin the suite runs with, as every suite gets them.
-pubtest @ https://github.com/Sustenaut/pubtest/releases/download/v0.3.0/pubtest-0.3.0-py3-none-any.whl
+pubtestrules==0.4.0

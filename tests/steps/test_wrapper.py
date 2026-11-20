@@ -15,8 +15,8 @@ from pubrules import __version__
 
 scenarios("wrapper.feature")
 
-WHEEL = (f"https://github.com/Sustenaut/pubrules/releases/download/v{__version__}/"
-         f"pubrules-{__version__}-py3-none-any.whl")
+# This pubrules, by name: uvx takes it from PyPI.
+WHEEL = f"pubrules=={__version__}"
 
 FAKE_UVX = f"""#!{sys.executable}
 import json, os, sys
@@ -54,12 +54,12 @@ def run_without_uv(repo, run, tmp_path, command):
     return run(shutil.which("bash"), program, *args, cwd=repo, env={"PATH": str(empty)})
 
 
-@then(parsers.parse('"{path}" runs this pubrules\' release wheel'))
+@then(parsers.parse('"{path}" runs this pubrules from PyPI'))
 def pins(repo, path):
     assert f'uvx --from "{WHEEL}" pubrules "$@"' in (repo / path).read_text()
 
 
-@then(parsers.parse('uvx ran pubrules from this pubrules\' release wheel with "{args}"'))
+@then(parsers.parse('uvx ran this pubrules from PyPI with "{args}"'))
 def ran(uvx_log, args):
     assert json.loads(uvx_log.read_text())["args"] == ["--from", WHEEL, "pubrules", *args.split(" ")]
 

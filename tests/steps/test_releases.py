@@ -41,6 +41,24 @@ def release_state_bare(release_state, name, version):
     release_state.write_text(json.dumps(data))
 
 
+@given(parsers.parse('PyPI\'s newest release of "{name}" is "{version}"'))
+def pypi_release(pypi_pages, name, version):
+    """PyPI's JSON API answer for `name`."""
+    pypi_pages[f"https://pypi.org/pypi/{name}/json"] = json.dumps({"releases": {"0.4.0": [], version: [],
+                                                                         "0.5.0rc1": []}})
+
+
+@given(parsers.parse('pubrules.json\'s PyPI mirror lists "{a}" and "{b}"'))
+def pypi_mirror_lists(pypi_pages, repo, a, b):
+    """A PyPI mirror's simple index page for the files' package."""
+    name = a.split("-", 1)[0]
+    pypi_pages[f"https://storage.example/pypi/simple/{name}/"] = "".join(
+        f'<a href="../../f/{f}">{f}</a>\n' for f in (a, b))
+    config = json.loads((repo / "pubrules.json").read_text())
+    config["mirror"] = {"pypi": "https://storage.example/pypi"}
+    (repo / "pubrules.json").write_text(json.dumps(config))
+
+
 @given(parsers.parse('GitHub has no release of "{slug}"'))
 def no_release(monkeypatch, slug):
     monkeypatch.setattr(nightly, "latest_release", lambda repo: None)
@@ -87,8 +105,8 @@ def exits(code):
 
 @then("the pubtest tests/requirements.txt pins is one tests/requirements-pubrules.txt takes")
 def pin_meets_floor(repo):
-    """What `pubrules lock` needs to resolve: the wheel's release is at
+    """What `pubrules lock` needs to resolve: the pinned release is at
     least the pubtest floor the managed requirements-pubrules.txt names."""
-    pinned = re.search(r"pubtest/releases/download/v([0-9.]+)/", (repo / "tests/requirements.txt").read_text())[1]
-    floor = re.search(r"^# pubtest floor: ([0-9.]+)$", (repo / "tests/requirements-pubrules.txt").read_text(), re.M)[1]
+    pinned = re.search(r"^pubtestrules==([0-9.]+)$", (repo / "tests/requirements.txt").read_text(), re.M)[1]
+    floor = re.search(r"^pubtestrules>=([0-9.]+)$", (repo / "tests/requirements-pubrules.txt").read_text(), re.M)[1]
     assert tuple(map(int, pinned.split("."))) >= tuple(map(int, floor.split("."))), (pinned, floor)

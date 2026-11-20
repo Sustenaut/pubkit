@@ -433,19 +433,20 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
       | {"terraform": "https://storage.example/tf/"}   |
       | "https://storage.example/wheels"                |
 
-  Scenario: The launcher takes pubrules' own wheel from the mirror when GitHub fails, checked against the lock's sha256
-    Given pubrules.json's wheel mirror is "https://storage.example/wheels"
-    And a lock that pins this pubrules' wheel
-    When the launcher fetches pubrules with GitHub failing and the mirror giving "the wheel"
-    Then uvx is given the cached wheel
-    When the launcher fetches pubrules with GitHub failing and the mirror giving "another file"
-    Then the launcher stops with "is not the wheel tests/requirements.lock pins"
-
-  Scenario: Without a wheel mirror, the launcher is as it was
+  Scenario: The launcher runs pubrules from PyPI by name
     Given a scratch directory
     When pubrules renders the utility launcher for '{"kind": "utility"}'
-    Then the file "pubrules" runs uvx on this pubrules' GitHub release URL
+    Then the file "pubrules" runs uvx on this pubrules from PyPI
     And the file "pubrules" does not include "fetch()"
+    And the file "pubrules" does not include "releases/download"
+
+  Scenario: With a PyPI mirror, the launcher takes pubrules from its simple index when PyPI fails
+    Given pubrules.json's PyPI mirror is "https://storage.example/pypi"
+    When the launcher runs pubrules with PyPI giving it
+    Then uvx is given pubrules by name
+    When the launcher runs pubrules with PyPI failing
+    Then uvx is given pubrules by name from "https://storage.example/pypi/simple/"
+
   Scenario Outline: A Terraform init that fails is tried three times, then once from pubrules.json's provider mirror, by pubrules' terraform-init action
     When I read the workflows and actions pubrules ships
     Then the "<workflow>" init step runs actions/terraform-init at pubrules' own pin in the terraform-dir input, with "-backend=false -input=false" and the action's default pause

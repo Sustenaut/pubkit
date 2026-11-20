@@ -8,7 +8,7 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And the repository has "AGENTS.md", "pubrules.mk", "rust-toolchain.toml", "tests/requirements-pubrules.txt", "tests/requirements.txt", "tests/pytest.ini", "Makefile", ".github/workflows/pr.yml", ".github/workflows/main.yml", ".github/workflows/nightly.yml"
     And the file "Makefile" includes "DEMO_BIN_DIR"
-    And "tests/requirements-pubrules.txt" pins this pubrules' wheel
+    And "tests/requirements-pubrules.txt" pins this pubrules by name, and pubtest by its floor
 
   Scenario: every repository gets the managed AGENTS.md, with the draft and up-to-date rules
     Given an empty repository
@@ -243,13 +243,14 @@ Feature: Keeping a repository's shared files in step
     Then it succeeds
     And "tests/requirements.lock" pins "demo==1.0" with the hashes "aaaa", "bbbb" and the resolved file's
 
-  Scenario: lock refuses a pubtest an index gives, which is another project
+  Scenario: lock refuses a package named pubtest, which PyPI gives to another project
+    pubtest's distribution is pubtestrules.
     Given an empty repository
     And a package "pubtest" 1.0 whose index lists files hashed "aaaa" and "bbbb"
     And a file "tests/requirements.txt" holding "pubtest>=0.2.2"
     When I run pubrules "lock"
     Then it fails
-    And stderr mentions "tests/requirements.txt must pin pubtest by its release wheel"
+    And stderr mentions "pubtest is pubtestrules (`pubtestrules==X`)"
     And the file "tests/requirements.lock" does not exist
 
   Scenario: lock works where pip is not installed, as under uvx and ./pubrules

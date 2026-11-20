@@ -10,9 +10,10 @@ every other repository's reusable workflow a workflow pins at a release
 (a control plane's reusable workflow, say), to that repository's
 latest release, every Python package a requirements file or pyproject.toml
 pins by another repository's release wheel (`name @ https://github.com/OWNER/
-REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`, pubtest's in
-tests/requirements.txt among them) to that repository's latest release,
-forward only, with each `uv pip compile` lock made from a moved file
+REPO/releases/download/vX.Y.Z/name-X.Y.Z-....whl`) to that repository's
+latest release, every pub* package a requirements file pins by name
+(`name==X`, pubtestrules' in tests/requirements.txt among them) to its newest
+release on PyPI, or on the PyPI mirror, forward only, with each `uv pip compile` lock made from a moved file
 compiled again, and the crates `nightly.pins.crates` names in
 `Cargo.lock`, within their requirements.
 
@@ -442,6 +443,70 @@ def wheels_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Pa
     return moved_files
 
 
+# The pub* packages PyPI has, which a requirements file pins by name
+# (`name==X`): the nightly moves each to its newest release there.
+PUBLISHED = ("pubrules", "pubdeploy", "pubsec", "pubfleet", "pubhost", "pubtestrules", "pubdocrules")
+NAME_PIN = re.compile(r"^(?P<name>" + "|".join(PUBLISHED) + r")==(?P<version>[0-9]+\.[0-9]+\.[0-9]+)"
+                      r"(?=[ \t]*(?:#|;|\\|$))", re.M)
+def read_url(url: str) -> str:
+    """The body of an https GET of `url`."""
+    import urllib.request  # noqa: PLC0415
+    with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310 (https bases only)
+        return response.read().decode("utf-8")
+
+
+@functools.cache
+def pypi_latest(name: str, mirror: str = "") -> str | None:
+    """The newest X.Y.Z release of `name` on PyPI, from its JSON API, or from
+    the simple index of the PyPI mirror (mirror.pypi) where one is set; None,
+    with a warning, when neither says."""
+    from .cli import INDEX_JSON  # noqa: PLC0415
+    index = os.environ.get("PUBRULES_INDEX_JSON", INDEX_JSON).rstrip("/")
+    url = f"{mirror}/simple/{name}/" if mirror else f"{index}/{name}/json"
+    try:
+        body = read_url(url)
+        found = (re.findall(rf"{name}-([0-9]+\.[0-9]+\.[0-9]+)-py3-none-any\.whl", body) if mirror
+                 else [v for v in json.loads(body).get("releases", {}) if RELEASE_TAG.fullmatch(f"v{v}")])
+    except (OSError, ValueError):
+        found = []
+    if not found:
+        print(f"pubrules: warning: no release of {name} on {mirror or index} to read, so its pins stay",
+              file=sys.stderr)
+        return None
+    return max(found, key=release_key)
+
+
+def names_by_release(root: Path, skip: set[str], changes: list[str]) -> list[Path]:
+    """Each pub* package a requirements file pins by name (NAME_PIN) moved to
+    its newest release on PyPI, when that is newer. The moves said in
+    `changes`; the files moved returned. One whose newest release cannot be
+    read, or is not newer, stays."""
+    path = root / "pubrules.json"
+    config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    mirror = (config.get("mirror") or {}).get("pypi", "") if isinstance(config, dict) else ""
+    moved_files = []
+
+    def move(m: re.Match[str], rel: str) -> str:
+        if m["name"] in skip:
+            return m.group(0)
+        latest = pypi_latest(m["name"], mirror if isinstance(mirror, str) else "")
+        if latest is None or release_key(latest) <= release_key(m["version"]):
+            return m.group(0)
+        changes.append(f"{rel}: {m['name']} {m['version']} -> {latest}")
+        return f"{m['name']}=={latest}"
+
+    for path in wheel_files(root):
+        if path.name == "pyproject.toml":
+            continue
+        text = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        new = NAME_PIN.sub(lambda m, rel=rel: move(m, rel), text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+            moved_files.append(path)
+    return moved_files
+
+
 def launchers_by_release(root: Path, changes: list[str]) -> bool:
     """The pubsec or pubdeploy a managed launcher fetches where deploy.providers
     lists none (a service without a deploy block runs ./pubsec), moved to its
@@ -682,6 +747,7 @@ def pins(root: Path, pubrel: str, lock: bool = True) -> list[str]:
     # deploy.providers' wheels too: a hand-written requirement of one keeps up with
     # the providers entry its package's hook moved. pubrules' are sync's to write.
     wheels = wheels_by_release(root, {"pubrules"}, changes)
+    wheels += [p for p in names_by_release(root, {"pubrules"}, changes) if p not in wheels]
     if wheels and lock:
         from .cli import REQUIREMENTS, lock as lock_requirements  # noqa: PLC0415
         if (root / REQUIREMENTS).is_file():

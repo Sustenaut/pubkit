@@ -843,57 +843,42 @@ def mirror_read(pubtest_ctx, setting):
     pubtest_ctx.attempt(lambda: cli.values({"kind": "utility", "mirror": setting}))
 
 
-@given("a lock that pins this pubrules' wheel", target_fixture="repo_dir")
-def pinned_repo(tmp_path):
-    repo = tmp_path / "repo"
-    (repo / "tests").mkdir(parents=True)
-    digest = hashlib.sha256(b"the wheel").hexdigest()
-    (repo / "tests" / "requirements.lock").write_text(
-        f"pubrules @ {PUBRULES_URL} \\\n    --hash=sha256:{digest}\n{PYTEST_LINES}")
-    return repo
-
-
-@when(parsers.parse('the launcher fetches pubrules with GitHub failing and the mirror giving "{content}"'),
-      target_fixture="launched")
-def launch(tmp_path, repo_dir, mirror, content):
-    launcher = repo_dir / "pubrules"
-    launcher.write_text(cli.render(cli.templates("utility")["pubrules"], cli.values(_config(mirror))))
+@when(parsers.parse("the launcher runs pubrules with PyPI {giving}"), target_fixture="launched")
+def launch(tmp_path, pypi, giving):
+    launcher = tmp_path / "pubrules"
+    launcher.write_text(cli.render(cli.templates("utility")["pubrules"], cli.values(_config("", pypi))))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
-    (bin_dir / "curl").write_text(
-        '#!/bin/bash\nout=""; url=""\nwhile [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift 2;; -*) shift;; '
-        '*) url=$1; shift;; esac; done\necho "$url" >> "$ASKED"\n'
-        'case "$url" in https://github.com/*) exit 22;; esac\nprintf %s "$GIVES" > "$out"\n')
-    (bin_dir / "uvx").write_text('#!/bin/bash\necho "$@"\n')
-    for tool in ("curl", "uvx"):
-        (bin_dir / tool).chmod(0o755)
-    cache = tmp_path / f"cache-{content.replace(' ', '-')}"
-    asked = tmp_path / "asked"
-    done = subprocess.run(["bash", str(launcher), "--version"], capture_output=True, text=True, check=False,
-                          env={"PATH": f"{bin_dir}{os.pathsep}/usr/bin:/bin", "XDG_CACHE_HOME": str(cache),
-                               "GIVES": content, "ASKED": str(asked)})
-    return {"code": done.returncode, "stdout": done.stdout, "stderr": done.stderr, "cache": cache,
-            "asked": asked.read_text().split()}
+    # uv: each run's arguments, one line each; the try that reads PyPI (no
+    # --index-url) fails when PyPI does.
+    (bin_dir / "uvx").write_text(
+        '#!/bin/bash\necho "$*" >> "$ASKED"\n'
+        'case " $* " in *" --index-url "*) ;; *) [ "$FAILS" = 1 ] && exit 1;; esac\nexit 0\n')
+    (bin_dir / "uvx").chmod(0o755)
+    asked = tmp_path / f"asked-{giving.replace(' ', '-')}"
+    done = subprocess.run(["bash", str(launcher), "sync"], capture_output=True, text=True, check=False,
+                          env={"PATH": f"{bin_dir}{os.pathsep}/usr/bin:/bin", "ASKED": str(asked),
+                               "FAILS": "1" if giving == "failing" else "0"})
+    return {"code": done.returncode, "stderr": done.stderr, "asked": asked.read_text().splitlines()}
 
 
-@then("uvx is given the cached wheel")
-def uvx_cached(launched, mirror):
-    digest = hashlib.sha256(b"the wheel").hexdigest()
-    held = launched["cache"] / "pubrules" / "wheels" / digest / PUBRULES_WHEEL
-    assert launched["code"] == 0 and launched["stdout"].split() == ["--from", str(held), "pubrules", "--version"], launched
-    assert launched["asked"] == [PUBRULES_URL, f"{mirror}/f/{digest}/{PUBRULES_WHEEL}"]
+@then("uvx is given pubrules by name")
+def uvx_by_name(launched):
+    assert launched["code"] == 0, launched
+    assert launched["asked"][-1] == f"--from pubrules=={__version__} pubrules sync", launched
 
 
-@then(parsers.parse('the launcher stops with "{message}"'))
-def launcher_stops(launched, message):
-    assert launched["code"] == 1 and message in launched["stderr"], launched
+@then(parsers.parse('uvx is given pubrules by name from "{index}"'))
+def uvx_from_mirror(launched, index):
+    assert launched["code"] == 0, launched
+    assert launched["asked"][-1] == f"--from pubrules=={__version__} --index-url {index} pubrules sync", launched
 
 
-@then(parsers.parse('the file "{path}" runs uvx on this pubrules\' GitHub release URL'))
+@then(parsers.parse('the file "{path}" runs uvx on this pubrules from PyPI'))
 def launcher_plain(pubtest_ctx, path):
     from pubtest.steps.files import at  # noqa: PLC0415
     text = at(pubtest_ctx, path).read_text()
-    assert f'exec uvx --from "{PUBRULES_URL}" pubrules "$@"' in text, text
+    assert f'exec uvx --from "pubrules=={__version__}" pubrules "$@"' in text, text
 
 
 def _steps(shipped, workflow):

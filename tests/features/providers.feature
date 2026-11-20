@@ -56,7 +56,7 @@ Feature: What sync and bump do for a deploy, now that the walk is pubdeploy's
     Given a scratch directory
     When pubrules renders the utility launcher for '{}'
     Then the file "pubrules" does not include "provider"
-    And the file "pubrules" includes "py3-none-any.whl" pubrules "$@""
+    And the file "pubrules" includes "exec uvx --from "pubrules=="
 
   Scenario: Sync lists pubsec and pubdeploy in deploy providers and check fails without them
     Given a repository with a deploy block
