@@ -548,13 +548,24 @@ def own_scan(own):
     assert passes("push", "success")
 
 
-@then("its wheel job runs only on a push to main")
+@then("its wheel is built by wheel.yml, after a passing run of ci on main, and uploaded to PyPI only when attached")
 def own_wheel(own):
     # The release itself tags from a push to main alone: pubrel's
-    # release.yml runs `pubrel tag` only then. The wheel is pubrules' own.
-    condition = own["jobs"]["wheel"]["if"]
-    assert "github.event_name == 'push'" in condition
-    assert "github.ref == 'refs/heads/main'" in condition
+    # release.yml runs `pubrel tag` only then. The wheel is pubrules' own,
+    # in a workflow of its own: PyPI's trusted publisher names it.
+    assert "wheel" not in own["jobs"]
+    wheel = yaml.safe_load((WORKFLOWS / "wheel.yml").read_text())
+    trigger = wheel[True]["workflow_run"]
+    assert (trigger["workflows"], trigger["branches"], trigger["types"]) == (["ci"], ["main"], ["completed"])
+    condition = wheel["jobs"]["wheel"]["if"]
+    assert "github.event.workflow_run.conclusion == 'success'" in condition
+    assert "github.event.workflow_run.event == 'push'" in condition
+    checkout = wheel["jobs"]["wheel"]["steps"][0]
+    assert "ref" not in checkout["with"], "a workflow_run job checks out main, not the run's commit"
+    pypi = wheel["jobs"]["pypi"]
+    assert pypi["needs"] == "wheel" and pypi["environment"] == "pypi"
+    assert pypi["if"] == "needs.wheel.outputs.upload == 'true'"
+    assert pypi["permissions"] == {"contents": "read", "id-token": "write"}
 
 
 @given(parsers.parse('the repository has the directories "{names}"'))

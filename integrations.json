@@ -35,6 +35,7 @@
       "plugin": "github.actions-oidc",
       "paths": [
         ".github/workflows/service-needs.yml",
+        ".github/workflows/wheel.yml",
         "src/pubrules/ci.py",
         "src/pubrules/service_needs.py"
       ],
@@ -51,8 +52,8 @@
     {
       "plugin": "github.repo-ops",
       "paths": [
-        ".github/workflows/ci.yml",
         ".github/workflows/job-tested.yml",
+        ".github/workflows/wheel.yml",
         "Makefile",
         "actions/pr-label/",
         "src/pubrules/nightly.py",

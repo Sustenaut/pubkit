@@ -128,9 +128,10 @@ jobs:
 
   # review is skipped on a push, and a job runs by default only when every
   # job before it, however far back, succeeded: without the condition, a
-  # push to main skips the release (and the wheel), so nothing is tagged.
+  # push to main skips the release, so nothing is tagged. wheel.yml attaches
+  # the wheel, and uploads it to PyPI, once main's run of this workflow passes.
   # On a pull request or in the merge queue it only reports the check:
-  # pubrel tags from a push to main alone, as the wheel is built. Where
+  # pubrel tags from a push to main alone. Where
   # the queue already passed the commit, its run of these jobs counts.
   release:
     needs: [passed, tested, cache-action]
@@ -144,34 +145,3 @@ jobs:
     secrets: { RELEASE_APP_ID: '${{ secrets.RELEASE_APP_ID }}', RELEASE_APP_KEY: '${{ secrets.RELEASE_APP_KEY }}' }
     permissions:
       contents: write
-
-  # Consumers lock the wheel by URL and sha256, so each release carries it.
-  # Built once, when the release appears, and never replaced, from the
-  # release's tag, with the commit the tag names in it as release-commit:
-  # `pubrules sync` pins pubrules' workflows to that commit (src/pubrules/refs.py)
-  # without asking the network.
-  wheel:
-    needs: release
-    if: >-
-      !cancelled() && needs.release.result == 'success'
-      && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: { python-version: '3.14' }
-      - run: |
-          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
-          wheel="pubrules-$version-py3-none-any.whl"
-          gh release view "v$version" >/dev/null 2>&1 || { echo "v$version is not released"; exit 0; }
-          gh release view "v$version" --json assets --jq '.assets[].name' | grep -qx "$wheel" && { echo "$wheel already attached"; exit 0; }
-          git fetch --quiet --depth 1 origin tag "v$version"
-          git checkout --quiet "v$version"
-          git rev-parse "v$version^{commit}" > src/pubrules/release-commit
-          python -m pip wheel --no-deps . -w dist
-          unzip -p "dist/$wheel" pubrules/release-commit | grep -qxE '[0-9a-f]{40}'
-          gh release upload "v$version" "dist/$wheel"
-        env:
-          GH_TOKEN: ${{ github.token }}
