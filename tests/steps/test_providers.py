@@ -197,9 +197,12 @@ def bumps(pubtest_ctx, repo, hooks):
 
 
 @when("the nightly moves the repository's pins", target_fixture="result")
-def nightly_pins(pubtest_ctx, repo, hooks):
-    from pubrules.nightly import pins  # noqa: PLC0415
-    pubtest_ctx.attempt(lambda: pins(repo, ""))
+def nightly_pins(pubtest_ctx, repo, hooks, monkeypatch):
+    from pubrules import nightly  # noqa: PLC0415
+    # Only the hooks move pins here: GitHub says no other release, so the
+    # wheels the repository pins (pubtest's) stay whatever has been released.
+    monkeypatch.setattr(nightly, "latest_release", lambda repo: None)
+    pubtest_ctx.attempt(lambda: nightly.pins(repo, ""))
     return pubtest_ctx.outcome
 
 

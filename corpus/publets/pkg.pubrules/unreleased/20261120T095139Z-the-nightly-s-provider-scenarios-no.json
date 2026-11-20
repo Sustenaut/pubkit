@@ -1,0 +1,4 @@
+{
+  "category": "internal",
+  "change": "The nightly's provider scenarios no longer read GitHub's latest releases, which moved pubtest's pin once 0.3.0 was out and so locked once too often"
+}
