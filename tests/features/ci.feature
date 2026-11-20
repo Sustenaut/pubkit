@@ -151,6 +151,18 @@ Feature: pubrules sync writes a repository's CI from pubrules.json, with no skip
     And in "pr.yml" the "browser" job is given "browser-test" "npm run test:browser"
     And in "pr.yml" the "test" job is given "coverage-report" "coverage/"
 
+  Scenario Outline: The scan is told where each language's coverage reports are
+    Given a <language> repository whose ci block is '{}'
+    When I run pubrules "sync"
+    Then it succeeds
+    And in "pr.yml" the "sonar" job is given "reports" "<reports>"
+
+    Examples:
+      | language | reports                                                                                  |
+      | Node     | sonar.javascript.lcov.reportPaths=*                                                      |
+      | Python   | sonar.python.coverage.reportPaths=*.xml sonar.javascript.lcov.reportPaths=lcov.info     |
+      | Rust     | sonar.rust.lcov.reportPaths=lcov.info sonar.python.coverage.reportPaths=*.xml            |
+
   Scenario Outline: The scan reads the code and the tests from where the repository keeps them
     Given a <language> repository whose ci block is '{}'
     And the repository has the directories "<directories>"

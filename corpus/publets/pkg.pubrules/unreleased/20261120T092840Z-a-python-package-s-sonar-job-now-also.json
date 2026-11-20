@@ -1,0 +1,4 @@
+{
+  "category": "fixed",
+  "change": "A Python package's sonar job now also gives SonarQube Cloud the JavaScript coverage in a lcov.info report, as a service's does, so a Python package with JavaScript code no longer needs a sonar-args path into the runner's temporary directory."
+}
